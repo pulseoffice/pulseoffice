@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <AvaloniaTestThreading>SerialAssembly</AvaloniaTestThreading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Shell/PulseOffice.Shell.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform/PulseOffice.Platform.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform.MacOS/PulseOffice.Platform.MacOS.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform.Linux/PulseOffice.Platform.Linux.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform.Windows/PulseOffice.Platform.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

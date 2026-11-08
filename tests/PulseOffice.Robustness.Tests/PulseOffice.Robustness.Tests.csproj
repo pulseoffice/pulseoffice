@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Presentations/PulseOffice.Presentations.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Rasterizing/PulseOffice.Formats.Rasterizing.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Localization/PulseOffice.Localization.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform/PulseOffice.Platform.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Exchange/PulseOffice.Exchange.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,48 @@
+namespace PulseOffice.UI.Icons;
+
+public sealed class CellIcons() : DictionaryIconCatalog(Shapes)
+{
+    private static readonly (string, string)[] Shapes =
+    [
+        ("ledger.sheet.insertRowsAbove", "M3 12h18 M3 16h18 M3 20h18 M12 2v7 M9 5l3-3 3 3"),
+        ("ledger.sheet.insertRowsBelow", "M3 4h18 M3 8h18 M3 12h18 M12 22v-7 M9 19l3 3 3-3"),
+        ("ledger.sheet.insertColumnsBefore", "M12 3v18 M16 3v18 M20 3v18 M2 12h7 M5 9l-3 3 3 3"),
+        ("ledger.sheet.insertColumnsAfter", "M4 3v18 M8 3v18 M12 3v18 M22 12h-7 M19 9l3 3-3 3"),
+        ("ledger.sheet.deleteRows", "M3 5h18 M3 10h18 M3 15h18 M15 20l6-6 M15 14l6 6"),
+        ("ledger.sheet.deleteColumns", "M5 3v18 M10 3v18 M15 3v18 M19 15l4 4 M19 19l4-4"),
+        ("ledger.cells.insert", "M4 4h16v16H4z M12 8v8 M8 12h8"),
+        ("ledger.cells.delete", "M4 4h16v16H4z M8 12h8"),
+        ("ledger.format.cells", "M3 5h18v14H3z M3 10h18 M9 5v14 M14 14l4 4 M18 14l-4 4"),
+        ("ledger.layout.rowHeight", "M4 6h16 M4 18h16 M12 8v8 M9 11l3-3 3 3 M9 15l3 3 3-3"),
+        ("ledger.layout.columnWidth", "M6 4v16 M18 4v16 M8 12h8 M11 9l-3 3 3 3 M13 9l3 3-3 3"),
+        ("ledger.format.optimalRowHeight", "M4 5h16 M4 19h16 M12 9v6 M9 12l3-3 3 3 M9 16l3 3 3-3 M4 12h4 M16 12h4"),
+        ("ledger.format.optimalColumnWidth", "M5 4v16 M19 4v16 M9 12h6 M12 9l-3 3 3 3 M12 15l3-3-3-3 M12 4v4 M12 16v4"),
+        ("ledger.layout.hideRows", "M3 6h18 M3 18h18 M7 12h10 M3 3l18 18"),
+        ("ledger.layout.hideColumns", "M6 3v18 M18 3v18 M12 7v10 M3 3l18 18"),
+        ("ledger.layout.showRows", "M3 5h18 M3 12h18 M3 19h18 M8 8l4 0 M8 15h8"),
+        ("ledger.layout.showColumns", "M5 3v18 M12 3v18 M19 3v18 M8 8v4 M15 8v8"),
+        ("ledger.merge.cells", "M3 6h18v12H3z M9 6v12 M15 6v12 M8 12h8 M11 9l-3 3 3 3 M13 9l3 3-3 3"),
+        ("ledger.merge.centre", "M3 6h18v12H3z M8 12h8 M11 9l-3 3 3 3 M13 9l3 3-3 3"),
+        ("ledger.merge.split", "M3 6h18v12H3z M12 6v12 M6 9l3 3-3 3 M18 9l-3 3 3 3"),
+        ("ledger.align.top", "M4 4h16 M12 20V8 M8 12l4-4 4 4"),
+        ("ledger.align.middle", "M4 12h16 M12 4v5 M12 15v5 M9 7l3-3 3 3 M9 17l3 3 3-3"),
+        ("ledger.align.bottom", "M4 20h16 M12 4v12 M8 12l4 4 4-4"),
+        ("ledger.align.justify", "M4 6h16 M4 10h16 M4 14h16 M4 18h16"),
+        ("ledger.print.downThenAcross", "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z M7 10v4 M10 16l4-7"),
+        ("ledger.print.acrossThenDown", "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z M10 7h4 M8 14l8-4"),
+        ("ledger.conditional.manage", "M4 5h16v14H4z M4 10h16 M4 15h16 M7 7.5h3 M7 12.5h5 M7 17.5h2 M15 12l2 2 3-4"),
+        ("ledger.align.fill", "M3 5v14 M21 5v14 M6 9h12 M6 15h12 M9 12h6"),
+        ("ledger.format.superscript", "M4 6l8 12 M12 6l-8 12 M16 9a2 2 0 1 1 4 0c0 1.5-4 2.5-4 4h4"),
+        ("ledger.format.subscript", "M4 6l8 12 M12 6l-8 12 M16 15a2 2 0 1 1 4 0c0 1.5-4 2.5-4 4h4"),
+        ("ledger.format.thousands", "M4 17h16 M6 13h3 M11 13h3 M16 13h3 M7 8h10"),
+        ("ledger.format.paintbrush", "M6 3h12v6H6z M12 9v4 M9 13h6v8H9z"),
+        ("ledger.clipboard.pasteSpecial", "M8 4h8v3H8z M6 5H4v16h9 M18 5h2v7 M15 15h6v6h-6z M18 15v6 M15 18h6"),
+        ("ledger.format.clear", "M5 18h14 M7 14L14 5l5 4-7 9z M9 9l5 4"),
+        ("ledger.fill.down", "M4 4h16 M12 7v10 M8 13l4 4 4-4 M4 20h16"),
+        ("ledger.fill.right", "M4 4v16 M7 12h10 M13 8l4 4-4 4 M20 4v16"),
+        ("ledger.fill.series", "M4 20h4v-4H4z M10 20h4v-8h-4z M16 20h4v-12h-4z"),
+        ("ledger.format.tableStyles", "M3 5h18v14H3z M3 10h18 M9 5v14 M15 5v14 M3 5h18v5H3z"),
+        ("ledger.format.theme", "M12 3a9 9 0 1 0 0 18 3 3 0 0 0 0-6 3 3 0 0 1 0-6 3 3 0 0 0 0-6z M8 8h.01 M16 8h.01 M16 16h.01"),
+        ("ledger.style.updateFromSelection", "M5 5h8v8H5z M17 5a4 4 0 1 1-4 4 M17 3v4h-4 M9 17h10 M9 21h6"),
+    ];
+}

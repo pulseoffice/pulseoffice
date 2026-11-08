@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>pulse-mcp</AssemblyName>
+    <RootNamespace>PulseOffice.Tools.McpClient</RootNamespace>
+  </PropertyGroup>
+
+</Project>

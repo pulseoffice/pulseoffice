@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <ProjectReference Include="../../src/PulseOffice.Presentations/PulseOffice.Presentations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Rasterizing/PulseOffice.Formats.Rasterizing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../PulseOffice.Typography.Tests/SyntheticFont.cs" Link="SyntheticFont.cs" />
+    <Compile Include="../PulseOffice.Formats.Odf.Tests/Odt/TextDocumentDescriber.cs" Link="TextDocumentDescriber.cs" />
+    <Compile Include="../PulseOffice.Formats.Odf.Tests/Odt/TextDocumentEssence.cs" Link="TextDocumentEssence.cs" />
+  </ItemGroup>
+
+</Project>

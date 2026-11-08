@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Data.PostgreSql/PulseOffice.Data.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Data.MySql/PulseOffice.Data.MySql.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Data.SqlServer/PulseOffice.Data.SqlServer.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Data.Sqlite/PulseOffice.Data.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Sheets.Queries/PulseOffice.Sheets.Queries.csproj" />
+  </ItemGroup>
+
+</Project>

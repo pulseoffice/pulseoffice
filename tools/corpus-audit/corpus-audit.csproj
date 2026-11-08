@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>corpus-audit</AssemblyName>
+    <RootNamespace>PulseOffice.Tools.CorpusAudit</RootNamespace>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Rasterizing/PulseOffice.Formats.Rasterizing.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <None Include="declared-features.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

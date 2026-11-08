@@ -1,0 +1,142 @@
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="docs/architecture.md" />
+    <File Path="docs/ledger-functions.md" />
+    <File Path="CLAUDE.md" />
+  </Folder>
+  <Folder Name="/src/Fondamenta/">
+    <Project Path="src/PulseOffice.Foundation/PulseOffice.Foundation.csproj" />
+    <Project Path="src/PulseOffice.Localization/PulseOffice.Localization.csproj" />
+    <Project Path="src/PulseOffice.Settings/PulseOffice.Settings.csproj" />
+    <Project Path="src/PulseOffice.Diagnostics/PulseOffice.Diagnostics.csproj" />
+    <Project Path="src/PulseOffice.Document/PulseOffice.Document.csproj" />
+    <Project Path="src/PulseOffice.Document.Data/PulseOffice.Document.Data.csproj" />
+    <Project Path="src/PulseOffice.Document.Commands/PulseOffice.Document.Commands.csproj" />
+    <Project Path="src/PulseOffice.Drawing/PulseOffice.Drawing.csproj" />
+    <Project Path="src/PulseOffice.Text/PulseOffice.Text.csproj" />
+    <Project Path="src/PulseOffice.Text.Rich/PulseOffice.Text.Rich.csproj" />
+    <Project Path="src/PulseOffice.Typography/PulseOffice.Typography.csproj" />
+    <Project Path="src/PulseOffice.Typography.Shaping/PulseOffice.Typography.Shaping.csproj" />
+    <Project Path="src/PulseOffice.Formulas/PulseOffice.Formulas.csproj" />
+    <Project Path="src/PulseOffice.Formulas.Editor/PulseOffice.Formulas.Editor.csproj" />
+    <Project Path="src/PulseOffice.Security/PulseOffice.Security.csproj" />
+    <Project Path="src/PulseOffice.Text.Spelling/PulseOffice.Text.Spelling.csproj" />
+    <Project Path="src/PulseOffice.Text.Spelling.Hunspell/PulseOffice.Text.Spelling.Hunspell.csproj" />
+    <Project Path="src/PulseOffice.Printing/PulseOffice.Printing.csproj" />
+    <Project Path="src/PulseOffice.Sheets.Printing/PulseOffice.Sheets.Printing.csproj" />
+    <Project Path="src/PulseOffice.Charts/PulseOffice.Charts.csproj" />
+    <Project Path="src/PulseOffice.Exchange/PulseOffice.Exchange.csproj" />
+  </Folder>
+  <Folder Name="/src/Moduli/">
+    <Project Path="src/PulseOffice.Sheets/PulseOffice.Sheets.csproj" />
+    <Project Path="src/PulseOffice.Sheets.Engine/PulseOffice.Sheets.Engine.csproj" />
+    <Project Path="src/PulseOffice.Sheets.Pivot/PulseOffice.Sheets.Pivot.csproj" />
+    <Project Path="src/PulseOffice.Sheets.Queries/PulseOffice.Sheets.Queries.csproj" />
+    <Project Path="src/PulseOffice.Documents/PulseOffice.Documents.csproj" />
+    <Project Path="src/PulseOffice.Presentations/PulseOffice.Presentations.csproj" />
+  </Folder>
+  <Folder Name="/src/Formati/">
+    <Project Path="src/PulseOffice.Formats/PulseOffice.Formats.csproj" />
+    <Project Path="src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <Project Path="src/PulseOffice.Formats.Package/PulseOffice.Formats.Package.csproj" />
+    <Project Path="src/PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <Project Path="src/PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <Project Path="src/PulseOffice.Formats.Pdf/PulseOffice.Formats.Pdf.csproj" />
+    <Project Path="src/PulseOffice.Formats.Rasterizing/PulseOffice.Formats.Rasterizing.csproj" />
+  </Folder>
+  <Folder Name="/src/Dati/">
+    <Project Path="src/PulseOffice.Data/PulseOffice.Data.csproj" />
+    <Project Path="src/PulseOffice.Remote/PulseOffice.Remote.csproj" />
+    <Project Path="src/PulseOffice.Remote.Cloud/PulseOffice.Remote.Cloud.csproj" />
+    <Project Path="src/PulseOffice.Remote.UI/PulseOffice.Remote.UI.csproj" />
+    <Project Path="src/PulseOffice.Data.Odbc/PulseOffice.Data.Odbc.csproj" />
+    <Project Path="src/PulseOffice.Data.SqlServer/PulseOffice.Data.SqlServer.csproj" />
+    <Project Path="src/PulseOffice.Data.PostgreSql/PulseOffice.Data.PostgreSql.csproj" />
+    <Project Path="src/PulseOffice.Data.MySql/PulseOffice.Data.MySql.csproj" />
+    <Project Path="src/PulseOffice.Data.Sqlite/PulseOffice.Data.Sqlite.csproj" />
+  </Folder>
+  <Folder Name="/src/Agente/">
+    <Project Path="src/PulseOffice.Agent/PulseOffice.Agent.csproj" />
+    <Project Path="src/PulseOffice.Agent.UI/PulseOffice.Agent.UI.csproj" />
+  </Folder>
+  <Folder Name="/src/Scripting/">
+    <Project Path="src/PulseOffice.Scripting/PulseOffice.Scripting.csproj" />
+    <Project Path="src/PulseOffice.Scripting.JavaScript/PulseOffice.Scripting.JavaScript.csproj" />
+    <Project Path="src/PulseOffice.Scripting.Python/PulseOffice.Scripting.Python.csproj" />
+    <Project Path="src/PulseOffice.Scripting.CPython/PulseOffice.Scripting.CPython.csproj" />
+    <Project Path="src/PulseOffice.Scripting.Editor/PulseOffice.Scripting.Editor.csproj" />
+  </Folder>
+  <Folder Name="/src/Interfaccia/">
+    <Project Path="src/PulseOffice.UI/PulseOffice.UI.csproj" />
+    <Project Path="src/PulseOffice.UI.Icons/PulseOffice.UI.Icons.csproj" />
+    <Project Path="src/PulseOffice.UI.Commands/PulseOffice.UI.Commands.csproj" />
+    <Project Path="src/PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <Project Path="src/PulseOffice.Data.UI/PulseOffice.Data.UI.csproj" />
+    <Project Path="src/PulseOffice.UI.Embedding/PulseOffice.UI.Embedding.csproj" />
+    <Project Path="src/PulseOffice.Drawing.Printing/PulseOffice.Drawing.Printing.csproj" />
+    <Project Path="src/PulseOffice.Shell/PulseOffice.Shell.csproj" />
+    <Project Path="src/PulseOffice.Sheets.UI/PulseOffice.Sheets.UI.csproj" />
+    <Project Path="src/PulseOffice.Documents.UI/PulseOffice.Documents.UI.csproj" />
+    <Project Path="src/PulseOffice.Presentations.UI/PulseOffice.Presentations.UI.csproj" />
+  </Folder>
+  <Folder Name="/src/Piattaforma/">
+    <Project Path="src/PulseOffice.Platform/PulseOffice.Platform.csproj" />
+    <Project Path="src/PulseOffice.Platform.Windows/PulseOffice.Platform.Windows.csproj" />
+    <Project Path="src/PulseOffice.Platform.MacOS/PulseOffice.Platform.MacOS.csproj" />
+    <Project Path="src/PulseOffice.Platform.Linux/PulseOffice.Platform.Linux.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/PulseOffice.Documents.Layout/PulseOffice.Documents.Layout.csproj" />
+    <Project Path="src/PulseOffice.Updates/PulseOffice.Updates.csproj" />
+  </Folder>
+  <Folder Name="/src/Applicazione/">
+    <Project Path="src/PulseOffice.Desktop/PulseOffice.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/mcp-client/PulseMcpClient.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PulseOffice.Agent.Tests/PulseOffice.Agent.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Localization.Tests/PulseOffice.Localization.Tests.csproj" />
+    <Project Path="tests/PulseOffice.UI.Tests/PulseOffice.UI.Tests.csproj" />
+    <Project Path="tests/PulseOffice.UI.Controls.Tests/PulseOffice.UI.Controls.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Shell.Tests/PulseOffice.Shell.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Desktop.Tests/PulseOffice.Desktop.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Desktop.Sweep.Tests/PulseOffice.Desktop.Sweep.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Robustness.Tests/PulseOffice.Robustness.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Remote.Tests/PulseOffice.Remote.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Architecture.Tests/PulseOffice.Architecture.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Document.Commands.Tests/PulseOffice.Document.Commands.Tests.csproj" />
+
+    <Project Path="tests/PulseOffice.Sheets.Engine.Tests/PulseOffice.Sheets.Engine.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Text.Tests/PulseOffice.Text.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Text.Rich.Tests/PulseOffice.Text.Rich.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Documents.Layout.Tests/PulseOffice.Documents.Layout.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Documents.Tests/PulseOffice.Documents.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Text.Spelling.Tests/PulseOffice.Text.Spelling.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Security.Tests/PulseOffice.Security.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Formulas.Tests/PulseOffice.Formulas.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Documents.UI.Tests/PulseOffice.Documents.UI.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Drawing.Tests/PulseOffice.Drawing.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Charts.Tests/PulseOffice.Charts.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Exchange.Tests/PulseOffice.Exchange.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Presentations.Tests/PulseOffice.Presentations.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Sheets.Queries.Tests/PulseOffice.Sheets.Queries.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Data.Tests/PulseOffice.Data.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Scripting.Tests/PulseOffice.Scripting.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Formats.Interchange.Tests/PulseOffice.Formats.Interchange.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Printing.Tests/PulseOffice.Printing.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Formats.Pdf.Tests/PulseOffice.Formats.Pdf.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Sheets.Printing.Tests/PulseOffice.Sheets.Printing.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Sheets.Pivot.Tests/PulseOffice.Sheets.Pivot.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Formats.Odf.Tests/PulseOffice.Formats.Odf.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Formats.OpenXml.Tests/PulseOffice.Formats.OpenXml.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Settings.Tests/PulseOffice.Settings.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Sheets.Tests/PulseOffice.Sheets.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Presentations.UI.Tests/PulseOffice.Presentations.UI.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Sheets.UI.Tests/PulseOffice.Sheets.UI.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Typography.Tests/PulseOffice.Typography.Tests.csproj" />
+    <Project Path="tests/PulseOffice.UI.Commands.Tests/PulseOffice.UI.Commands.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Updates.Tests/PulseOffice.Updates.Tests.csproj" />
+  </Folder>
+</Solution>

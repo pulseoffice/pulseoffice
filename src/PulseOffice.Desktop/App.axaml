@@ -1,0 +1,19 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:theming="clr-namespace:PulseOffice.UI.Controls.Theming;assembly=PulseOffice.UI.Controls"
+             x:Class="PulseOffice.Desktop.App"
+             Name="PulseOffice"
+             RequestedThemeVariant="Default">
+  <NativeMenu.Menu>
+    <NativeMenu>
+      <NativeMenuItem Header="PulseOffice" />
+      <NativeMenuItemSeparator />
+      <NativeMenuItem Header="PulseOffice" />
+    </NativeMenu>
+  </NativeMenu.Menu>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+    <theming:PulseTheme />
+  </Application.Styles>
+</Application>

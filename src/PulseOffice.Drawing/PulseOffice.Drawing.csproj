@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Foundation/PulseOffice.Foundation.csproj" />
+    <ProjectReference Include="../PulseOffice.Document/PulseOffice.Document.csproj" />
+    <ProjectReference Include="../PulseOffice.Text.Rich/PulseOffice.Text.Rich.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Shapes/Geometry/PresetShapeDefinitions.xml" LogicalName="PulseOffice.Drawing.PresetShapeDefinitions.xml" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Foundation/PulseOffice.Foundation.csproj" />
+    <ProjectReference Include="../PulseOffice.Document/PulseOffice.Document.csproj" />
+    <ProjectReference Include="../PulseOffice.Platform/PulseOffice.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PulseOffice.Typography.Tests" />
+  </ItemGroup>
+
+</Project>

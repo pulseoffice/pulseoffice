@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <EnableDefaultAvaloniaItems>true</EnableDefaultAvaloniaItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PulseOffice.Sheets.UI.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Formats/PulseOffice.Formats.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <ProjectReference Include="../PulseOffice.Localization/PulseOffice.Localization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Shell/PulseOffice.Shell.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.Formulas.Editor/PulseOffice.Formulas.Editor.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets/PulseOffice.Sheets.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Engine/PulseOffice.Sheets.Engine.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Printing/PulseOffice.Sheets.Printing.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Pivot/PulseOffice.Sheets.Pivot.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Queries/PulseOffice.Sheets.Queries.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.Sqlite/PulseOffice.Data.Sqlite.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Pdf/PulseOffice.Formats.Pdf.csproj" />
+    <ProjectReference Include="../PulseOffice.Platform/PulseOffice.Platform.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.UI/PulseOffice.Data.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting.Editor/PulseOffice.Scripting.Editor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Text.Spelling/PulseOffice.Text.Spelling.csproj" />
+    <ProjectReference Include="../PulseOffice.Remote.UI/PulseOffice.Remote.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+  </ItemGroup>
+
+</Project>

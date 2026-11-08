@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Foundation/PulseOffice.Foundation.csproj" />
+    <ProjectReference Include="../PulseOffice.Document/PulseOffice.Document.csproj" />
+    <ProjectReference Include="../PulseOffice.Drawing/PulseOffice.Drawing.csproj" />
+  </ItemGroup>
+
+</Project>

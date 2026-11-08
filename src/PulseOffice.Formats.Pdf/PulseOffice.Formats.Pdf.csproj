@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Formats/PulseOffice.Formats.csproj" />
+    <ProjectReference Include="../PulseOffice.Printing/PulseOffice.Printing.csproj" />
+    <ProjectReference Include="../PulseOffice.Drawing/PulseOffice.Drawing.csproj" />
+    <ProjectReference Include="../PulseOffice.Text/PulseOffice.Text.csproj" />
+    <ProjectReference Include="../PulseOffice.Typography/PulseOffice.Typography.csproj" />
+    <ProjectReference Include="../PulseOffice.Typography.Shaping/PulseOffice.Typography.Shaping.csproj" />
+    <ProjectReference Include="../PulseOffice.Security/PulseOffice.Security.csproj" />
+  </ItemGroup>
+
+</Project>

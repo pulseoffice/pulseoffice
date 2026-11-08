@@ -1,0 +1,249 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"dotnet.defaultSolution": "PulseOffice.slnx",
+		"omnisharp.defaultLaunchSolution": "PulseOffice.slnx",
+		"files.exclude": {
+			"**/bin": true,
+			"**/obj": true
+		},
+		"search.exclude": {
+			"**/bin": true,
+			"**/obj": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-dotnettools.csdevkit",
+			"ms-dotnettools.csharp"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				// Si avvia l'**eseguibile nativo**, non la dll: lanciare la dll passa da
+				// `dotnet`, che VS Code non trova quando parte dal Finder senza il PATH
+				// della shell. L'apphost non ha questo problema.
+				// L'assembly si chiama PulseOffice, non PulseOffice.Desktop: il progetto
+				// imposta <AssemblyName>. Puntare al nome del progetto non troverebbe nulla.
+				"name": "PulseOffice — avvia",
+				"type": "coreclr",
+				"request": "launch",
+				"preLaunchTask": "PulseOffice: compila",
+				"program": "${workspaceFolder}/src/PulseOffice.Desktop/bin/Debug/net10.0/PulseOffice",
+				"windows": {
+					"program": "${workspaceFolder}/src/PulseOffice.Desktop/bin/Debug/net10.0/PulseOffice.exe"
+				},
+				"args": [],
+				"cwd": "${workspaceFolder}/src/PulseOffice.Desktop",
+				"console": "internalConsole",
+				"stopAtEntry": false
+			},
+			{
+				// In Debug la registrazione scrive anche su console (LogOptions.WriteToConsole):
+				// col terminale integrato si vedono i momenti dell'avvio mentre accadono,
+				// che è ciò che serve quando la finestra non compare.
+				"name": "PulseOffice — avvia con log sul terminale",
+				"type": "coreclr",
+				"request": "launch",
+				"preLaunchTask": "PulseOffice: compila",
+				"program": "${workspaceFolder}/src/PulseOffice.Desktop/bin/Debug/net10.0/PulseOffice",
+				"windows": {
+					"program": "${workspaceFolder}/src/PulseOffice.Desktop/bin/Debug/net10.0/PulseOffice.exe"
+				},
+				"args": [],
+				"cwd": "${workspaceFolder}/src/PulseOffice.Desktop",
+				"console": "integratedTerminal",
+				"stopAtEntry": false
+			},
+			{
+				"name": "PulseOffice — collega a processo in esecuzione",
+				"type": "coreclr",
+				"request": "attach",
+				"processName": "PulseOffice"
+			}
+		],
+		"compounds": []
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "PulseOffice: compila",
+				// Il nome non è "build" di proposito: C# Dev Kit contribuisce una sua
+				// attività con quel nome, e preLaunchTask finiva per eseguire quella
+				// invece di questa — con l'ambiente dell'estensione, non il nostro.
+				"detail": "Compila l'intera soluzione",
+				"command": "dotnet",
+				"type": "process",
+				"options": {
+					"env": {
+						"PATH": "${env:PATH}"
+					}
+				},
+				"osx": {
+					// Percorso assoluto, non "dotnet": con `type: process` VSCode risolve il
+					// comando col **proprio** ambiente, prima di applicare options.env, e
+					// avviato dal Finder non ha il PATH della shell. Allargare il PATH qui
+					// sotto serve ai processi figli (MSBuild), non a trovare l'eseguibile.
+					"command": "/usr/local/share/dotnet/dotnet",
+					"options": {
+						"env": {
+							"PATH": "/usr/local/share/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+				"linux": {
+					"options": {
+						"env": {
+							"PATH": "/usr/share/dotnet:/usr/lib/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+
+				"args": [
+					"build",
+					"${workspaceFolder}/PulseOffice.slnx",
+					"-v",
+					"quiet",
+					"--nologo"
+				],
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "PulseOffice: avvia",
+				"detail": "Avvia l'app senza debugger",
+				"command": "dotnet",
+				"type": "process",
+				"options": {
+					"env": {
+						"PATH": "${env:PATH}"
+					}
+				},
+				"osx": {
+					// Percorso assoluto, non "dotnet": con `type: process` VSCode risolve il
+					// comando col **proprio** ambiente, prima di applicare options.env, e
+					// avviato dal Finder non ha il PATH della shell. Allargare il PATH qui
+					// sotto serve ai processi figli (MSBuild), non a trovare l'eseguibile.
+					"command": "/usr/local/share/dotnet/dotnet",
+					"options": {
+						"env": {
+							"PATH": "/usr/local/share/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+				"linux": {
+					"options": {
+						"env": {
+							"PATH": "/usr/share/dotnet:/usr/lib/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+
+				"args": [
+					"run",
+					"--project",
+					"${workspaceFolder}/src/PulseOffice.Desktop"
+				],
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "PulseOffice: avvia in ricompilazione continua",
+				"detail": "Riavvia l'app a ogni modifica del sorgente",
+				"command": "dotnet",
+				"type": "process",
+				"options": {
+					"env": {
+						"PATH": "${env:PATH}"
+					}
+				},
+				"osx": {
+					// Percorso assoluto, non "dotnet": con `type: process` VSCode risolve il
+					// comando col **proprio** ambiente, prima di applicare options.env, e
+					// avviato dal Finder non ha il PATH della shell. Allargare il PATH qui
+					// sotto serve ai processi figli (MSBuild), non a trovare l'eseguibile.
+					"command": "/usr/local/share/dotnet/dotnet",
+					"options": {
+						"env": {
+							"PATH": "/usr/local/share/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+				"linux": {
+					"options": {
+						"env": {
+							"PATH": "/usr/share/dotnet:/usr/lib/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+
+				"args": [
+					"watch",
+					"run",
+					"--project",
+					"${workspaceFolder}/src/PulseOffice.Desktop"
+				],
+				"isBackground": true,
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "PulseOffice: test",
+				"detail": "Esegue tutti i test della soluzione",
+				"command": "dotnet",
+				"type": "process",
+				"options": {
+					"env": {
+						"PATH": "${env:PATH}"
+					}
+				},
+				"osx": {
+					// Percorso assoluto, non "dotnet": con `type: process` VSCode risolve il
+					// comando col **proprio** ambiente, prima di applicare options.env, e
+					// avviato dal Finder non ha il PATH della shell. Allargare il PATH qui
+					// sotto serve ai processi figli (MSBuild), non a trovare l'eseguibile.
+					"command": "/usr/local/share/dotnet/dotnet",
+					"options": {
+						"env": {
+							"PATH": "/usr/local/share/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+				"linux": {
+					"options": {
+						"env": {
+							"PATH": "/usr/share/dotnet:/usr/lib/dotnet:${env:HOME}/.dotnet:${env:PATH}"
+						}
+					}
+				},
+
+				"args": [
+					"test",
+					"${workspaceFolder}/PulseOffice.slnx",
+					"--nologo"
+				],
+				"group": {
+					"kind": "test",
+					"isDefault": true
+				},
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "PulseOffice: log — segui il file",
+				"detail": "Mostra il registro dell'app mentre viene scritto (macOS e Linux)",
+				"type": "shell",
+				"command": "tail -f \"$HOME/Library/Logs/PulseOffice/\"*.log 2>/dev/null || tail -f \"$HOME/.local/share/PulseOffice/logs/\"*.log",
+				"isBackground": true,
+				"problemMatcher": []
+			}
+		]
+	}
+}

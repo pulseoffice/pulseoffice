@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Foundation/PulseOffice.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Data/autocorrect/**/*" Link="autocorrect/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Data/autocorrect-pulseoffice/**/*" Link="autocorrect-pulseoffice/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

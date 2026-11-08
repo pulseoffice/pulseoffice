@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="IronPython" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Scripting/PulseOffice.Scripting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PulseOffice.Scripting.Tests" />
+  </ItemGroup>
+
+</Project>

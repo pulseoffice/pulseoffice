@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <EnableDefaultAvaloniaItems>true</EnableDefaultAvaloniaItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <ProjectReference Include="../PulseOffice.UI.Icons/PulseOffice.UI.Icons.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Document.Commands/PulseOffice.Document.Commands.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Commands/PulseOffice.UI.Commands.csproj" />
+    <ProjectReference Include="../PulseOffice.Settings/PulseOffice.Settings.csproj" />
+    <ProjectReference Include="../PulseOffice.Updates/PulseOffice.Updates.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats/PulseOffice.Formats.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Pdf/PulseOffice.Formats.Pdf.csproj" />
+    <ProjectReference Include="../PulseOffice.Security/PulseOffice.Security.csproj" />
+  </ItemGroup>
+
+</Project>

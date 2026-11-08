@@ -1,0 +1,15 @@
+PulseOffice autocorrect lists
+============================
+
+The files <language>.json in this folder are derived from LibreOffice,
+https://www.libreoffice.org, path extras/source/autocorr/lang/<language>/
+(DocumentList.xml, SentenceExceptList.xml, WordExceptList.xml).
+
+They are distributed under the Mozilla Public License, version 2.0; the full
+text is in LICENSE-MPL-2.0.txt next to this notice. The source form of these
+files is the LibreOffice repository named above.
+
+Modifications: the block-list XML of each language was converted, without
+changing entries, into one JSON document per language with the keys
+"replacements", "sentenceExceptions" and "wordExceptions". The conversion is
+reproducible with tools/import-autocorrect/import-autocorrect.py.

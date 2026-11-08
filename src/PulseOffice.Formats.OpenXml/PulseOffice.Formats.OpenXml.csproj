@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Formats/PulseOffice.Formats.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Package/PulseOffice.Formats.Package.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets/PulseOffice.Sheets.csproj" />
+    <ProjectReference Include="../PulseOffice.Charts/PulseOffice.Charts.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Engine/PulseOffice.Sheets.Engine.csproj" />
+    <ProjectReference Include="../PulseOffice.Documents/PulseOffice.Documents.csproj" />
+    <ProjectReference Include="../PulseOffice.Presentations/PulseOffice.Presentations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Formulas/PulseOffice.Formulas.csproj" />
+    <ProjectReference Include="../PulseOffice.Typography/PulseOffice.Typography.csproj" />
+  </ItemGroup>
+
+</Project>

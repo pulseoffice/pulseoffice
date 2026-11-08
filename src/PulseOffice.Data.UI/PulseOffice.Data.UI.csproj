@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <EnableDefaultAvaloniaItems>true</EnableDefaultAvaloniaItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.Localization/PulseOffice.Localization.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Icons/PulseOffice.UI.Icons.csproj" />
+    <ProjectReference Include="../PulseOffice.Document.Data/PulseOffice.Document.Data.csproj" />
+  </ItemGroup>
+
+</Project>

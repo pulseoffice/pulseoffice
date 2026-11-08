@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Documents.Layout/PulseOffice.Documents.Layout.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Typography/PulseOffice.Typography.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Platform/PulseOffice.Platform.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

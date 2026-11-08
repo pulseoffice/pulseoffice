@@ -1,0 +1,17 @@
+{
+ "format": "pulseoffice.autocorrect",
+ "version": 1,
+ "language": "it",
+ "source": "PulseOffice",
+ "license": "PulseOffice",
+ "replacements": {
+  "qual'è": "qual è",
+  "pò": "po'",
+  "sopratutto": "soprattutto",
+  "propio": "proprio",
+  "efficenza": "efficienza",
+  "sufficente": "sufficiente"
+ },
+ "sentenceExceptions": [],
+ "wordExceptions": []
+}

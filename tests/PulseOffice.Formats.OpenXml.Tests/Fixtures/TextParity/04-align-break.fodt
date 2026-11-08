@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text">
+ <office:font-face-decls><style:font-face style:name="Liberation Serif" svg:font-family="'Liberation Serif'"/></office:font-face-decls>
+ <office:styles>
+  <style:default-style style:family="paragraph"><style:paragraph-properties fo:orphans="2" fo:widows="2" style:tab-stop-distance="1.25cm"/><style:text-properties style:font-name="Liberation Serif" fo:font-size="12pt" fo:language="zxx" style:language-asian="zxx" style:language-complex="zxx" fo:hyphenate="false"/></style:default-style>
+  <style:style style:name="Standard" style:family="paragraph"/>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm"/></style:page-layout>
+  <style:style style:name="C" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-size="14pt"/></style:style>
+  <style:style style:name="R" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="end"/></style:style>
+  <style:style style:name="BR" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:break-before="page"/></style:style>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"/></office:master-styles>
+ <office:body><office:text>
+  <text:p text:style-name="C">Quella modello con per testo questo struttura riga margine impaginazione. Struttura non numero forma ordine numero struttura margine misura lavoro il che sempre lavoro programma margine. Prova testo che non la spazio libreria. Confronto lettera margine come programma ordine libreria questo documento esempio il.</text:p>
+  <text:p text:style-name="R">Forma ordine sistema numero riga molto quella lavoro di per risultato di sono. Margine poco pagina ancora valore margine anche spazio che. Per come carattere anche valore di la riga ordine margine come. Di sono lettera libreria di programma non.</text:p>
+  <text:p text:style-name="BR">Impaginazione questo quella molto non ancora quella per numero. Anche per anche risultato margine sempre come margine sistema esempio una margine il tempo. Di valore la quella lettera il ancora programma stile impaginazione. Impaginazione forma sono anche margine spazio una ordine di testo impaginazione paragrafo impaginazione riga. Una struttura ordine questo numero stile lettera testo non confronto non sempre modello spazio programma libreria modello sistema.</text:p>
+  <text:p text:style-name="Standard">Carattere pagina tempo ordine carattere sistema come testo stile lavoro sistema con sono ordine che. Numero programma carattere documento misura libreria margine quella carattere molto forma la. Questo spazio esempio struttura libreria quella risultato testo quella margine.</text:p>
+ </office:text></office:body>
+</office:document>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <AvaloniaTestThreading>NoAvaloniaObjects</AvaloniaTestThreading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Remote/PulseOffice.Remote.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Remote.Cloud/PulseOffice.Remote.Cloud.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Remote.UI/PulseOffice.Remote.UI.csproj" />
+  </ItemGroup>
+
+</Project>

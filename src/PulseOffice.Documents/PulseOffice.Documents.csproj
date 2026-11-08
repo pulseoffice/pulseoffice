@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Document/PulseOffice.Document.csproj" />
+    <ProjectReference Include="../PulseOffice.Document.Commands/PulseOffice.Document.Commands.csproj" />
+    <ProjectReference Include="../PulseOffice.Drawing/PulseOffice.Drawing.csproj" />
+    <ProjectReference Include="../PulseOffice.Security/PulseOffice.Security.csproj" />
+    <ProjectReference Include="../PulseOffice.Text/PulseOffice.Text.csproj" />
+    <ProjectReference Include="../PulseOffice.Text.Rich/PulseOffice.Text.Rich.csproj" />
+  </ItemGroup>
+
+</Project>

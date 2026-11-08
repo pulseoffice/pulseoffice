@@ -1,0 +1,71 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]64/
+artifacts/
+publish/
+*.user
+*.userosscache
+*.suo
+*.dbmdl
+project.lock.json
+project.fragment.lock.json
+.packages/
+*.nuget.props
+*.nuget.targets
+
+## Test e copertura
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.trx
+BenchmarkDotNet.Artifacts/
+
+## IDE
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.swp
+*.sln.docstates
+*.DotSettings.user
+
+## Avalonia
+*.axaml.g.cs
+*.g.cs
+!Directory.Build.props
+
+## Sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*~
+
+## PulseOffice
+# Documenti di prova per i test di round-trip sui formati
+tests/**/fixtures/local/
+*.odt.bak
+*.ods.bak
+*.odp.bak
+# Profili utente generati in fase di sviluppo
+.pulseoffice-profile/
+tools/uiprobe/click
+tools/uiprobe/drag
+tools/uiprobe/keys
+tools/uiprobe/windowshot
+tools/uiprobe/topmost
+
+.claude/worktrees/

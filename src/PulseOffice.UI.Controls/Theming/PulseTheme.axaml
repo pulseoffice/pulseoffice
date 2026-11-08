@@ -1,0 +1,786 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PulseOffice.UI.Controls.Theming.PulseTheme">
+
+
+
+
+  <Style Selector=":is(Button)">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseAccent}" CornerRadius="4" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="MenuItem, CheckBox, RadioButton, ToggleSwitch, ComboBox, Slider">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseAccent}" CornerRadius="4" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="26" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseFieldBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource PulseAccentSubtle}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="TextBox /template/ Border#PART_BorderElement">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+  <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+
+  <Style Selector="TextBox.measure /template/ Border#PART_BorderElement">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBox.measure">
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+  </Style>
+  <Style Selector="TextBox.measure:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBox.measure:focus-within /template/ Border#PART_BorderElement">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Border.measureFrame">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseFieldBorder}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.measureFrame:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+  <Style Selector="Border.measureFrame:focus-within">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="26" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseFieldBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ComboBox:not(:disabled) /template/ PathIcon#DropDownGlyph, ComboBox:disabled /template/ PathIcon#DropDownGlyph">
+    <Setter Property="Data" Value="M5.43,9.57 L6.57,8.43 L12,13.87 L17.43,8.43 L18.57,9.57 L12,16.13 Z" />
+    <Setter Property="Width" Value="7" />
+    <Setter Property="Height" Value="7" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ComboBox:pointerover /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+  </Style>
+
+  <Style Selector="ComboBox:focus /template/ Border#Background, ComboBox:focus-visible /template/ Border#Background, ComboBox:focus:pointerover /template/ Border#Background, ComboBox:dropdownopen /template/ Border#Background, ComboBox:pressed /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+  </Style>
+
+  <Style Selector="ComboBox:focus /template/ Border#HighlightBackground, ComboBox:focus-visible /template/ Border#HighlightBackground, ComboBox:pressed /template/ Border#HighlightBackground">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <Style Selector="ComboBox:focus /template/ ContentControl#ContentPresenter, ComboBox:focus-visible /template/ ContentControl#ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ComboBox:focus /template/ TextBlock#PlaceholderTextBlock, ComboBox:focus-visible /template/ TextBlock#PlaceholderTextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ComboBox:focus /template/ PathIcon#DropDownGlyph, ComboBox:focus-visible /template/ PathIcon#DropDownGlyph">
+    <Setter Property="Foreground" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="ComboBoxItem">
+    <Setter Property="MinHeight" Value="26" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ComboBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter, ComboBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="CheckBox">
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+  <Style Selector="ScrollBar">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ScrollBar /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource PulseBorderStrong}" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <Style Selector="ScrollBar:pointerover /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource PulseTextDisabled}" />
+  </Style>
+  <Style Selector="Button /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="MenuItem /template/ Border">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="ComboBoxItem /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="FlyoutPresenter, MenuFlyoutPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="FlyoutPresenter">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceOverlay}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="MenuFlyoutPresenter">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceOverlay}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="FlyoutPresenter /template/ Border, MenuFlyoutPresenter /template/ Border">
+    <Setter Property="BoxShadow" Value="0 12 32 -8 #33000000" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+
+  <Style Selector="PopupRoot">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="TransparencyLevelHint" Value="Transparent" />
+  </Style>
+
+  <Style Selector="FlyoutPresenter.plain">
+    <Setter Property="MaxWidth" Value="1200" />
+    <Setter Property="MaxHeight" Value="900" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter Name="PART_ContentPresenter"
+                          Background="Transparent"
+                          Content="{TemplateBinding Content}"
+                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                          Padding="0" />
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.ribbon">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.ribbon:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextDisabled}" />
+  </Style>
+
+  <Style Selector="Button.ribbon /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <Style Selector="Button.ribbon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="Button.ribbon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+  </Style>
+
+  <Style Selector="Button.ribbon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Button.ribbon.checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+  </Style>
+
+  <Style Selector="Button.ribbon.checked">
+    <Setter Property="Foreground" Value="{DynamicResource PulseAccentText}" />
+  </Style>
+
+  <Style Selector="Button.ribbon.checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+  </Style>
+
+  <Style Selector="Button.ribbon.field /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Button.ribbon.field:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseFieldBorder}" />
+  </Style>
+
+  <Style Selector="Button.ribbon.tile /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Button.ribbon.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="Button.ribbon.tile.checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="TextBox.ribbonNumber">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="ContextMenu">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Margin="0,0,18,18"
+                Padding="4"
+                CornerRadius="12"
+                BorderThickness="1"
+                Background="{DynamicResource PulseSurfaceOverlay}"
+                BorderBrush="{DynamicResource PulseBorder}"
+                BoxShadow="2 6 18 -4 #40101828">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <ItemsPresenter Name="PART_ItemsPresenter"
+                            ItemsPanel="{TemplateBinding ItemsPanel}" />
+          </ScrollViewer>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="MenuItem /template/ Border:not(#PART_LayoutRoot)">
+    <Setter Property="Margin" Value="0,0,18,18" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceOverlay}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BoxShadow" Value="2 6 18 -4 #40101828" />
+  </Style>
+
+  <Style Selector="MenuItem, CheckBox, RadioButton, ToggleSwitch, ComboBox, Slider">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="ToolTip">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceOverlay}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+
+  <Style Selector="ListBoxItem">
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter, ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="ListBox.compact ListBoxItem">
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+
+  <Style Selector="ListBox.panelList">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0,3" />
+  </Style>
+
+  <Style Selector="ListBox.panelList ListBoxItem">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Margin" Value="3,1" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ListBox.panelList ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ListBox.panelList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ListBox.panelList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.panelList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.panelList ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+  </Style>
+
+  <Style Selector="ListBox.panelList ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+
+  <Style Selector="Button.dialogClose">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextSecondary}" />
+  </Style>
+
+  <Style Selector="Button.dialogClose:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="CornerRadius" Value="999" />
+  </Style>
+
+  <Style Selector="Button.dialogClose:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+    <Setter Property="CornerRadius" Value="999" />
+  </Style>
+
+
+  <Style Selector="Button.dialogPrimary">
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="Button.dialogPrimary /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="Button.dialogPrimary:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Opacity" Value="0.88" />
+  </Style>
+
+  <Style Selector="Button.dialogPrimary:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Opacity" Value="0.74" />
+  </Style>
+
+  <Style Selector="Button.dialogPrimary:disabled /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+
+  <Style Selector="Button.dialogPrimary:focus-visible /template/ ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="Button.dialogQuiet /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Button.dialogQuiet:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="Button.settingsNav">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.settingsNav /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.settingsNav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.settingsNav:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+  </Style>
+
+  <Style Selector="Button.settingsNav.selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="ToggleButton.keySearch /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextSecondary}" />
+  </Style>
+
+  <Style Selector="ToggleButton.keySearch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ToggleButton.keySearch:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="ToggleButton.iconChoice /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ToggleButton.iconChoice:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ToggleButton.iconChoice:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="ToggleButton.iconChoice:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="ToggleButton.borderSide /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="ToggleButton.borderSide:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ToggleButton.borderSide:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="ToggleButton.borderSide:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="ToggleButton.swatch /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="ToggleButton.swatch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ToggleButton.swatch:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="ToggleButton.swatch:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="Button.helpTip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="ListBox.checklist ListBoxItem">
+    <Setter Property="Padding" Value="4,1" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+
+  <Style Selector="ListBox.checklist ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ListBox.checklist ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ListBox.checklist ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="Button.swatch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{TemplateBinding Background}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="Button.swatch:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{TemplateBinding Background}" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav)">
+    <Setter Property="Padding" Value="12,5" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav) /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav):pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorderStrong}" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav):pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulsePressed}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorderStrong}" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav):disabled">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextDisabled}" />
+  </Style>
+
+  <Style Selector="Button:not(.ribbon):not(.dialogPrimary):not(.dialogQuiet):not(.dialogClose):not(.close):not(.swatch):not(.settingsNav):disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceSunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+  </Style>
+
+  <Style Selector="TextBox:disabled /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceSunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+  </Style>
+
+  <Style Selector="TextBox:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextDisabled}" />
+  </Style>
+
+  <Style Selector="ComboBox:disabled /template/ Border#Background">
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceSunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseBorder}" />
+  </Style>
+
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="{DynamicResource PulseSurfaceSunken}" />
+  </Style>
+
+  <Style Selector="ComboBox:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextDisabled}" />
+  </Style>
+
+  <Style Selector="ListBox.palette ListBoxItem">
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+
+  <Style Selector="ListBox.palette ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="ListBox.palette ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseAccentSubtle}" />
+  </Style>
+
+  <Style Selector="ListBox.palette ListBoxItem:selected">
+    <Setter Property="Foreground" Value="{DynamicResource PulseAccentText}" />
+  </Style>
+
+  <Style Selector="ListBox.palette ListBoxItem.paletteHeader /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="TextBox.invalid">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseDanger}" />
+  </Style>
+
+  <Style Selector="TextBox.invalid:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseDanger}" />
+  </Style>
+
+  <Style Selector="Button.caption">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.08" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.caption /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.caption:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.caption:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource PulseTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.caption:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseBorder}" />
+  </Style>
+
+  <Style Selector="Button.caption.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#C42B1C" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="Button.caption.close:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#B3261E" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="Button.startRecent /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+
+  <Style Selector="Button.startRecent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseHover}" />
+  </Style>
+
+  <Style Selector="Button.startSearch /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.startSearch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PulseSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PulseAccent}" />
+  </Style>
+
+  <Style Selector="Button.startCreate /template/ ContentPresenter#PART_ContentPresenter, Button.startCreate:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.startCreate:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="Button.startQuiet /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="Button.startCreate:pointerover > Border">
+    <Setter Property="Opacity" Value="0.88" />
+  </Style>
+
+</Styles>

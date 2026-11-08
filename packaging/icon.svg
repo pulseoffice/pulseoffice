@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3730A3"/>
+      <stop offset="0.5" stop-color="#1E1B4B"/>
+      <stop offset="1" stop-color="#0B0A24"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.12" r="0.8">
+      <stop offset="0" stop-color="#A5B4FC" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#A5B4FC" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#9333EA"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E6E9F4"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F87171"/>
+      <stop offset="1" stop-color="#DC2626"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#glow)"/>
+  <g transform="rotate(-18 512 760)">
+    <rect x="322" y="286" width="380" height="470" rx="44" fill="url(#blue)"/>
+  </g>
+  <g transform="rotate(18 512 760)">
+    <rect x="322" y="286" width="380" height="470" rx="44" fill="url(#red)"/>
+  </g>
+  <rect x="322" y="250" width="380" height="470" rx="44" fill="url(#green)"/>
+  <rect x="312" y="330" width="400" height="460" rx="44" fill="#000000" opacity="0.45" filter="url(#shadow)"/>
+  <rect x="302" y="310" width="420" height="470" rx="44" fill="url(#paper)"/>
+  <rect x="360" y="374" width="200" height="22" rx="11" fill="#C3C8DA"/>
+  <rect x="360" y="416" width="300" height="22" rx="11" fill="#D6DAE8"/>
+  <polyline points="356,574 444,574 480,506 526,660 570,462 608,600 636,574 668,574"
+            fill="none" stroke="url(#pulse)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="360" y="700" width="260" height="22" rx="11" fill="#D6DAE8"/>
+</svg>

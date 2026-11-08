@@ -1,0 +1,17 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/TestProcessWatchdog.cs" Link="Shared/TestProcessWatchdog.cs" />
+    <AssemblyAttribute Include="Xunit.AssemblyFixtureAttribute">
+      <_Parameter1>typeof(PulseOffice.Testing.TestProcessWatchdog)</_Parameter1>
+      <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
+    </AssemblyAttribute>
+    <AssemblyMetadata Include="PulseOffice.TestProcessLifetimeMinutes" Value="$(TestProcessLifetimeMinutes)" Condition="'$(TestProcessLifetimeMinutes)' != ''" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(AvaloniaTestThreading)' == 'SerialAssembly'">
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/SingleUiThreadAssembly.cs" Link="Shared/SingleUiThreadAssembly.cs" />
+  </ItemGroup>
+</Project>

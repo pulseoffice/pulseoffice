@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Agent/PulseOffice.Agent.csproj" />
+    <ProjectReference Include="../PulseOffice.Shell/PulseOffice.Shell.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting.Editor/PulseOffice.Scripting.Editor.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Icons/PulseOffice.UI.Icons.csproj" />
+  </ItemGroup>
+
+</Project>

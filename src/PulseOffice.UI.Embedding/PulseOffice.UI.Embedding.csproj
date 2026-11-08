@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.UI/PulseOffice.Data.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Charts/PulseOffice.Charts.csproj" />
+    <ProjectReference Include="../PulseOffice.Formulas/PulseOffice.Formulas.csproj" />
+    <ProjectReference Include="../PulseOffice.Localization/PulseOffice.Localization.csproj" />
+  </ItemGroup>
+
+</Project>

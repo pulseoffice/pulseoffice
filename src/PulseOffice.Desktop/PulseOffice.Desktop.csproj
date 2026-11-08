@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AssemblyName>PulseOffice</AssemblyName>
+    <RootNamespace>PulseOffice.Desktop</RootNamespace>
+    <ApplicationIcon>../../packaging/icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Condition="'$(Configuration)' == 'Debug'" />
+    <ProjectReference Include="../PulseOffice.Localization/PulseOffice.Localization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Diagnostics/PulseOffice.Diagnostics.csproj" />
+    <ProjectReference Include="../PulseOffice.Shell/PulseOffice.Shell.csproj" />
+    <ProjectReference Include="../PulseOffice.Agent.UI/PulseOffice.Agent.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Remote.Cloud/PulseOffice.Remote.Cloud.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.Engine/PulseOffice.Sheets.Engine.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.OpenXml/PulseOffice.Formats.OpenXml.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <ProjectReference Include="../PulseOffice.Formats.Rasterizing/PulseOffice.Formats.Rasterizing.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting.JavaScript/PulseOffice.Scripting.JavaScript.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting.Python/PulseOffice.Scripting.Python.csproj" />
+    <ProjectReference Include="../PulseOffice.Sheets.UI/PulseOffice.Sheets.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Documents.UI/PulseOffice.Documents.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Presentations.UI/PulseOffice.Presentations.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.PostgreSql/PulseOffice.Data.PostgreSql.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.MySql/PulseOffice.Data.MySql.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.SqlServer/PulseOffice.Data.SqlServer.csproj" />
+    <ProjectReference Include="../PulseOffice.Data.Odbc/PulseOffice.Data.Odbc.csproj" />
+    <ProjectReference Include="../PulseOffice.Platform.Windows/PulseOffice.Platform.Windows.csproj" />
+    <ProjectReference Include="../PulseOffice.Platform.MacOS/PulseOffice.Platform.MacOS.csproj" />
+    <ProjectReference Include="../PulseOffice.Platform.Linux/PulseOffice.Platform.Linux.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Text.Spelling.Hunspell/PulseOffice.Text.Spelling.Hunspell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <Compile Remove="DeveloperTools/AbsentDeveloperTools.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Compile Remove="DeveloperTools/AttachedDeveloperTools.cs" />
+  </ItemGroup>
+
+</Project>

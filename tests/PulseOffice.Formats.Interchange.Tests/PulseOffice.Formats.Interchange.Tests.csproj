@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PulseOffice.Formats.Interchange/PulseOffice.Formats.Interchange.csproj" />
+    <ProjectReference Include="../../src/PulseOffice.Formats.Odf/PulseOffice.Formats.Odf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../PulseOffice.Formats.Odf.Tests/Odt/TextDocumentDescriber.cs" Link="Text/TextDocumentDescriber.cs" />
+    <Compile Include="../PulseOffice.Formats.Odf.Tests/Odt/TextDocumentEssence.cs" Link="Text/TextDocumentEssence.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

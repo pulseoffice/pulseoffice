@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="AvaloniaEdit.TextMate" />
+    <PackageReference Include="TextMateSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PulseOffice.Document/PulseOffice.Document.csproj" />
+    <ProjectReference Include="../PulseOffice.Document.Commands/PulseOffice.Document.Commands.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting/PulseOffice.Scripting.csproj" />
+    <ProjectReference Include="../PulseOffice.Scripting.CPython/PulseOffice.Scripting.CPython.csproj" />
+    <ProjectReference Include="../PulseOffice.UI/PulseOffice.UI.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Controls/PulseOffice.UI.Controls.csproj" />
+    <ProjectReference Include="../PulseOffice.UI.Commands/PulseOffice.UI.Commands.csproj" />
+  </ItemGroup>
+
+</Project>

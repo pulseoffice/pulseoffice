@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text">
+ <office:font-face-decls><style:font-face style:name="Liberation Serif" svg:font-family="'Liberation Serif'"/></office:font-face-decls>
+ <office:styles>
+  <style:default-style style:family="paragraph"><style:paragraph-properties fo:orphans="2" fo:widows="2" style:tab-stop-distance="1.25cm"/><style:text-properties style:font-name="Liberation Serif" fo:font-size="12pt" fo:language="zxx" style:language-asian="zxx" style:language-complex="zxx" fo:hyphenate="false"/></style:default-style>
+  <style:style style:name="Standard" style:family="paragraph"/>
+  <style:style style:name="Header" style:family="paragraph" style:parent-style-name="Standard"/>
+  <style:style style:name="Footer" style:family="paragraph" style:parent-style-name="Standard"/>
+  <style:style style:name="Footnote" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-left="0.6cm" fo:text-indent="-0.6cm"/><style:text-properties fo:font-size="10pt"/></style:style>
+  <style:style style:name="B" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0.25cm"/></style:style>
+  <style:style style:name="Graphics" style:family="graphic"><style:graphic-properties fo:margin-left="0cm" fo:margin-right="0cm" fo:margin-top="0cm" fo:margin-bottom="0cm" style:wrap="parallel" style:number-wrapped-paragraphs="no-limit" style:vertical-pos="from-top" style:vertical-rel="paragraph" style:horizontal-pos="from-left" style:horizontal-rel="paragraph" fo:border="none" fo:padding="0cm"/></style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm"><style:footnote-sep style:width="0.018cm" style:distance-before-sep="0.101cm" style:distance-after-sep="0.101cm" style:line-style="solid" style:adjustment="left" style:rel-width="25%" style:color="#000000"/></style:page-layout-properties></style:page-layout>
+  <style:style style:name="Tab" style:family="table"><style:table-properties style:width="17cm" table:align="left"/></style:style>
+  <style:style style:name="TabA" style:family="table-column"><style:table-column-properties style:column-width="5cm"/></style:style>
+  <style:style style:name="TabB" style:family="table-column"><style:table-column-properties style:column-width="12cm"/></style:style>
+  <style:style style:name="TabC" style:family="table-cell"><style:table-cell-properties fo:padding="0.097cm" fo:border="none"/></style:style>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"></style:master-page></office:master-styles>
+ <office:body><office:text>
+  <text:p text:style-name="B">Lettera margine programma pagina prova lavoro sistema con pagina molto parola per poco di. Documento documento modello testo esempio margine lettera la quella libreria ancora carattere misura forma questo.</text:p>
+  <text:p text:style-name="B"><draw:frame draw:style-name="Graphics" draw:name="Img" text:anchor-type="paragraph" svg:x="0cm" svg:y="0cm" svg:width="5cm" svg:height="4cm" draw:z-index="0"><draw:image><office:binary-data>iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGNoaPgPRwzEcQA20R/x6taOpAAAAABJRU5ErkJggg==</office:binary-data></draw:image></draw:frame>Modello margine lettera ordine impaginazione libreria programma tempo numero esempio ancora per spazio. Anche valore lettera documento spazio programma pagina. Pagina impaginazione pagina come con stile. Questo confronto confronto prova non la sono spazio prova parola numero programma carattere tempo spazio. Numero stile tempo impaginazione ordine che. Sistema modello con struttura la paragrafo forma forma. Paragrafo esempio misura tempo forma numero di. La stile ancora numero che prova misura testo spazio.</text:p>
+  <text:p text:style-name="B">Molto lavoro una che poco paragrafo non molto libreria paragrafo di tempo ordine. Che misura una modello con stile margine numero riga come prova sistema valore.</text:p>
+  <text:p text:style-name="B">Riga il una poco riga una riga anche il poco. Misura tempo testo una sistema che riga risultato documento valore il. Documento valore impaginazione sempre pagina con prova paragrafo modello testo la numero risultato struttura sistema. Valore che libreria ordine anche sempre.</text:p>
+  <text:p text:style-name="B">Sempre sempre impaginazione esempio misura documento non libreria sempre riga molto il parola lettera testo. Spazio la risultato come la questo confronto. Che pagina documento modello non non sistema struttura documento poco parola sistema poco ancora per la. Modello libreria sono risultato confronto testo. Quella che programma esempio paragrafo tempo la.</text:p>
+ </office:text></office:body>
+</office:document>

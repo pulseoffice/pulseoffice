@@ -1,0 +1,22 @@
+{
+ "format": "pulseoffice.autocorrect",
+ "version": 1,
+ "language": "*",
+ "source": "PulseOffice",
+ "license": "PulseOffice",
+ "replacements": {
+  "--": "–",
+  "->": "→",
+  "<-": "←",
+  "=>": "⇒",
+  "<=": "≤",
+  ">=": "≥",
+  "+-": "±",
+  "(c)": "©",
+  "(r)": "®",
+  "(tm)": "™",
+  "...": "…"
+ },
+ "sentenceExceptions": [],
+ "wordExceptions": ["IDs", "PCs", "CDs", "TVs"]
+}
