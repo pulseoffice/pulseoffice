@@ -64,7 +64,7 @@ with a command:
 
 Output goes to `artifacts/` (not versioned).
 
-`release` also writes `SHA256SUMS` and signs it (`SHA256SUMS.sig`): the app installs updates only when this signature
+`release` and `all --release` run only from `main` and stop at once on any other branch. `release` also writes `SHA256SUMS` and signs it (`SHA256SUMS.sig`): the app installs updates only when this signature
 and the package checksum match. It uses the GitHub CLI (`gh`, already logged in). If the tag is not on GitHub yet it offers to commit the
 version, tag it and push; notes are generated from the commits unless a file is given. It lists the files and asks
 for confirmation before publishing.
