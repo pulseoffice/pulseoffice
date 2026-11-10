@@ -43,7 +43,6 @@ sc/qa/unit/data/ods/passwordWrongSHA.ods	-	-	0	0	READFAIL	ODF004
 sc/qa/unit/data/ods/tdf132278.ods	.ods	macros	6	0	DECL	ODF041
 sc/qa/unit/data/ods/tdf134161.ods	.ods	groups	2	0	DECL	ODF193
 sc/qa/unit/data/ods/tdf134161.ods	.xlsx	groups	2	0	DECL	ODF193
-sc/qa/unit/data/ods/tdf155091_paste_duplicates.ods	.xlsx	filters	1	0	DECL	XLSX233
 sc/qa/unit/data/ods/user-defined-function.ods	.ods	macros	1	0	DECL	ODF041
 sc/qa/unit/data/ods/vba_macro_functions.ods	.ods	macros	7	0	DECL	ODF041
 sc/qa/unit/data/xlsx/activex_checkbox.xlsx	.ods	shapes	1	0	DECL	XLSX089

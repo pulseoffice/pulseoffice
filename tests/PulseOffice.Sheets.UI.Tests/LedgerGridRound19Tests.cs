@@ -30,7 +30,7 @@ public sealed class LedgerGridRound19Tests
             Grid = new SheetGridView(Engine, presenter, new ConditionalFormattingEvaluator(provider.GetRequiredService<Evaluator>()), selection);
             var writer = new LedgerCellWriter(Workbook, Engine, History, status, texts, new PulseOffice.Shell.DocumentWorkspace(), Grid,
                 null, null, null, null);
-            Operations = new LedgerCellOperations(Workbook, Engine, Grid, selection, History, status, texts, writer);
+            Operations = new LedgerCellOperations(Workbook, Engine, Grid, selection, History, status, texts, writer, new PulseOffice.Sheets.UI.Outline.OutlineGutter());
         }
 
         public Workbook Workbook { get; } = Workbook.CreateDefault();
@@ -98,7 +98,7 @@ public sealed class LedgerGridRound19Tests
     {
         var parts = new Parts();
         var viewport = new PulseOffice.Sheets.UI.GridParts.GridViewport(parts.Engine,
-            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600));
+            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600), new PulseOffice.Sheets.UI.Outline.OutlineGutter());
         var painter = new PulseOffice.Sheets.UI.GridParts.Painting.GridOverlayPainter(
             viewport, new SheetSelection(), new PulseOffice.Sheets.UI.GridParts.GridDisplayOptions(), null!);
 

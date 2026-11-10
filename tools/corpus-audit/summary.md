@@ -8,7 +8,7 @@ Files: 5016; copies written: 9948
 - OK: 9948
 - READFAIL: 28
 
-## Losses: LOSS 0, DECL 128
+## Losses: LOSS 0, DECL 127
 
 | Pair | Feature | LOSS | DECL |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Files: 5016; copies written: 9948
 | .ods->.ods | images | 0 | 1 |
 | .ods->.ods | macros | 0 | 35 |
 | .ods->.ods | merges | 0 | 2 |
-| .ods->.xlsx | filters | 0 | 4 |
+| .ods->.xlsx | filters | 0 | 3 |
 | .ods->.xlsx | groups | 0 | 1 |
 | .ods->.xlsx | images | 0 | 1 |
 | .ods->.xlsx | merges | 0 | 2 |

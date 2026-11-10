@@ -315,6 +315,7 @@ internal sealed class LayoutPartReader(TableRows rows, OdfLayoutMapper layout) :
 
         foreach (var group in layout.ReadRowGroups(table)) sheet.RowGroups.Add(group);
         foreach (var group in layout.ReadColumnGroups(table)) sheet.ColumnGroups.Add(group);
+        sheet.OutlineSummary = new OdfOutlineSummaryCodec().Read(table);
     }
 
     private Twip? Prevailing(IEnumerable<(Twip? Size, int Repeat)> spans)

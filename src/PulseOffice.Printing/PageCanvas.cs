@@ -36,9 +36,24 @@ public readonly record struct PrintColor(byte R, byte G, byte B)
     }
 }
 
+public enum PrintUnderline
+{
+    None,
+    Single,
+    Double,
+}
+
 public sealed record PrintFont(string Family, double SizePoints, bool Bold = false, bool Italic = false)
 {
     public static readonly PrintFont Default = new("Helvetica", 10);
+
+    public PrintUnderline Underline { get; init; }
+
+    public bool Strikethrough { get; init; }
+
+    public bool IsDecorated => Underline != PrintUnderline.None || Strikethrough;
+
+    public PrintFont Undecorated => IsDecorated ? this with { Underline = PrintUnderline.None, Strikethrough = false } : this;
 }
 
 public enum TextAlignment
@@ -104,10 +119,11 @@ public interface IPageCanvas
             {
                 var bounds = new DocumentRect(Twip.FromPoints(left), Twip.FromPoints(run.Baseline - run.Font.SizePoints * 0.8),
                     Twip.FromPoints(Math.Max(advance, run.Font.SizePoints)), Twip.FromPoints(run.Font.SizePoints * 1.2));
-                DrawText(glyph, bounds, run.Font, run.Color, TextAlignment.Left, TextBaseline.Top);
+                DrawText(glyph, bounds, run.Font.Undecorated, run.Color, TextAlignment.Left, TextBaseline.Top);
             }
             left += advance;
         }
+        new TextDecorationPainter().Paint(this, new PrintTextSpan(run.X, run.Baseline, left - run.X, run.Font, run.Color));
     }
 }
 

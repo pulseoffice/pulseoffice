@@ -19,9 +19,10 @@ internal sealed class GridViewport
     private readonly Dictionary<Worksheet, GridGeometry> _geometries = [];
     private readonly GridGeometry _detached;
 
-    public GridViewport(CalculationEngine engine, DesignTokens.Metrics metrics, int sheetIndex, Func<Size> bounds)
+    public GridViewport(CalculationEngine engine, DesignTokens.Metrics metrics, int sheetIndex, Func<Size> bounds, Outline.IOutlineGutter gutter)
     {
         _engine = engine;
+        Gutter = gutter;
         _bounds = bounds;
         Metrics = metrics;
         SheetIndex = sheetIndex;
@@ -29,6 +30,8 @@ internal sealed class GridViewport
     }
 
     public CalculationEngine Engine => _engine;
+
+    public Outline.IOutlineGutter Gutter { get; }
 
     public DesignTokens.Metrics Metrics { get; }
 
@@ -57,9 +60,9 @@ internal sealed class GridViewport
 
     private GridGeometry GeometryFor(Worksheet? sheet)
     {
-        if (sheet is null) return WithHeaders(_detached);
+        if (sheet is null) return WithHeaders(_detached, null);
 
-        if (_geometries.TryGetValue(sheet, out var geometry)) return WithHeaders(geometry);
+        if (_geometries.TryGetValue(sheet, out var geometry)) return WithHeaders(geometry, sheet);
 
         foreach (var stale in _geometries.Keys.Where(known => !ReferenceEquals(known.Owner, _engine.Workbook)).ToList())
             _geometries.Remove(stale);
@@ -67,13 +70,15 @@ internal sealed class GridViewport
         geometry = new GridGeometry(sheet.Layout);
         _geometries[sheet] = geometry;
 
-        return WithHeaders(geometry);
+        return WithHeaders(geometry, sheet);
     }
 
-    private GridGeometry WithHeaders(GridGeometry geometry)
+    private GridGeometry WithHeaders(GridGeometry geometry, Worksheet? sheet)
     {
-        geometry.RowHeaderWidth = ShowHeaders ? RowHeaderWidthFor(geometry) : 0;
-        geometry.ColumnHeaderHeight = ShowHeaders ? DefaultColumnHeaderHeight : 0;
+        geometry.RowGutterWidth = ShowHeaders && sheet is not null ? Gutter.Thickness(sheet, PulseOffice.Sheets.Engine.Operations.StructureAxis.Rows) : 0;
+        geometry.ColumnGutterHeight = ShowHeaders && sheet is not null ? Gutter.Thickness(sheet, PulseOffice.Sheets.Engine.Operations.StructureAxis.Columns) : 0;
+        geometry.RowHeaderWidth = ShowHeaders ? RowHeaderWidthFor(geometry) + geometry.RowGutterWidth : 0;
+        geometry.ColumnHeaderHeight = ShowHeaders ? DefaultColumnHeaderHeight + geometry.ColumnGutterHeight : 0;
 
         return geometry;
     }
@@ -239,6 +244,30 @@ internal sealed class GridViewport
         point.X < Geometry.RowHeaderWidth && point.Y >= Geometry.ColumnHeaderHeight
             ? Geometry.RowBorderAt(point.Y - Geometry.ColumnHeaderHeight + OffsetYAt(point))
             : -1;
+
+    public Outline.OutlineButton? OutlineButtonAt(Point point)
+    {
+        if (Sheet is not { } sheet) return null;
+        var geometry = Geometry;
+        var rows = PulseOffice.Sheets.Engine.Operations.StructureAxis.Rows;
+        var columns = PulseOffice.Sheets.Engine.Operations.StructureAxis.Columns;
+
+        if (point.X < geometry.RowGutterWidth)
+        {
+            if (point.Y >= geometry.ColumnHeaderHeight)
+                return Gutter.ToggleAt(sheet, rows, point.X, geometry.RowAt(point.Y - geometry.ColumnHeaderHeight + OffsetYAt(point)));
+            return point.Y >= geometry.ColumnGutterHeight ? Gutter.LevelAt(sheet, rows, point.X) : null;
+        }
+
+        if (point.Y < geometry.ColumnGutterHeight)
+        {
+            if (point.X >= geometry.RowHeaderWidth)
+                return Gutter.ToggleAt(sheet, columns, point.Y, geometry.ColumnAt(point.X - geometry.RowHeaderWidth + OffsetXAt(point)));
+            return point.X >= geometry.RowGutterWidth ? Gutter.LevelAt(sheet, columns, point.Y) : null;
+        }
+
+        return null;
+    }
 
     public SheetGridView.GridHit HitTest(Point point)
     {

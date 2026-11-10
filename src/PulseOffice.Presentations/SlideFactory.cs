@@ -89,6 +89,7 @@ public sealed class SlideFactory : ISlideFactory
             {
                 Id = $"{newId}.{animation.Id}",
                 TargetId = Mapped(ids, animation.TargetId, source.Id, newId),
+                TriggerShapeId = animation.TriggerShapeId is { } trigger ? Mapped(ids, trigger, source.Id, newId) : null,
             });
 
         foreach (var interaction in source.Interactions)
@@ -157,7 +158,7 @@ public sealed class SlideFactory : ISlideFactory
 
         var kept = order.Select(element => element.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var animation in source.Animations.Where(animation => kept.Contains(animation.TargetId)))
-            target.AddAnimation(animation);
+            target.AddAnimation(animation.TriggerShapeId is { } trigger && !kept.Contains(trigger) ? animation with { TriggerShapeId = null } : animation);
         foreach (var interaction in source.Interactions.Where(interaction => kept.Contains(interaction.TargetId)))
             target.AddInteraction(interaction);
         foreach (var comment in source.Comments)

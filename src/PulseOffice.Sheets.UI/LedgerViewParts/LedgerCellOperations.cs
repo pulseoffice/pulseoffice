@@ -16,7 +16,8 @@ internal sealed class LedgerCellOperations(
     PulseOffice.Document.Commands.UndoStack history,
     IStatusBarService status,
     ITextCatalog texts,
-    LedgerCellWriter writer)
+    LedgerCellWriter writer,
+    Outline.IOutlineGutter gutter)
 {
     public event EventHandler? SelectionStale;
 
@@ -95,6 +96,31 @@ internal sealed class LedgerCellOperations(
             redo: () => Set(request.After),
             undo: () => Set(request.Before)));
 
+        grid.Refresh();
+    }
+
+    public void ApplyOutline(Outline.OutlineButton button)
+    {
+        ArgumentNullException.ThrowIfNull(button);
+        if (!writer.CanEdit()) return;
+
+        var sheet = workbook.Sheets[grid.SheetIndex];
+        if (sheet.Protection.IsEnabled)
+        {
+            status.Report(texts["status.protection.format"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            return;
+        }
+
+        var before = new OutlineState(sheet);
+        gutter.Press(sheet, button);
+        var after = new OutlineState(sheet);
+
+        history.Push(new PulseOffice.Document.Commands.DelegateAction(
+            texts["history.outline.details"],
+            redo: () => after.Restore(sheet),
+            undo: () => before.Restore(sheet)));
+
+        SelectionStale?.Invoke(this, EventArgs.Empty);
         grid.Refresh();
     }
 
@@ -188,4 +214,21 @@ internal sealed class LedgerCellOperations(
 
     private CellRange WithRows(CellRange range, CellRange used) =>
         new(new CellAddress(used.Start.Row, range.Start.Column), new CellAddress(used.End.Row, range.End.Column));
+}
+
+internal sealed record OutlineState(SheetLayout Layout, IReadOnlyList<OutlineGroup> Rows, IReadOnlyList<OutlineGroup> Columns)
+{
+    public OutlineState(Worksheet sheet) : this(new SheetLayout(), [.. sheet.RowGroups], [.. sheet.ColumnGroups])
+    {
+        sheet.Layout.CopyTo(Layout);
+    }
+
+    public void Restore(Worksheet sheet)
+    {
+        Layout.CopyTo(sheet.Layout);
+        sheet.RowGroups.Clear();
+        sheet.RowGroups.AddRange(Rows);
+        sheet.ColumnGroups.Clear();
+        sheet.ColumnGroups.AddRange(Columns);
+    }
 }

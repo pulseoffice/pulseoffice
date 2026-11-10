@@ -21,6 +21,10 @@ public sealed record SheetSnapshot(
 
     public IReadOnlyList<OutlineGroup> ColumnGroups { get; init; } = [];
 
+    public OutlineSummary OutlineSummary { get; init; } = OutlineSummary.Default;
+
+    public ConsolidationSettings? Consolidation { get; init; }
+
     public IReadOnlyList<DataValidation> Validations { get; init; } = [];
 
     public IReadOnlyList<int> RowBreaks { get; init; } = [];
@@ -69,6 +73,8 @@ public sealed class SheetSnapshots : ISheetSnapshots
             PrintRanges = [.. sheet.PrintRanges],
             RowGroups = [.. sheet.RowGroups],
             ColumnGroups = [.. sheet.ColumnGroups],
+            OutlineSummary = sheet.OutlineSummary,
+            Consolidation = sheet.Owner?.Consolidation,
             Validations = [.. sheet.Validations],
             RowBreaks = [.. sheet.RowBreaks],
             ColumnBreaks = [.. sheet.ColumnBreaks],
@@ -136,6 +142,7 @@ public sealed class SheetSnapshots : ISheetSnapshots
         Replace(sheet.PrintRanges, snapshot.PrintRanges);
         Replace(sheet.RowGroups, snapshot.RowGroups);
         Replace(sheet.ColumnGroups, snapshot.ColumnGroups);
+        sheet.OutlineSummary = snapshot.OutlineSummary;
         Replace(sheet.Validations, snapshot.Validations);
 
         sheet.RowBreaks.Clear();
@@ -153,6 +160,7 @@ public sealed class SheetSnapshots : ISheetSnapshots
         if (snapshot.AutoFilter is { } autoFilter) sheet.AutoFilter.Restore(autoFilter);
         foreach (var (owner, filter) in snapshot.RangeFilters) owner.RangeFilter = filter;
         sheet.RangeSort = snapshot.RangeSort;
+        if (sheet.Owner is { } book) book.Consolidation = snapshot.Consolidation;
 
         foreach (var (other, address, formula) in snapshot.OtherFormulas)
             if (other[address].Formula != formula) other[address] = other[address] with { Formula = formula };

@@ -24,6 +24,7 @@ public sealed class PptxTransitionMapper
         [
             new FadeTransition(TransitionKind.Reveal, throughBlack: true),
             new FadeTransition(TransitionKind.Fade, throughBlack: false),
+            new FadeTransition(TransitionKind.Morph, throughBlack: false),
             new PlainTransition<P.CutTransition>(TransitionKind.Cut, () => new P.CutTransition()),
             new PlainTransition<P.DissolveTransition>(TransitionKind.Dissolve, () => new P.DissolveTransition()),
             new SlidingTransition<P.PushTransition>(TransitionKind.Push, directions, (t, d) => t.Direction = d, t => t.Direction),
@@ -49,9 +50,9 @@ public sealed class PptxTransitionMapper
             },
         };
 
-        if (transition.Advance == AdvanceMode.AfterTime)
+        if (transition.AdvancesAfterTime)
         {
-            element.AdvanceOnClick = false;
+            element.AdvanceOnClick = transition.Advance == AdvanceMode.OnClickOrAfterTime;
             element.AdvanceAfterTime = transition.AdvanceAfterMs.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         }
@@ -119,26 +120,41 @@ public sealed class PptxTransitionMapper
 
     private const string P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 
+    private const string P15 = "http://schemas.microsoft.com/office/powerpoint/2012/main";
+
+    private const string P159 = "http://schemas.microsoft.com/office/powerpoint/2015/09/main";
+
+    private readonly IReadOnlyList<(string Prefix, string Uri)> _extensions = [("p14", P14), ("p15", P15), ("p159", P159)];
+
+    private string StandardMorph => $"<p159:morph xmlns:p159=\"{P159}\" option=\"byObject\"/>";
+
     public void Append(P.Slide slide, SlideTransition transition)
     {
         if (ToTransition(transition) is not { } fallback) return;
 
         var choice = (P.Transition)fallback.CloneNode(true);
-        if (NativeXml(transition) is { } native)
+        var native = NativeXml(transition) ?? (transition.Kind == TransitionKind.Morph ? StandardMorph : null);
+        var required = "p14";
+        if (native is not null)
         {
             ReplaceEffect(choice, native);
-            if (System.Xml.Linq.XElement.Parse(native).Name.NamespaceName != P14)
-                ReplaceEffect(fallback, native);
+            var space = System.Xml.Linq.XElement.Parse(native).Name.NamespaceName;
+            if (space == PMain) ReplaceEffect(fallback, native);
+            required = _extensions.FirstOrDefault(extension => extension.Uri == space).Prefix ?? required;
         }
         choice.SetAttribute(new OpenXmlAttribute("p14", "dur", P14,
             Math.Max(1, transition.DurationMs).ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
         slide.AddNamespaceDeclaration("mc", "http://schemas.openxmlformats.org/markup-compatibility/2006");
         slide.AddNamespaceDeclaration("p14", P14);
+        if (required != "p14")
+            slide.AddNamespaceDeclaration(required, _extensions.First(extension => extension.Prefix == required).Uri);
         slide.Append(new AlternateContent(
-            new AlternateContentChoice(choice) { Requires = "p14" },
+            new AlternateContentChoice(choice) { Requires = required },
             new AlternateContentFallback(fallback)));
     }
+
+    private bool IsMorph(string native) => System.Xml.Linq.XElement.Parse(native).Name == System.Xml.Linq.XName.Get("morph", P159);
 
     public SlideTransition? FromSlide(P.Slide? slide)
     {
@@ -148,7 +164,11 @@ public sealed class PptxTransitionMapper
             .Select(element => element.GetAttributes().FirstOrDefault(a => a.LocalName == "dur" && a.NamespaceUri == P14).Value)
             .FirstOrDefault(value => value is not null);
 
-        if (NativeEffect(slide) is { } native && _natives.Key(native) != _natives.Key(Standard(transition)) && (_natives.Knows(native) || !Standardized(native)))
+        if (NativeEffect(slide) is { } morph && IsMorph(morph))
+            transition = _natives.Key(morph) == _natives.Key(StandardMorph)
+                ? transition with { Kind = TransitionKind.Morph, Direction = TransitionDirection.None }
+                : transition with { Kind = TransitionKind.Morph, Direction = TransitionDirection.None, Native = new NativeTransition(NativeTransition.Ooxml, morph, TransitionKind.Morph, TransitionDirection.None) };
+        else if (NativeEffect(slide) is { } native && _natives.Key(native) != _natives.Key(Standard(transition)) && (_natives.Knows(native) || !Standardized(native)))
             transition = transition with { Native = new NativeTransition(NativeTransition.Ooxml, native, transition.Kind, transition.Direction) };
 
         return int.TryParse(exact, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var ms) && ms > 0
@@ -172,8 +192,8 @@ public sealed class PptxTransitionMapper
                 var s when s == P.TransitionSpeedValues.Slow => 900,
                 _ => 500,
             },
-            Advance = transition.AdvanceAfterTime is not null
-                ? AdvanceMode.AfterTime : AdvanceMode.OnClick,
+            Advance = transition.AdvanceAfterTime is null ? AdvanceMode.OnClick
+                : transition.AdvanceOnClick?.Value == false ? AdvanceMode.AfterTime : AdvanceMode.OnClickOrAfterTime,
             AdvanceAfterMs = int.TryParse(transition.AdvanceAfterTime?.Value, System.Globalization.NumberStyles.Integer,
                 System.Globalization.CultureInfo.InvariantCulture, out var ms) ? Math.Clamp(ms, 0, LongestTimingMs) : 0,
         };

@@ -192,7 +192,7 @@ public sealed class OdsReader
 
         var named = context.Styles is { } common ? _cellStyles.ReadNamed(common, NumberFormat) : [];
         foreach (var style in named)
-            workbook.NamedStyles.Define(style.Name, style.Style, style.Parent, workbook.NamedStyles.Find(style.Name)?.IsBuiltIn ?? false);
+            workbook.NamedStyles.Define(style.Name, style.Style, style.Parent, workbook.NamedStyles.Find(style.Name)?.IsBuiltIn ?? false, style.Declared);
         context.NamedStyleNames = named.ToDictionary(style => style.EncodedName, style => style.Name, StringComparer.Ordinal);
     }
 

@@ -27,6 +27,10 @@ public sealed class AgentArguments(JsonObject values)
 {
     public JsonObject Values { get; } = values ?? new JsonObject();
 
+    public Hosting.AgentConfirmationNeed? Confirmed { get; private set; }
+
+    public void Confirm(Hosting.AgentConfirmationNeed need) => Confirmed = need ?? throw new ArgumentNullException(nameof(need));
+
     public bool Has(string name) => Values[name] is not null;
 
     public JsonNode? Raw(string name) => Values[name];

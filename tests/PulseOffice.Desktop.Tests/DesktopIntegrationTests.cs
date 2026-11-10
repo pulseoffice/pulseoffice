@@ -46,6 +46,7 @@ public sealed class AppImageDesktopIntegrationTests : IDisposable
         var downloads = Directory.CreateDirectory(Path.Combine(_home, "Downloads")).FullName;
         var image = Path.Combine(downloads, "PulseOffice-0.3.0-linux-x86_64.AppImage");
         File.WriteAllText(image, "#!/bin/sh\necho launched \"$0\" \"$@\"\n");
+        File.SetUnixFileMode(image, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var appDir = Directory.CreateDirectory(Path.Combine(_home, "appdir")).FullName;
         File.WriteAllBytes(Path.Combine(appDir, "io.pulseoffice.PulseOffice.png"), [1, 2, 3]);
         var location = new Location(image);
@@ -141,6 +142,58 @@ public sealed class AppImageDesktopIntegrationTests : IDisposable
         File.Delete(image);
 
         Assert.Equal(string.Empty, Launch());
+    }
+
+    [Fact]
+    public void The_launcher_never_runs_a_downloaded_image_that_is_not_executable()
+    {
+        var (integration, _, image) = Build();
+        integration.Integrate();
+        File.Delete(image);
+        var planted = Path.Combine(_home, "Downloads", "PulseOffice-9.9.9-linux-x86_64.AppImage");
+        File.WriteAllText(planted, "#!/bin/sh\necho planted\n");
+
+        Assert.Equal(string.Empty, Launch());
+        Assert.Equal(0, (int)(File.GetUnixFileMode(planted) & UnixFileMode.UserExecute));
+    }
+
+    [Fact]
+    public void The_launcher_never_runs_a_registered_path_replaced_by_a_file_that_is_not_executable()
+    {
+        var (integration, _, image) = Build();
+        integration.Integrate();
+        File.Delete(image);
+        File.WriteAllText(image, "#!/bin/sh\necho planted\n");
+
+        Assert.Equal(string.Empty, Launch());
+    }
+
+    [Fact]
+    public void The_menu_entry_escapes_the_launcher_path_as_the_desktop_entry_specification_requires()
+    {
+        var data = Directory.CreateDirectory(Path.Combine(_home, "da\"ta $x `y` \\z 100%")).FullName;
+        var (_, location, _) = Build();
+        var integration = new AppImageDesktopIntegration(location,
+            new Environment(new Dictionary<string, string> { ["HOME"] = _home, ["XDG_DATA_HOME"] = data }), new NoProcesses(), new AppImageLauncherScript());
+
+        integration.Integrate();
+
+        var entry = File.ReadAllLines(Path.Combine(data, "applications", "io.pulseoffice.PulseOffice.desktop"));
+        var execQuoted = string.Concat(Path.Combine(data, "PulseOffice", "launch")
+            .Select(character => character is '"' or '`' or '$' or '\\' ? "\\" + character : character.ToString()));
+        var expected = "Exec=\"" + execQuoted.Replace("%", "%%", StringComparison.Ordinal).Replace("\\", "\\\\", StringComparison.Ordinal) + "\" %F";
+        Assert.Contains("\\\\\\\\z", expected);
+        Assert.Contains(expected, entry);
+    }
+
+    [Fact]
+    public void A_data_folder_with_a_line_break_is_refused()
+    {
+        var (_, location, _) = Build();
+        var integration = new AppImageDesktopIntegration(location,
+            new Environment(new Dictionary<string, string> { ["HOME"] = _home, ["XDG_DATA_HOME"] = Path.Combine(_home, "a\nExec=evil") }), new NoProcesses(), new AppImageLauncherScript());
+
+        Assert.Throws<InvalidOperationException>(integration.Integrate);
     }
 }
 

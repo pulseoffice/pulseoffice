@@ -91,10 +91,13 @@ public sealed class LedgerAnalysisDialogsTests(HeadlessDesktopSession headless)
         view.Function.SelectKey("max");
         Dispatcher.UIThread.RunJobs();
         Assert.Contains(view.Sketch.Shown.SelectMany(row => row), cell => cell.Text == "4");
+        Assert.False(view.LinkToSource.IsChecked);
+        view.LinkToSource.IsChecked = true;
         object? result = null;
         view.Completed += (_, value) => result = value;
         view.Confirm();
         Assert.Equal(Sheets.Engine.Operations.SubtotalFunction.Max, Assert.IsType<ConsolidateChoice>(result).Function);
+        Assert.True(Assert.IsType<ConsolidateChoice>(result).LinkToSource);
         window.Close();
     }, CancellationToken.None);
 

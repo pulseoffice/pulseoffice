@@ -4,7 +4,7 @@ using PulseOffice.Sheets.Addressing;
 
 namespace PulseOffice.Sheets.UI.GridParts.Painting;
 
-internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection selection)
+internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection selection, OutlineGutterPainter gutter)
 {
     public void Paint(
         DrawingContext context, VisibleRange visible,
@@ -28,7 +28,7 @@ internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection se
             if (width <= 0) return;
 
             var columnSelected = column >= range.Start.Column && column <= range.End.Column;
-            var columnArea = new Rect(x, 0, width, geometry.ColumnHeaderHeight);
+            var columnArea = new Rect(x, geometry.ColumnGutterHeight, width, geometry.ColumnHeaderHeight - geometry.ColumnGutterHeight);
 
             if (columnSelected) context.FillRectangle(selectedFill, columnArea);
 
@@ -36,7 +36,7 @@ internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection se
                 columnSelected ? selectedText : foreground, columnArea);
 
             context.DrawLine(pen,
-                new Point(x + width, 0), new Point(x + width, geometry.ColumnHeaderHeight));
+                new Point(x + width, geometry.ColumnGutterHeight), new Point(x + width, geometry.ColumnHeaderHeight));
         }
 
         void RowHeader(int row, double offset)
@@ -46,7 +46,7 @@ internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection se
             if (height <= 0) return;
 
             var rowSelected = row >= range.Start.Row && row <= range.End.Row;
-            var rowArea = new Rect(0, y, geometry.RowHeaderWidth, height);
+            var rowArea = new Rect(geometry.RowGutterWidth, y, geometry.RowHeaderWidth - geometry.RowGutterWidth, height);
 
             if (rowSelected) context.FillRectangle(selectedFill, rowArea);
 
@@ -54,7 +54,7 @@ internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection se
                 rowSelected ? selectedText : foreground, rowArea);
 
             context.DrawLine(pen,
-                new Point(0, y + height), new Point(geometry.RowHeaderWidth, y + height));
+                new Point(geometry.RowGutterWidth, y + height), new Point(geometry.RowHeaderWidth, y + height));
         }
 
         var columnsArea = new Rect(
@@ -100,6 +100,8 @@ internal sealed class GridHeaderPainter(GridViewport viewport, SheetSelection se
 
         context.FillRectangle(headerBrush,
             new Rect(0, 0, geometry.RowHeaderWidth, geometry.ColumnHeaderHeight));
+
+        gutter.Paint(context, headerBrush, foreground, lineBrush);
     }
 
     private void DrawCentred(DrawingContext context, string text, IBrush brush, Rect bounds)

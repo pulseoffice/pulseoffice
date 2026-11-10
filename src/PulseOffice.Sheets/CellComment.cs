@@ -13,6 +13,11 @@ public sealed record CellComment
     public bool IsAlwaysVisible { get; init; }
 }
 
+public sealed record OutlineSummary(bool Below = true, bool Right = true)
+{
+    public static OutlineSummary Default { get; } = new();
+}
+
 public sealed record OutlineGroup
 {
     public required int First { get; init; }

@@ -215,6 +215,7 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
             Decelerate = Number((string?)timeNode.Attribute("decel")) / 100000.0 ?? 0,
             AutoReverse = (string?)timeNode.Attribute("autoRev") is "1" or "true",
             RepeatCount = Number(repeat) / 1000.0,
+            RepeatsIndefinitely = repeat == "indefinite",
         };
     }
 
@@ -346,7 +347,8 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
             if (timing.Accelerate > 0) node.Add(new XAttribute("accel", codec.Percent(timing.Accelerate)));
             if (timing.Decelerate > 0) node.Add(new XAttribute("decel", codec.Percent(timing.Decelerate)));
             if (timing.AutoReverse) node.Add(new XAttribute("autoRev", "1"));
-            if (timing.RepeatCount is { } repeat) node.Add(new XAttribute("repeatCount", (int)Math.Round(repeat * 1000)));
+            if (timing.RepeatsIndefinitely) node.Add(new XAttribute("repeatCount", "indefinite"));
+            else if (timing.RepeatCount is { } repeat) node.Add(new XAttribute("repeatCount", (long)Math.Round(Math.Clamp(repeat, 0, 1_000_000) * 1000)));
             if (timing.Fill is "hold" or "remove" or "freeze" or "transition") node.Add(new XAttribute("fill", timing.Fill));
             if (timing.Begin is { } begin)
                 node.Add(new XElement(P + "stCondLst", new XElement(P + "cond", new XAttribute("delay", codec.Milliseconds(begin)))));

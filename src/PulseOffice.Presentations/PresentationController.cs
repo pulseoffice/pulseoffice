@@ -13,6 +13,10 @@ public sealed class PresentationController
     private readonly IReadOnlyList<Slide> _slides;
     private readonly IAnimationScheduler _scheduler;
     private readonly int[] _stepCounts;
+    private readonly bool _ignoreSteps;
+    private readonly Dictionary<string, int> _triggerSteps = new(StringComparer.Ordinal);
+    private SlideAnimationPlan? _plan;
+    private int _slideIndex;
 
     public PresentationController(Presentation deck, IAnimationScheduler scheduler, int startIndex = 0)
         : this(deck?.Slides ?? throw new ArgumentNullException(nameof(deck)), scheduler, startIndex)
@@ -26,13 +30,22 @@ public sealed class PresentationController
 
         _slides = slides;
         _scheduler = scheduler;
+        _ignoreSteps = ignoreSteps;
         _stepCounts = ignoreSteps ? [.. slides.Select(_ => 0)] : [.. slides.Select(StepsOf)];
 
         SlideIndex = Math.Clamp(startIndex, 0, Math.Max(0, slides.Count - 1));
         StepIndex = -1;
     }
 
-    public int SlideIndex { get; private set; }
+    public int SlideIndex
+    {
+        get => _slideIndex;
+        private set
+        {
+            if (value != _slideIndex) _triggerSteps.Clear();
+            _slideIndex = value;
+        }
+    }
 
     public int StepIndex { get; private set; }
 
@@ -93,7 +106,43 @@ public sealed class PresentationController
 
         SlideIndex = Math.Clamp(slideIndex, 0, _slides.Count - 1);
         StepIndex = -1;
+        _triggerSteps.Clear();
     }
+
+    public SlideAnimationPlan? Plan => Current is { } slide ? PlanOf(slide) : null;
+
+    public SlideAnimationPlan PlanOf(Slide slide)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        if (_plan is { } plan && ReferenceEquals(plan.Slide, slide) && plan.Count == slide.Animations.Count) return plan;
+        if (!ReferenceEquals(slide, Current)) return new SlideAnimationPlan(slide, _scheduler);
+        _plan = new SlideAnimationPlan(slide, _scheduler);
+        return _plan;
+    }
+
+    public bool IsTrigger(string elementId) =>
+        !_ignoreSteps && Plan is { } plan && plan.Triggers.Contains(elementId, StringComparer.Ordinal);
+
+    public (int StartMs, int EndMs)? Trigger(string elementId)
+    {
+        if (!IsTrigger(elementId)) return null;
+        var groups = Plan!.TriggerGroups(elementId);
+        if (groups.Count == 0) return null;
+        var step = _triggerSteps.TryGetValue(elementId, out var last) && last + 1 < groups.Count ? last + 1 : 0;
+        _triggerSteps[elementId] = step;
+        return groups[step];
+    }
+
+    public int TriggeredTimeMs(string triggerShapeId)
+    {
+        if (Plan is not { } plan || !_triggerSteps.TryGetValue(triggerShapeId, out var step)) return -1;
+        var groups = plan.TriggerGroups(triggerShapeId);
+        return step < groups.Count ? groups[step].EndMs : -1;
+    }
+
+    public ElementVisual VisualAt(string elementId, int mainTimeMs, string? liveTrigger = null, int liveTimeMs = -1) =>
+        Plan is not { } plan ? ElementVisual.Shown
+            : plan.VisualAt(elementId, mainTimeMs, trigger => string.Equals(trigger, liveTrigger, StringComparison.Ordinal) ? liveTimeMs : TriggeredTimeMs(trigger));
 
     public (int StartMs, int EndMs)? CurrentStepWindow()
     {

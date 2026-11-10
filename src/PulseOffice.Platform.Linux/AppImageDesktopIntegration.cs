@@ -62,12 +62,13 @@ public sealed class AppImageDesktopIntegration(
     public void Integrate()
     {
         var image = CurrentImage ?? throw new InvalidOperationException("PulseOffice is not running from an AppImage.");
+        var entry = DesktopEntry();
         Directory.CreateDirectory(OwnFolder);
         Directory.CreateDirectory(DesktopFolder);
         WriteAtomically(PathFile, image + "\n");
         WriteAtomically(LauncherFile, launcher.Text(PathFile));
         File.SetUnixFileMode(LauncherFile, Executable);
-        WriteAtomically(DesktopFile, DesktopEntry());
+        WriteAtomically(DesktopFile, entry);
         if (environment.Get("APPDIR") is { Length: > 0 } appDir && File.Exists(Path.Combine(appDir, ApplicationId + ".png")))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(IconFile)!);
@@ -111,12 +112,27 @@ public sealed class AppImageDesktopIntegration(
         "Name=PulseOffice\n" +
         "GenericName=Office Suite\n" +
         "Comment=Documents, spreadsheets and presentations\n" +
-        $"Exec=\"{LauncherFile.Replace("\"", "\\\"", StringComparison.Ordinal)}\" %F\n" +
+        $"Exec=\"{ExecArgument(LauncherFile)}\" %F\n" +
         $"Icon={ApplicationId}\n" +
         "Terminal=false\n" +
         "Categories=Office;\n" +
         $"MimeType={string.Join(';', MediaTypes)};\n" +
         "StartupWMClass=PulseOffice\n";
+
+    private static string ExecArgument(string path)
+    {
+        if (path.Any(char.IsControl))
+            throw new InvalidOperationException("The menu entry cannot point to a path that contains control characters.");
+        var quoted = new System.Text.StringBuilder(path.Length + 8);
+        foreach (var character in path)
+        {
+            if (character is '"' or '`' or '$' or '\\') quoted.Append('\\');
+            quoted.Append(character);
+        }
+        return quoted.ToString()
+            .Replace("%", "%%", StringComparison.Ordinal)
+            .Replace("\\", "\\\\", StringComparison.Ordinal);
+    }
 
     private void Refresh(bool registerTypes)
     {

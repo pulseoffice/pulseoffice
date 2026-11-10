@@ -27,7 +27,7 @@ public interface ILineBreaker
     LineSpan BreakLine(ShapedParagraph paragraph, ParagraphFrame frame, int start, int index, double available);
 }
 
-public sealed class LineBreaker(ITabResolver tabs) : ILineBreaker
+public sealed class LineBreaker(ITabResolver tabs, ILineBreakOpportunities opportunities) : ILineBreaker
 {
     private const double Epsilon = 0.001;
 
@@ -99,6 +99,7 @@ public sealed class LineBreaker(ITabResolver tabs) : ILineBreaker
                 breakAt = i + 1;
                 continue;
             }
+            if (i > start && opportunities.BreaksBefore(text, i)) breakAt = i;
             if (x + width > available + Epsilon && i > start)
             {
                 var end = Choose(paragraph, start, i, breakAt, widths, x0, available, out var hyphenated);

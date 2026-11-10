@@ -67,13 +67,19 @@ public sealed class OdfStyleMapper(string dataStylePrefix = "N")
 
     private string? _generalDataStyle;
 
-    public XElement DeclareNamed(string name, CellStyle style, string? parent, string? numberFormatCode = null)
+    public XElement DeclareNamed(string name, CellStyle style, string? parent, string? numberFormatCode = null) =>
+        DeclareNamed(name, style, parent, numberFormatCode, null);
+
+    public XElement DeclareNamed(string name, CellStyle style, string? parent, string? numberFormatCode, CellStyleProperties? declared)
     {
         var element = _builder.Build(_names.Encode(name), style, DataStyleFor(numberFormatCode));
         element.SetAttributeValue(Namespaces.Style + "parent-style-name", parent is null ? null : _names.Encode(parent));
         element.SetAttributeValue(Namespaces.Style + "display-name", name);
+        if (declared is { } properties) _layer.Limit(element, properties, GeneralDataStyle);
         return element;
     }
+
+    private readonly OdfNamedStyleLayer _layer = new(new OdfPropertySetPlacement());
 }
 
 internal sealed class OdfCellStyleHyperlink

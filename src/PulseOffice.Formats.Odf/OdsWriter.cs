@@ -328,6 +328,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 new XAttribute(Namespaces.Table + "name", sheet.Name));
             _tableStyles.Write(sheet, table);
             new OdfProtectionMapper().Write(sheet, table);
+            new OdfOutlineSummaryCodec().Write(sheet, table);
             if (new OdfSheetEventMapper().Build(sheet) is { } events) table.Add(events);
 
             if (sheet.PrintRanges.Count > 0)

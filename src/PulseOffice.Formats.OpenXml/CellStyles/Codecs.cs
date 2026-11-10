@@ -251,21 +251,23 @@ public sealed class XlsxStyleReader
         return styles.Count == 0 ? [PulseOffice.Sheets.Styling.CellStyle.Default] : styles;
     }
 
-    public IReadOnlyList<(string Name, PulseOffice.Sheets.Styling.CellStyle Style)> ReadNamedStyles(Stylesheet? stylesheet)
+    public IReadOnlyList<XlsxNamedStyle> ReadNamedStyles(Stylesheet? stylesheet)
     {
         if (stylesheet?.CellStyles is null || stylesheet.CellStyleFormats is null) return [];
 
         var read = Reading(stylesheet);
         var formats = stylesheet.CellStyleFormats.Elements<CellFormat>().ToList();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var result = new List<(string, PulseOffice.Sheets.Styling.CellStyle)>();
+        var result = new List<XlsxNamedStyle>();
         foreach (var style in stylesheet.CellStyles.Elements<DocumentFormat.OpenXml.Spreadsheet.CellStyle>())
         {
             if (ModelName(style) is not { } name || style.FormatId?.Value is not { } id || id >= formats.Count) continue;
-            if (seen.Add(name)) result.Add((name, read(formats[(int)id])));
+            if (seen.Add(name)) result.Add(new XlsxNamedStyle(name, read(formats[(int)id]), _includes.Read(formats[(int)id])));
         }
         return result;
     }
+
+    private readonly XlsxStyleIncludes _includes = new();
 
     private Func<CellFormat, PulseOffice.Sheets.Styling.CellStyle> Reading(Stylesheet stylesheet)
     {
@@ -309,4 +311,31 @@ public sealed class XlsxStyleReader
         style.Name?.Value?.Trim() is not { Length: > 0 } name ? null
         : string.Equals(name, "Normal", StringComparison.Ordinal) && style.BuiltinId?.Value == 0 ? DefaultStyle
         : name;
+}
+
+public sealed record XlsxNamedStyle(string Name, PulseOffice.Sheets.Styling.CellStyle Style, CellStyleProperties Explicit);
+
+internal sealed class XlsxStyleIncludes
+{
+    public CellStyleProperties Read(CellFormat format)
+    {
+        var result = CellStyleProperties.None;
+        if (format.ApplyFont?.Value != false) result |= CellStyleProperties.Font;
+        if (format.ApplyFill?.Value != false) result |= CellStyleProperties.Background;
+        if (format.ApplyBorder?.Value != false) result |= CellStyleProperties.Borders;
+        if (format.ApplyAlignment?.Value != false) result |= CellStyleProperties.Alignment;
+        if (format.ApplyNumberFormat?.Value != false) result |= CellStyleProperties.NumberFormat;
+        if (format.ApplyProtection?.Value != false) result |= CellStyleProperties.Locked;
+        return result | CellStyleProperties.Language;
+    }
+
+    public void Write(CellFormat format, CellStyleProperties declared)
+    {
+        format.ApplyFont = (declared & CellStyleProperties.Font) != 0;
+        format.ApplyFill = (declared & CellStyleProperties.Background) != 0;
+        format.ApplyBorder = (declared & CellStyleProperties.Borders) != 0;
+        format.ApplyAlignment = (declared & CellStyleProperties.Alignment) != 0;
+        format.ApplyNumberFormat = (declared & CellStyleProperties.NumberFormat) != 0;
+        format.ApplyProtection = (declared & CellStyleProperties.Locked) != 0;
+    }
 }

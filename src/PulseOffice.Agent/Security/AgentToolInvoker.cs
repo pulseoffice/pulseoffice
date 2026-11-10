@@ -40,11 +40,15 @@ public sealed class AgentToolInvoker(
         var parsed = new AgentArguments(arguments);
         try
         {
-            if (await tool.ConfirmationAsync(parsed, ct).ConfigureAwait(true) is { } need
-                && !await confirmation.ConfirmAsync(new AgentConfirmationRequest(tool.Name, need.Kind, need.Subject, tool.Title), ct).ConfigureAwait(true))
+            if (await tool.ConfirmationAsync(parsed, ct).ConfigureAwait(true) is { } need)
             {
-                Record(client, tool, AgentOperationOutcome.Declined, $"{need.Kind.ToString().ToLowerInvariant()} {Summary(arguments)}");
-                return AgentToolResult.Failure($"The user declined: {need.Summary}");
+                if (!await confirmation.ConfirmAsync(new AgentConfirmationRequest(tool.Name, need.Kind, need.Subject, tool.Title), ct).ConfigureAwait(true))
+                {
+                    Record(client, tool, AgentOperationOutcome.Declined, $"{need.Kind.ToString().ToLowerInvariant()} {Summary(arguments)}");
+                    return AgentToolResult.Failure($"The user declined: {need.Summary}");
+                }
+
+                parsed.Confirm(need);
             }
 
             var result = await tool.InvokeAsync(parsed, ct).ConfigureAwait(true);

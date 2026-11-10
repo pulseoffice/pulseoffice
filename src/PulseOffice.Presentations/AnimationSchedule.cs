@@ -13,6 +13,10 @@ public interface IAnimationScheduler
 {
     IReadOnlyList<ScheduledEffect> Schedule(IReadOnlyList<AnimationEffect> effects);
 
+    IReadOnlyList<ScheduledEffect> ScheduleTriggered(IReadOnlyList<AnimationEffect> effects, string triggerShapeId);
+
+    IReadOnlyList<(int StartMs, int EndMs)> TriggerGroups(IReadOnlyList<ScheduledEffect> schedule);
+
     int Duration(IReadOnlyList<ScheduledEffect> schedule);
 
     IReadOnlyList<(int StartMs, int EndMs)> ClickGroups(IReadOnlyList<ScheduledEffect> schedule);
@@ -35,6 +39,19 @@ public sealed class AnimationScheduler : IAnimationScheduler
     public IReadOnlyList<ScheduledEffect> Schedule(IReadOnlyList<AnimationEffect> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
+        return Plan([.. effects.Where(effect => !effect.IsTriggered)]);
+    }
+
+    public IReadOnlyList<ScheduledEffect> ScheduleTriggered(IReadOnlyList<AnimationEffect> effects, string triggerShapeId)
+    {
+        ArgumentNullException.ThrowIfNull(effects);
+        return Plan([.. effects.Where(effect => effect.IsTriggered && string.Equals(effect.TriggerShapeId, triggerShapeId, StringComparison.Ordinal))]);
+    }
+
+    public IReadOnlyList<(int StartMs, int EndMs)> TriggerGroups(IReadOnlyList<ScheduledEffect> schedule) => Groups(schedule);
+
+    private List<ScheduledEffect> Plan(IReadOnlyList<AnimationEffect> effects)
+    {
 
         var scheduled = new List<ScheduledEffect>(effects.Count);
         var cursor = 0;
@@ -122,6 +139,12 @@ public sealed class AnimationScheduler : IAnimationScheduler
             }
 
             appeared |= scheduled.Effect.Category is AnimationCategory.Entrance or AnimationCategory.Exit;
+
+            if (scheduled.Effect.Rewind && timeMs >= scheduled.EndMs)
+            {
+                if (scheduled.Effect.Category == AnimationCategory.Entrance) visual = Hidden;
+                continue;
+            }
 
             var progress = Progress(scheduled, timeMs);
             visual = Apply(scheduled.Effect, progress, visual);

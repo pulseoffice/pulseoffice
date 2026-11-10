@@ -22,6 +22,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
     private readonly DateTimeOffset _printedAt;
     private readonly IConditionalAppearanceSource _conditional;
     private readonly ConditionalCellPainter _conditionalPainter;
+    private readonly ISheetCellTextPainter _cellText;
 
     private const double IndentPoints = 6;
     private static readonly Twip HeadingHeight = Twip.FromPoints(12);
@@ -41,8 +42,10 @@ public sealed class SheetPrintDocument : IPrintableDocument
         ISheetObjectExtent? extent = null,
         IObjectPathBuilder? paths = null,
         ISheetObjectImages? images = null,
-        IJobPageNumbering? numbering = null)
+        IJobPageNumbering? numbering = null,
+        ISheetCellTextPainter? cellText = null)
     {
+        _cellText = cellText ?? new SheetCellTextPainter();
         _numbering = numbering ?? new OwnPageNumbering(options?.Setup.FirstPageNumber);
         _images = images ?? new NoSheetObjectImages();
         _paths = paths ?? new ObjectPathBuilder();
@@ -458,7 +461,6 @@ public sealed class SheetPrintDocument : IPrintableDocument
         var formatted = _presenter.Present(cell, _styles, _sheet.Owner?.NumberFormats ?? _builtInFormats, CharactersIn(bounds.Width, style));
         if (formatted.Text.Length == 0) return;
 
-        var font = new PrintFont(style.Font.Family, style.Font.Size, style.Font.Bold, style.Font.Italic);
         var color = PrintColor.FromName(formatted.ColorName) ?? PrintColor.FromHex(style.Font.ColorHex);
 
         var padding = Twip.FromPoints(2 + Math.Max(style.Indent, 0) * IndentPoints);
@@ -468,12 +470,12 @@ public sealed class SheetPrintDocument : IPrintableDocument
         var text = new DocumentRect(
             bounds.Left + padding, bounds.Top, available - padding * 2, bounds.Height);
 
-        canvas.DrawText(formatted.Text, text, font, color, Align(style, formatted), Baseline(style));
+        _cellText.Paint(canvas, new SheetCellText(formatted, style, bounds, text, color));
     }
 
     private Twip SpilledWidth(CellAddress address, CellStyle style, Twip width, IEnumerable<int> followingColumns)
     {
-        if (style.WrapText || style.Horizontal is CellHorizontalAlignment.Right) return width;
+        if (!_cellText.Spills(style) || style.Horizontal is CellHorizontalAlignment.Right) return width;
         if (_sheet.GetValue(address).Kind != Values.ValueKind.Text) return width;
 
         var total = width.Value;
@@ -495,21 +497,6 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
         return new Twip(total);
     }
-
-    private static TextAlignment Align(CellStyle style, FormattedCell formatted) => style.Horizontal switch
-    {
-        CellHorizontalAlignment.Left => TextAlignment.Left,
-        CellHorizontalAlignment.Center => TextAlignment.Center,
-        CellHorizontalAlignment.Right => TextAlignment.Right,
-        _ => formatted.AlignRight ? TextAlignment.Right : TextAlignment.Left,
-    };
-
-    private static TextBaseline Baseline(CellStyle style) => style.Vertical switch
-    {
-        CellVerticalAlignment.Top => TextBaseline.Top,
-        CellVerticalAlignment.Middle => TextBaseline.Middle,
-        _ => TextBaseline.Bottom,
-    };
 
     private static double CharactersIn(Twip width, CellStyle style) =>
         Math.Max(width.ToPoints() / Math.Max(style.Font.Size * 0.55, 1), 1);

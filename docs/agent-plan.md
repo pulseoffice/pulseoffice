@@ -42,7 +42,11 @@ those with an `Origin` other than localhost (defence against DNS rebinding: a we
 47820, changeable in the advanced settings. Sessions idle for ten minutes expire.
 
 For clients that start MCP servers as stdio commands (Claude Desktop) there is a bridge: `tools/mcp-client`
-(`pulse-mcp bridge`) reads JSON-RPC from stdin and forwards it to the HTTP server. The same program acts as a test client
+(`pulse-mcp bridge`) reads JSON-RPC from stdin and forwards it to the HTTP server. Since round 139 the bridge never
+stops on a bad exchange: a malformed line gets a parse error, a refused or unreachable request (401, 403, 413, 503,
+timeout, connection refused) gets a JSON-RPC error with the request's id, and when the server answers 404 because the
+session expired or PulseOffice restarted, the bridge replays the client's last `initialize`, opens a new session and
+retries the request once. The same program acts as a test client
 (`pulse-mcp tools`, `pulse-mcp call <tool> '<JSON arguments>' [--image file.png]`).
 
 ## The tools (139 with the three modules)

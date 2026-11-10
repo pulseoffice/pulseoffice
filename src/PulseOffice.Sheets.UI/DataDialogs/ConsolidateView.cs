@@ -10,9 +10,15 @@ using PulseOffice.UI.Controls.References;
 namespace PulseOffice.Sheets.UI.DataDialogs;
 
 public sealed record ConsolidateChoice(
-    IReadOnlyList<string> Sources, string Destination, SubtotalFunction Function, bool RowLabels, bool ColumnLabels);
+    IReadOnlyList<string> Sources, string Destination, SubtotalFunction Function, bool RowLabels, bool ColumnLabels)
+{
+    public bool LinkToSource { get; init; }
+}
 
-public sealed record ConsolidateLabels(SubtotalFunction Function, bool RowLabels, bool ColumnLabels);
+public sealed record ConsolidateLabels(SubtotalFunction Function, bool RowLabels, bool ColumnLabels)
+{
+    public bool LinkToSource { get; init; }
+}
 
 public sealed record SketchPreview(IReadOnlyList<IReadOnlyList<SketchCell>> Rows, string? Problem, string Summary = "");
 
@@ -52,6 +58,7 @@ public sealed class ConsolidateView : LedgerDialogView
             Math.Max(0, _functions.IndexOf(initial?.Function ?? SubtotalFunction.Sum)), showLabels: true, columns: 2);
         RowLabels = kit.Check("consolidate.labelsRow", initial?.RowLabels ?? true);
         ColumnLabels = kit.Check("consolidate.labelsColumn", initial?.ColumnLabels ?? true);
+        LinkToSource = kit.Check("consolidate.link", initial?.LinkToSource ?? false);
         Sketch = new CellGridSketch(kit);
         _summary = kit.Note();
 
@@ -62,6 +69,7 @@ public sealed class ConsolidateView : LedgerDialogView
         how.Add(kit["consolidate.function"], Function, alignTop: true);
         how.Add(null, RowLabels, DialogRowKind.Indented);
         how.Add(null, ColumnLabels, DialogRowKind.Indented);
+        how.Add(null, LinkToSource, DialogRowKind.Indented);
         var where = Layout.AddSection(kit["consolidate.section.result"]);
         where.Add(kit["consolidate.destination"], Destination);
         Finish("consolidate.confirm", where);
@@ -84,13 +92,18 @@ public sealed class ConsolidateView : LedgerDialogView
 
     public CheckBox ColumnLabels { get; }
 
+    public CheckBox LinkToSource { get; }
+
     public CellGridSketch Sketch { get; }
 
     public void AddSource(string source) => _sources.Add(source);
 
     public ConsolidateChoice Choice => new(
         [.. _sources.Items], Destination.Text, _functions[Math.Max(Function.SelectedIndex, 0)],
-        RowLabels.IsChecked == true, ColumnLabels.IsChecked == true);
+        RowLabels.IsChecked == true, ColumnLabels.IsChecked == true)
+    {
+        LinkToSource = LinkToSource.IsChecked == true,
+    };
 
     protected override object? Result() => Choice;
 

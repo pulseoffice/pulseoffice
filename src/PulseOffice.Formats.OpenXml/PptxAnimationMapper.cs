@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml;
 
 public sealed class PptxAnimationMapper
 {
-    private const int MaxTimingMs = 3_600_000;
+    private const int MaxTimingMs = AnimationEffect.LongestTimingMs;
 
     private readonly AnimationClickGroups _groups = new();
     private readonly TokenMap<AnimationCategory> _categories = new(AnimationCategory.MotionPath, "path",
@@ -48,11 +48,47 @@ public sealed class PptxAnimationMapper
                 media + "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>");
 
         var id = 2;
-        var mainSeq = new StringBuilder();
+        var triggered = slide.Animations
+            .Where(effect => effect.IsTriggered && spidByElement.ContainsKey(effect.TriggerShapeId!))
+            .ToList();
+        var mainSeq = Groups([.. slide.Animations.Except(triggered)], spidByElement, sounds, ref id, "indefinite");
+        var interactive = new StringBuilder();
+        foreach (var sequence in triggered.GroupBy(effect => effect.TriggerShapeId!))
+        {
+            var triggerSpid = spidByElement[sequence.Key];
+            var sequenceId = id++;
+            var body = Groups([.. sequence], spidByElement, sounds, ref id, "0");
+            if (body.Length == 0) continue;
+            var condition = string.Create(CultureInfo.InvariantCulture,
+                $"<p:cond evt=\"onClick\" delay=\"0\"><p:tgtEl><p:spTgt spid=\"{triggerSpid}\"/></p:tgtEl></p:cond>");
+            interactive.Append(CultureInfo.InvariantCulture,
+                $"<p:seq concurrent=\"1\" nextAc=\"seek\"><p:cTn id=\"{sequenceId}\" restart=\"whenNotActive\" fill=\"hold\" evtFilter=\"cancelBubble\" nodeType=\"interactiveSeq\">");
+            interactive.Append("<p:stCondLst>").Append(condition).Append("</p:stCondLst>");
+            interactive.Append("<p:endSync evt=\"end\" delay=\"0\"><p:rtn val=\"all\"/></p:endSync><p:childTnLst>");
+            interactive.Append(body);
+            interactive.Append("</p:childTnLst></p:cTn><p:nextCondLst>").Append(condition).Append("</p:nextCondLst></p:seq>");
+        }
 
-        var groups = _groups.Of(slide.Animations);
+        var main = mainSeq.Length == 0 && interactive.Length > 0 ? string.Empty :
+            "<p:seq concurrent=\"1\" nextAc=\"seek\"><p:cTn id=\"100000\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>" +
+            mainSeq +
+            "</p:childTnLst></p:cTn>" +
+            "<p:prevCondLst><p:cond evt=\"onPrev\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>" +
+            "<p:nextCondLst><p:cond evt=\"onNext\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>" +
+            "</p:seq>";
+        var xml =
+            $"<p:timing xmlns:p=\"{PNs}\" xmlns:a=\"{ANs}\"><p:tnLst>" +
+            "<p:par><p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\"><p:childTnLst>" +
+            main + interactive + media + "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>";
 
-        foreach (var group in groups)
+        return new P.Timing(xml);
+    }
+
+    private StringBuilder Groups(IReadOnlyList<AnimationEffect> animations, IReadOnlyDictionary<string, uint> spidByElement,
+        Func<string?, PptxSoundReference?> sounds, ref int id, string firstDelay)
+    {
+        var sequence = new StringBuilder();
+        foreach (var group in _groups.Of(animations))
         {
             var groupStart = id;
             var clickId = id++;
@@ -71,12 +107,6 @@ public sealed class PptxAnimationMapper
                     continue;
                 }
 
-                var nodeType = effect.Trigger switch
-                {
-                    AnimationTrigger.WithPrevious => "withEffect",
-                    AnimationTrigger.AfterPrevious => "afterEffect",
-                    _ => "clickEffect",
-                };
                 var behaviours = _behaviours.Resolve(effect);
                 if (!_codec.Children(behaviours, spid, new TimeNodeIdSequence(0)).Any())
                     behaviours = _behaviours.Fallback(effect);
@@ -89,9 +119,9 @@ public sealed class PptxAnimationMapper
                     new System.Xml.Linq.XAttribute("presetSubtype", Subtype(effect)),
                     effect.Repeat > 1 ? new System.Xml.Linq.XAttribute("repeatCount", effect.Repeat * 1000) : null,
                     _codec.RootAttributes(behaviours),
-                    new System.Xml.Linq.XAttribute("fill", "hold"),
+                    new System.Xml.Linq.XAttribute("fill", Fill(effect)),
                     new System.Xml.Linq.XAttribute("grpId", "0"),
-                    new System.Xml.Linq.XAttribute("nodeType", nodeType),
+                    new System.Xml.Linq.XAttribute("nodeType", NodeType(effect)),
                     new System.Xml.Linq.XElement(p + "stCondLst", new System.Xml.Linq.XElement(p + "cond", new System.Xml.Linq.XAttribute("delay", effect.DelayMs))),
                     _codec.Iterate(behaviours),
                     new System.Xml.Linq.XElement(p + "childTnLst", _codec.Children(behaviours, spid, ids)));
@@ -110,27 +140,26 @@ public sealed class PptxAnimationMapper
                 id = groupStart;
                 continue;
             }
-            mainSeq.Append(CultureInfo.InvariantCulture,
-                $"<p:par><p:cTn id=\"{clickId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"indefinite\"/></p:stCondLst><p:childTnLst>");
-            mainSeq.Append(CultureInfo.InvariantCulture,
+            var delay = sequence.Length == 0 ? firstDelay : "indefinite";
+            sequence.Append(CultureInfo.InvariantCulture,
+                $"<p:par><p:cTn id=\"{clickId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"{delay}\"/></p:stCondLst><p:childTnLst>");
+            sequence.Append(CultureInfo.InvariantCulture,
                 $"<p:par><p:cTn id=\"{withId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"0\"/></p:stCondLst><p:childTnLst>");
-            mainSeq.Append(effects);
-            mainSeq.Append("</p:childTnLst></p:cTn></p:par>");
-            mainSeq.Append("</p:childTnLst></p:cTn></p:par>");
+            sequence.Append(effects);
+            sequence.Append("</p:childTnLst></p:cTn></p:par>");
+            sequence.Append("</p:childTnLst></p:cTn></p:par>");
         }
-
-        var xml =
-            $"<p:timing xmlns:p=\"{PNs}\" xmlns:a=\"{ANs}\"><p:tnLst>" +
-            "<p:par><p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\"><p:childTnLst>" +
-            "<p:seq concurrent=\"1\" nextAc=\"seek\"><p:cTn id=\"100000\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>" +
-            mainSeq +
-            "</p:childTnLst></p:cTn>" +
-            "<p:prevCondLst><p:cond evt=\"onPrev\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>" +
-            "<p:nextCondLst><p:cond evt=\"onNext\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>" +
-            "</p:seq>" + media + "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>";
-
-        return new P.Timing(xml);
+        return sequence;
     }
+
+    private string NodeType(AnimationEffect effect) => effect.Trigger switch
+    {
+        AnimationTrigger.WithPrevious => "withEffect",
+        AnimationTrigger.AfterPrevious => "afterEffect",
+        _ => "clickEffect",
+    };
+
+    private string Fill(AnimationEffect effect) => effect.Rewind ? "remove" : "hold";
 
     private int Subtype(AnimationEffect effect) =>
         _subtypes.ToOoxml(effect.Category, int.Parse(_presets.OoxmlPresetId(effect.Category, effect.Preset), CultureInfo.InvariantCulture), effect.Subtype);
@@ -151,12 +180,8 @@ public sealed class PptxAnimationMapper
             head.SetAttributeValue("presetID", _presets.OoxmlPresetId(effect.Category, effect.Preset));
             head.SetAttributeValue("presetClass", _categories.Token(effect.Category));
             head.SetAttributeValue("presetSubtype", Subtype(effect));
-            head.SetAttributeValue("nodeType", effect.Trigger switch
-            {
-                AnimationTrigger.WithPrevious => "withEffect",
-                AnimationTrigger.AfterPrevious => "afterEffect",
-                _ => "clickEffect",
-            });
+            head.SetAttributeValue("nodeType", NodeType(effect));
+            head.SetAttributeValue("fill", Fill(effect));
             if (head.Element(p + "stCondLst")?.Element(p + "cond") is { } condition)
                 condition.SetAttributeValue("delay", effect.DelayMs);
         }
@@ -215,6 +240,8 @@ public sealed class PptxAnimationMapper
                 DelayMs = cTn.StartConditionList?.GetFirstChild<P.Condition>()?.Delay?.Value is { } d
                     && int.TryParse(d, NumberStyles.Integer, CultureInfo.InvariantCulture, out var delay) && delay >= 0 ? Math.Min(delay, MaxTimingMs) : 0,
                 SoundPath = sounds is not null && _sound.Target(cTn) is { } target ? sounds(target) : null,
+                TriggerShapeId = TriggerShape(cTn, resolve),
+                Rewind = cTn.Fill?.Value == P.TimeNodeFillValues.Remove,
             };
             var read = xml is not null
                 ? effect with { Native = new NativeAnimation(NativeAnimation.Ooxml, xml, effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours) }
@@ -226,6 +253,13 @@ public sealed class PptxAnimationMapper
 
         return effects;
     }
+
+    private string? TriggerShape(P.CommonTimeNode effect, Func<uint, IReadOnlyList<string>> resolve) =>
+        effect.Ancestors<P.CommonTimeNode>().FirstOrDefault(node => node.NodeType?.Value == P.TimeNodeValues.InteractiveSequence)?
+            .StartConditionList?.Elements<P.Condition>()
+            .Select(condition => condition.TargetElement?.ShapeTarget?.ShapeId?.Value)
+            .Select(spid => uint.TryParse(spid, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && resolve(value) is [var id, ..] ? id : null)
+            .FirstOrDefault(id => id is not null);
 
     private AnimationBehaviours? Behaviours(string xml) =>
         System.Xml.Linq.XElement.Parse(xml).Element(_codec.PresentationNamespace + "cTn") is { } head ? _codec.Read(head) : null;

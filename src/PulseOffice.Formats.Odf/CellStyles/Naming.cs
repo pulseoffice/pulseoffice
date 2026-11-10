@@ -60,7 +60,10 @@ public sealed class OdfStyleNames
     private string Sanitize(string name) => new([.. name.Where(char.IsLetterOrDigit)]);
 }
 
-public sealed record OdfNamedCellStyle(string EncodedName, string Name, string? Parent, CellStyle Style);
+public sealed record OdfNamedCellStyle(string EncodedName, string Name, string? Parent, CellStyle Style)
+{
+    public CellStyleProperties Declared { get; init; } = CellStyleProperties.All;
+}
 
 internal sealed class OdfConditionOnlyStyles
 {
@@ -83,6 +86,7 @@ public sealed class OdfCellStyleReader
     private readonly OdfStyleNames _names = new();
     private readonly OdfConditionOnlyStyles _conditions = new();
     private readonly OdfCellStyleInheritance _inheritance = new();
+    private readonly OdfNamedStyleLayer _layer = new(new OdfPropertySetPlacement());
 
     public IReadOnlyDictionary<string, CellStyle> ReadStyles(XDocument content) => ReadStyles(content, _ => 0);
 
@@ -137,7 +141,7 @@ public sealed class OdfCellStyleReader
                 : string.Equals(parentName, RootStyle, StringComparison.Ordinal) ? (string.Equals(display, RootStyle, StringComparison.OrdinalIgnoreCase) ? null : RootStyle)
                 : displays.TryGetValue(parentName, out var parentDisplay) && !string.Equals(parentDisplay, display, StringComparison.OrdinalIgnoreCase) ? parentDisplay
                 : null;
-            result.Add(new OdfNamedCellStyle(encoded, display, parent, style));
+            result.Add(new OdfNamedCellStyle(encoded, display, parent, style) { Declared = _layer.Declared(element) });
         }
         return result;
     }

@@ -53,10 +53,20 @@ public sealed class OdfAnimationMapper
 
         if (slide.Animations.Count == 0) return root;
 
-        var seq = new XElement(Anim + "seq",
-            new XAttribute(Pres + "node-type", "main-sequence"));
+        var triggered = slide.Animations.Where(effect => effect.IsTriggered).ToList();
+        var main = slide.Animations.Except(triggered).ToList();
+        if (main.Count > 0 || triggered.Count == 0)
+            root.Add(Sequence(new XElement(Anim + "seq", new XAttribute(Pres + "node-type", "main-sequence")), main));
+        foreach (var sequence in triggered.GroupBy(effect => effect.TriggerShapeId!))
+            root.Add(Sequence(new XElement(Anim + "seq",
+                new XAttribute(Smil + "begin", sequence.Key + ".click"),
+                new XAttribute(Pres + "node-type", "interactive-sequence")), [.. sequence]));
+        return root;
+    }
 
-        foreach (var group in _groups.Of(slide.Animations))
+    private XElement Sequence(XElement seq, IReadOnlyList<AnimationEffect> animations)
+    {
+        foreach (var group in _groups.Of(animations))
         {
             var click = new XElement(Anim + "par",
                 new XAttribute(Pres + "node-type", "on-click"));
@@ -72,7 +82,7 @@ public sealed class OdfAnimationMapper
                 var effectPar = _codec.Write(_behaviours.Resolve(effect), _paragraphs.Target(effect));
                 effectPar.Add(
                     new XAttribute(Smil + "begin", Time(effect.DelayMs)),
-                    new XAttribute(Smil + "fill", "hold"),
+                    new XAttribute(Smil + "fill", Fill(effect)),
                     new XAttribute(Pres + "node-type", _triggers.Token(effect.Trigger)),
                     new XAttribute(Pres + "preset-class", _categories.Token(effect.Category)),
                     new XAttribute(Pres + "preset-id", _presets.OdfPresetId(effect.Category, effect.Preset)));
@@ -93,14 +103,16 @@ public sealed class OdfAnimationMapper
             seq.Add(click);
         }
 
-        root.Add(seq);
-        return root;
+        return seq;
     }
+
+    private string Fill(AnimationEffect effect) => effect.Rewind ? "remove" : "hold";
 
     private XElement Native(NativeAnimation native, AnimationEffect effect)
     {
         var par = XElement.Parse(native.Xml);
         par.SetAttributeValue(Smil + "begin", Time(effect.DelayMs));
+        par.SetAttributeValue(Smil + "fill", Fill(effect));
         par.SetAttributeValue(Pres + "node-type", _triggers.Token(effect.Trigger));
         par.SetAttributeValue(Pres + "preset-class", _categories.Token(effect.Category));
         par.SetAttributeValue(Pres + "preset-id", _presets.OdfPresetId(effect.Category, effect.Preset));
@@ -154,7 +166,7 @@ public sealed class OdfAnimationMapper
                     ? (string?)effectPar.Descendants(Anim + "command").FirstOrDefault()?.Attribute(Anim + "command") ?? "play"
                     : _presets.FromOdf(category, (string?)effectPar.Attribute(Pres + "preset-id") ?? string.Empty),
                 Trigger = _triggers.Value((string?)effectPar.Attribute(Pres + "node-type")),
-                DurationMs = behaviours.NaturalDuration > 0 ? (int)Math.Round(behaviours.NaturalDuration * 1000)
+                DurationMs = behaviours.NaturalDuration > 0 && double.IsFinite(behaviours.NaturalDuration) ? (int)Math.Min(AnimationEffect.LongestTimingMs, Math.Round(behaviours.NaturalDuration * 1000))
                     : timed.Count > 0
                     ? timed.Max(e => Seconds((string?)e.Attribute(Smil + "dur"), 500))
                     : Seconds((string?)set?.Attribute(Smil + "dur"), 500),
@@ -163,6 +175,8 @@ public sealed class OdfAnimationMapper
                 SoundPath = (string?)effectPar.Descendants(Anim + "audio").FirstOrDefault()?.Attribute(Xlink + "href"),
                 Repeat = RepeatCount((string?)effectPar.Attribute(Smil + "repeatCount")),
                 Subtype = (string?)effectPar.Attribute(Pres + "preset-sub-type") is { Length: > 0 } subtype ? subtype : null,
+                TriggerShapeId = TriggerShape(effectPar),
+                Rewind = (string?)effectPar.Attribute(Smil + "fill") == "remove",
             };
             effects.Add(single
                 ? effect with { Native = new NativeAnimation(NativeAnimation.Odf, effectPar.ToString(SaveOptions.DisableFormatting), effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours) }
@@ -171,6 +185,13 @@ public sealed class OdfAnimationMapper
 
         return effects;
     }
+
+    private string? TriggerShape(XElement effect) =>
+        effect.Ancestors(Anim + "seq").FirstOrDefault(seq => (string?)seq.Attribute(Pres + "node-type") == "interactive-sequence")?
+            .Attribute(Smil + "begin")?.Value.Split(';').Select(value => value.Trim())
+            .Where(value => value.EndsWith(".click", StringComparison.Ordinal) && value.Length > ".click".Length)
+            .Select(value => value[..^".click".Length])
+            .FirstOrDefault();
 
     private string Time(int milliseconds) =>
         (milliseconds / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "s";
@@ -182,8 +203,8 @@ public sealed class OdfAnimationMapper
 
     private int Seconds(string? value, int fallback) =>
         value is not null && double.TryParse(value.TrimEnd('s', 'S'), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
-            && double.IsFinite(seconds) && seconds >= 0 && seconds < 86400
-            ? (int)Math.Round(seconds * 1000)
+            && double.IsFinite(seconds) && seconds >= 0
+            ? (int)Math.Min(AnimationEffect.LongestTimingMs, Math.Round(seconds * 1000))
             : fallback;
 }
 

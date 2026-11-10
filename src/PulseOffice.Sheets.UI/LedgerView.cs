@@ -197,7 +197,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
             validator, autoInput ?? new Engine.Operations.AutoInput(), _metrics);
         _objects = new LedgerObjectEditing(_workbook, _grid, _history, _status, _texts,
             connectors ?? new SheetConnectors(), binding, _writer);
-        _operations = new LedgerCellOperations(_workbook, _engine, _grid, _selection, _history, _status, _texts, _writer);
+        _operations = new LedgerCellOperations(_workbook, _engine, _grid, _selection, _history, _status, _texts, _writer, new Outline.OutlineGutter());
         var textEditing = shapeTextEditing ?? new Drawing.Shapes.ShapeTextEditing();
         _shapeText = new LedgerShapeTextSession(_workbook, _grid, _overlay, this, _texts,
             shapeTextStyle ?? new ShapeText.ShapeTextCellStyle(textEditing), textEditing,
@@ -259,6 +259,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _grid.ClearRequested += (_, range) => _operations.ClearContents(range);
         _grid.ObjectsDeleteRequested += (_, objects) => _objects.DeleteObjects(objects);
         _grid.ResizeRequested += (_, request) => _operations.ApplyResize(request);
+        _grid.OutlineRequested += (_, button) => _operations.ApplyOutline(button);
         _grid.FormControlChanged += (_, change) => _objects.ApplyFormControl(change);
         _grid.FreeformCompleted += (_, completed) => _objects.InsertFreeform(completed);
         _grid.FreeformEdited += (_, edited) => _objects.ApplyFreeform(edited);

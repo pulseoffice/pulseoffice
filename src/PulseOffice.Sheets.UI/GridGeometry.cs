@@ -43,6 +43,10 @@ public sealed class GridGeometry(SheetLayout layout)
 
     public double ColumnHeaderHeight { get; set; } = 20;
 
+    public double RowGutterWidth { get; set; }
+
+    public double ColumnGutterHeight { get; set; }
+
     public int FrozenRows { get; set; }
 
     public int FrozenColumns { get; set; }

@@ -36,6 +36,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<IParagraphShaper, ParagraphShaper>();
         services.AddSingleton<IBulletPictureSizing, BulletPictureSizing>();
         services.AddSingleton<ITabResolver, TabResolver>();
+        services.TryAddSingleton<ILineBreakOpportunities, IdeographicBreaks>();
         services.AddSingleton<ILineBreaker, LineBreaker>();
         services.TryAddSingleton<PulseOffice.Text.Rich.Bidi.IBidiClasses, PulseOffice.Text.Rich.Bidi.UnicodeBidiClasses>();
         services.TryAddSingleton<PulseOffice.Text.Rich.Bidi.IBidiMirroring, PulseOffice.Text.Rich.Bidi.BidiMirroring>();

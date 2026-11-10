@@ -15,6 +15,10 @@ public enum SubtotalFunction
 
 public sealed record SubtotalRequest(CellRange Range, int GroupColumn, IReadOnlyList<int> ValueColumns)
 {
+    public IReadOnlyList<int> ThenGroupColumns { get; init; } = [];
+
+    public IReadOnlyList<int> GroupColumns => [GroupColumn, .. ThenGroupColumns.Where(column => column != GroupColumn).Distinct()];
+
     public SubtotalFunction Function { get; init; } = SubtotalFunction.Sum;
 
     public IReadOnlyDictionary<int, SubtotalFunction> ColumnFunctions { get; init; } = new Dictionary<int, SubtotalFunction>();
@@ -45,11 +49,23 @@ public sealed record SubtotalRequest(CellRange Range, int GroupColumn, IReadOnly
 public sealed record SubtotalRow(int InsertAt, string Label, int First, int Last, IReadOnlyDictionary<int, string> Formulas)
 {
     public bool IsGrandTotal { get; init; }
+
+    public int Level { get; init; } = 1;
+
+    public int LabelColumn { get; init; }
+
+    public int Line { get; init; }
+
+    public int ContentStart { get; init; }
+
+    public int ContentEnd { get; init; }
 }
 
 public sealed record SubtotalPlan(IReadOnlyList<SubtotalRow> Rows)
 {
     public int LabelColumn { get; init; }
+
+    public int FirstRow { get; init; }
 
     public bool SummaryBelow { get; init; } = true;
 
@@ -101,18 +117,16 @@ public sealed class SheetSubtotals : ISheetSubtotals
         var range = new CellRange(request.Range.Start, new CellAddress(request.Range.End.Row - removed, request.Range.End.Column));
         if (range.End.Row < range.Start.Row) return new SubtotalOutcome(removed, 0);
         var plan = Plan(sheet, request with { Range = range });
-        var ordered = plan.SummaryBelow
-            ? plan.Rows.OrderByDescending(row => row.InsertAt).ThenByDescending(row => row.IsGrandTotal)
-            : plan.Rows.OrderByDescending(row => row.InsertAt).ThenBy(row => row.IsGrandTotal);
+        var ordered = plan.Rows.OrderBy(row => row.Line).ToList();
+        foreach (var row in ordered)
+            _structure.InsertRows(engine, sheetIndex, plan.FirstRow + row.Line, 1);
         foreach (var row in ordered)
         {
-            _structure.InsertRows(engine, sheetIndex, row.InsertAt, 1);
-            engine.SetValue(new SheetCell(sheetIndex, new CellAddress(row.InsertAt, plan.LabelColumn)), CellValue.Text(row.Label));
-            var first = row.First >= row.InsertAt ? row.First + 1 : row.First;
-            var spanned = row.IsGrandTotal && !plan.SummaryBelow ? row.Last + plan.Rows.Count - 1 : row.Last;
-            var last = spanned >= row.InsertAt ? spanned + 1 : spanned;
+            var at = plan.FirstRow + row.Line;
+            engine.SetValue(new SheetCell(sheetIndex, new CellAddress(at, row.LabelColumn)), CellValue.Text(row.Label));
             foreach (var column in plan.ValueColumns)
-                engine.SetFormula(new SheetCell(sheetIndex, new CellAddress(row.InsertAt, column)), Formula(plan.Functions[column], column, first, last));
+                engine.SetFormula(new SheetCell(sheetIndex, new CellAddress(at, column)),
+                    Formula(plan.Functions[column], column, plan.FirstRow + row.ContentStart, plan.FirstRow + row.ContentEnd));
         }
         Arrange(sheet, plan);
         return new SubtotalOutcome(removed, plan.Rows.Count);
@@ -146,23 +160,15 @@ public sealed class SheetSubtotals : ISheetSubtotals
     {
         var groups = plan.Rows.Where(row => !row.IsGrandTotal).ToList();
         if (groups.Count == 0) return;
-        var grand = plan.Rows.Any(row => row.IsGrandTotal) ? 1 : 0;
-        var above = plan.SummaryBelow ? 0 : 1;
-        var lead = plan.SummaryBelow ? 0 : grand;
-        var placed = groups
-            .Select((group, index) => (Subtotal: plan.SummaryBelow ? group.Last + index + 1 : group.First + lead + index,
-                First: group.First + lead + index + above, Last: group.Last + lead + index + above))
-            .ToList();
         if (plan.Outline)
         {
-            if (grand == 1)
-                _outline.Group(sheet, StructureAxis.Rows,
-                    Math.Min(placed[0].First, placed[0].Subtotal), Math.Max(placed[^1].Last, placed[^1].Subtotal));
-            foreach (var group in placed) _outline.Group(sheet, StructureAxis.Rows, group.First, group.Last);
+            sheet.OutlineSummary = sheet.OutlineSummary with { Below = plan.SummaryBelow };
+            foreach (var row in plan.Rows.OrderBy(row => row.Level).ThenBy(row => row.Line))
+                _outline.Group(sheet, StructureAxis.Rows, plan.FirstRow + row.ContentStart, plan.FirstRow + row.ContentEnd);
         }
         if (plan.PageBreaks)
-            foreach (var group in placed.Skip(1))
-                sheet.RowBreaks.Add(Math.Min(group.First, group.Subtotal));
+            foreach (var group in groups.Where(row => row.Level == 1).OrderBy(row => row.Line).Skip(1))
+                sheet.RowBreaks.Add(plan.FirstRow + Math.Min(group.Line, group.ContentStart));
     }
 
     public SubtotalPlan Plan(Worksheet sheet, SubtotalRequest request)
@@ -173,9 +179,11 @@ public sealed class SheetSubtotals : ISheetSubtotals
         var rows = new List<SubtotalRow>();
         var first = request.HasHeader ? request.Range.Start.Row + 1 : request.Range.Start.Row;
         var last = request.Range.End.Row;
+        var levels = request.GroupColumns;
         var shape = new SubtotalPlan(rows)
         {
-            LabelColumn = LabelColumn(request),
+            LabelColumn = LabelColumn(request, levels[0]),
+            FirstRow = first,
             SummaryBelow = request.SummaryBelow,
             PageBreaks = request.PageBreaks,
             Outline = request.Outline,
@@ -185,35 +193,70 @@ public sealed class SheetSubtotals : ISheetSubtotals
 
         if (last < first) return shape;
 
-        var groupStart = first;
-        var groupKey = KeyOf(sheet, first, request.GroupColumn);
-
-        for (var row = first + 1; row <= last + 1; row++)
+        var lines = new SubtotalLines();
+        if (request.GrandTotal && !request.SummaryBelow) lines.Reserve();
+        var grandStart = lines.Count;
+        Emit(sheet, request, shape, lines, 0, first, last);
+        if (lines.Summaries == 0) return shape;
+        if (request.GrandTotal)
         {
-            var key = row <= last ? KeyOf(sheet, row, request.GroupColumn) : null;
-
-            if (key is not null && Same(key, groupKey, request.CaseSensitive)) continue;
-
-            rows.Add(new SubtotalRow(
-                request.SummaryBelow ? row : groupStart,
-                string.Format(
-                    _locale.Culture,
-                    request.GroupLabelFormat, groupKey, request.FunctionLabel),
-                groupStart, row - 1,
-                Formulas(shape, groupStart, row - 1)));
-
-            groupStart = row;
-            groupKey = key;
+            var line = request.SummaryBelow ? lines.Count : 0;
+            if (request.SummaryBelow) lines.Reserve();
+            rows.Add(new SubtotalRow(request.SummaryBelow ? last + 1 : first, request.GrandTotalLabel, first, last, Formulas(shape, first, last))
+            {
+                IsGrandTotal = true,
+                Level = 0,
+                LabelColumn = shape.LabelColumn,
+                Line = line,
+                ContentStart = grandStart,
+                ContentEnd = request.SummaryBelow ? line - 1 : lines.Count - 1,
+            });
         }
-
-        if (request.GrandTotal && rows.Count > 0)
-            rows.Add(new SubtotalRow(request.SummaryBelow ? last + 1 : first, request.GrandTotalLabel, first, last, Formulas(shape, first, last)) { IsGrandTotal = true });
+        rows.InsertRange(0, lines.Rows);
+        rows.Sort((left, right) => left.Line.CompareTo(right.Line));
 
         return shape;
     }
 
-    private int LabelColumn(SubtotalRequest request) =>
-        request.ValueColumns.Contains(request.GroupColumn) ? request.Range.Start.Column : request.GroupColumn;
+    private void Emit(Worksheet sheet, SubtotalRequest request, SubtotalPlan shape, SubtotalLines lines, int depth, int first, int last)
+    {
+        var levels = request.GroupColumns;
+        var column = levels[depth];
+        var runStart = first;
+        var runKey = KeyOf(sheet, first, column);
+
+        for (var row = first + 1; row <= last + 1; row++)
+        {
+            var key = row <= last ? KeyOf(sheet, row, column) : null;
+            if (key is not null && Same(key, runKey, request.CaseSensitive)) continue;
+
+            var line = request.SummaryBelow ? -1 : lines.Reserve();
+            var contentStart = lines.Count;
+            if (depth + 1 < levels.Count) Emit(sheet, request, shape, lines, depth + 1, runStart, row - 1);
+            else lines.Data(row - runStart);
+            var contentEnd = lines.Count - 1;
+            if (request.SummaryBelow) line = lines.Reserve();
+
+            lines.Add(new SubtotalRow(
+                request.SummaryBelow ? row : runStart,
+                string.Format(_locale.Culture, request.GroupLabelFormat, runKey, request.FunctionLabel),
+                runStart, row - 1,
+                Formulas(shape, runStart, row - 1))
+            {
+                Level = depth + 1,
+                LabelColumn = LabelColumn(request, column),
+                Line = line,
+                ContentStart = contentStart,
+                ContentEnd = contentEnd,
+            });
+
+            runStart = row;
+            runKey = key;
+        }
+    }
+
+    private int LabelColumn(SubtotalRequest request, int groupColumn) =>
+        request.ValueColumns.Contains(groupColumn) ? request.Range.Start.Column : groupColumn;
 
     private bool Same(string key, string? groupKey, bool caseSensitive) =>
         caseSensitive
@@ -234,4 +277,21 @@ public sealed class SheetSubtotals : ISheetSubtotals
             ? value.AsText()
             : value.ToString();
     }
+}
+
+internal sealed class SubtotalLines
+{
+    private readonly List<SubtotalRow> _rows = [];
+
+    public int Count { get; private set; }
+
+    public int Summaries => _rows.Count;
+
+    public IReadOnlyList<SubtotalRow> Rows => _rows;
+
+    public int Reserve() => Count++;
+
+    public void Data(int count) => Count += count;
+
+    public void Add(SubtotalRow row) => _rows.Add(row);
 }

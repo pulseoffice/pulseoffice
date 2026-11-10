@@ -52,7 +52,18 @@ internal sealed class FakeFiles : IAgentFileSystem
 {
     public HashSet<string> Existing { get; } = [];
 
-    public bool Exists(string path) => Existing.Contains(path);
+    public HashSet<string> AppearingAfterFirstCheck { get; } = [];
+
+    public bool Exists(string path)
+    {
+        if (AppearingAfterFirstCheck.Remove(path))
+        {
+            Existing.Add(path);
+            return false;
+        }
+
+        return Existing.Contains(path);
+    }
 }
 
 internal sealed class FakeWorkspace : IAgentWorkspace

@@ -12,8 +12,8 @@ public sealed class DocumentToolSource(IAgentWorkspace workspace, IAgentModuleNa
         new CreateDocumentTool(workspace, modules),
         new OpenDocumentTool(workspace, modules),
         new SaveDocumentTool(workspace, modules, new AgentDocumentChoice(workspace)),
-        new SaveDocumentAsTool(workspace, modules, files, new AgentDocumentChoice(workspace)),
-        new ExportDocumentTool(workspace, files, new AgentDocumentChoice(workspace)),
+        new SaveDocumentAsTool(workspace, modules, new AgentOverwriteCheck(files), new AgentDocumentChoice(workspace)),
+        new ExportDocumentTool(workspace, new AgentOverwriteCheck(files), new AgentDocumentChoice(workspace)),
     ];
 }
 
@@ -32,6 +32,19 @@ public sealed class AgentDocumentJson(IAgentModuleNames modules)
             ["active"] = document.IsActive,
             ["readOnly"] = document.IsReadOnly,
         };
+    }
+}
+
+public sealed class AgentOverwriteCheck(IAgentFileSystem files)
+{
+    public AgentConfirmationNeed? Need(string path) =>
+        files.Exists(path) ? new AgentConfirmationNeed(AgentConfirmationKind.Overwrite, path) : null;
+
+    public void EnsureConfirmed(AgentArguments arguments, string path)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        if (files.Exists(path) && arguments.Confirmed?.Kind != AgentConfirmationKind.Overwrite)
+            throw new AgentHostException($"'{path}' appeared after the call was checked, so it was not overwritten: call again and the user will be asked to confirm.");
     }
 }
 
@@ -152,7 +165,7 @@ internal sealed class SaveDocumentTool(IAgentWorkspace workspace, IAgentModuleNa
         AgentToolResult.Json(new AgentDocumentJson(modules).Describe(await workspace.SaveAsync(await choice.IdAsync(arguments, ct).ConfigureAwait(true), ct).ConfigureAwait(true)));
 }
 
-internal sealed class SaveDocumentAsTool(IAgentWorkspace workspace, IAgentModuleNames modules, IAgentFileSystem files, AgentDocumentChoice choice) : AgentTool
+internal sealed class SaveDocumentAsTool(IAgentWorkspace workspace, IAgentModuleNames modules, AgentOverwriteCheck overwrite, AgentDocumentChoice choice) : AgentTool
 {
     public override string Name => "save_document_as";
 
@@ -169,18 +182,19 @@ internal sealed class SaveDocumentAsTool(IAgentWorkspace workspace, IAgentModule
         .String("path", "Absolute destination path.", required: true)
         .Build();
 
-    public override Task<AgentConfirmationNeed?> ConfirmationAsync(AgentArguments arguments, CancellationToken ct)
-    {
-        var path = new AgentPaths().Absolute(arguments.Text("path"));
-        return Task.FromResult(files.Exists(path) ? new AgentConfirmationNeed(AgentConfirmationKind.Overwrite, path) : null);
-    }
+    public override Task<AgentConfirmationNeed?> ConfirmationAsync(AgentArguments arguments, CancellationToken ct) =>
+        Task.FromResult(overwrite.Need(new AgentPaths().Absolute(arguments.Text("path"))));
 
-    public override async Task<AgentToolResult> InvokeAsync(AgentArguments arguments, CancellationToken ct) =>
-        AgentToolResult.Json(new AgentDocumentJson(modules).Describe(
-            await workspace.SaveAsAsync(await choice.IdAsync(arguments, ct).ConfigureAwait(true), new AgentPaths().Absolute(arguments.Text("path")), ct).ConfigureAwait(true)));
+    public override async Task<AgentToolResult> InvokeAsync(AgentArguments arguments, CancellationToken ct)
+    {
+        var id = await choice.IdAsync(arguments, ct).ConfigureAwait(true);
+        var path = new AgentPaths().Absolute(arguments.Text("path"));
+        overwrite.EnsureConfirmed(arguments, path);
+        return AgentToolResult.Json(new AgentDocumentJson(modules).Describe(await workspace.SaveAsAsync(id, path, ct).ConfigureAwait(true)));
+    }
 }
 
-internal sealed class ExportDocumentTool(IAgentWorkspace workspace, IAgentFileSystem files, AgentDocumentChoice choice) : AgentTool
+internal sealed class ExportDocumentTool(IAgentWorkspace workspace, AgentOverwriteCheck overwrite, AgentDocumentChoice choice) : AgentTool
 {
     public override string Name => "export_document";
 
@@ -197,15 +211,15 @@ internal sealed class ExportDocumentTool(IAgentWorkspace workspace, IAgentFileSy
         .String("path", "Absolute destination path, for example /Users/me/report.pdf.", required: true)
         .Build();
 
-    public override Task<AgentConfirmationNeed?> ConfirmationAsync(AgentArguments arguments, CancellationToken ct)
-    {
-        var path = new AgentPaths().Absolute(arguments.Text("path"));
-        return Task.FromResult(files.Exists(path) ? new AgentConfirmationNeed(AgentConfirmationKind.Overwrite, path) : null);
-    }
+    public override Task<AgentConfirmationNeed?> ConfirmationAsync(AgentArguments arguments, CancellationToken ct) =>
+        Task.FromResult(overwrite.Need(new AgentPaths().Absolute(arguments.Text("path"))));
 
     public override async Task<AgentToolResult> InvokeAsync(AgentArguments arguments, CancellationToken ct)
     {
-        var written = await workspace.ExportAsync(await choice.IdAsync(arguments, ct).ConfigureAwait(true), new AgentPaths().Absolute(arguments.Text("path")), ct).ConfigureAwait(true);
+        var id = await choice.IdAsync(arguments, ct).ConfigureAwait(true);
+        var path = new AgentPaths().Absolute(arguments.Text("path"));
+        overwrite.EnsureConfirmed(arguments, path);
+        var written = await workspace.ExportAsync(id, path, ct).ConfigureAwait(true);
         return AgentToolResult.Json(new JsonObject { ["path"] = written });
     }
 }

@@ -360,7 +360,11 @@ native macOS menu, modal service, settings schema.
    read back in XLSX as in ODS, or the loss is declared in `CheckFidelity` with its own
    code. A format that loses data silently is the worst defect this project can
    have, and silence is exactly what happens when something is added to one format only.
-   Guarded by `XlsxOdsParityTests`.
+   Guarded by `XlsxOdsParityTests`. **Declaring is the last resort** (user, 2026-11-10): before declaring a loss, study
+   both specifications (ODF 1.3, ECMA-376 with its extension lists and newer namespaces), how the reference suite and
+   Microsoft Office store the same thing, and the web; prefer a native mapping, then a standard extension other
+   applications read, then our own `urn:pulseoffice:` extension that round-trips and degrades gracefully. The round log
+   records what was researched when a loss is still declared.
 8. **Log messages are in English.** The log is read by developers and ends up
    in bug reports: Italian would make it unusable outside here. **Interface**
    texts stay translated into the five languages — they are two different audiences.

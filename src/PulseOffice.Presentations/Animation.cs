@@ -18,6 +18,8 @@ public enum AnimationTrigger
 
 public sealed record AnimationEffect
 {
+    public const int LongestTimingMs = 3_600_000;
+
     public required string Id { get; init; }
 
     public required string TargetId { get; init; }
@@ -41,6 +43,12 @@ public sealed record AnimationEffect
     public string? SoundPath { get; init; }
 
     public string? Subtype { get; init; }
+
+    public string? TriggerShapeId { get; init; }
+
+    public bool Rewind { get; init; }
+
+    public bool IsTriggered => !string.IsNullOrEmpty(TriggerShapeId);
 
     public NativeAnimation? Native { get; init; }
 

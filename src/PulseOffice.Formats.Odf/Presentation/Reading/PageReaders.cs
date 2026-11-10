@@ -245,8 +245,11 @@ internal sealed class AnimationReader(OdfAnimationMapper animations) : OdpPageRe
     public override void Read(XElement page, SlideAssembly<string> assembly, OdpReadContext context)
     {
         var targets = new AnimationTargetResolver(page, assembly.ElementByFrame);
-        foreach (var effect in animations.Read(page, assembly.Slide.Id))
+        foreach (var read in animations.Read(page, assembly.Slide.Id))
         {
+            var effect = read.TriggerShapeId is { } trigger
+                ? read with { TriggerShapeId = targets.Resolve(trigger) is [var shape, ..] ? shape : null }
+                : read;
             var resolved = targets.Resolve(effect.TargetId);
             for (var index = 0; index < resolved.Count; index++)
                 assembly.Slide.AddAnimation(index == 0

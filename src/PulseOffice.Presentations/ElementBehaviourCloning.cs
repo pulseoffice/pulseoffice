@@ -47,7 +47,8 @@ public sealed class ElementBehaviourCloning(SoundTypes soundTypes) : IElementBeh
         var animations = new List<AnimationEffect>();
         foreach (var effect in source.Animations)
             if (elementIds.TryGetValue(effect.TargetId, out var mapped))
-                animations.Add(effect with { Id = FreeId(target.Id, taken), TargetId = mapped, SoundPath = sounds.Mapped(effect.SoundPath) });
+                animations.Add(effect with { Id = FreeId(target.Id, taken), TargetId = mapped, SoundPath = sounds.Mapped(effect.SoundPath),
+                    TriggerShapeId = effect.TriggerShapeId is { } trigger && elementIds.TryGetValue(trigger, out var mappedTrigger) ? mappedTrigger : null });
         var interactions = source.Interactions
             .Where(action => elementIds.ContainsKey(action.TargetId))
             .Where(action => !foreign || action.Kind != InteractionKind.GoToSlide)

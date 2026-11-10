@@ -1003,6 +1003,7 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
             var height = gap;
             for (var index = from; index < flow.Count; index++)
             {
+                if (index > from && flow[index] is TableItem table && flow[index - 1] is ParagraphEntry keeper) return height + keeper.Flow.SpaceAfter + FirstRows(table, width);
                 if (flow[index] is not ParagraphEntry entry) return height;
                 var lines = entry.Lines(width);
                 if (index > from && flow[index - 1] is ParagraphEntry previous) height += previous.Flow.SpaceAfter + entry.Flow.SpaceBefore;
@@ -1015,6 +1016,17 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
                 height += Height(lines);
                 if (height > Capacity) return height;
             }
+            return height;
+        }
+
+        private double FirstRows(TableItem table, double width)
+        {
+            var placement = _owner.Tables.Place(table, width, _geometry.Body.Height);
+            if (placement.Rows.Count == 0) return 0;
+            var end = placement.GroupEnd(0);
+            while (end < placement.Rows.Count && end <= table.HeaderRows) end = placement.GroupEnd(end);
+            var height = 0.0;
+            for (var row = 0; row < end; row++) height += placement.Rows[row].Height;
             return height;
         }
 

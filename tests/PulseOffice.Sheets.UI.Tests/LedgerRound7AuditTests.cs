@@ -59,6 +59,10 @@ public class LedgerRound7AuditTests
 
         public void Write(IActiveSheetContext context, Engine.Recalculation.CalculationEngine engine,
             IReadOnlyList<(CellAddress Address, CellValue Value)> values, string description) => Calls++;
+
+        public void Write(IActiveSheetContext context, Engine.Recalculation.CalculationEngine engine,
+            IReadOnlyList<(CellAddress Address, CellValue Value)> values, IReadOnlyList<(CellAddress Address, string Formula)> formulas,
+            string description) => Calls++;
     }
 
     private sealed class FixedSplit(IReadOnlyDictionary<CellAddress, CellValue> values) : Engine.Operations.ITextToColumns

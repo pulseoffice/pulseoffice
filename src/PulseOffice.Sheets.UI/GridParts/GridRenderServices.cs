@@ -1,3 +1,4 @@
+using PulseOffice.Sheets.Styling;
 using PulseOffice.Charts;
 using PulseOffice.Sheets.Engine.Operations;
 using PulseOffice.UI.Controls.Charts;

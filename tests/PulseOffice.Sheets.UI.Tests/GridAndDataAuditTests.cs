@@ -133,7 +133,7 @@ public sealed class GridAndDataAuditTests
         workbook.Sheets[0].Layout.HideColumns(10, CellAddress.MaxColumns - 1);
         var engine = new ServiceCollection().AddSheetsEngine().BuildServiceProvider()
             .GetRequiredService<ICalculationEngineFactory>().Create(workbook);
-        var viewport = new GridViewport(engine, DesignTokens.For(InterfaceDensity.Compact), 0, () => new Size(1200, 800));
+        var viewport = new GridViewport(engine, DesignTokens.For(InterfaceDensity.Compact), 0, () => new Size(1200, 800), new PulseOffice.Sheets.UI.Outline.OutlineGutter());
 
         var edges = viewport.CellEdges();
 
@@ -148,7 +148,7 @@ public sealed class GridAndDataAuditTests
         var workbook = Workbook.CreateDefault();
         var engine = new ServiceCollection().AddSheetsEngine().BuildServiceProvider()
             .GetRequiredService<ICalculationEngineFactory>().Create(workbook);
-        var viewport = new GridViewport(engine, DesignTokens.For(InterfaceDensity.Compact), 0, () => new Size(1200, 800));
+        var viewport = new GridViewport(engine, DesignTokens.For(InterfaceDensity.Compact), 0, () => new Size(1200, 800), new PulseOffice.Sheets.UI.Outline.OutlineGutter());
         viewport.FreezePanes(0, 2);
         viewport.Scroll = new Vector(3000, 0);
 

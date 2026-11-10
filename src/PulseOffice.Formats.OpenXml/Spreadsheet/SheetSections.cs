@@ -177,6 +177,12 @@ internal sealed class SheetPropertiesSection : WorksheetSection
         var properties = new SheetProperties();
         if (sheet.TabColorHex?.TrimStart('#') is { Length: 6 } colour && colour.All(char.IsAsciiHexDigit))
             properties.Append(new TabColor { Rgb = "FF" + colour.ToUpperInvariant() });
+        if (sheet.OutlineSummary != OutlineSummary.Default)
+            properties.Append(new OutlineProperties
+            {
+                SummaryBelow = sheet.OutlineSummary.Below ? null : false,
+                SummaryRight = sheet.OutlineSummary.Right ? null : false,
+            });
         if (context.Workbook.PageStyles.For(sheet).Setup.FitsToPages)
             properties.Append(new PageSetupProperties { FitToPage = true });
         if (properties.HasChildren) Append(part, properties);

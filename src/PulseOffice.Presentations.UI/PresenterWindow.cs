@@ -165,9 +165,17 @@ public sealed class PresenterWindow : Window
             case Key.Left or Key.Up or Key.PageUp or Key.Back:
                 _show.BackExternal();
                 break;
+            case Key.Home:
+                _show.FirstExternal();
+                break;
+            case Key.End:
+                _show.LastExternal();
+                break;
             case Key.Escape:
                 _show.Close();
                 break;
+            default:
+                return;
         }
 
         e.Handled = true;

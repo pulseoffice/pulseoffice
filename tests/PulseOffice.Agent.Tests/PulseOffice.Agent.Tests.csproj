@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/PulseOffice.Agent/PulseOffice.Agent.csproj" />
+    <ProjectReference Include="../../tools/mcp-client/PulseMcpClient.csproj" />
     <ProjectReference Include="../../src/PulseOffice.Scripting.JavaScript/PulseOffice.Scripting.JavaScript.csproj" />
   </ItemGroup>
 

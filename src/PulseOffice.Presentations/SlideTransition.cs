@@ -39,6 +39,7 @@ public enum AdvanceMode
 {
     OnClick,
     AfterTime,
+    OnClickOrAfterTime,
 }
 
 public sealed record SlideTransition
@@ -62,6 +63,8 @@ public sealed record SlideTransition
     public NativeTransition? Native { get; init; }
 
     public NativeTransition? CurrentNative => Native is { } native && native.Describes(this) ? native : null;
+
+    public bool AdvancesAfterTime => Advance is AdvanceMode.AfterTime or AdvanceMode.OnClickOrAfterTime;
 
     public bool IsNone => Kind == TransitionKind.None;
 

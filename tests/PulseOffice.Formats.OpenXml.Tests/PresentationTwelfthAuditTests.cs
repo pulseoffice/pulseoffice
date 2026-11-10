@@ -111,7 +111,7 @@ public sealed class PresentationTwelfthAuditTests
     {
         var deck = Deck();
         deck.Slides[0].Transition = new SlideTransition { Kind = TransitionKind.Morph };
-        Assert.Contains(new PptxWriter().CheckFidelity(deck).Losses, d => d.Code == "PPTX024");
+        Assert.DoesNotContain(new PptxWriter().CheckFidelity(deck).Losses, d => d.Code == "PPTX024");
         Assert.Contains(new OdpWriter().CheckFidelity(deck).Losses, d => d.Code == "ODP021");
     }
 

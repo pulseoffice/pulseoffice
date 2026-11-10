@@ -11,91 +11,163 @@ public sealed record NamedCellStyle
     public string? Parent { get; init; }
 
     public bool IsBuiltIn { get; init; }
+
+    public CellStyleProperties Explicit { get; init; } = CellStyleProperties.All;
+
+    public bool Sets(CellStyleProperties property) => (Explicit & property) == property;
 }
 
-public sealed class NamedStyleCatalog(StyleCatalog styles)
+public sealed class NamedStyleCatalog
 {
-    private readonly StyleCatalog _styles = styles ?? throw new ArgumentNullException(nameof(styles));
+    private readonly StyleCatalog _styles;
+    private readonly ICellStyleLayering _layering;
     private readonly List<NamedCellStyle> _named = [];
+
+    public NamedStyleCatalog(StyleCatalog styles) : this(styles, new CellStyleLayering())
+    {
+    }
+
+    public NamedStyleCatalog(StyleCatalog styles, ICellStyleLayering layering)
+    {
+        _styles = styles ?? throw new ArgumentNullException(nameof(styles));
+        _layering = layering ?? throw new ArgumentNullException(nameof(layering));
+    }
 
     public IReadOnlyList<NamedCellStyle> All => _named;
 
-    public NamedCellStyle Define(string name, CellStyle style, string? parent = null, bool builtIn = false)
+    public ICellStyleLayering Layering => _layering;
+
+    public NamedCellStyle Define(string name, CellStyle style, string? parent = null, bool builtIn = false, CellStyleProperties? explicitProperties = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(style);
 
+        var properties = explicitProperties ?? _layering.Differences(style, CellStyle.Default);
         var entry = new NamedCellStyle
         {
             Name = name,
-            StyleId = _styles.Intern(style),
+            StyleId = _styles.Intern(_layering.Overlay(CellStyle.Default, style, properties)),
             Parent = parent,
             IsBuiltIn = builtIn,
+            Explicit = properties,
         };
 
-        var existing = Find(name);
+        var index = IndexOf(name);
 
-        if (existing is null) _named.Add(entry);
-        else _named[_named.IndexOf(existing)] = entry;
+        if (index < 0) _named.Add(entry);
+        else _named[index] = entry;
 
         return entry;
+    }
+
+    public NamedCellStyle Restyle(NamedCellStyle named, CellStyle own)
+    {
+        ArgumentNullException.ThrowIfNull(named);
+        ArgumentNullException.ThrowIfNull(own);
+
+        var previous = _styles.Get(named.StyleId);
+        return Define(named.Name, own, named.Parent, named.IsBuiltIn, named.Explicit | _layering.Differences(own, previous));
     }
 
     public NamedCellStyle? Find(string name) =>
         _named.FirstOrDefault(style =>
             string.Equals(style.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    public void Restore(string name, NamedCellStyle? entry)
+    public int IndexOf(string name) =>
+        _named.FindIndex(style => string.Equals(style.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    public void Restore(string name, NamedCellStyle? entry, int position = -1)
     {
-        var existing = Find(name);
-        if (existing is not null) _named.Remove(existing);
-        if (entry is not null) _named.Add(entry);
+        var index = IndexOf(name);
+        if (index >= 0) _named.RemoveAt(index);
+        if (entry is null) return;
+
+        var target = index >= 0 ? index : position;
+        if (target < 0 || target > _named.Count) _named.Add(entry);
+        else _named.Insert(target, entry);
     }
 
     public void ReplaceAll(IEnumerable<NamedCellStyle> entries)
     {
+        var list = entries.ToList();
         _named.Clear();
-        _named.AddRange(entries);
+        _named.AddRange(list);
     }
 
     public bool Remove(string name)
     {
         if (Find(name) is not { IsBuiltIn: false } style) return false;
 
-        _named.Remove(style);
+        ReplaceAll(Without(style.Name, Heir(style)));
         return true;
+    }
+
+    public string? Heir(NamedCellStyle removed)
+    {
+        ArgumentNullException.ThrowIfNull(removed);
+
+        return removed.Parent is { } parent && !string.Equals(parent, removed.Name, StringComparison.OrdinalIgnoreCase) && Find(parent) is { } found
+            ? found.Name
+            : null;
+    }
+
+    public IReadOnlyList<NamedCellStyle> Without(string name, string? heir)
+    {
+        if (Find(name) is not { } removed) return [.. _named];
+
+        var removedOwn = _styles.Get(removed.StyleId);
+        return [.. _named.Where(entry => !ReferenceEquals(entry, removed)).Select(entry =>
+            !string.Equals(entry.Parent, removed.Name, StringComparison.OrdinalIgnoreCase) ? entry
+            : entry with
+            {
+                Parent = heir,
+                Explicit = entry.Explicit | removed.Explicit,
+                StyleId = _styles.Intern(_layering.Overlay(_layering.Overlay(CellStyle.Default, removedOwn, removed.Explicit), _styles.Get(entry.StyleId), entry.Explicit)),
+            })];
+    }
+
+    public CellStyle OwnStyleOf(NamedCellStyle named)
+    {
+        ArgumentNullException.ThrowIfNull(named);
+        return _styles.Get(named.StyleId);
+    }
+
+    public CellStyle InheritedStyleOf(NamedCellStyle named)
+    {
+        ArgumentNullException.ThrowIfNull(named);
+        var chain = Chain(named);
+        return Resolve(chain.Skip(1));
+    }
+
+    public CellStyleProperties DeclaredAlong(NamedCellStyle named)
+    {
+        ArgumentNullException.ThrowIfNull(named);
+        return Chain(named).Aggregate(CellStyleProperties.None, (declared, entry) => declared | entry.Explicit);
     }
 
     public CellStyle StyleOf(NamedCellStyle named)
     {
         ArgumentNullException.ThrowIfNull(named);
+        return Resolve(Chain(named));
+    }
 
+    private List<NamedCellStyle> Chain(NamedCellStyle named)
+    {
         var chain = new List<NamedCellStyle>();
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var current = named; current is not null && visited.Add(current.Name);
              current = current.Parent is { } parent ? Find(parent) : null)
             chain.Add(current);
-
-        var style = _styles.Get(chain[^1].StyleId);
-        for (var index = chain.Count - 2; index >= 0; index--)
-            style = Merge(style, _styles.Get(chain[index].StyleId));
-        return style;
+        return chain;
     }
 
-    private static CellStyle Merge(CellStyle parent, CellStyle child) => child with
+    private CellStyle Resolve(IEnumerable<NamedCellStyle> chain)
     {
-        Font = child.Font == CellFont.Default ? parent.Font : child.Font,
-        BackgroundHex = child.BackgroundHex ?? parent.BackgroundHex,
-        Borders = child.Borders.IsEmpty ? parent.Borders : child.Borders,
-        Horizontal = child.Horizontal == CellHorizontalAlignment.General ? parent.Horizontal : child.Horizontal,
-        NumberFormatId = child.NumberFormatId == 0 ? parent.NumberFormatId : child.NumberFormatId,
-        Vertical = child.Vertical == CellStyle.Default.Vertical ? parent.Vertical : child.Vertical,
-        WrapText = child.WrapText || parent.WrapText,
-        RotationDegrees = child.RotationDegrees == 0 ? parent.RotationDegrees : child.RotationDegrees,
-        Indent = child.Indent == 0 ? parent.Indent : child.Indent,
-        Locked = child.Locked == CellStyle.Default.Locked ? parent.Locked : child.Locked,
-        Language = child.Language ?? parent.Language,
-    };
+        var style = CellStyle.Default;
+        foreach (var entry in chain.Reverse())
+            style = _layering.Overlay(style, _styles.Get(entry.StyleId), entry.Explicit);
+        return style;
+    }
 
     public void AddDefaults()
     {

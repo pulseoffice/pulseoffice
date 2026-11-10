@@ -18,8 +18,8 @@ public sealed class SheetThemeApplier(ICellStyleDelta delta) : ISheetThemeApplie
 
         foreach (var named in catalog.All.ToList())
         {
-            var own = workbook.Styles.Get(named.StyleId);
-            catalog.Define(named.Name, Themed(named.Name, own, theme), named.Parent, named.IsBuiltIn);
+            var own = catalog.OwnStyleOf(named);
+            catalog.Restyle(named, Themed(named.Name, own, theme));
         }
 
         var restyled = 0;

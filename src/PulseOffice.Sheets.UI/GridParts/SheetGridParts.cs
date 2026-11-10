@@ -63,7 +63,7 @@ internal sealed class SheetGridPartsFactory
         PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords)
     {
         var metrics = DesignTokens.For(InterfaceDensity.Compact);
-        var viewport = new GridViewport(dependencies.Engine, metrics, dependencies.SheetIndex, bounds);
+        var viewport = new GridViewport(dependencies.Engine, metrics, dependencies.SheetIndex, bounds, new Outline.OutlineGutter());
         var notifications = new GridNotifications(sender);
         var services = new GridRenderServices();
         var options = new GridDisplayOptions();
@@ -102,6 +102,6 @@ internal sealed class SheetGridPartsFactory
 
         return new SheetGridParts(
             viewport, notifications, services, options, objects, drawing,
-            new GridHeaderPainter(viewport, selection), cells, overlay, objectPainter, pointer, keyboard);
+            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, pointer, keyboard);
     }
 }

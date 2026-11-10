@@ -242,9 +242,6 @@ internal sealed class PptxFidelityRules
             deck => deck.FormSettings != new PulseOffice.Document.Forms.FormDocumentSettings(),
             Diagnostic.Warning("PPTX027", "Open in design mode, automatic focus and the data source of forms have no PPTX equivalent; they are dropped in PPTX and kept in ODP.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
-            deck => deck.Slides.Any(slide => slide.Transition.Kind == TransitionKind.Morph),
-            Diagnostic.Info("PPTX024", "Morph transitions require a PowerPoint 2019 extension that is not written; they are saved as a fade.")),
-        new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.Masters.SelectMany(master => master.Objects.Concat(master.Layouts.SelectMany(layout => layout.Objects)))
                 .Any(element => element is not ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject }),
             Diagnostic.Info("PPTX023", "Master and layout decoration other than preset shapes is not written in PPTX; preset shapes round-trip in the master and layout shape trees.")),

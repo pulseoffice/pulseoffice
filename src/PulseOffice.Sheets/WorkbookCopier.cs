@@ -75,5 +75,6 @@ public sealed class WorkbookCopier : IWorkbookCopier
         copy.TraceArrows.AddRange(source.TraceArrows);
         copy.RowGroups.AddRange(source.RowGroups);
         copy.ColumnGroups.AddRange(source.ColumnGroups);
+        copy.OutlineSummary = source.OutlineSummary;
     }
 }

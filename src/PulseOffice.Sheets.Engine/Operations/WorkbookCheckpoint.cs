@@ -13,6 +13,8 @@ public sealed record WorkbookCheckpoint(
     public ExternalDataMemento? ExternalData { get; init; }
 
     public IReadOnlyList<DefinedName> Names { get; init; } = [];
+
+    public ConsolidationSettings? Consolidation { get; init; }
 }
 
 public interface IWorkbookCheckpoints
@@ -36,6 +38,7 @@ public sealed class WorkbookCheckpoints(ISheetSnapshots snapshots) : IWorkbookCh
             Changes = workbook.Changes.Save(),
             ExternalData = workbook.ExternalData.Save(workbook.DatabaseRanges),
             Names = [.. workbook.DefinedNames],
+            Consolidation = workbook.Consolidation,
         };
     }
 
@@ -64,5 +67,7 @@ public sealed class WorkbookCheckpoints(ISheetSnapshots snapshots) : IWorkbookCh
         foreach (var name in checkpoint.Names) workbook.DefineName(name);
 
         if (checkpoint.ExternalData is { } external) workbook.ExternalData.Restore(external, workbook.DatabaseRanges);
+
+        workbook.Consolidation = checkpoint.Consolidation;
     }
 }

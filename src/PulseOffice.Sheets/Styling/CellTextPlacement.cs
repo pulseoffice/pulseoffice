@@ -1,6 +1,5 @@
-using PulseOffice.Sheets.Styling;
 
-namespace PulseOffice.Sheets.UI;
+namespace PulseOffice.Sheets.Styling;
 
 public readonly record struct CellBox(double X, double Y, double Width, double Height)
 {
