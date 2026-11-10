@@ -16,6 +16,7 @@ public sealed class ShellCommands(
     PulseOffice.UI.Controls.Settings.ISettingsDialog settingsDialog,
     PulseOffice.Shell.About.IAboutDialog about,
     PulseOffice.Shell.Updates.IUpdateCoordinator updates,
+    PulseOffice.Shell.Desktop.IDesktopIntegrationCoordinator desktop,
     IDocumentWorkspace workspace,
     ILedgerDocumentFactory ledgerDocuments,
     IDeckDocumentFactory deckDocuments,
@@ -241,7 +242,22 @@ public sealed class ShellCommands(
             Surface = CommandSurface.Advanced,
             Execute = (_, ct) => updates.CheckNowAsync(ct),
         },
+
+        .. DesktopIntegrationCommands(),
     ];
+
+    private IEnumerable<CommandDefinition> DesktopIntegrationCommands()
+    {
+        if (!desktop.IsAvailable) yield break;
+        yield return new CommandDefinition
+        {
+            Id = new CommandId(PulseOffice.Shell.Desktop.DesktopIntegrationCoordinator.CommandId),
+            MenuPath = "help",
+            Surface = CommandSurface.Advanced,
+            CheckedWhen = _ => desktop.IsIntegrated,
+            Execute = (_, ct) => desktop.ToggleAsync(ct),
+        };
+    }
 
     private string? Described(string? what) => what is not null && texts.Contains("history.folio." + what) ? texts["history.folio." + what] : what;
 

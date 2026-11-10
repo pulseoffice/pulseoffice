@@ -98,6 +98,12 @@ internal static class SettingsComposition
         services.AddSingleton<PulseOffice.Updates.IUpdateDownloader, PulseOffice.Updates.UpdateDownloader>();
         services.AddSingleton<PulseOffice.Updates.IUpdateStateStore, PulseOffice.Updates.JsonUpdateStateStore>();
         services.TryAddSingleton<PulseOffice.Platform.IEnvironmentVariables, PulseOffice.Platform.SystemEnvironmentVariables>();
+        services.AddSingleton<PulseOffice.Platform.IAppImageLocation, PulseOffice.Platform.EnvironmentAppImageLocation>();
+        services.AddSingleton<PulseOffice.Platform.Linux.IAppImageLauncherScript, PulseOffice.Platform.Linux.AppImageLauncherScript>();
+        services.AddSingleton<DesktopIntegrationProvider>();
+        services.AddSingleton(provider => provider.GetRequiredService<DesktopIntegrationProvider>().Select());
+        services.AddSingleton<PulseOffice.Shell.Desktop.IDesktopIntegrationPreferencesStore, PulseOffice.Shell.Desktop.JsonDesktopIntegrationPreferencesStore>();
+        services.AddSingleton<PulseOffice.Shell.Desktop.IDesktopIntegrationCoordinator, PulseOffice.Shell.Desktop.DesktopIntegrationCoordinator>();
         services.AddSingleton<UpdateInstallerProvider>();
         services.AddSingleton(provider => provider.GetRequiredService<UpdateInstallerProvider>().Select());
         services.AddSingleton<PulseOffice.Updates.IUpdateService, PulseOffice.Updates.UpdateService>();

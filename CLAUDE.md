@@ -237,6 +237,20 @@ Central package management in `Directory.Packages.props`: **versions are never w
     runs outside an installed app only point to the download page. `pulse-cmd.py update-key` creates the signing key (private key outside the repository, passphrase asked
     by openssl); `release` writes and signs `SHA256SUMS` and uploads both files.
 
+30. **Linux desktop integration for the AppImage** (user decisions, 2026-11-10): `IDesktopIntegration` (Platform;
+    `AppImageDesktopIntegration` in Platform.Linux, `IAppImageLocation` tracks the running image and is shared with the
+    updater). On the first start from an AppImage, `DesktopIntegrationCoordinator` (Shell) asks, with the shared
+    `ChoicePromptView`, whether to add PulseOffice to the applications menu, by default moving it to `~/Applications`;
+    "don't ask again" is remembered in `desktop-integration.json`. Integration writes, for the current user only, a
+    launcher script (`~/.local/share/PulseOffice/launch`), the path it starts (`appimage-path`), the `.desktop` entry
+    pointing to the launcher, the icon and the file types (`update-desktop-database`, `xdg-mime`, best effort). The
+    launcher starts the registered image, otherwise the newest `PulseOffice*.AppImage` in the usual folders, otherwise
+    asks with `zenity` or `kdialog` (texts in the five languages from `LANG`) and lets the user pick the file, otherwise
+    shows a `notify-send` notice, otherwise does nothing. When the app starts from another place than the registered one
+    it offers to move itself to `~/Applications` (or leaves it, updating the menu; "don't ask again" makes it silent).
+    Help › Show in Applications Menu adds or removes the integration; the command exists only when running from an
+    AppImage.
+
 16. **Folio content controls**: a pair of inline markers with the properties on the start marker,
     not anchored objects. In DOCX form controls are distinguished by the `pulseoffice.form:` prefix in `w:tag`.
 

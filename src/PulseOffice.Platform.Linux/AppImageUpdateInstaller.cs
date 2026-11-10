@@ -5,7 +5,7 @@ using PulseOffice.Platform;
 namespace PulseOffice.Platform.Linux;
 
 [System.Runtime.Versioning.SupportedOSPlatform("linux")]
-public sealed class AppImageUpdateInstaller(IEnvironmentVariables environment, int processId) : IUpdateInstaller
+public sealed class AppImageUpdateInstaller(IAppImageLocation location, int processId) : IUpdateInstaller
 {
     private const string SwapScript = """
         #!/bin/sh
@@ -19,13 +19,12 @@ public sealed class AppImageUpdateInstaller(IEnvironmentVariables environment, i
         rm -f "$0"
         """;
 
-    public AppImageUpdateInstaller(IEnvironmentVariables environment)
-        : this(environment, Environment.ProcessId)
+    public AppImageUpdateInstaller(IAppImageLocation location)
+        : this(location, Environment.ProcessId)
     {
     }
 
-    private string? CurrentImage =>
-        environment.Get("APPIMAGE") is { Length: > 0 } path && File.Exists(path) ? Path.GetFullPath(path) : null;
+    private string? CurrentImage => location.Current;
 
     public bool CanInstall => CurrentImage is { } image && Writable(Path.GetDirectoryName(image)!);
 

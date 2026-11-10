@@ -132,6 +132,14 @@ public partial class App : Application
                 await arrivals.OpenStartupAsync();
                 try
                 {
+                    await _services.GetRequiredService<PulseOffice.Shell.Desktop.IDesktopIntegrationCoordinator>().CheckAsync();
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    logger.LogWarning(ex, "Desktop integration check failed");
+                }
+                try
+                {
                     await _services.GetRequiredService<PulseOffice.Shell.Updates.IUpdateCoordinator>().CheckInBackgroundAsync();
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
