@@ -559,7 +559,17 @@ class Git:
         self.shell = shell
         self.console = console
 
+    RELEASE_BRANCH = "main"
+
+    def require_release_branch(self):
+        branch = self.shell.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT, capture=True).strip()
+        if branch != self.RELEASE_BRANCH:
+            self.console.fail(
+                f"releases are made from '{self.RELEASE_BRANCH}', but the current branch is '{branch}': "
+                f"run 'git switch {self.RELEASE_BRANCH} && git pull' first")
+
     def commit_and_tag(self, version, push=None):
+        self.require_release_branch()
         self.shell.run(["git", "add", PROPS, MANIFEST], cwd=ROOT)
         if not self.shell.succeeds(["git", "diff", "--cached", "--quiet"], cwd=ROOT):
             self.shell.run(["git", "commit", "-m", f"Version {version}"], cwd=ROOT)
@@ -638,6 +648,7 @@ class GitHubRelease:
         return found
 
     def publish(self, version, notes_file=None, draft=False, prerelease=False):
+        self.git.require_release_branch()
         self.shell.require("gh")
         self.shell.run(["gh", "auth", "status"], cwd=ROOT, capture=True)
         tag = f"v{version}"
@@ -775,6 +786,8 @@ class PulseCommand:
         self.appimage.build(self.version.current(), architectures)
 
     def command_all(self, arguments):
+        if arguments.release:
+            self.git.require_release_branch()
         self.build_all(arguments.no_notarize)
         if arguments.release:
             self.release.publish(self.version.current())
