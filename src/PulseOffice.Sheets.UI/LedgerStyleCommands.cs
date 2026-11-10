@@ -253,15 +253,12 @@ public sealed class LedgerStyleCommands(
     {
         if (Context.Workbook is not { } workbook) return;
 
-        var name = await dialogs.ShowAsync<string>(
+        var choice = await dialogs.ShowAsync<CellFormat.NewCellStyleChoice>(
             new CellFormat.NewCellStyleView(formatting.CurrentStyle, string.Empty, candidate => workbook.NamedStyles.Find(candidate) is not null, texts),
             new DialogOptions { TitleKey = "dialog.styleCreate.title", PreferredWidth = 520 }, ct)
             .ConfigureAwait(true);
 
-        if (name is null) return;
-
-        var trimmed = name.Trim();
-        if (trimmed.Length == 0) return;
+        if (choice?.Name.Trim() is not { Length: > 0 } trimmed) return;
 
         Define(workbook, trimmed, "command.ledger.style.createFromSelection.title");
         status.Report(texts.Format("status.style.created", trimmed));
@@ -271,26 +268,44 @@ public sealed class LedgerStyleCommands(
     {
         if (Context.Workbook is not { } workbook || workbook.NamedStyles.Find(parent) is not { } basis) return;
 
-        var name = await dialogs.ShowAsync<string>(
-            new CellFormat.NewCellStyleView(workbook.NamedStyles.StyleOf(basis), Title(basis) + " 2", candidate => workbook.NamedStyles.Find(candidate) is not null, texts),
-            new DialogOptions { TitleKey = "dialog.styleCreate.title", PreferredWidth = 520 }, ct)
+        var look = workbook.NamedStyles.StyleOf(basis);
+        var choice = await dialogs.ShowAsync<CellFormat.NewCellStyleChoice>(
+            new CellFormat.NewCellStyleView(look, Title(basis) + " 2", candidate => workbook.NamedStyles.Find(candidate) is not null, texts,
+                new CellFormat.NewCellStyleInheritance(look, CellStyleProperties.None, workbook.NamedStyles.Layering)),
+            new DialogOptions { TitleKey = "dialog.styleCreate.title", PreferredWidth = 560 }, ct)
             .ConfigureAwait(true);
 
-        if (name?.Trim() is not { Length: > 0 } trimmed) return;
+        if (choice?.Name.Trim() is not { Length: > 0 } trimmed || workbook.NamedStyles.Find(basis.Name) is null) return;
 
-        Define(workbook, trimmed, "command.ledger.style.createFromSelection.title", workbook.NamedStyles.StyleOf(basis), basis.Name);
+        Define(workbook, trimmed, "command.ledger.style.createFromSelection.title",
+            new NamedStyleDefinition(choice.Style, basis.Name, false, choice.Explicit ?? CellStyleProperties.None));
         status.Report(texts.Format("status.style.created", trimmed));
     }
 
-    private void Define(Workbook workbook, string name, string titleKey) => Define(workbook, name, titleKey, formatting.CurrentStyle, null);
+    private void Define(Workbook workbook, string name, string titleKey) =>
+        Define(workbook, name, titleKey, Definition(workbook, name, formatting.CurrentStyle));
 
-    private void Define(Workbook workbook, string name, string titleKey, CellStyle style, string? parent)
+    public NamedStyleDefinition Definition(Workbook workbook, string name, CellStyle look)
     {
-        var before = workbook.NamedStyles.Find(name);
-        var after = workbook.NamedStyles.Define(name, style, parent);
+        var catalog = workbook.NamedStyles;
+        if (catalog.Find(name) is not { } existing) return new NamedStyleDefinition(look, null, false, null);
+
+        var inherited = catalog.InheritedStyleOf(existing);
+        var declared = existing.Explicit | catalog.Layering.Differences(look, inherited);
+        return new NamedStyleDefinition(look, existing.Parent, existing.IsBuiltIn, declared);
+    }
+
+    private void Define(Workbook workbook, string name, string titleKey, NamedStyleDefinition definition)
+    {
+        var catalog = workbook.NamedStyles;
+        var position = catalog.IndexOf(name);
+        var before = catalog.Find(name);
+        var after = catalog.Define(before?.Name ?? name, definition.Style, definition.Parent, definition.BuiltIn, definition.Explicit);
 
         Context.History?.Push(new PulseOffice.Document.Commands.DelegateAction(texts[titleKey],
-            redo: () => workbook.NamedStyles.Restore(name, after),
-            undo: () => workbook.NamedStyles.Restore(name, before)));
+            redo: () => catalog.Restore(name, after, position),
+            undo: () => catalog.Restore(name, before, position)));
     }
 }
+
+public sealed record NamedStyleDefinition(CellStyle Style, string? Parent, bool BuiltIn, CellStyleProperties? Explicit);

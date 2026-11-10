@@ -128,6 +128,8 @@ public sealed class Worksheet
 
     public List<OutlineGroup> ColumnGroups { get; } = [];
 
+    public OutlineSummary OutlineSummary { get; set; } = OutlineSummary.Default;
+
     public string PageStyleName { get; set; } = "Default";
 
     public int RepeatedPrintRows { get; set; }

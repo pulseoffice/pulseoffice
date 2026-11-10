@@ -275,12 +275,12 @@ internal sealed class OdsStylesDocumentBuilder
     {
         var declarer = new OdfStyleMapper("NS");
         var root = workbook.NamedStyles.Find(RootStyle) is { } declaredRoot
-            ? declarer.DeclareNamed(RootStyle, workbook.Styles.Get(declaredRoot.StyleId), null, CodeOf(workbook, workbook.Styles.Get(declaredRoot.StyleId).NumberFormatId))
+            ? declarer.DeclareNamed(RootStyle, workbook.Styles.Get(declaredRoot.StyleId), null, CodeOf(workbook, workbook.Styles.Get(declaredRoot.StyleId).NumberFormatId), declaredRoot.Explicit)
             : new XElement(Namespaces.Style + "style", new XAttribute(Namespaces.Style + "name", RootStyle), new XAttribute(Namespaces.Style + "family", "table-cell"));
         var named = workbook.NamedStyles.All
             .Where(style => !string.Equals(style.Name, RootStyle, StringComparison.OrdinalIgnoreCase))
             .Select(style => declarer.DeclareNamed(style.Name, workbook.Styles.Get(style.StyleId), style.Parent,
-                CodeOf(workbook, workbook.Styles.Get(style.StyleId).NumberFormatId)))
+                CodeOf(workbook, workbook.Styles.Get(style.StyleId).NumberFormatId), style.Explicit))
             .ToList();
         var pages = new OdfPageStyleMapper().Build(workbook.PageStyles);
 

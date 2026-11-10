@@ -89,7 +89,7 @@ public sealed class LedgerViewPartsAuditTests
         var second = parts.Workbook.Sheets[1];
         first.Layout.SetRowHeight(5, Twip.FromPoints(30));
         var viewport = new PulseOffice.Sheets.UI.GridParts.GridViewport(parts.Engine,
-            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600));
+            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600), new PulseOffice.Sheets.UI.Outline.OutlineGutter());
 
         viewport.ApplyRowFilter(first, new HashSet<int> { 3, 5 });
         Assert.True(first.Layout.IsRowHidden(3));
@@ -111,7 +111,7 @@ public sealed class LedgerViewPartsAuditTests
     {
         var parts = new Parts();
         var viewport = new PulseOffice.Sheets.UI.GridParts.GridViewport(parts.Engine,
-            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600));
+            PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact), 0, () => new Avalonia.Size(800, 600), new PulseOffice.Sheets.UI.Outline.OutlineGutter());
         parts.Sheet.Layout.SetRowHeight(10, Twip.FromPoints(40));
         var region = new CellRange(new CellAddress(0, 0), new CellAddress(CellAddress.MaxRows - 1, 2));
 

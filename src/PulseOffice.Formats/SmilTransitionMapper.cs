@@ -70,6 +70,19 @@ public sealed class SmilTransitionMapper(INativeTransitionTable natives)
             : read with { Native = new NativeTransition(NativeTransition.Odf, payload, kind, direction) };
     }
 
+    public System.Xml.Linq.XNamespace ExtensionNamespace { get; } = "urn:pulseoffice:transition";
+
+    private readonly IReadOnlyList<(TransitionKind Kind, string Token)> _extensionKinds =
+        [(TransitionKind.Cut, "cut"), (TransitionKind.Zoom, "zoom"), (TransitionKind.Morph, "morph")];
+
+    public string? ExtensionKind(SlideTransition transition) =>
+        Native(transition) is null ? _extensionKinds.FirstOrDefault(entry => entry.Kind == transition.Kind).Token : null;
+
+    public SlideTransition WithExtensionKind(SlideTransition read, string? token) =>
+        token is not null && _extensionKinds.FirstOrDefault(entry => entry.Token == token) is { Token: not null } entry && read.CurrentNative is null
+            ? read with { Kind = entry.Kind, Direction = TransitionDirection.None }
+            : read;
+
     public bool ReachesOdf(SlideTransition transition) =>
         transition.CurrentNative is not { Format: NativeTransition.Ooxml } native || natives.SmilFor(native.Payload) is not null;
 

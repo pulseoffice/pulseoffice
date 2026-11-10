@@ -13,7 +13,7 @@ public sealed class ElementBehaviours
         ArgumentNullException.ThrowIfNull(slide);
         var ids = targets.ToHashSet(StringComparer.Ordinal);
         _slide = slide;
-        _animations = [.. slide.Animations.Select((effect, index) => (index, effect)).Where(pair => ids.Contains(pair.effect.TargetId))];
+        _animations = [.. slide.Animations.Select((effect, index) => (index, effect)).Where(pair => ids.Contains(pair.effect.TargetId) || (pair.effect.TriggerShapeId is { } trigger && ids.Contains(trigger)))];
         _interactions = [.. slide.Interactions.Where(action => ids.Contains(action.TargetId))];
         _groupsBefore = [.. slide.Groups];
         _groupsAfter = Pruned(_groupsBefore, ids);

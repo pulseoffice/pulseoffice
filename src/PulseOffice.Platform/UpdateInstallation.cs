@@ -1,6 +1,6 @@
 namespace PulseOffice.Platform;
 
-public sealed record StagedUpdate(string PackagePath, string StagedPath);
+public sealed record StagedUpdate(string PackagePath, string StagedPath, string? Sha256 = null);
 
 public interface IUpdateInstaller
 {

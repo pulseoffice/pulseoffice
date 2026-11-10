@@ -72,12 +72,21 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
             properties.Add(new XAttribute(Smil + "subtype", smil.Subtype));
             if (smil.Reverse) properties.Add(new XAttribute(Smil + "direction", "reverse"));
             properties.Add(new XAttribute(Smil + "dur", units.Seconds(transition.DurationMs)));
+            if (transitions.ExtensionKind(transition) is { } kind)
+                properties.Add(new XAttribute(XNamespace.Xmlns + "pulsetransition", transitions.ExtensionNamespace.NamespaceName),
+                    new XAttribute(transitions.ExtensionNamespace + "kind", kind));
         }
 
-        if (transition.Advance == AdvanceMode.AfterTime)
+        if (transition.AdvancesAfterTime)
         {
             properties.Add(new XAttribute(Presentation + "transition-type", "automatic"));
             properties.Add(new XAttribute(Presentation + "duration", units.XmlDuration(transition.AdvanceAfterMs)));
+            if (transition.Advance == AdvanceMode.OnClickOrAfterTime)
+            {
+                if (properties.Attribute(XNamespace.Xmlns + "pulsetransition") is null)
+                    properties.Add(new XAttribute(XNamespace.Xmlns + "pulsetransition", transitions.ExtensionNamespace.NamespaceName));
+                properties.Add(new XAttribute(transitions.ExtensionNamespace + "advance-on-click", "true"));
+            }
         }
         else
         {

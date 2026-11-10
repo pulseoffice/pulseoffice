@@ -75,10 +75,9 @@ public sealed class CellStyleReferences : ICellStyleReferences
         ArgumentNullException.ThrowIfNull(workbook);
         var catalog = workbook.NamedStyles;
         if (catalog.Find(name) is not { IsBuiltIn: false } style) return null;
-        var heir = style.Parent is { } parent && !Names(parent, style.Name) && catalog.Find(parent) is { } found ? found.Name : null;
+        var heir = catalog.Heir(style);
         var before = catalog.All.ToList();
-        var after = before.Where(entry => !ReferenceEquals(entry, style))
-            .Select(entry => Names(entry.Parent, style.Name) ? entry with { Parent = heir } : entry).ToList();
+        var after = catalog.Without(style.Name, heir);
         var relink = new CellStyleRelink(before, after, Links(workbook, style.Name, heir));
         Apply(workbook, relink);
         return relink;

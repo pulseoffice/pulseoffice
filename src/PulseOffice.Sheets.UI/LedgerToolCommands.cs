@@ -161,6 +161,8 @@ public sealed class LedgerToolCommands(
         var answers = await AskAsync("subtotals",
         [
             new ChoiceField("group", texts["tools.groupColumn"], headers),
+            new ChoiceField("then1", texts["tools.subtotals.thenBy"], [texts["tools.subtotals.none"], .. headers]),
+            new ChoiceField("then2", texts["tools.subtotals.thenBy"], [texts["tools.subtotals.none"], .. headers]),
             new Dialogs.SubtotalColumnsField("values", texts["tools.valueColumns"], headers, functionNames,
                 [new Dialogs.SubtotalColumnChoice(headers.Count - 1, 0)]),
             new CheckField("header", texts["tools.hasHeader"], true),
@@ -186,6 +188,9 @@ public sealed class LedgerToolCommands(
             GroupColumn: range.Start.Column + (int)answers["group"],
             ValueColumns: [.. functions.Keys])
         {
+            ThenGroupColumns = [.. new[] { (int)answers["then1"], (int)answers["then2"] }
+                .Where(choice => choice > 0)
+                .Select(choice => range.Start.Column + choice - 1)],
             Function = distinct[0],
             ColumnFunctions = functions,
             HasHeader = (bool)answers["header"],

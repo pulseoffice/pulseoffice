@@ -20,7 +20,7 @@ public sealed class Round128TableEditorTests
         Query = new DataQuerySource { ConnectionId = string.Empty, Sql = string.Empty },
         Snapshot = new DataSnapshot
         {
-            Columns = [new DataColumn("A", DataValueKind.Text), new DataColumn("B", DataValueKind.Text)],
+            Columns = [new DataColumn("First", DataValueKind.Text), new DataColumn("Second", DataValueKind.Text)],
             Rows = [.. Enumerable.Range(0, rows).Select(row => (IReadOnlyList<object?>)new object?[] { $"a{row}", $"b{row}" })],
         },
     };
@@ -35,7 +35,7 @@ public sealed class Round128TableEditorTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var cell = view.GetVisualDescendants().OfType<TextBox>().Single(box => box.Text == "b0").GetVisualAncestors().OfType<Border>().First();
+        var cell = view.GetVisualDescendants().OfType<TableCellPresenter>().Single(presenter => presenter.IsVisible && presenter.Text == "b0");
         Assert.Same(surface, cell.Background);
         window.Close();
     }, CancellationToken.None);
@@ -49,10 +49,11 @@ public sealed class Round128TableEditorTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var boxes = view.GetVisualDescendants().OfType<TextBox>().ToList();
-        Assert.DoesNotContain(boxes, box => box.Text == "B");
-        var header = boxes.Single(box => box.Text == "A").GetVisualAncestors().OfType<Border>().First();
-        Assert.Equal(2, Grid.GetColumnSpan(header));
+        var shown = view.GetVisualDescendants().OfType<TableCellPresenter>().Where(presenter => presenter.IsVisible).ToList();
+        Assert.DoesNotContain(shown, presenter => presenter.Text == "Second");
+        var header = shown.Single(presenter => presenter.Text == "First");
+        var single = shown.Single(presenter => presenter.Text == "a0");
+        Assert.Equal(single.Bounds.Width * 2, header.Bounds.Width, 3);
         window.Close();
     }, CancellationToken.None);
 }

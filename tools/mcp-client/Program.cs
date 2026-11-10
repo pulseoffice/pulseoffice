@@ -29,7 +29,7 @@ var ct = CancellationToken.None;
 switch (options.Command)
 {
     case "bridge":
-        await new StdioBridge(client, Console.In, Console.Out).RunAsync(ct);
+        await new StdioBridge(client, Console.In, Console.Out, Console.Error).RunAsync(ct);
         return 0;
 
     case "tools":

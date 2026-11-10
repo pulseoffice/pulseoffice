@@ -32,10 +32,18 @@ public sealed class AppImageUpdateInstaller(IAppImageLocation location, int proc
     {
         var current = CurrentImage ?? throw new InvalidOperationException("PulseOffice is not running from an AppImage.");
         var staged = Path.Combine(Path.GetDirectoryName(current)!, $".{Path.GetFileName(current)}.update");
-        File.Copy(packagePath, staged, overwrite: true);
-        File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                                     | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
-                                     | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        File.Delete(staged);
+        using (var source = new FileStream(packagePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (var target = new FileStream(staged, new FileStreamOptions
+               {
+                   Mode = FileMode.CreateNew,
+                   Access = FileAccess.Write,
+                   Share = FileShare.None,
+                   UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                                    | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+                                    | UnixFileMode.OtherRead | UnixFileMode.OtherExecute,
+               }))
+            source.CopyTo(target);
         return Task.FromResult(new StagedUpdate(packagePath, staged));
     }
 

@@ -7,6 +7,7 @@ namespace PulseOffice.Formats.Odf;
 public sealed class OdfAnimationBehaviourCodec
 {
     private const int DeepestNesting = 64;
+    private const string Indefinite = "indefinite";
 
     private static readonly XNamespace Anim = OdfPackage.Namespaces.Anim;
     private static readonly XNamespace Smil = OdfPackage.Namespaces.Smil;
@@ -37,7 +38,7 @@ public sealed class OdfAnimationBehaviourCodec
             IterateType = iterating ? (string?)effect.Attribute(Anim + "iterate-type") ?? "by-letter" : null,
             IterateInterval = iterating ? Number((string?)effect.Attribute(Anim + "iterate-interval")) ?? 0 : null,
             TextOnly = iterating && (string?)effect.Attribute(Anim + "sub-item") == "text",
-            RootTiming = ReadTiming(effect) with { Begin = null, Duration = null, Fill = null, RepeatCount = null },
+            RootTiming = ReadTiming(effect) with { Begin = null, Duration = null, Fill = null, RepeatCount = null, RepeatsIndefinitely = false },
         };
     }
 
@@ -113,6 +114,7 @@ public sealed class OdfAnimationBehaviourCodec
             Decelerate = Number(Smil("decelerate")) ?? 0,
             AutoReverse = Smil("autoReverse") == "true",
             RepeatCount = Number(Smil("repeatCount")),
+            RepeatsIndefinitely = Smil("repeatCount") == Indefinite,
         };
     }
 
@@ -124,7 +126,8 @@ public sealed class OdfAnimationBehaviourCodec
         if (timing.Accelerate > 0) yield return new XAttribute(Smil + "accelerate", Format(timing.Accelerate));
         if (timing.Decelerate > 0) yield return new XAttribute(Smil + "decelerate", Format(timing.Decelerate));
         if (timing.AutoReverse) yield return new XAttribute(Smil + "autoReverse", "true");
-        if (timing.RepeatCount is { } repeat) yield return new XAttribute(Smil + "repeatCount", Format(repeat));
+        if (timing.RepeatsIndefinitely) yield return new XAttribute(Smil + "repeatCount", Indefinite);
+        else if (timing.RepeatCount is { } repeat) yield return new XAttribute(Smil + "repeatCount", Format(repeat));
     }
 
     private string Seconds(double seconds) => Format(seconds) + "s";

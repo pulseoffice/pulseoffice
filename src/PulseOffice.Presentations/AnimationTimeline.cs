@@ -19,15 +19,20 @@ public sealed class AnimationTimeline(IAnimationScheduler scheduler) : IAnimatio
     public AnimationTimelineView Build(IReadOnlyList<AnimationEffect> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
-        var schedule = scheduler.Schedule(effects);
-        var rows = new List<AnimationTimelineRow>(schedule.Count);
+        var main = scheduler.Schedule(effects);
+        var timed = new Dictionary<AnimationEffect, ScheduledEffect>(ReferenceEqualityComparer.Instance);
+        foreach (var scheduled in main.Concat(effects.Where(effect => effect.IsTriggered).Select(effect => effect.TriggerShapeId!).Distinct(StringComparer.Ordinal)
+            .SelectMany(trigger => scheduler.ScheduleTriggered(effects, trigger))))
+            timed.TryAdd(scheduled.Effect, scheduled);
+        var rows = new List<AnimationTimelineRow>(effects.Count);
         var clicks = 0;
-        foreach (var scheduled in schedule)
+        foreach (var effect in effects)
         {
-            int? number = scheduled.Effect.Trigger == AnimationTrigger.OnClick ? ++clicks : null;
-            rows.Add(new AnimationTimelineRow(scheduled.Effect, number, scheduled.StartMs, scheduled.EndMs));
+            if (!timed.TryGetValue(effect, out var scheduled)) continue;
+            int? number = !effect.IsTriggered && effect.Trigger == AnimationTrigger.OnClick ? ++clicks : null;
+            rows.Add(new AnimationTimelineRow(effect, number, scheduled.StartMs, scheduled.EndMs));
         }
-        return new AnimationTimelineView(rows, scheduler.Duration(schedule));
+        return new AnimationTimelineView(rows, timed.Count == 0 ? 0 : timed.Values.Max(scheduled => scheduled.EndMs));
     }
 }
 

@@ -13,7 +13,6 @@ public sealed class PresentationWindow : Window
 {
     private readonly Presentation _deck;
     private readonly IReadOnlyList<Slide> _playlist;
-    private readonly IAnimationScheduler _scheduler;
     private readonly PresentationController _controller;
     private readonly ISlideRenderer _renderer;
     private readonly bool _loop;
@@ -78,7 +77,6 @@ public sealed class PresentationWindow : Window
     {
         _deck = deck;
         _playlist = [.. options.Playlist is { Count: > 0 } list ? list : deck.Slides];
-        _scheduler = scheduler;
         _renderer = renderer;
         _loop = options.Loop;
         _rehearse = options.Rehearse;
@@ -241,10 +239,9 @@ public sealed class PresentationWindow : Window
         else
         {
             var frozen = _controller.FrozenTimeMs();
-            var schedule = ScheduleFor(_controller.Current);
-            _front.PlaybackVisual = frozen < 0 && !HasEntrance(schedule)
+            _front.PlaybackVisual = frozen < 0 && _controller.Plan is not { NeedsVisuals: true }
                 ? null
-                : id => _scheduler.VisualAt(id, schedule, frozen);
+                : id => _controller.VisualAt(id, frozen);
             _front.InvalidateVisual();
         }
 
@@ -253,11 +250,6 @@ public sealed class PresentationWindow : Window
         SlideChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private IReadOnlyList<ScheduledEffect> ScheduleFor(Slide? slide) =>
-        slide is null ? [] : _scheduler.Schedule(slide.Animations);
-
-    private bool HasEntrance(IReadOnlyList<ScheduledEffect> schedule) =>
-        schedule.Any(s => s.Effect.Category == AnimationCategory.Entrance);
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -415,6 +407,13 @@ public sealed class PresentationWindow : Window
             return;
         }
 
+        if (element is not null && !_withoutAnimation && !_busy && _controller.Trigger(element.Id) is { } triggered)
+        {
+            PlayTrigger(element.Id, triggered);
+            e.Handled = true;
+            return;
+        }
+
         if (element is not null && _controller.Current?.Interaction(element.Id) is { } action && Follow(action))
         {
             e.Handled = true;
@@ -512,15 +511,31 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        var schedule = ScheduleFor(_controller.Current);
         var span = Math.Max(1, window.EndMs - window.StartMs);
 
         AnimateOver(span, progress =>
         {
             var t = window.StartMs + (int)(progress * span);
-            _front.PlaybackVisual = id => _scheduler.VisualAt(id, schedule, t);
+            _front.PlaybackVisual = id => _controller.VisualAt(id, t);
             _front.InvalidateVisual();
         }, FreezeFront);
+    }
+
+    private void PlayTrigger(string triggerShapeId, (int StartMs, int EndMs) window)
+    {
+        var frozen = _controller.FrozenTimeMs();
+        var span = Math.Max(1, window.EndMs - window.StartMs);
+
+        AnimateOver(span, progress =>
+        {
+            var t = window.StartMs + (int)(progress * span);
+            _front.PlaybackVisual = id => _controller.VisualAt(id, frozen, triggerShapeId, t);
+            _front.InvalidateVisual();
+        }, () =>
+        {
+            _front.PlaybackVisual = id => _controller.VisualAt(id, frozen);
+            _front.InvalidateVisual();
+        });
     }
 
     private void PlayTransition(int fromIndex, int toIndex)
@@ -574,23 +589,22 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        var schedule = ScheduleFor(_controller.Current);
         var span = Math.Max(1, window.EndMs - window.StartMs);
-        _front.PlaybackVisual = id => _scheduler.VisualAt(id, schedule, window.StartMs);
+        _front.PlaybackVisual = id => _controller.VisualAt(id, window.StartMs);
         _front.InvalidateVisual();
 
         AnimateOver(span, progress =>
         {
             var t = window.StartMs + (int)(progress * span);
-            _front.PlaybackVisual = id => _scheduler.VisualAt(id, schedule, t);
+            _front.PlaybackVisual = id => _controller.VisualAt(id, t);
             _front.InvalidateVisual();
         }, FreezeFront);
     }
 
     private Func<string, ElementVisual>? InitialVisualFor(int index)
     {
-        var schedule = ScheduleFor(_playlist[index]);
-        return HasEntrance(schedule) ? id => _scheduler.VisualAt(id, schedule, -1) : null;
+        var plan = _controller.PlanOf(_playlist[index]);
+        return plan.NeedsVisuals ? id => plan.VisualAt(id, -1, _ => -1) : null;
     }
 
     private void AnimateOver(int durationMs, Action<double> onFrame, Action onDone)
@@ -636,7 +650,7 @@ public sealed class PresentationWindow : Window
         if (_rehearse || _manualAdvance) return;
 
         if (_controller.StepIndex >= _controller.CurrentStepCount() - 1
-            && _controller.Current?.Transition is { Advance: AdvanceMode.AfterTime } t
+            && _controller.Current?.Transition is { AdvancesAfterTime: true } t
             && t.AdvanceAfterMs > 0)
         {
             _autoAdvance = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(t.AdvanceAfterMs) };

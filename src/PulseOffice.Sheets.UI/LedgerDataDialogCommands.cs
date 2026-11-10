@@ -57,7 +57,10 @@ public sealed class LedgerDataDialogCommands(
             : [.. remembered.Sources.Select(area => references.Qualify(workbook, area.SheetIndex, area.Range.ToString(), sheetIndex))];
         var initialTarget = remembered?.Target.ToA1() ?? Context.Selection.Start.ToA1();
         var labels = remembered is null ? null
-            : new DataDialogs.ConsolidateLabels((SubtotalFunction)(int)remembered.Function, remembered.TopRowLabels, remembered.LeftColumnLabels);
+            : new DataDialogs.ConsolidateLabels((SubtotalFunction)(int)remembered.Function, remembered.TopRowLabels, remembered.LeftColumnLabels)
+            {
+                LinkToSource = remembered.LinkToSource,
+            };
         var choice = await dialogs.ShowAsync<DataDialogs.ConsolidateChoice>(
             new DataDialogs.ConsolidateView(kit, dialogProbes.Consolidation(workbook, sheetIndex), initialSources,
                 initialTarget, sources.Picker(Dialogs.ReferenceShape.Range), sources.For(Dialogs.ReferenceShape.Cell), labels),
@@ -90,6 +93,7 @@ public sealed class LedgerDataDialogCommands(
             Function = choice.Function,
             LabelsInFirstRow = choice.RowLabels,
             LabelsInFirstColumn = choice.ColumnLabels,
+            LinkToSource = choice.LinkToSource,
         });
 
         var settings = new ConsolidationSettings
@@ -100,14 +104,24 @@ public sealed class LedgerDataDialogCommands(
             Function = (ConsolidationFunction)(int)choice.Function,
             TopRowLabels = choice.RowLabels,
             LeftColumnLabels = choice.ColumnLabels,
-            LinkToSource = workbook.Consolidation?.LinkToSource ?? false,
+            LinkToSource = choice.LinkToSource,
         };
         var title = texts["command.ledger.data.consolidate.title"];
         using (Context.History?.BeginTransaction(title))
         {
-            Write(engine, plan.Values, "command.ledger.data.consolidate.title");
+            Write(engine, plan, title);
             Remember(workbook, settings, title);
         }
+    }
+
+    private void Write(Engine.Recalculation.CalculationEngine engine, ConsolidationPlan plan, string title)
+    {
+        var values = plan.Values.Where(pair => !plan.Formulas.ContainsKey(pair.Key)).Select(pair => (pair.Key, pair.Value)).ToList();
+        var formulas = plan.Formulas.Select(pair => (pair.Key, pair.Value)).ToList();
+        if (values.Count + formulas.Count == 0) return;
+
+        writes.Write(Context, engine, values, formulas, title);
+        status.Report(texts.Format("status.cells.written", values.Count + formulas.Count));
     }
 
     private void Remember(Workbook workbook, ConsolidationSettings settings, string title)

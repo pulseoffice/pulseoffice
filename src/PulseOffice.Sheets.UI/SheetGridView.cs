@@ -1,3 +1,4 @@
+using PulseOffice.Sheets.Styling;
 using PulseOffice.Drawing.Shapes;
 using PulseOffice.Sheets.Engine.Operations;
 using Avalonia;
@@ -456,6 +457,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
     public event EventHandler<IReadOnlyList<PlacedObject>>? ObjectsDeleteRequested { add => Events.ObjectsDeleteRequested += value; remove => Events.ObjectsDeleteRequested -= value; }
 
     public event EventHandler<ResizeRequest>? ResizeRequested { add => Events.ResizeRequested += value; remove => Events.ResizeRequested -= value; }
+
+    public event EventHandler<Outline.OutlineButton>? OutlineRequested { add => Events.OutlineRequested += value; remove => Events.OutlineRequested -= value; }
 
     public sealed record FillRequest(CellRange Source, CellRange Target);
 

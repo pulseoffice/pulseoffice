@@ -15,9 +15,16 @@ public sealed record ConsolidationRequest(IReadOnlyList<ConsolidationSource> Sou
     public bool LabelsInFirstRow { get; init; }
 
     public bool LabelsInFirstColumn { get; init; }
+
+    public bool LinkToSource { get; init; }
 }
 
-public sealed record ConsolidationPlan(IReadOnlyDictionary<CellAddress, CellValue> Values);
+public sealed record ConsolidationPlan(IReadOnlyDictionary<CellAddress, CellValue> Values)
+{
+    public IReadOnlyDictionary<CellAddress, string> Formulas { get; init; } = new Dictionary<CellAddress, string>();
+}
+
+internal sealed record ConsolidationEntry(CellValue Value, int SheetIndex, CellAddress Address);
 
 public interface ISheetConsolidation
 {
@@ -27,6 +34,7 @@ public interface ISheetConsolidation
 public sealed class SheetConsolidation : ISheetConsolidation
 {
     private readonly ConsolidationCombiners _combiners = new();
+    private readonly ConsolidationLinks _links = new();
     private readonly ISpreadsheetLocale _locale;
 
     public SheetConsolidation() : this(new SystemSpreadsheetLocale())
@@ -46,15 +54,23 @@ public sealed class SheetConsolidation : ISheetConsolidation
         var values = new Dictionary<CellAddress, CellValue>();
         if (request.Sources.Count == 0) return new ConsolidationPlan(values);
 
-        return request.LabelsInFirstRow || request.LabelsInFirstColumn
-            ? new ConsolidationPlan(ByLabel(workbook, request))
-            : new ConsolidationPlan(ByPosition(workbook, request));
+        var buckets = request.LabelsInFirstRow || request.LabelsInFirstColumn
+            ? ByLabel(workbook, request, values)
+            : ByPosition(workbook, request);
+
+        var formulas = new Dictionary<CellAddress, string>();
+        foreach (var (address, entries) in buckets)
+        {
+            values[address] = _combiners.Combine([.. entries.Select(entry => entry.Value)], request.Function);
+            if (request.LinkToSource) formulas[address] = _links.Formula(workbook, request.Function, entries);
+        }
+
+        return new ConsolidationPlan(values) { Formulas = formulas };
     }
 
-    private Dictionary<CellAddress, CellValue> ByPosition(
-        Workbook workbook, ConsolidationRequest request)
+    private Dictionary<CellAddress, List<ConsolidationEntry>> ByPosition(Workbook workbook, ConsolidationRequest request)
     {
-        var buckets = new Dictionary<(int Row, int Column), List<CellValue>>();
+        var buckets = new Dictionary<CellAddress, List<ConsolidationEntry>>();
 
         foreach (var source in request.Sources)
         {
@@ -64,27 +80,28 @@ public sealed class SheetConsolidation : ISheetConsolidation
             for (var row = used.Start.Row; row <= used.End.Row; row++)
                 for (var column = used.Start.Column; column <= used.End.Column; column++)
                 {
-                    var value = sheet.GetValue(new CellAddress(row, column));
+                    var address = new CellAddress(row, column);
+                    var value = sheet.GetValue(address);
                     if (value.IsEmpty) continue;
 
-                    var key = (row - source.Range.Start.Row, column - source.Range.Start.Column);
+                    var key = new CellAddress(
+                        request.Destination.Row + row - source.Range.Start.Row,
+                        request.Destination.Column + column - source.Range.Start.Column);
 
                     if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = [];
-                    list.Add(value);
+                    list.Add(new ConsolidationEntry(value, source.SheetIndex, address));
                 }
         }
 
-        return buckets.ToDictionary(
-            pair => new CellAddress(
-                request.Destination.Row + pair.Key.Row, request.Destination.Column + pair.Key.Column),
-            pair => _combiners.Combine(pair.Value, request.Function));
+        return buckets;
     }
 
-    private Dictionary<CellAddress, CellValue> ByLabel(Workbook workbook, ConsolidationRequest request)
+    private Dictionary<CellAddress, List<ConsolidationEntry>> ByLabel(
+        Workbook workbook, ConsolidationRequest request, Dictionary<CellAddress, CellValue> values)
     {
         var rowLabels = new List<string>();
         var columnLabels = new List<string>();
-        var buckets = new Dictionary<(string Row, string Column), List<CellValue>>();
+        var buckets = new Dictionary<(string Row, string Column), List<ConsolidationEntry>>();
 
         foreach (var source in request.Sources)
         {
@@ -98,7 +115,8 @@ public sealed class SheetConsolidation : ISheetConsolidation
             for (var row = firstRow; row <= used.End.Row; row++)
                 for (var column = firstColumn; column <= used.End.Column; column++)
                 {
-                    var value = sheet.GetValue(new CellAddress(row, column));
+                    var address = new CellAddress(row, column);
+                    var value = sheet.GetValue(address);
                     if (value.IsEmpty) continue;
 
                     var rowLabel = request.LabelsInFirstColumn
@@ -115,11 +133,10 @@ public sealed class SheetConsolidation : ISheetConsolidation
                     var key = (rowLabel, columnLabel);
                     if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = [];
 
-                    list.Add(value);
+                    list.Add(new ConsolidationEntry(value, source.SheetIndex, address));
                 }
         }
 
-        var values = new Dictionary<CellAddress, CellValue>();
         var origin = request.Destination;
         var rowOffset = request.LabelsInFirstRow ? 1 : 0;
         var columnOffset = request.LabelsInFirstColumn ? 1 : 0;
@@ -134,15 +151,11 @@ public sealed class SheetConsolidation : ISheetConsolidation
                 values[new CellAddress(origin.Row + index + rowOffset, origin.Column)] =
                     CellValue.Text(rowLabels[index]);
 
-        foreach (var ((rowLabel, columnLabel), cells) in buckets)
-        {
-            var row = origin.Row + rowLabels.IndexOf(rowLabel) + rowOffset;
-            var column = origin.Column + columnLabels.IndexOf(columnLabel) + columnOffset;
-
-            values[new CellAddress(row, column)] = _combiners.Combine(cells, request.Function);
-        }
-
-        return values;
+        return buckets.ToDictionary(
+            pair => new CellAddress(
+                origin.Row + rowLabels.IndexOf(pair.Key.Row) + rowOffset,
+                origin.Column + columnLabels.IndexOf(pair.Key.Column) + columnOffset),
+            pair => pair.Value);
     }
 
     private string Canonical(List<string> labels, string label)
@@ -228,4 +241,22 @@ internal sealed class SpreadCombiner(SubtotalFunction function, bool population,
         var variance = SpreadsheetMath.Variance(numbers, population);
         return CellValue.Number(root ? Math.Sqrt(variance) : variance);
     }
+}
+
+internal sealed class ConsolidationLinks
+{
+    private readonly IReadOnlyDictionary<SubtotalFunction, string> _names = new Dictionary<SubtotalFunction, string>
+    {
+        [SubtotalFunction.Sum] = "SUM", [SubtotalFunction.Count] = "COUNTA", [SubtotalFunction.CountNumbers] = "COUNT",
+        [SubtotalFunction.Average] = "AVERAGE", [SubtotalFunction.Max] = "MAX", [SubtotalFunction.Min] = "MIN",
+        [SubtotalFunction.Product] = "PRODUCT", [SubtotalFunction.StandardDeviation] = "STDEV",
+        [SubtotalFunction.StandardDeviationPopulation] = "STDEVP", [SubtotalFunction.Variance] = "VAR",
+        [SubtotalFunction.VariancePopulation] = "VARP",
+    };
+
+    public string Formula(Workbook workbook, SubtotalFunction function, IReadOnlyList<ConsolidationEntry> entries) =>
+        $"={(_names.TryGetValue(function, out var name) ? name : "SUM")}({string.Join(';', entries.Select(entry => Reference(workbook, entry)))})";
+
+    private string Reference(Workbook workbook, ConsolidationEntry entry) =>
+        $"'{workbook.Sheets[entry.SheetIndex].Name.Replace("'", "''", StringComparison.Ordinal)}'!${CellAddress.ColumnName(entry.Address.Column)}${entry.Address.Row + 1}";
 }

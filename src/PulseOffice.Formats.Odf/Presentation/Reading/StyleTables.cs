@@ -134,7 +134,9 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
 
         var native = type is null
             ? SlideTransition.None
-            : transitions.FromSmil(type, (string?)properties.Attribute(Smil + "subtype") ?? string.Empty, (string?)properties.Attribute(Smil + "direction") == "reverse");
+            : transitions.WithExtensionKind(
+                transitions.FromSmil(type, (string?)properties.Attribute(Smil + "subtype") ?? string.Empty, (string?)properties.Attribute(Smil + "direction") == "reverse"),
+                (string?)properties.Attribute(transitions.ExtensionNamespace + "kind"));
 
         return native with
         {
@@ -145,7 +147,8 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
                     "fast" => 500,
                     _ => 1000,
                 }),
-            Advance = advancing ? AdvanceMode.AfterTime : AdvanceMode.OnClick,
+            Advance = !advancing ? AdvanceMode.OnClick
+                : (string?)properties.Attribute(transitions.ExtensionNamespace + "advance-on-click") == "true" ? AdvanceMode.OnClickOrAfterTime : AdvanceMode.AfterTime,
             AdvanceAfterMs = values.XmlDuration((string?)properties.Attribute(Presentation + "duration")),
             SoundPath = (string?)sound?.Attribute(OdfPackage.Namespaces.Xlink + "href"),
             LoopSoundUntilNext = (string?)sound?.Attribute(Presentation + "play-full") == "false",

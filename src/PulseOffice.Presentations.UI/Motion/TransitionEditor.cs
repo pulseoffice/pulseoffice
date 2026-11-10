@@ -38,7 +38,9 @@ public sealed record TransitionEditorContext(Presentation Deck, ITransitionSampl
 
 public sealed class TransitionEditor : UserControl
 {
-    private static readonly string[] SoundExtensions = ["*.wav", "*.mp3", "*.ogg", "*.m4a", "*.aac", "*.flac"];
+    private static readonly AdvanceMode[] AdvanceModes = [AdvanceMode.OnClick, AdvanceMode.AfterTime, AdvanceMode.OnClickOrAfterTime];
+
+    private static readonly string[] SoundExtensions =["*.wav", "*.mp3", "*.ogg", "*.m4a", "*.aac", "*.flac"];
 
     private readonly TransitionEditorServices _services;
     private readonly TransitionEditorContext _context;
@@ -73,10 +75,11 @@ public sealed class TransitionEditor : UserControl
             [
                 new IconChoice("onClick", "deck.motion.advance.onClick", Texts["deck.transitionDialog.onClick"]),
                 new IconChoice("afterTime", "deck.motion.advance.afterTime", Texts["deck.transitionDialog.afterTime"]),
+                new IconChoice("onClickOrAfterTime", "deck.motion.advance.afterTime", Texts["deck.transitionDialog.onClickOrAfterTime"]),
             ],
-            services.Icons, _metrics, Texts["deck.transitionDialog.advance"], _transition.Advance == AdvanceMode.AfterTime ? 1 : 0, showLabels: true);
+            services.Icons, _metrics, Texts["deck.transitionDialog.advance"], Array.IndexOf(AdvanceModes, _transition.Advance), showLabels: true);
         _advance.SelectionChanged += (_, index) =>
-            Update(_transition with { Advance = index == 1 ? AdvanceMode.AfterTime : AdvanceMode.OnClick });
+            Update(_transition with { Advance = AdvanceModes[Math.Clamp(index, 0, AdvanceModes.Length - 1)] });
 
         _after = Seconds(_transition.AdvanceAfterMs / 1000.0, 0, 3600, Texts["deck.motion.after"], [1, 2, 3, 5, 10, 15, 30, 60]);
         _after.ValueCommitted += (_, value) => Update(_transition with { AdvanceAfterMs = Milliseconds(value) });
@@ -304,9 +307,9 @@ public sealed class TransitionEditor : UserControl
             SyncDirections();
             _duration.Value = _transition.DurationMs / 1000.0;
             _duration.IsEnabled = !_transition.IsNone;
-            _advance.SelectedIndex = _transition.Advance == AdvanceMode.AfterTime ? 1 : 0;
+            _advance.SelectedIndex = Array.IndexOf(AdvanceModes, _transition.Advance);
             _after.Value = _transition.AdvanceAfterMs / 1000.0;
-            _after.IsEnabled = _transition.Advance == AdvanceMode.AfterTime;
+            _after.IsEnabled = _transition.AdvancesAfterTime;
             SyncSounds();
             _loop.IsChecked = _transition.LoopSoundUntilNext;
             _loop.IsEnabled = _transition.SoundPath is not null;

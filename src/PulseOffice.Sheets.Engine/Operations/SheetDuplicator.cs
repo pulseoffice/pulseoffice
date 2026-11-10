@@ -129,6 +129,7 @@ public sealed class SheetDuplicator : ISheetDuplicator
         copy.Scenarios.AddRange(source.Scenarios);
         copy.RowGroups.AddRange(source.RowGroups);
         copy.ColumnGroups.AddRange(source.ColumnGroups);
+        copy.OutlineSummary = source.OutlineSummary;
         copy.TraceArrows.AddRange(source.TraceArrows);
         copy.RowBreaks.UnionWith(source.RowBreaks);
         copy.ColumnBreaks.UnionWith(source.ColumnBreaks);

@@ -62,6 +62,13 @@ internal sealed class GridPointerInput(
             return;
         }
 
+        if (viewport.OutlineButtonAt(point) is { } outline)
+        {
+            notifications.Outline(outline);
+            e.Handled = true;
+            return;
+        }
+
         if (drawing.Begin(point, e)) return;
 
         if (BeginPathEdit(point, e)) return;

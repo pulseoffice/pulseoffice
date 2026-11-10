@@ -18,6 +18,8 @@ public sealed record BehaviourTiming
 
     public double? RepeatCount { get; init; }
 
+    public bool RepeatsIndefinitely { get; init; }
+
     public BehaviourTiming Scaled(double factor) => this with
     {
         Begin = Begin * factor,

@@ -81,6 +81,8 @@ public sealed class XlsxReader
                 _consolidation.Read(content.GetFirstChild<DataConsolidate>(), sheet, context.Workbook);
                 if (content.GetFirstChild<SheetProperties>()?.TabColor?.Rgb?.Value is { Length: >= 6 } tab)
                     sheet.TabColorHex = "#" + tab[^6..].ToUpperInvariant();
+                if (content.GetFirstChild<SheetProperties>()?.OutlineProperties is { } outline)
+                    sheet.OutlineSummary = new PulseOffice.Sheets.OutlineSummary(outline.SummaryBelow?.Value ?? true, outline.SummaryRight?.Value ?? true);
                 var view = content.GetFirstChild<SheetViews>()?.GetFirstChild<SheetView>();
                 sheet.RightToLeft = view?.RightToLeft?.Value == true;
                 if (view?.GetFirstChild<Pane>() is { } pane && pane.State?.Value is { } paneState
@@ -137,11 +139,11 @@ public sealed class XlsxReader
 
             var stylesheet = workbookPart.WorkbookStylesPart?.Stylesheet;
             var numberCodes = NumberCodes(stylesheet);
-            foreach (var (name, style) in _styles.ReadNamedStyles(stylesheet))
+            foreach (var (name, style, declared) in _styles.ReadNamedStyles(stylesheet))
             {
                 var builtIn = workbook.NamedStyles.Find(name) is { IsBuiltIn: true } existing ? existing : null;
                 workbook.NamedStyles.Define(builtIn?.Name ?? name, style with { NumberFormatId = NumberFormatIdOf(workbook, numberCodes, style.NumberFormatId) },
-                    builtIn?.Parent, builtIn is not null);
+                    builtIn?.Parent, builtIn is not null, declared);
             }
             var context = new XlsxReadContext(
                 workbook, _strings.Read(workbookPart),

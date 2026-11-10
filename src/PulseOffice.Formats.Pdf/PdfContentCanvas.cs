@@ -7,8 +7,10 @@ using PulseOffice.Formats.Pdf.Fonts;
 
 namespace PulseOffice.Formats.Pdf;
 
-public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, IArcFlattener? flattener = null) : IPageCanvas
+public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, IArcFlattener? flattener = null, ITextDecorationPainter? decorations = null) : IPageCanvas
 {
+    private readonly ITextDecorationPainter _decorations = decorations ?? new TextDecorationPainter();
+
     private readonly PathReplay _replay = new();
 
     private readonly StringBuilder _content = new();
@@ -319,6 +321,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         _content.Append(composer.Compose(font.SizePoints, resource => Select(resource, font)));
         _content.Append("ET\n");
         if (synthetic) _content.Append("0 Tr\n");
+        _decorations.Paint(this, new PrintTextSpan(new Twip((int)x).ToPoints(), new Twip(y).ToPoints(), visibleWidth.ToPoints(), font, color));
     }
 
     public void DrawGlyphs(PrintGlyphRun run)
@@ -370,6 +373,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         _content.Append(composer.Compose(size, resource => Select(resource, run.Font)));
         _content.Append("ET\n");
         if (synthetic) _content.Append("0 Tr\n");
+        _decorations.Paint(this, new PrintTextSpan(run.X, run.Baseline, run.Width, run.Font, run.Color, run.RotationDegrees));
     }
 
     private string Select(IPdfFontResource resource, PrintFont font)

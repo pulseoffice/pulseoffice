@@ -232,6 +232,19 @@ public sealed class AnimationPane : UserControl
         track.Children.Add(bar);
         ToolTip.SetTip(track, Texts.Format("deck.motion.timeRange", Seconds(row.StartMs), Seconds(row.EndMs)));
 
+        var content = new StackPanel { Children = { top, track } };
+        if (effect.IsTriggered)
+        {
+            var triggeredBy = new TextBlock
+            {
+                Text = Texts.Format("deck.motion.triggeredBy", _context.TargetName(effect.TriggerShapeId!)),
+                FontSize = Math.Max(9, _metrics.FontSizeSmall - 1),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(44, 2, 0, 0),
+            }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
+            content.Children.Insert(0, triggeredBy);
+        }
+
         var selected = effect.Id == _selectedId;
         var button = new Button
         {
@@ -242,10 +255,10 @@ public sealed class AnimationPane : UserControl
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(selected ? 1 : 0),
             CornerRadius = new CornerRadius(_metrics.RadiusTight),
-            Content = new StackPanel { Children = { top, track } },
+            Content = content,
         };
         if (selected) button.Themed(Button.BackgroundProperty, "PulseAccentSubtle").Themed(Button.BorderBrushProperty, "PulseAccent");
-        AutomationProperties.SetName(button, $"{row.ClickNumber?.ToString(CultureInfo.CurrentCulture) ?? string.Empty} {looks.CategoryName(effect.Category)}, {name.Text}, {looks.TriggerName(effect.Trigger)}".Trim());
+        AutomationProperties.SetName(button, $"{row.ClickNumber?.ToString(CultureInfo.CurrentCulture) ?? string.Empty} {looks.CategoryName(effect.Category)}, {name.Text}, {looks.TriggerName(effect.Trigger)}{(effect.IsTriggered ? ", " + Texts.Format("deck.motion.triggeredBy", _context.TargetName(effect.TriggerShapeId!)) : string.Empty)}".Trim());
         button.Click += (_, _) =>
         {
             if (_dragging) return;
@@ -279,6 +292,15 @@ public sealed class AnimationPane : UserControl
         start.SelectionChanged += (_, index) => Edit(effect with { Trigger = triggers[index] });
         section.Add(Texts["deck.animationDialog.trigger"], start);
 
+        section.Add(Texts["deck.motion.triggerShape"], TriggerShapes(effect));
+
+        var rewind = new CheckBox { Content = Texts["deck.motion.rewind"], IsChecked = effect.Rewind };
+        rewind.IsCheckedChanged += (_, _) =>
+        {
+            if ((rewind.IsChecked == true) != effect.Rewind) Edit(effect with { Rewind = rewind.IsChecked == true });
+        };
+        section.Add(null, rewind, DialogRowKind.Wide);
+
         var duration = Measure("s", effect.DurationMs / 1000.0, 0.05, 600, 0.25, Texts["deck.motion.duration"]);
         duration.ValueCommitted += (_, value) => Edit(effect with { DurationMs = (int)Math.Round(value * 1000) });
         Scrubbed(section.Add(Texts["deck.motion.duration"], duration), duration);
@@ -300,6 +322,29 @@ public sealed class AnimationPane : UserControl
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { earlier, later, remove } };
         section.Add(null, actions, DialogRowKind.Wide);
         return section;
+    }
+
+    private ComboBox TriggerShapes(AnimationEffect effect)
+    {
+        var shapes = _context.Slide.InZOrder().Select(element => element.Id).ToList();
+        if (effect.TriggerShapeId is { } current && !shapes.Contains(current, StringComparer.Ordinal)) shapes.Add(current);
+        var items = new List<string?> { null };
+        items.AddRange(shapes);
+        var box = new ComboBox
+        {
+            ItemsSource = items.Select(id => id is null ? Texts["deck.motion.triggerSequence"] : Texts.Format("deck.motion.triggeredBy", _context.TargetName(id))).ToList(),
+            SelectedIndex = Math.Max(0, items.IndexOf(effect.TriggerShapeId)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 140,
+        };
+        AutomationProperties.SetName(box, Texts["deck.motion.triggerShape"]);
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0 || box.SelectedIndex >= items.Count) return;
+            var chosen = items[box.SelectedIndex];
+            if (!string.Equals(chosen, effect.TriggerShapeId, StringComparison.Ordinal)) Edit(effect with { TriggerShapeId = chosen });
+        };
+        return box;
     }
 
     private void Scrubbed(DialogRow row, MeasureField field)

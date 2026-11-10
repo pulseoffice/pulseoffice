@@ -13419,3 +13419,19 @@ move, or asks with `zenity`/`kdialog` to pick it, or shows a notice; when the ap
 itself to `~/Applications`. Help › Show in Applications Menu adds or removes the integration. Tests: integration files,
 move, removal and the launcher (registered image, moved image, nothing found) in `DesktopIntegrationTests`; the launcher
 was also run under `dash` on Ubuntu 24.04. Not yet tried on a real Linux desktop session.
+
+## Rounds 130-139 and corpus audit (2026-11-10)
+
+Logs in `docs/deep-audit/round-130…139-*.md`. Ledger: outline gutter with buttons placed by the summary position (XLSX
+`outlinePr`, ODS our attribute), nested subtotals in one step, consolidate linked to source data and restored by undo
+(130); named cell styles inherit per property with explicit values, per-attribute font and borders, restored at their
+place (131); printing wraps, rotates, underlines and strikes cell text through shared print canvas decorations (132).
+Deck: virtualized table editor (100,000 cells in 51 ms instead of 34.6 s), multi-line cells, splittable header (133);
+Morph written natively in PPTX, p15/p159 transitions with the right fallback, cut/zoom/morph kept in ODP (135); shape
+triggered animations in the model, both formats, slide show and pane, rewind, advance on click or after a time (137);
+indefinite repeats carried, presenter view keys (138). Folio: ideographic line breaking and justification,
+keep-with-next before tables (134). Security: AppImage launcher runs only executable images, Desktop Entry escaping,
+Windows installer hash re-checked, no symlink following (136); MCP bridge survives errors and expired sessions, no
+overwrite after confirmation (139). Corpus audit after the rounds: LOSS 0, DECL 127. CLAUDE.md rule 7: declaring a format
+loss is the last resort after researching both specifications. Open: video export without transitions and animations,
+rehearsal keeping only the last visit of a slide.

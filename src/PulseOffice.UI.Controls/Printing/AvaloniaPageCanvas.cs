@@ -72,9 +72,12 @@ public sealed class PageImageBitmaps : IPageImageBitmaps
 }
 
 public sealed class AvaloniaPageCanvas(
-    DrawingContext context, DocumentSize pageSize, double scale, PulseOffice.UI.Controls.Fonts.IDisplayFonts fonts, IPageImageBitmaps bitmaps)
+    DrawingContext context, DocumentSize pageSize, double scale, PulseOffice.UI.Controls.Fonts.IDisplayFonts fonts, IPageImageBitmaps bitmaps,
+    ITextDecorationPainter? decorations = null)
     : IPageCanvas
 {
+    private readonly ITextDecorationPainter _decorations = decorations ?? new TextDecorationPainter();
+
     private readonly PulseOffice.UI.Controls.Shapes.OutlineGeometry _geometry = new();
 
     public DocumentSize PageSize => pageSize;
@@ -122,6 +125,7 @@ public sealed class AvaloniaPageCanvas(
 
         using var clip = context.PushClip(area);
         context.DrawText(formatted, new Point(x, y));
+        _decorations.Paint(this, new PrintTextSpan(x / scale, (y + formatted.Baseline) / scale, formatted.Width / scale, font, color));
     }
 
     public void DrawPath(PrintPath path)
@@ -157,6 +161,7 @@ public sealed class AvaloniaPageCanvas(
         ArgumentNullException.ThrowIfNull(run);
         if (run.Text.Length == 0 || run.Font.SizePoints <= 0) return;
 
+        DrawGlyphDecorations(run);
         var origin = new Point(run.X * scale, run.Baseline * scale);
         var turn = Matrix.CreateTranslation(-origin.X, -origin.Y)
             * Matrix.CreateScale(run.HorizontalScale > 0 ? run.HorizontalScale : 1, 1)
@@ -179,6 +184,9 @@ public sealed class AvaloniaPageCanvas(
             x += advance;
         }
     }
+
+    private void DrawGlyphDecorations(PrintGlyphRun run) =>
+        _decorations.Paint(this, new PrintTextSpan(run.X, run.Baseline, run.Width, run.Font, run.Color, run.RotationDegrees));
 
     private Matrix Placement(PrintPath path, Rect area)
     {

@@ -11,7 +11,7 @@ public interface ILineComposer
     ComposedLine Compose(CompositionRequest request, LineSpan span, int index);
 }
 
-public sealed class LineComposer(ILineBidi bidi) : ILineComposer
+public sealed class LineComposer(ILineBidi bidi, ILineBreakOpportunities opportunities) : ILineComposer
 {
     public ComposedLine Compose(CompositionRequest request, LineSpan span, int index)
     {
@@ -75,9 +75,22 @@ public sealed class LineComposer(ILineBidi bidi) : ILineComposer
         for (var i = span.Start; i < span.ContentEnd; i++) if (text[i] == '\t') lastTab = i;
         var spaces = new List<int>();
         for (var i = Math.Max(span.Start, lastTab + 1); i < span.ContentEnd; i++) if (text[i] == ' ') spaces.Add(i - span.Start);
+        if (spaces.Count == 0) spaces = Ideographic(text, span, Math.Max(span.Start, lastTab + 1));
         if (spaces.Count == 0) return;
         var extra = free / spaces.Count;
         foreach (var space in spaces) widths[space] += extra;
+    }
+
+    private List<int> Ideographic(string text, LineSpan span, int from)
+    {
+        var gaps = new List<int>();
+        var ideographic = false;
+        for (var i = from; i < span.ContentEnd; i++)
+        {
+            if (opportunities.Ideographic(text, i)) ideographic = true;
+            if (i + 1 < span.ContentEnd && !char.IsLowSurrogate(text[i + 1])) gaps.Add(i - span.Start);
+        }
+        return ideographic ? gaps : [];
     }
 
     private void AddTextRuns(ShapedParagraph paragraph, LineSpan span, double[] widths, List<GlyphRun> runs, ref double x, int skip, LineDirections? directions)

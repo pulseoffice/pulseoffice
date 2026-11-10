@@ -14,7 +14,7 @@ public sealed class VideoSlideDuration : IVideoSlideDuration
     public int Of(Slide slide)
     {
         ArgumentNullException.ThrowIfNull(slide);
-        return slide.Transition is { Advance: AdvanceMode.AfterTime, AdvanceAfterMs: > 0 } transition
+        return slide.Transition is { AdvancesAfterTime: true, AdvanceAfterMs: > 0 } transition
             ? Math.Min(transition.AdvanceAfterMs, LongestSlideMs)
             : DefaultSlideMs;
     }

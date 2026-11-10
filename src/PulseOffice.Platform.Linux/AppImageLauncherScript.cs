@@ -12,16 +12,16 @@ public sealed class AppImageLauncherScript : IAppImageLauncherScript
         config='@PATHFILE@'
         registered=""
         [ -f "$config" ] && registered=$(cat "$config")
-        if [ -n "$registered" ] && [ -f "$registered" ]; then
-          [ -x "$registered" ] || chmod +x "$registered" 2>/dev/null
+        if [ -n "$registered" ] && [ -f "$registered" ] && [ -x "$registered" ]; then
           exec "$registered" "$@"
         fi
 
         newest() {
           for dir in "$@"; do
             [ -n "$dir" ] && [ -d "$dir" ] || continue
-            found=$(ls -t "$dir"/PulseOffice*.AppImage 2>/dev/null | head -n 1)
-            [ -n "$found" ] && { printf '%s\n' "$found"; return 0; }
+            for found in $(ls -t "$dir" 2>/dev/null | grep -x 'PulseOffice[A-Za-z0-9._+-]*\.AppImage'); do
+              [ -f "$dir/$found" ] && [ -x "$dir/$found" ] && { printf '%s\n' "$dir/$found"; return 0; }
+            done
           done
           return 1
         }
@@ -30,7 +30,6 @@ public sealed class AppImageLauncherScript : IAppImageLauncherScript
         desktop=$(xdg-user-dir DESKTOP 2>/dev/null)
         candidate=$(newest "$HOME/Applications" "$HOME/applications" "$HOME/.local/bin" "$downloads" "$HOME/Downloads" "$desktop" "$HOME")
         if [ -n "$candidate" ]; then
-          chmod +x "$candidate" 2>/dev/null
           exec "$candidate" "$@"
         fi
 

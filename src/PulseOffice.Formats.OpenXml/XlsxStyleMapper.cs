@@ -83,21 +83,11 @@ public sealed class XlsxStyleMapper
                 FillId = Fill(style.BackgroundHex),
                 BorderId = Border(style.Borders),
                 NumberFormatId = NumberFormat(style.NumberFormatId, code),
-                ApplyFont = true,
-                ApplyFill = style.BackgroundHex is not null,
-                ApplyBorder = !style.Borders.IsEmpty,
-                ApplyNumberFormat = style.NumberFormatId != 0,
             };
-            if (_alignment.Build(style) is { } alignment)
-            {
-                format.Alignment = alignment;
-                format.ApplyAlignment = true;
-            }
-            if (!style.Locked)
-            {
-                format.Protection = new Protection { Locked = false };
-                format.ApplyProtection = true;
-            }
+            var declared = catalog.DeclaredAlong(named);
+            _includes.Write(format, declared);
+            if (_alignment.Build(style) is { } alignment) format.Alignment = alignment;
+            if ((declared & CellStyleProperties.Locked) != 0) format.Protection = new Protection { Locked = style.Locked };
             _namedFormats.AppendChild(format);
             _namedStyles.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.CellStyle
             {
@@ -187,6 +177,8 @@ public sealed class XlsxStyleMapper
     private readonly HashSet<int> _writtenNumberFormats = [];
 
     private uint _cellFormatCount;
+
+    private readonly XlsxStyleIncludes _includes = new();
 
     private const string DefaultStyle = "Default";
 }

@@ -274,7 +274,7 @@ internal sealed class OdpFidelityRules
             Diagnostic.Info("ODP107", "ODF has one page layout per layout type: further layouts of the same type, such as custom layouts read from PowerPoint files, are written as the first layout of their type, and their slides re-read with it.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.Slides.Any(slide => slide.Transition.Kind is TransitionKind.Cut or TransitionKind.Zoom or TransitionKind.Morph),
-            Diagnostic.Info("ODP021", "Cut, zoom and morph transitions have no ODF equivalent; they are written and re-read as a crossfade.")),
+            Diagnostic.Info("ODP021", "Cut, zoom and morph transitions have no ODF equivalent; other applications show them as a crossfade, while PulseOffice reads the kind back from an extension attribute.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.Masters.SelectMany(master => master.Objects.Concat(master.Layouts.SelectMany(layout => layout.Objects)))
                 .Any(element => element is not ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject or PulseOffice.Drawing.Assets.RasterImageObject or PulseOffice.Drawing.Assets.VectorGraphicObject }),
