@@ -13410,3 +13410,12 @@ hides `lp`, `ffmpeg` and `secret-tool`, and a bundle installed from a file never
 covers Linux: `AppImageUpdateInstaller` stages the verified AppImage next to the running one (`APPIMAGE`), swaps it after
 exit and reopens it. Verified: the aarch64 AppImage starts on Ubuntu 24.04 under Xvfb and opens its main window. The
 system ICU library is required. Flathub was evaluated and dropped because of its generative AI policy.
+
+## AppImage desktop integration (2026-11-10)
+
+Decision 30. On the first start from an AppImage, PulseOffice offers to add itself to the applications menu (icon, file
+types) and to move into `~/Applications`. The menu entry runs a small launcher script that finds the image even after a
+move, or asks with `zenity`/`kdialog` to pick it, or shows a notice; when the app runs from a new place it offers to move
+itself to `~/Applications`. Help › Show in Applications Menu adds or removes the integration. Tests: integration files,
+move, removal and the launcher (registered image, moved image, nothing found) in `DesktopIntegrationTests`; the launcher
+was also run under `dash` on Ubuntu 24.04. Not yet tried on a real Linux desktop session.

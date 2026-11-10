@@ -44,7 +44,7 @@ public sealed class ShellFileCommandsTests
         document.MarkModified();
         workspace.Open(document);
         var status = new StatusBarService(TimeProvider.System, new NotificationCenter(TimeProvider.System), new NotificationHistory(TimeProvider.System));
-        var commands = new ShellCommands(status, null!, null!, null!, workspace, null!, null!, null!, null!,
+        var commands = new ShellCommands(status, null!, null!, null!, new PulseOffice.Shell.Desktop.DesktopIntegrationCoordinator(new PulseOffice.Platform.UnavailableDesktopIntegration(), null!, null!, null!, null!, null!), workspace, null!, null!, null!, null!,
             new DocumentFileServices([new CancelledDialogs()]), null!, null!, () => new Refusing(), new TextCatalog(UiLanguage.Italian), new PulseOffice.Platform.RuntimeHostSystem());
         return (commands, workspace, document);
     }

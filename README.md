@@ -30,6 +30,8 @@ Developed with the help of AI (<a href="https://claude.com/claude-code">Claude C
 - **Security**: digital signatures (ODF, OOXML, PDF), password and OpenPGP encryption, sheet and document protection.
 - **Automatic updates**: checks GitHub once a day, downloads and verifies signed packages, installs on restart (macOS,
   Windows and Linux AppImage).
+- **Linux desktop integration**: on first start the AppImage offers to add itself to the applications menu, with icon
+  and file types, and to move into `~/Applications`; the menu entry still finds it if it is moved.
 - **Five interface languages**: English, Italian, German, Spanish, French.
 
 Built with .NET 10 and Avalonia 12.
