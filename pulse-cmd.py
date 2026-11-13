@@ -553,9 +553,9 @@ class Git:
                 f"releases are made from '{self.RELEASE_BRANCH}', but the current branch is '{branch}': "
                 f"run 'git switch {self.RELEASE_BRANCH} && git pull' first")
 
-    def commit_and_tag(self, version, push=None):
+    def commit_and_tag(self, version, push=None, everything=False):
         self.require_release_branch()
-        self.shell.run(["git", "add", PROPS, MANIFEST], cwd=ROOT)
+        self.shell.run(["git", "add", "--all"] if everything else ["git", "add", PROPS, MANIFEST], cwd=ROOT)
         if not self.shell.succeeds(["git", "diff", "--cached", "--quiet"], cwd=ROOT):
             self.shell.run(["git", "commit", "-m", f"Version {version}"], cwd=ROOT)
         if not self.shell.succeeds(["git", "rev-parse", "-q", "--verify", f"refs/tags/v{version}"], cwd=ROOT):
@@ -687,6 +687,8 @@ class PulseCommand:
         bump.add_argument("part", choices=["major", "minor", "patch"], nargs="?")
         bump.add_argument("--set", dest="explicit", help="set an explicit version, e.g. 1.2.0")
         bump.add_argument("--git", action="store_true", help="commit and tag the new version")
+        bump.add_argument("--push", action="store_true",
+                          help="commit every pending change with the new version, tag it and push both (starts the CI packages)")
         mac = commands.add_parser("mac", help="signed dmg images for macOS")
         mac.add_argument("--arch", choices=["arm64", "x64", "all"], default="all")
         mac.add_argument("--no-notarize", action="store_true")
@@ -741,10 +743,14 @@ class PulseCommand:
             ["patch", "minor", "major"][index])
         self.apply_version(target, self.console.confirm("Git commit and tag?", False))
 
-    def apply_version(self, target, tag):
+    def apply_version(self, target, tag, push=False):
+        if push:
+            self.git.require_release_branch()
         self.version.write(target)
         self.console.step(f"Version {target}")
-        if tag:
+        if push:
+            self.git.commit_and_tag(target, push=True, everything=True)
+        elif tag:
             self.git.commit_and_tag(target)
 
     def build_all(self, skip_notarize):
@@ -759,7 +765,7 @@ class PulseCommand:
     def command_bump(self, arguments):
         if not arguments.explicit and not arguments.part:
             return self.interactive_bump()
-        self.apply_version(arguments.explicit or self.version.bumped(arguments.part), arguments.git)
+        self.apply_version(arguments.explicit or self.version.bumped(arguments.part), arguments.git, arguments.push)
 
     def command_mac(self, arguments):
         architectures = ["arm64", "x64"] if arguments.arch == "all" else [arguments.arch]

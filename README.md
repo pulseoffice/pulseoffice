@@ -54,7 +54,7 @@ with a command:
 | Command | What it does |
 |---|---|
 | `version` | Shows the current version (`<Version>` in `Directory.Build.props`) |
-| `bump [major\|minor\|patch]` | Bumps the version; `--set 1.2.0` sets it explicitly, `--git` commits and tags it |
+| `bump [major\|minor\|patch]` | Bumps the version; `--set 1.2.0` sets it explicitly, `--git` commits and tags it, `--push` commits every pending change with it, tags it and pushes both, which starts the CI packages |
 | `mac [--arch arm64\|x64\|all]` | Signed `.dmg` images, notarized by Apple unless `--no-notarize` |
 | `windows [--arch x64\|arm64\|all]` | NSIS installer in the five languages, with the license page |
 | `linux [--arch x86_64\|aarch64\|all]` | AppImage, built in Docker |
