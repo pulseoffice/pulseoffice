@@ -13435,3 +13435,13 @@ Windows installer hash re-checked, no symlink following (136); MCP bridge surviv
 overwrite after confirmation (139). Corpus audit after the rounds: LOSS 0, DECL 127. CLAUDE.md rule 7: declaring a format
 loss is the last resort after researching both specifications. Open: video export without transitions and animations,
 rehearsal keeping only the last visit of a slide.
+
+## Continuous packaging on GitHub Actions (2026-11-13)
+
+`.github/workflows/packages.yml` builds all packages in CI: AppImages on native x86_64 and arm64 Ubuntu runners,
+the NSIS installer on Windows, signed and notarized dmg images on macOS 15. A `v*` tag (checked against `<Version>`)
+adds a job that signs `SHA256SUMS` and creates a draft release; manual runs only upload artifacts. Secrets live in the
+`release` environment. `pulse-cmd.py` now reads credentials from the environment (`PULSE_MAC_IDENTITY`,
+`PULSE_NOTARY_KEY`/`_KEY_ID`/`_ISSUER` for an App Store Connect API key, `PULSE_UPDATE_KEY`/`_PASSPHRASE`), has a
+`sign` command, and lays out the dmg with `dmgbuild` instead of AppleScript driving Finder, which is unreliable on
+headless runners; the window size, icon positions and Retina background are unchanged.

@@ -8,7 +8,6 @@ import shutil
 import subprocess
 import sys
 import textwrap
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -142,6 +141,7 @@ class Publisher:
         if output.exists():
             shutil.rmtree(output)
         self.console.step(f"Publishing {runtime}")
+        self.shell.require("dotnet")
         self.shell.run([
             "dotnet", "publish", DESKTOP_PROJECT,
             "-c", "Release",
@@ -173,6 +173,9 @@ class MacPackager:
         return re.findall(r'"(Developer ID Application: [^"]+)"', listing)
 
     def choose_identity(self):
+        configured = os.environ.get("PULSE_MAC_IDENTITY")
+        if configured:
+            return configured
         found = self.identities()
         if not found:
             self.console.fail("no 'Developer ID Application' certificate found in the keychain")
@@ -183,8 +186,10 @@ class MacPackager:
     def build(self, version, architectures, notarize):
         self.shell.require("codesign")
         self.shell.require("hdiutil")
+        if not self.shell.succeeds([sys.executable, "-c", "import dmgbuild"]):
+            self.console.fail(f"dmgbuild is missing: run '{sys.executable} -m pip install dmgbuild'")
         identity = self.choose_identity()
-        profile = self.notary_profile() if notarize else None
+        notary = self.notary_credentials() if notarize else None
         entitlements = ARTIFACTS / "mac" / "entitlements.plist"
         entitlements.parent.mkdir(parents=True, exist_ok=True)
         with entitlements.open("wb") as handle:
@@ -195,8 +200,8 @@ class MacPackager:
             bundle = self.bundle(published, version, architecture)
             self.sign_bundle(bundle, identity, entitlements)
             dmg = self.disk_image(bundle, version, architecture, identity)
-            if profile:
-                self.notarize(dmg, profile)
+            if notary:
+                self.notarize(dmg, notary)
             self.console.step(f"Ready: {dmg}")
 
     def bundle(self, published, version, architecture):
@@ -270,34 +275,34 @@ class MacPackager:
 
     def disk_image(self, bundle, version, architecture, identity):
         self.console.step(f"Disk image ({architecture})")
-        content = bundle.parent / "dmg"
-        if content.exists():
-            shutil.rmtree(content)
-        content.mkdir()
-        self.shell.run(["ditto", bundle, content / bundle.name])
-        (content / "Applications").symlink_to("/Applications")
-        background = content / ".background"
-        background.mkdir()
-        self.background(background / "background.tiff")
-        volume = f"{APP_NAME} {version}"
-        writable = bundle.parent / f"{APP_NAME}-{architecture}-rw.dmg"
-        if writable.exists():
-            writable.unlink()
-        self.shell.run(["hdiutil", "create", "-volname", volume, "-srcfolder", content, "-fs", "HFS+",
-                        "-format", "UDRW", "-ov", writable])
-        mount = Path("/Volumes") / volume
-        if mount.exists():
-            self.shell.run(["hdiutil", "detach", mount, "-force"])
-        self.shell.run(["hdiutil", "attach", writable, "-readwrite", "-noverify", "-noautoopen"])
-        try:
-            self.arrange(mount, volume, bundle.name)
-        finally:
-            self.shell.run(["hdiutil", "detach", mount])
+        background = bundle.parent / "background.tiff"
+        self.background(background)
         dmg = ARTIFACTS / f"{APP_NAME}-{version}-macos-{architecture}.dmg"
         if dmg.exists():
             dmg.unlink()
-        self.shell.run(["hdiutil", "convert", writable, "-format", "UDZO", "-imagekey", "zlib-level=9", "-o", dmg])
-        writable.unlink()
+        settings = bundle.parent / "dmg-settings.py"
+        icon = bundle / "Contents" / "Resources" / f"{APP_NAME}.icns"
+        settings.write_text(textwrap.dedent(f"""\
+            format = "UDZO"
+            compression_level = 9
+            filesystem = "HFS+"
+            files = [{str(bundle)!r}]
+            symlinks = {{"Applications": "/Applications"}}
+            icon = {str(icon) if icon.exists() else None!r}
+            background = {str(background)!r}
+            window_rect = ((200, 120), (660, 428))
+            default_view = "icon-view"
+            show_status_bar = False
+            show_tab_view = False
+            show_toolbar = False
+            show_pathbar = False
+            show_sidebar = False
+            arrange_by = None
+            icon_size = 128
+            text_size = 13
+            icon_locations = {{{bundle.name!r}: (165, 190), "Applications": (495, 190)}}
+            """), encoding="utf-8")
+        self.shell.run([sys.executable, "-m", "dmgbuild", "-s", settings, f"{APP_NAME} {version}", dmg])
         self.shell.run(["codesign", "--force", "--timestamp", "--sign", identity, dmg])
         return dmg
 
@@ -308,35 +313,15 @@ class MacPackager:
         self.shell.run(["tiffutil", "-cathidpicheck", standard, retina, "-out", target], capture=True)
         standard.unlink()
 
-    def arrange(self, mount, volume, application):
-        self.console.info("Arranging the disk image window (macOS may ask to let the terminal control Finder)")
-        script = textwrap.dedent(f'''
-            tell application "Finder"
-                tell disk "{volume}"
-                    open
-                    set current view of container window to icon view
-                    set toolbar visible of container window to false
-                    set statusbar visible of container window to false
-                    set bounds of container window to {{200, 120, 860, 548}}
-                    set options to the icon view options of container window
-                    set arrangement of options to not arranged
-                    set icon size of options to 128
-                    set text size of options to 13
-                    set background picture of options to file ".background:background.tiff"
-                    set position of item "{application}" of container window to {{165, 190}}
-                    set position of item "Applications" of container window to {{495, 190}}
-                    update without registering applications
-                    delay 1
-                    close
-                end tell
-            end tell
-        ''')
-        self.shell.run(["osascript", "-e", script])
-        layout = mount / ".DS_Store"
-        arranged = layout.read_bytes()
-        time.sleep(6)
-        layout.write_bytes(arranged)
-        self.shell.run(["sync"])
+    def notary_credentials(self):
+        key = os.environ.get("PULSE_NOTARY_KEY")
+        if key:
+            key_id = os.environ.get("PULSE_NOTARY_KEY_ID")
+            issuer = os.environ.get("PULSE_NOTARY_ISSUER")
+            if not key_id or not issuer:
+                self.console.fail("PULSE_NOTARY_KEY needs PULSE_NOTARY_KEY_ID and PULSE_NOTARY_ISSUER")
+            return ["--key", key, "--key-id", key_id, "--issuer", issuer]
+        return ["--keychain-profile", self.notary_profile()]
 
     def notary_profile(self):
         self.console.step("Notarization credentials")
@@ -354,9 +339,9 @@ class MacPackager:
         )
         return name
 
-    def notarize(self, dmg, profile):
+    def notarize(self, dmg, credentials):
         self.console.step(f"Notarizing {dmg.name} (this may take a few minutes)")
-        self.shell.run(["xcrun", "notarytool", "submit", dmg, "--keychain-profile", profile, "--wait"])
+        self.shell.run(["xcrun", "notarytool", "submit", dmg, *credentials, "--wait"])
         self.shell.run(["xcrun", "stapler", "staple", dmg])
         self.shell.run(["spctl", "--assess", "--type", "open", "--context", "context:primary-signature", "-v", dmg])
 
@@ -614,11 +599,14 @@ class UpdateSigning:
         signature = ARTIFACTS / self.SIGNATURE
         lines = [f"{self.digest(package)}  {package.name}\n" for package in packages]
         checksums.write_text("".join(lines), encoding="ascii")
-        private = Path(self.console.ask("Private update signing key", str(self.DEFAULT_PRIVATE_KEY))).expanduser()
+        configured = os.environ.get("PULSE_UPDATE_KEY")
+        private = Path(configured or self.console.ask("Private update signing key", str(self.DEFAULT_PRIVATE_KEY))).expanduser()
         if not private.exists():
             self.console.fail(f"{private} does not exist")
-        self.console.info("openssl asks for the key's passphrase.")
-        self.shell.run(["openssl", "dgst", "-sha256", "-sign", private, "-out", signature, checksums])
+        passphrase = ["-passin", "env:PULSE_UPDATE_KEY_PASSPHRASE"] if os.environ.get("PULSE_UPDATE_KEY_PASSPHRASE") else []
+        if not passphrase:
+            self.console.info("openssl asks for the key's passphrase.")
+        self.shell.run(["openssl", "dgst", "-sha256", "-sign", private, *passphrase, "-out", signature, checksums])
         self.shell.run(["openssl", "dgst", "-sha256", "-verify", self.PUBLIC_KEY, "-signature", signature, checksums])
         return [checksums, signature]
 
@@ -711,6 +699,7 @@ class PulseCommand:
         everything.add_argument("--release", action="store_true", help="publish a GitHub release afterwards")
         everything.add_argument("--force", action="store_true", help="answer yes to every confirmation and take the defaults")
         commands.add_parser("update-key", help="create the key that signs update checksums (once)")
+        commands.add_parser("sign", help="write and sign SHA256SUMS for the built packages of the current version")
         release = commands.add_parser("release", help="publish a GitHub release with the built packages")
         release.add_argument("--notes", dest="notes_file", help="release notes file (default: generated from commits)")
         release.add_argument("--draft", action="store_true")
@@ -720,7 +709,6 @@ class PulseCommand:
 
     def run(self, argv):
         arguments = self.parser().parse_args(argv)
-        self.shell.require("dotnet")
         if arguments.command is None:
             return self.menu()
         self.console.automatic = getattr(arguments, "force", False)
@@ -794,6 +782,13 @@ class PulseCommand:
 
     def command_update_key(self, arguments):
         self.signing.create_key()
+
+    def command_sign(self, arguments):
+        packages = self.release.packages(self.version.current())
+        if not packages:
+            self.console.fail(f"no packages for version {self.version.current()} in {ARTIFACTS}")
+        for path in self.signing.sign(packages):
+            self.console.step(f"Ready: {path}")
 
     def command_release(self, arguments):
         self.release.publish(self.version.current(), arguments.notes_file, arguments.draft, arguments.prerelease)

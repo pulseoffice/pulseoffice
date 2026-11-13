@@ -59,6 +59,7 @@ with a command:
 | `windows [--arch x64\|arm64\|all]` | NSIS installer in the five languages, with the license page |
 | `linux [--arch x86_64\|aarch64\|all]` | AppImage, built in Docker |
 | `all [--release] [--force]` | All of the above; `--release` then publishes them; `--force` answers yes to every confirmation |
+| `sign` | Writes and signs `SHA256SUMS` for the built packages of the current version, without publishing |
 | `update-key` | Creates, once, the key that signs update checksums; the public key goes in `src/PulseOffice.Updates/Trust/` |
 | `release [--notes FILE] [--draft] [--prerelease] [--force]` | Publishes a GitHub release `vX.Y.Z` with the packages of the current version attached |
 
@@ -77,6 +78,20 @@ What each target needs:
 - **Windows**: `makensis` (NSIS) on the `PATH`; the installer is built from macOS or Linux too.
 - **Linux**: Docker; the AppImage is built in a `debian:bookworm-slim` container with `appimagetool`. It needs the
   system's ICU library (`libicu`), present on desktop distributions.
+
+The macOS disk image is laid out by `dmgbuild` (`pip install dmgbuild`), which writes the Finder layout without
+driving Finder. Credentials can also come from the environment: `PULSE_MAC_IDENTITY`, `PULSE_NOTARY_KEY` (App Store
+Connect API key `.p8`) with `PULSE_NOTARY_KEY_ID` and `PULSE_NOTARY_ISSUER`, `PULSE_UPDATE_KEY` with
+`PULSE_UPDATE_KEY_PASSPHRASE`.
+
+## Continuous packaging
+
+`.github/workflows/packages.yml` builds every package on GitHub Actions: AppImage x86_64 and aarch64 on native Ubuntu
+runners, the Windows installer, signed and notarized dmg images (arm64 and x64) on macOS. Pushing a tag `vX.Y.Z` that
+matches `<Version>` also signs `SHA256SUMS` and creates a **draft** release to review and publish by hand; a manual run
+only uploads the packages as workflow artifacts. Signing jobs run in the `release` environment, which holds the secrets
+`MACOS_CERTIFICATE_P12` (base64), `MACOS_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (base64), `APPLE_API_KEY_ID`,
+`APPLE_API_ISSUER_ID`, `UPDATE_SIGNING_KEY` (PEM) and `UPDATE_SIGNING_KEY_PASSPHRASE`.
 
 ## Documentation
 

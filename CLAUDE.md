@@ -160,7 +160,9 @@ Central package management in `Directory.Packages.props`: **versions are never w
     keychain), NSIS installers in the five languages with a license page, Linux AppImages (x86_64 and aarch64, built in
     Docker with `appimagetool`; replaced the Flatpak bundle on 2026-11-08 because its sandbox hides `lp`, `ffmpeg` and
     `secret-tool` and cannot update itself), and publishes a GitHub release with the packages (`release`, via `gh`,
-    confirmation before publishing). Icon in `packaging/` (`icon.svg` source, `icon.png`, `icon.ico`).
+    confirmation before publishing). Icon in `packaging/` (`icon.svg` source, `icon.png`, `icon.ico`). The same packages are built by GitHub Actions
+    (`.github/workflows/packages.yml`, 2026-11-13): a `v*` tag yields a **draft** release; credentials come from the
+    `release` environment's secrets, and the dmg is laid out by `dmgbuild` rather than by scripting Finder.
 
 21. **Protection leaves the undo history** (user decision, 2026-11-02; done 2026-11-03): protection of sheet, structure,
     changes and document, protection of fields and bookmarks, and change recording are not ⌘Z steps, and no undo or redo
