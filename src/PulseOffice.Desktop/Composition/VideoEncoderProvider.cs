@@ -4,13 +4,13 @@ using PulseOffice.Platform.Windows;
 
 namespace PulseOffice.Desktop.Composition;
 
-public sealed class VideoEncoderProvider(IExecutableLocator executables, IHostSystem host) : IVideoEncoderProvider
+public sealed class VideoEncoderProvider(IExecutableLocator executables, IExternalProcess processes, IHostSystem host) : IVideoEncoderProvider
 {
-    private readonly Lazy<IVideoEncoder> _encoder = new(() => Select(executables, host));
+    private readonly Lazy<IVideoEncoder> _encoder = new(() => Select(executables, processes, host));
 
     public IVideoEncoder Current => _encoder.Value;
 
-    private static IVideoEncoder Select(IExecutableLocator executables, IHostSystem host)
+    private static IVideoEncoder Select(IExecutableLocator executables, IExternalProcess processes, IHostSystem host)
     {
         if (host.IsMacOS)
             return new VideoToolboxVideoEncoder();
@@ -18,7 +18,7 @@ public sealed class VideoEncoderProvider(IExecutableLocator executables, IHostSy
         if (host.IsWindows)
             return new MediaFoundationVideoEncoder();
 
-        var ffmpeg = new FfmpegVideoEncoder(executables);
+        var ffmpeg = new FfmpegVideoEncoder(executables, new FfmpegEncoderChoice(processes));
         return ffmpeg.IsAvailable ? ffmpeg : new UnavailableVideoEncoder("ffmpeg");
     }
 }

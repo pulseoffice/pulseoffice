@@ -9,6 +9,65 @@ public sealed class VideoEncodingRegressionTests
     private readonly VideoFrameFitter _fitter = new();
     private readonly SampleTiming _timing = new();
 
+    private sealed class Listing(string output, int exitCode = 0) : IExternalProcess
+    {
+        public int Calls { get; private set; }
+
+        public Task<ProcessOutcome?> RunAsync(string executable, IReadOnlyList<string> arguments,
+            IReadOnlyDictionary<string, string>? environment = null, string? input = null, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<ProcessOutcome?>(new ProcessOutcome(exitCode, output, string.Empty));
+        }
+    }
+
+    private const string FedoraEncoders = """
+        Encoders:
+         V..... = Video
+         ------
+         V....D libopenh264          OpenH264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+         V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)
+         V.S..D mpeg4                MPEG-4 part 2
+         A....D aac                  AAC (Advanced Audio Coding)
+        """;
+
+    [Fact]
+    public async Task Senza_libx264_si_usa_openh264_come_nell_ffmpeg_di_Fedora()
+    {
+        var encoder = await new FfmpegEncoderChoice(new Listing(FedoraEncoders)).ChooseAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("libopenh264", encoder?.Name);
+    }
+
+    [Fact]
+    public async Task Libx264_ha_la_precedenza_quando_c_e()
+    {
+        var listing = FedoraEncoders.Replace(" V.S..D mpeg4", " V....D libx264              libx264 H.264\n V.S..D mpeg4", StringComparison.Ordinal);
+
+        var encoder = await new FfmpegEncoderChoice(new Listing(listing)).ChooseAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("libx264", encoder?.Name);
+    }
+
+    [Fact]
+    public async Task Con_il_solo_mpeg4_si_ripiega_su_mpeg4()
+    {
+        var encoder = await new FfmpegEncoderChoice(new Listing(" V.S..D mpeg4                MPEG-4 part 2\n")).ChooseAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("mpeg4", encoder?.Name);
+    }
+
+    [Fact]
+    public async Task Senza_encoder_adatti_non_si_sceglie_nulla_e_ffmpeg_si_interroga_una_volta()
+    {
+        var listing = new Listing(" A....D aac                  AAC\n V....D h264_vaapi           VAAPI\n");
+        var choice = new FfmpegEncoderChoice(listing);
+
+        Assert.Null(await choice.ChooseAsync(TestContext.Current.CancellationToken));
+        Assert.Null(await choice.ChooseAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(1, listing.Calls);
+    }
+
     [Fact]
     public async Task LeDimensioniDispariSiArrotondanoAlPari()
     {

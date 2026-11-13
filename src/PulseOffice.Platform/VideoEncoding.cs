@@ -19,7 +19,7 @@ public interface IVideoEncoderProvider
     IVideoEncoder Current { get; }
 }
 
-public sealed class FfmpegVideoEncoder(IExecutableLocator executables) : IVideoEncoder
+public sealed class FfmpegVideoEncoder(IExecutableLocator executables, IFfmpegEncoderChoice encoders) : IVideoEncoder
 {
     private readonly VideoFrameFitter _fitter = new();
 
@@ -39,11 +39,14 @@ public sealed class FfmpegVideoEncoder(IExecutableLocator executables) : IVideoE
         if (_fitter.Fit(frames) is not { } fitted)
             return OperationResult<string>.Fail(Diagnostic.Error("VIDEO004", "Frames do not match the declared size."));
 
+        if (await encoders.ChooseAsync(ct).ConfigureAwait(false) is not { } encoder)
+            return OperationResult<string>.Fail(Diagnostic.Error("VIDEO006", "ffmpeg offers no H.264 or MPEG-4 encoder.").With("ffmpeg offers no H.264 or MPEG-4 encoder."));
+
         Process? process = null;
 
         try
         {
-            process = Process.Start(StartInfo(fitted, Math.Max(1, fps), outputPath));
+            process = Process.Start(StartInfo(fitted, Math.Max(1, fps), encoder, outputPath));
             if (process is null)
                 return OperationResult<string>.Fail(Diagnostic.Error("VIDEO001", "ffmpeg").With("ffmpeg"));
 
@@ -87,7 +90,7 @@ public sealed class FfmpegVideoEncoder(IExecutableLocator executables) : IVideoE
         }
     }
 
-    private ProcessStartInfo StartInfo(IVideoFrameSource fitted, int fps, string outputPath)
+    private ProcessStartInfo StartInfo(IVideoFrameSource fitted, int fps, FfmpegEncoder encoder, string outputPath)
     {
         var info = new ProcessStartInfo("ffmpeg")
         {
@@ -98,12 +101,13 @@ public sealed class FfmpegVideoEncoder(IExecutableLocator executables) : IVideoE
 
         var size = string.Create(CultureInfo.InvariantCulture, $"{fitted.Width}x{fitted.Height}");
 
-        foreach (var argument in new[]
-        {
+        string[] arguments =
+        [
             "-y", "-f", "rawvideo", "-pixel_format", "bgra", "-video_size", size,
             "-framerate", fps.ToString(CultureInfo.InvariantCulture), "-i", "-",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputPath,
-        })
+            "-c:v", encoder.Name, .. encoder.Options, "-movflags", "+faststart", outputPath,
+        ];
+        foreach (var argument in arguments)
             info.ArgumentList.Add(argument);
 
         return info;
