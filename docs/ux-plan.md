@@ -14,8 +14,7 @@ and the styles panel. This document is **only the plan**: no code has been touch
   side panel (styles, navigator, review, Deck transitions and animations), ribbon popups (colours, borders, table grid,
   band galleries), command palette, filter menu, status bar, notifications.
 - **Live**, by sampling: own instance with a throwaway `PULSEOFFICE_DATA_HOME`, foreground verified by pid before every
-  key, dialogs opened from the palette (⇧⌘P), captures with `windowshot --pid` in
-  `/private/tmp/claude-501/-Volumes-Dati-develop-quadoffice/bddfccb4-bf7c-470e-b056-751ec31a2231/scratchpad/ux-inventario/`
+  key, dialogs opened from the palette (⇧⌘P), captures with `windowshot --pid` in a session scratchpad that no longer exists
   (30 captures: 11 Ledger, 11 Folio, 8 Deck, palette and startup). Light theme; the dark theme must be reviewed block
   by block.
 
@@ -36,8 +35,8 @@ click confirms); theme tokens in both themes; **one component, three modules**.
 
 ## Cross-cutting defects found
 
-1. **The "flat form" is the rule.** 211 surfaces out of 298 are a column of full-width labels and fields (capture
-   `L-pagina.png`: Ledger Page Setup, 16 fields in a row with scrolling, no preview).
+1. **The "flat form" is the rule.** 211 surfaces out of 298 are a column of full-width labels and fields (Ledger Page Setup: 16 fields
+   in a row with scrolling, no preview).
 2. **Bare numeric fields.** `NumberField` has `Unit`, but 9 dialogs out of 10 in Ledger and Deck do not use it
    (`Durata (s)`, `Margine sinistro (mm)` with the unit in the label); no field has dragging, a slider or presets; the
    box is narrow (120 px) with tiny arrows and the value right-aligned far from the label.
@@ -48,18 +47,18 @@ click confirms); theme tokens in both themes; **one component, three modules**.
    Header and Footer, Ledger Page Setup, Lists.
 5. **Verbose help texts** at the top of 140 dialogs ("In headers: &P page, &N pages, &D date…", "Structure protection
    prevents adding…"): often two lines that push the content down.
-6. **Focused dropdown filled with the accent** (`L-convalida.png`, `F-elenchi.png`, `D-tema.png`): the solid green,
+6. **Focused dropdown filled with the accent**: the solid green,
    blue or red background looks like an error or selection state, not focus. A `PulseTheme` defect, one for all.
 7. **Single-dropdown dialogs** (More Fields, Index or Table of Contents, Paste Special, Apply Master, Which style?): a
-   whole modal for a choice that in Word/Excel is a gallery or an icon menu (`F-campi.png`, `F-indice.png`).
+   whole modal for a choice that in Word/Excel is a gallery or an icon menu.
 8. **Dialogs with one empty tab**: Folio's Character takes 620 × 640 for six fields, half of the pane is white
-   (`F-carattere.png`); Validation with "Any value" is an empty pane (`L-convalida.png`).
+  ; Validation with "Any value" is an empty pane.
 9. **Inconsistencies between modules**: Character and Paragraph exist three times (Folio with tabs, Deck flat in
    `DeckTextDialogCommands`, Ledger inside Format Cells) with different fields and order; Page Setup twice (Folio with
    tabs in cm, Ledger flat in mm); Lists twice (Folio and Deck); Thesaurus, Language, Hyphenation, Spelling repeated per
    module with different forms.
-10. **Bare command palette** (`x-palette.png`): no icons, no shortcuts, no module, solid grey selection, no "recent"
-    entry; and the search does not find synonyms ("Misura della diapositiva" → no results, `D-misura.png`).
+10. **Bare command palette**: no icons, no shortcuts, no module, solid grey selection, no "recent"
+    entry; and the search does not find synonyms ("Misura della diapositiva" → no results).
 
 ## Shared components to build first
 
@@ -257,9 +256,9 @@ dei blocchi".
 
 ## Reference captures
 
-In the scratchpad folder indicated above: `L-pagina.png` (worst flat form), `L-cond-pal.png` (conditional
-formatting), `L-formatocelle.png` (number formats without an example), `L-convalida.png` (empty tab, dropdown filled
-with the accent), `F-carattere.png` (half-empty pane), `F-paragrafo.png` (bare numbers in a column), `F-elenchi.png`
-(dropdowns instead of the gallery), `F-campi.png` and `F-indice.png` (modal for a single dropdown),
-`D-transizione.png` (transition without gallery or preview), `D-imposta.png`, `D-intestazione.png`, `D-sfondo.png`
-(tabs that do not belong), `x-palette.png` (bare palette); by contrast `D-tema.png` (reference level).
+The 30 captures of the survey were kept only in a session scratchpad and are gone. What they showed is described in
+words in "Cross-cutting defects found": the worst flat form was Ledger's Page Setup; conditional formatting, number
+formats without an example and the empty Validation tab in Ledger; the half-empty Character pane, bare numbers in
+Paragraph, dropdowns instead of a gallery in Lists, single-dropdown modals for Fields and Index in Folio; transition
+without gallery or preview, and tabs that do not belong in Deck's setup, header and background dialogs; the bare
+command palette. Deck's theme dialog was the reference level.

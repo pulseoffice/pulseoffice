@@ -425,9 +425,11 @@ patterns and boundaries.
   as files but are already split into several types.
 - A shared object gesture machine in `PulseOffice.UI.Controls` for Ledger, Deck and Folio (extracted in
   Ledger as State, to be generalised): it would remove `SlideView` and `FolioCanvas` from the table.
-  Not yet done at the twenty-eighth round; `DocxInlineReader` has instead moved to per-element strategies.
-- Parallel components of the three modules to unify: spelling, rulers, zoom, navigator and macro sources.
-- Hexadecimal colour conversion and dash and border tables into a single catalogue shared by ODF and OOXML.
+  The shared core is now `ObjectTransformSession` (see below); `DocxInlineReader` moved to per-element strategies.
+- Parallel components of the three modules: spelling, rulers and zoom were unified, navigator and macro sources stay
+  adapters by choice, see "Reuse across modules" below.
+- Hexadecimal colour conversion: unified in `ArgbColor`; dash and border tables stay each format's own vocabulary
+  (see below).
 - Folio commands that call services with `editor.Document, editor.History`: move them to editor methods.
 - Convenience constructors with `new` in the formats (`DocxWriter`, `OdtReader`/`OdtWriter`, `PdfExporter`) and in the views.
 - Abstract `PulseOffice.Formats` depending on the module models; concrete `OdsReader` in `LedgerSheetExtraCommands`.
@@ -500,84 +502,6 @@ style is data, `FrameStyle` (outline, handle fill, rotation marker, thicknesses,
 
 In both themes the frame keeps the same shapes; in dark the hollow handles are filled with the dark surface colour and
 the outlines use the accent or module colour, so they stay legible on dark pages and cells.
-
-### What remains
-- Types still over the cap, with a reason in the table: `Paginator`, `SlideView`, `FolioCanvas`, `CalculationEngine`,
-  `RtfReadSession`, `FolioEditor` (plus two data tables). `OdtBodyReading`, `OdtBodyWriting` and `DocxDrawingCodec` exceed the cap
-  as files but are already split into several types.
-- A shared object gesture machine in `PulseOffice.UI.Controls` for Ledger, Deck and Folio (extracted in
-  Ledger as State, to be generalised): it would remove `SlideView` and `FolioCanvas` from the table.
-  Not yet done at the twenty-eighth round; `DocxInlineReader` has instead moved to per-element strategies.
-- Parallel components of the three modules to unify: spelling, rulers, zoom, navigator and macro sources.
-- Hexadecimal colour conversion and dash and border tables into a single catalogue shared by ODF and OOXML.
-- Folio commands that call services with `editor.Document, editor.History`: move them to editor methods.
-- Convenience constructors with `new` in the formats (`DocxWriter`, `OdtReader`/`OdtWriter`, `PdfExporter`) and in the views.
-- Abstract `PulseOffice.Formats` depending on the module models; concrete `OdsReader` in `LedgerSheetExtraCommands`.
-- The command sweep (`PulseOffice.Desktop.Sweep.Tests`) takes about half an hour: it should be split per module into parallel
-  runs or made selectable, not shortened by removing contexts.
-
-## Reuse across modules (2026-10)
-
-Census requested by the user ("is there still code reusable by Folio, Ledger and Deck?"), over all of `src/`, with
-tools (parallel `Folio*`/`Ledger*`/`Deck*` names, method signatures, hexadecimal colour conversions, gesture
-machines) and reading. **129 type names** appear with the same suffix in at least two modules; most of them are
-legitimate adapters (Strategy over the module's own model: `*FontCollector`, `*DocumentFactory`, `*CommandSet`,
-`*View`), which already reuse a shared service. The entries below are those where the **logic** is repeated.
-
-| Item | Files | Duplicated | Proposal | Priority | Status |
-|---|---|---|---|---|---|
-| Object gestures (move, resize, rotate, "has changed" threshold) | `ObjectDragGesture` (Ledger), `SlideView.TransformGesture` (Deck), `FolioCanvas.ObjectGesture` | preview state, rotation, comparison with the start, three times (~60 lines each) | `ObjectTransformSession` in the core (`PulseOffice.Drawing.Shapes`), created by `IObjectManipulator.Begin` | high | **done** |
-| Hexadecimal colour conversion | 26 formatters and 10 readers in 30 files (ODF, OOXML, HTML, three modules, controls) | `"#" + (argb & 0xFFFFFF).ToString("X6")` and `uint.TryParse(…, HexNumber)` repeated | `ArgbColor` in `PulseOffice.Foundation.Colors` | high | **done** |
-| Spell-check loop | `LedgerSpellingCommands`, `DeckSpellingCommands`, `FolioSpellingCommands` | ignored words, "replace all", "learn", translated from `SpellingDecision` three times | `SpellingRound` in `UI.Controls.Spelling` | high | **done** |
-| Dictionary language choice | Ledger, Deck (Folio additionally has "no check") | available dictionaries, warning if missing, current index, prompt | `ISpellingLanguagePicker`, with one extra entry at the end | medium | **done** (Ledger, Deck, Folio) |
-| Painting the selection frame (frame, handles, rotation handle, rotation around the centre) | `GridObjectPainter`, `SlideView.DrawFrame`, `FolioCanvas` | same geometry, different styles (see "Selection frame: the variants") | `IObjectFrameChrome` in `UI.Controls.Shapes` with the style as data | medium | **done** (user decision: Ledger solid, Deck and Folio dashed) |
-| Snapping during the gesture | Deck (`Snapping`, lines from grid, guides, margins, objects), Folio (grid only), Ledger (none) | two different implementations | `IObjectSnapping` and `SnapLines` in the core | medium | **done** (Ledger: Alt snaps to cell borders, as in Excel) |
-| Zoom | `PageZoom` (Folio, maximum 5) and `CanvasZoom` (Deck, maximum 4), `FolioZoomCommands` and `DeckZoomCommands` (Ledger presets only) | twin type and twin commands (in, out, fit, width, custom) | `ViewZoom`, `ZoomLimits`, `ZoomHistory` in `Foundation.Zoom`; `IZoomChoice` in `UI.Controls.Zoom` | medium | **done** (Folio, Deck); Ledger stays on its factor zoom |
-| Arrow keys on objects | `DeckStageKeys` (Deck), `FolioView` (Folio, with Shift), none in Ledger | direction → stepped move, written twice with different rules | `IObjectNudgeKeys` in `UI.Controls.Shapes`, steps as per-module data | low | **done** (new in Ledger) |
-| Navigator and macro sources | `*NavigatorSource` (355 lines in all), `*MacroEventsSource` (222) | parallel structure over different models | leave: they are adapters, the panel is already shared | low | not duplication |
-| Rulers | `FolioRulers`, `DeckRulers` (343 lines) | indent and tab markers, units and tab operations computed twice | `IParagraphRuler` in `UI.Controls.Rulers` (ticks and strip were already shared) | low | **done** |
-| ODF/OOXML dashes and borders | `Formats.Odf/ShapeStyles`, `Formats.OpenXml/ShapeStyles/Vocabulary`, `DocxBorders`, `OdtProperties` | the model is already one (`LineDash`, `BorderEdge`); each format has its own vocabulary | leave: it is each format's own translation | — | not duplication |
-| Two `ILanguageChoices` | `UI.Controls.Text` (character languages) and `UI.Controls.Spelling` (dictionary names) | same name, different purposes | rename the spelling one `IDictionaryLanguageNames` | low | **done** (the record too: `DictionaryLanguage`) |
-
-### What was unified
-- `ObjectTransformSession` (core, without Avalonia): handle, start, preview, rotation, `Track`, `Settle` (for
-  snapping), `Moved`/`Rotated` with the module's threshold. Ledger, Deck and Folio keep only what is their own (multiple
-  selection and groups in Deck, target page in Folio, cell-anchored changes in Ledger).
-- `ArgbColor` (`Foundation.Colors`): `FromRgbHex`, `FromHashedRgbHex` (ODF form), `ToHashedHex`, `ToRgbDigits`, lowercase
-  forms for ODF. It replaces the copies in ODF, OOXML, HTML, Folio, Deck, Ledger and in the controls.
-- `SpellingRound` and `SpellingLanguagePicker` (`UI.Controls.Spelling`), wired into the three modules.
-- `ViewZoom`, `ZoomLimits` (`Slides` 10–400 %, `Pages` 10–500 %) and `ZoomHistory` in `Foundation.Zoom` in place of
-  `CanvasZoom` and `PageZoom`; `IZoomChoice` in `UI.Controls.Zoom` (step forward and back on the scale, zoom dialog)
-  in place of `FolioZoomChoice` and `DeckZoomChoice`. Each target exposes a `ZoomSubject` with its own limits. A non-finite
-  factor becomes 100 % in Folio too (previously `Math.Clamp` let `NaN` through).
-- `IParagraphRuler` in `UI.Controls.Rulers`: first-line, indent and tab markers, metric or imperial unit,
-  move, add and remove tab (always sorted: previously Deck did not re-sort). `FolioRulers` and `DeckRulers` keep
-  only page margins (Folio), text box inner margins (Deck) and application to their own model.
-- `IObjectNudgeKeys` in `UI.Controls.Shapes`: arrow = small step, Shift+arrow = large step, the other modifiers
-  do not move. Per-module steps: Deck 3/15 pt, Folio 1/10 pt, Ledger 1/10 px. Ledger had no arrow keys on objects:
-  now it has them, also on several selected objects, each as a history step.
-- `IObjectSnapping` in the core (`Drawing.Shapes`, formerly `Presentations.Snapping`): `Snap(session, lines, tolerance)` snaps
-  the move (edge, centre or opposite side) or the dragged sides of a resize, never the rotation; `Lattice`
-  builds the lines of a grid. Deck uses it with grid, guides and margins; Folio with the page grid (it now
-  also snaps resizing, not just moving); Ledger with the borders of visible cells, holding Alt
-  while dragging as in Excel.
-- `IDictionaryLanguageNames` and `DictionaryLanguage` in place of the second `ILanguageChoices`/`LanguageChoice`; the language
-  picker accepts one extra entry at the end (in Folio "no check") and Folio uses it.
-
-### Selection frame: the variants (user decision)
-The geometry is the same in the three modules (eight handles, rotation handle above the top side, rotation around the
-centre), the style is not. It was not unified because any choice changes the look of at least two modules.
-
-| Module | Frame | Handles | Rotation |
-|---|---|---|---|
-| Ledger | continuous, module green | filled squares | filled square with stem |
-| Deck | dashed, accent | hollow squares (white) | hollow circle with stem; yellow adjustment handles |
-| Folio | thin continuous, accent | hollow squares (white) | filled dot without stem |
-
-The two variants to choose from: **A, solid** (Ledger's: continuous frame, filled handles, more legible on the
-grid sheet) and **B, dashed** (Deck's, the convention of presentation programs such as PowerPoint, hollow handles). Folio sits
-in between and will follow the choice. With `IObjectFrameChrome` the style becomes data (`FrameStyle`), and the choice is one line per
-module.
 
 ### What remains
 - Ledger does not use `IZoomChoice`: its zoom is a grid factor with five presets and the shared zoom

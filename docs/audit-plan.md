@@ -270,7 +270,6 @@ formula-based geometries) and silent defects fixed; only minor items remain open
 giro"). The next round can start from the open minor items and the three remaining LOSS. Closed after the round:
 revisions in ODT headers (`SdtContent.docx` from LOSS to OK) and default tab distance in Folio (log, "Quattordicesimo
 giro, minori di Folio").
-"Audit, quattordicesimo giro"). The next round can start from the open minor items and the three remaining LOSS.
 
 **Fifteenth round, Ledger and Deck (2026-10-24)**: closed the open minor items of the fourteenth for Ledger and Deck
 (localized formula bar, cell linked to another sheet, click sound with the `dom` namespace declared, appearance of links
@@ -379,18 +378,18 @@ if desired, on keyboard and screen readers in Folio (see log, "Audit, diciannove
 - Deep audit, second round (2026-11-03): six areas, branches merged into `deep-audit-round-2`; one severe regression of
   the first round (volatile SUBTOTAL) and several quadratic paths and silent caps fixed (see work log). Corpus unchanged.
   **Status: the second round did NOT find only minor defects**; a third round follows.
-- Deep audit, round 119 (2026-11-08): Folio HTML/RTF readers left by round 115 (tail of the RTF and HTML readers,
-  `HtmlTableReader`, `HtmlCellBorders`, `RtfPicture`). Two medium (row spans lost or overrunning the table on paste,
-  list headers numbered in HTML) and minor defects fixed; log in docs/deep-audit/round-119-folio-readers.md.
-- Deep audit, round 121 (2026-11-08): HTML tables and the HTML clipboard path of the three modules. The three limits
-  left by round 119 fixed at the root (nested tables, mixed inline formatting, border longhands), borders now
-  written by the Folio HTML writer and Ledger's fragment; medium and minor defects fixed; log in
-  docs/deep-audit/round-121-html-tables.md.
 - Deep audit, round 118 (2026-11-08): Deck graphic-style relinking through groups, masters and layouts; ODS cell-style
   inheritance from other suites and explicit resets under named styles; `Default` parent kept; PPTX shape-style fidelity
   rules extended to every drawn object. Log: [deep-audit/round-118-deck-styles.md](deep-audit/round-118-deck-styles.md).
   **Status: grave defects found and fixed**, minor residuals listed in the log.
-- Deep audit round 120 (2026-11-08): Ledger filter leftovers of round 117 and the sort code; two medium (dates in
+- Deep audit, round 119 (2026-11-08): Folio HTML/RTF readers left by round 115 (tail of the RTF and HTML readers,
+  `HtmlTableReader`, `HtmlCellBorders`, `RtfPicture`). Two medium (row spans lost or overrunning the table on paste,
+  list headers numbered in HTML) and minor defects fixed; log in docs/deep-audit/round-119-folio-readers.md.
+- Deep audit, round 120 (2026-11-08): Ledger filter leftovers of round 117 and the sort code; two medium (dates in
   saved value filters now written as XLSX `dateGroupItem` and ODS ISO text; sorting refuses rows holding part of an
   array formula) and six minor fixed; sort settings persistence noted as open. Log:
   [deep-audit/round-120-ledger-filter-ui.md](deep-audit/round-120-ledger-filter-ui.md).
+- Deep audit, round 121 (2026-11-08): HTML tables and the HTML clipboard path of the three modules. The three limits
+  left by round 119 fixed at the root (nested tables, mixed inline formatting, border longhands), borders now
+  written by the Folio HTML writer and Ledger's fragment; medium and minor defects fixed; log in
+  docs/deep-audit/round-121-html-tables.md.

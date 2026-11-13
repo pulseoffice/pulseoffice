@@ -186,6 +186,8 @@ All files of the PulseOffice.Scripting* projects are read in full (plus the two 
 - **Remaining, recorded decision (medium)** `CertificateJudge.cs:12`: the certificate is judged at the date *declared
   by the signer* (work log, ODF signature cross-checked with the reference suite). Without a trusted timestamp whoever owns an
   expired key can backdate. Not changed because it is a recorded choice covered by tests; it must be decided by the user.
+  *Resolved afterwards by decision 22 (2026-11-03): without a trusted timestamp the certificate is judged at today's
+  date (`SignatureStatus.UnverifiableInTime`).*
 
 ### Coverage
 | File | Lines | Outcome |
@@ -221,7 +223,7 @@ All files of the PulseOffice.Scripting* projects are read in full (plus the two 
 | src/PulseOffice.Agent.UI/ScriptApiAgentCatalog.cs | 10/10 | ok |
 | src/PulseOffice.Agent.UI/AgentStatusIndicator.cs | 46/46 | ok (client name now shortened, A6) |
 | src/PulseOffice.Agent.UI/AgentConnectionSettingEditor.cs | 224/224 | ok: code masked until one asks to see it |
-| src/PulseOffice.Security/CertificateJudge.cs | 47/47 | A8 fixed; declared date: remaining |
+| src/PulseOffice.Security/CertificateJudge.cs | 47/47 | A8 fixed; declared date: resolved by decision 22 |
 | src/PulseOffice.Security/Signatures.cs | 94/94 | ok |
 | src/PulseOffice.Security/MacroSigning.cs | 103/103 | A9 fixed |
 | src/PulseOffice.Security/XmlSignatures.cs | 344/344 | A7 fixed; XXE and DTD closed, references only canonicalizations |

@@ -24,12 +24,24 @@ the app, and looking at the application on screen.
 
 ---
 
-## Actual state today
+## Actual state today (2026-11-13)
 
-What **works and is proven**:
+Phases 0 to 6 are closed; phase 7 is under way. The phase sections below are kept as the record of why the order was
+chosen; their "state" lines are those of the time they were written.
 
 | Part | State |
 |---|---|
+| Ledger | Complete against the reference spreadsheet's command census; 534 of 535 functions (DDE excluded) plus the REGEX functions |
+| Deck | Complete against the reference presentation program's census (367 of 367) |
+| Folio | Complete against the reference word processor's census (471 of 471 wanted entries) |
+| Formats | ODF and OOXML for the three modules; corpus audit over 5016 files at LOSS 0, DECL 127 |
+| Cross-cutting | Exchange, macros (JavaScript, IronPython, CPython), MCP agent, digital signatures, PDF with embedded fonts |
+| Packaging | dmg, NSIS installer, AppImage, signed automatic updates; built by GitHub Actions since 2026-11-13 |
+
+What remains is phase 7: verification on real Windows and Linux machines and in Word, Excel and PowerPoint, plus the
+open points listed in `CLAUDE.md`.
+
+---|---|
 | Calculation engine | 526 functions out of 535, dynamic arrays, lambda, topological recalculation |
 | ODS and XLSX formats | Reading and writing proven both ways with a real reference suite, styles, conditional formatting, charts |
 | Shell | Ribbon, menus, palette, settings, modals, themes, workspace |
@@ -256,7 +268,7 @@ blown up on Windows and Linux, where we draw the window buttons ourselves.
   catalogues. The completeness test prevents forgetting it.
 - **CLAUDE.md updated at every substantial change.** If the code and the file diverge,
   the file is a bug.
-- **Frequent commits without co-author, and push.**
+- **Commits and pushes only when the user asks** (rule 2 in `CLAUDE.md`).
 - **Restructure instead of patching**, and no gratuitous static methods: composition through
   interfaces and dependency injection.
 - **Tests on what is deterministic**: engine, formats, commands. The interface is tested

@@ -189,6 +189,8 @@ Full coverage: 62 files out of 62, 10,699 lines read in full.
 - `LedgerPartialCommands.cs:284` and `LedgerChangeCommands`: structure protection (and change
   recording) are history steps; undoing past the protection removes it without a password. It is the same choice
   for all protections of the app: it should be decided once (the reference suite does not put them in the history).
+  *Resolved afterwards by decision 21 (2026-11-03): protection and change recording leave the undo history
+  (`UndoStack.ApplyOutsideHistory`).*
 - `LedgerRibbonCommands.cs:30-31`: the ribbon's currency and accounting have the euro fixed, whatever the language
   or the currency of the document.
 - `LedgerSelectionExtraCommands.cs:150-217`: with a single-rectangle selection, «unprotected cells» and

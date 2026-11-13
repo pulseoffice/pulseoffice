@@ -4,7 +4,8 @@
 > loss declared). The goal is parity of **capabilities** — not copying the menus, names or code
 > of other office suites: Deck's ribbon and menus are **our own**, as for Ledger.
 > Reference and measurement: the command census of the reference presentation program and its coverage script.
-> Coverage today: **2 of 387 (0.5 %)**.
+> Coverage when this plan was written: 2 of 387 (0.5 %). **Status (2026-11-13): blocks D1–D8 closed, coverage 367 of 367
+> wanted entries** (see `CLAUDE.md` and the work log).
 
 The previous "six blocks" (model, masters/themes, formats, transitions/animations, slide show,
 media/sounds/events) built **the invisible foundations**: the document, the two formats, playback.
