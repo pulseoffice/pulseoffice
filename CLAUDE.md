@@ -282,7 +282,17 @@ three Windows 11 style `CaptionButtons` (46 px, close in red on hover, restore g
 `MinimizeButton`/`MaximizeButton`/`CloseButton` roles (snap layouts) and running the actions on click themselves.
 `TitleBar` starts a window drag only outside buttons, menus and role-carrying elements. Our
 `TitleBar` carries `WindowDecorationsElementRole.TitleBar`; menus and search `User`, so they stay clickable.
-`IWindowChrome` says where the menus are, the insets and whether we draw the caption buttons.
+`IWindowChrome` says where the menus are, the insets, whether we draw the caption buttons and whether the app draws the
+window shadow.
+
+On Linux (X11, and GNOME Wayland through XWayland) Avalonia draws the frame itself only with
+`X11PlatformOptions.EnableDrawnDecorations = true` (set in `Program`; marked experimental, diagnostic `AVALONIA_X11_CSD`
+suppressed in `PulseOffice.Desktop.csproj`): without it the window manager adds its own title bar (2026-11-13). In that
+mode the shadow is a margin of the drawn frame below the client area, and an app that extends into the decorations must
+inset its content by `Window.WindowDecorationMargin` (frame + shadow + title bar height; verified in Avalonia's
+`Window.UpdateDrawnDecorationMargins`). `LinuxWindowChrome.DrawsWindowShadow` makes `ShellWindow` transparent
+(`TransparencyLevelHint = Transparent`), paint the canvas on its root panel and inset that panel by the margin minus our
+own title bar height; Windows and macOS keep the system shadow and an opaque window.
 
 ## Status
 
@@ -320,8 +330,9 @@ native macOS menu, modal service, settings schema.
   and declares capabilities (no duplex or native copies: copies and collation are obtained by repeating the
   pages in the PDF). Written but **not tested** on a real Windows.
 - **mp4 video export on Windows (Media Foundation via Vortice)**: written and wired, but **not
-  verified** on a real Windows — this machine is a Mac. macOS (VideoToolbox) and Linux (ffmpeg)
-  are verified. To be tested as soon as a Windows is available.
+  verified** on a real Windows. macOS (VideoToolbox) and Linux (ffmpeg, encoder chosen by `IFfmpegEncoderChoice`
+  among libx264, libopenh264 and mpeg4; verified on Fedora 2026-11-13) are verified. To be tested as soon as a Windows
+  is available.
 - **OOXML signature in Word**: verified by our tests, by `SignedXml` and by a headless
   check of the reference suite with `tools/verify-signatures` (ODT, ODS, DOCX, XLSX, PPTX, two signatures, broken signature: see log); not yet seen in Word.
 - **Signature line in Word and Excel**: the VML now shows a PNG (rasterized by `SkiaVectorRasterizer`),

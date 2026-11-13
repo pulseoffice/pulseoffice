@@ -106,12 +106,26 @@ public sealed class AppImageDesktopIntegrationTests : IDisposable
         start.ArgumentList.Add(Share("PulseOffice", "launch"));
         start.ArgumentList.Add("report.odt");
         start.Environment["HOME"] = _home;
-        start.Environment["PATH"] = "/usr/bin:/bin";
+        start.Environment["PATH"] = ToolsWithoutDialogs();
         start.Environment.Remove("XDG_DATA_HOME");
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit();
         return output.Trim();
+    }
+
+    private string ToolsWithoutDialogs()
+    {
+        var tools = Directory.CreateDirectory(Path.Combine(_home, ".launcher-tools")).FullName;
+        foreach (var tool in new[] { "cat", "ls", "grep", "chmod" })
+        {
+            var link = Path.Combine(tools, tool);
+            if (File.Exists(link)) continue;
+            var target = new[] { "/usr/bin", "/bin" }.Select(folder => Path.Combine(folder, tool)).First(File.Exists);
+            File.CreateSymbolicLink(link, target);
+        }
+
+        return tools;
     }
 
     [Fact]

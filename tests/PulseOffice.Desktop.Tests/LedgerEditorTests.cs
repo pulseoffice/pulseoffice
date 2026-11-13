@@ -660,7 +660,7 @@ public sealed class LedgerEditorTests : IDisposable
             var dark = 0;
             for (var x = (int)origin.X + 60; x < Math.Min(bitmap.Width, (int)(origin.X + grid.Bounds.Width)); x++)
                 for (var y = top; y < top + 12; y++)
-                    if (bitmap.GetPixel(x, y) is var pixel && pixel.Red + pixel.Green + pixel.Blue < 200) dark++;
+                    if (bitmap.GetPixel(x, y) is var pixel && pixel.Red + pixel.Green + pixel.Blue < 450) dark++;
             return dark;
         }
 

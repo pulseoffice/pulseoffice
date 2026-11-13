@@ -13461,3 +13461,39 @@ note that their open user decisions were settled by decisions 22 and 21. The wor
 `bump <part> --push` (or `--set X.Y.Z --push`) checks it runs on `main`, writes the version, commits every pending
 change (`git add --all`) as "Version X.Y.Z", tags `vX.Y.Z` and pushes the commit and the tag without asking, so the
 packaging workflow starts and leaves a draft release. Tried in a throwaway clone against a local bare remote.
+
+## Linux window frame and launcher tests (2026-11-13)
+
+First run on Fedora with GNOME (Wayland, app through XWayland). Defects found live:
+
+- **GNOME title bar above ours** (medium): Avalonia 12's X11 backend honours `ExtendClientAreaToDecorationsHint` only
+  with `X11PlatformOptions.EnableDrawnDecorations`, otherwise the window manager decorates the window. Enabled in
+  `Program`; the option is experimental, so `AVALONIA_X11_CSD` is suppressed in the Desktop project only.
+- **No frame and no shadow once Avalonia draws them** (medium): the Fluent decorations draw border and shadow in the
+  underlay, in an 8 px margin below the client area, and an extended window must inset its content by
+  `WindowDecorationMargin`. `ShellWindow` painted an opaque background over the whole surface. New
+  `IWindowChrome.DrawsWindowShadow` (Linux only): the window becomes transparent, the canvas is painted by the root
+  panel, inset by the margin minus our title bar. Seen live: frame, shadow, resizing, maximize without margin.
+- **Launcher tests opened a real zenity dialog** (minor, tests only): `AppImageDesktopIntegrationTests` ran the launcher
+  with `PATH=/usr/bin:/bin`, assuming no dialog tool there, true on macOS but not on Fedora. The launcher now gets a
+  private folder with only `cat`, `ls`, `grep` and `chmod`.
+
+## Desktop test suite on Linux (2026-11-13)
+
+First full run of `PulseOffice.Desktop.Tests` on Fedora: six tests failed the same way on `main`, all of them assuming
+macOS. Now 359 passed, 1 skipped.
+
+- **Deck mp4 export failed on Fedora** (serious, product): the ffmpeg encoder always asked for `libx264`, which
+  Fedora's ffmpeg does not ship. New `IFfmpegEncoderChoice` (`FfmpegEncoderChoice`, Platform) reads
+  `ffmpeg -encoders` once and takes `libx264`, then `libopenh264`, then `mpeg4`, each with its own options; none of them
+  gives `VIDEO006`. Four tests in `VideoEncodingRegressionTests`; the Deck export test encodes with the real ffmpeg.
+- **Folio accessibility test pressed Meta** for the primary modifier: it now uses `ShortcutGesture.Primary` (Ctrl on
+  Linux and Windows), also for Cmd+B, which passed by chance.
+- **Ledger merged-cell text test** counted pixels darker than a fixed sum of 200; with the substitute font the text is
+  lighter (darkest 229). Threshold 450 against the white cell; still red without the merge.
+- **Gallery pixel tests** compared against images made with macOS fonts. The headless session registers the bundled
+  Inter (`WithInterFont`), the gallery window uses it and the theme fonts (Arial, Courier New, Georgia, Trebuchet MS,
+  Verdana) map to it, so the three golden images, regenerated and checked by eye, are the same on every system. To
+  check on a Mac: in the old theme golden the accent line of Aurora and Laguna was teal, now it is lighter.
+- Headless frames show black where nothing paints a background, because the test composition does not load the theme
+  tokens; the real app paints them.

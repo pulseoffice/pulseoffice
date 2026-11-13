@@ -21,6 +21,8 @@ namespace PulseOffice.Desktop.Tests;
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class FolioAccessibilityTests : IDisposable
 {
+    private static readonly RawInputModifiers Primary = (RawInputModifiers)PulseOffice.UI.Controls.Shortcuts.ShortcutGesture.Primary;
+
     private readonly UiThreadSession _session;
     private readonly string _dataHome = Path.Combine(Path.GetTempPath(), "pulseoffice-folio-a11y-" + Guid.NewGuid().ToString("N"));
 
@@ -139,7 +141,7 @@ public sealed class FolioAccessibilityTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(texts.Format("folio.surface.position", surface, 1, 1, 2, 3), folio.Spoken);
 
-        folio.Key(Key.B, RawInputModifiers.Meta, PhysicalKey.B);
+        folio.Key(Key.B, Primary, PhysicalKey.B);
         var help = Avalonia.Automation.AutomationProperties.GetHelpText(folio.Focused!);
         Assert.Contains(texts["folio.surface.bold"], help, StringComparison.Ordinal);
 
@@ -192,7 +194,7 @@ public sealed class FolioAccessibilityTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         var all = folio.Editor.Document.Objects.All;
 
-        folio.Key(Key.O, RawInputModifiers.Meta | RawInputModifiers.Alt | RawInputModifiers.Shift, PhysicalKey.O);
+        folio.Key(Key.O, Primary | RawInputModifiers.Alt | RawInputModifiers.Shift, PhysicalKey.O);
         Assert.Equal(all[0].Id, folio.Editor.SelectedObjectId);
         Assert.Equal(texts.Format("folio.surface.object", texts["folio.surface.name"], texts["folio.surface.kind.frame"]), folio.Spoken);
         folio.Key(Key.Tab, physical: PhysicalKey.Tab);

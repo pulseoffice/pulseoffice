@@ -70,7 +70,7 @@ public sealed class GalleryPixelTests(HeadlessDesktopSession headless)
 
     private void Compare(string name, Control view, double width, double height)
     {
-        var window = new Window { Width = width, Height = height, Content = view };
+        var window = new Window { Width = width, Height = height, FontFamily = new Avalonia.Media.FontFamily("fonts:Inter#Inter"), Content = view };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
