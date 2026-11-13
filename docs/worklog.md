@@ -13445,3 +13445,19 @@ adds a job that signs `SHA256SUMS` and creates a draft release; manual runs only
 `PULSE_NOTARY_KEY`/`_KEY_ID`/`_ISSUER` for an App Store Connect API key, `PULSE_UPDATE_KEY`/`_PASSPHRASE`), has a
 `sign` command, and lays out the dmg with `dmgbuild` instead of AppleScript driving Finder, which is unreliable on
 headless runners; the window size, icon positions and Retina background are unchanged.
+
+## Documentation consistency pass (2026-11-13)
+
+After a full reading of `CLAUDE.md` and `docs/`: `architecture.md` lost its duplicated "Reuse across modules" section
+(the older copy still showed the selection frame as undecided) and its review leftovers were marked done where later
+work closed them; `audit-plan.md` lost a repeated line and has rounds 118-121 in order; `plan.md` states the current
+state (phases 0-6 closed, phase 7 under way) and its commit rule now points to rule 2; `deck-plan.md` gives the current
+coverage next to the original one; `ux-plan.md` no longer points to captures in a vanished macOS scratchpad nor names
+image files (rule 12), and describes them in words; `deep-audit/platform.md` and `deep-audit/ledger-ui-commands.md`
+note that their open user decisions were settled by decisions 22 and 21. The work log keeps its historical paths.
+
+## `pulse-cmd.py bump --push` (2026-11-13)
+
+`bump <part> --push` (or `--set X.Y.Z --push`) checks it runs on `main`, writes the version, commits every pending
+change (`git add --all`) as "Version X.Y.Z", tags `vX.Y.Z` and pushes the commit and the tag without asking, so the
+packaging workflow starts and leaves a draft release. Tried in a throwaway clone against a local bare remote.
