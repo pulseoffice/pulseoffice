@@ -107,7 +107,6 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         _metrics = DesignTokens.For(InterfaceDensity.Compact);
 
         Title = "PulseOffice";
-        this.Themed(BackgroundProperty, Palette.Keys.Canvas);
         Width = 1280;
         Height = 800;
         MinWidth = 720;
@@ -186,7 +185,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         layout.Children.Add(_statusBar);
 
         dialogHost.Content = layout;
-        Content = new Panel
+        var surface = new Panel
         {
             Children =
             {
@@ -194,6 +193,8 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
                 new NotificationToastHost(notifications, _icons, _texts, this),
             },
         };
+        PaintSurface(surface);
+        Content = surface;
 
         ApplyVisibility();
 
@@ -529,6 +530,30 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         _status.Report(_texts["status.ready"]);
         _statusBar.Refresh();
     }
+
+    private void PaintSurface(Panel surface)
+    {
+        if (!_chrome.DrawsWindowShadow)
+        {
+            this.Themed(BackgroundProperty, Palette.Keys.Canvas);
+            return;
+        }
+
+        TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
+        Background = Brushes.Transparent;
+        surface.Themed(Panel.BackgroundProperty, Palette.Keys.Canvas);
+        surface.Margin = FrameAndShadow(WindowDecorationMargin);
+        PropertyChanged += (_, change) =>
+        {
+            if (change.Property == WindowDecorationMarginProperty) surface.Margin = FrameAndShadow(WindowDecorationMargin);
+        };
+    }
+
+    private Thickness FrameAndShadow(Thickness decorationMargin) =>
+        new(decorationMargin.Left,
+            Math.Max(0, decorationMargin.Top - ExtendClientAreaTitleBarHeightHint),
+            decorationMargin.Right,
+            decorationMargin.Bottom);
 
     private void UseOwnCaptionButtons()
     {

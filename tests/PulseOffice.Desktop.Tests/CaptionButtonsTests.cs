@@ -25,6 +25,8 @@ public sealed class CaptionButtonsTests(HeadlessDesktopSession headless)
         public bool ShowsTitleText => true;
 
         public bool DrawsCaptionButtons => draws;
+
+        public bool DrawsWindowShadow => false;
     }
 
     [Fact]

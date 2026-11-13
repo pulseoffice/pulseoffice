@@ -65,6 +65,7 @@ internal static class Program
             .WithInterFont()
             .With(new Avalonia.Media.FontManagerOptions { FontFamilyMappings = fontMappings })
             .With(new MacOSPlatformOptions { DisableDefaultApplicationMenuItems = true })
+            .With(new X11PlatformOptions { EnableDrawnDecorations = true })
             .AfterSetup(builder => new DeveloperTools.ConfiguredDeveloperTools().Attach(builder.Instance!))
             .LogToTrace();
 }

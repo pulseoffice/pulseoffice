@@ -13,4 +13,6 @@ public sealed class MacWindowChrome : IWindowChrome
     public bool ShowsTitleText => true;
 
     public bool DrawsCaptionButtons => false;
+
+    public bool DrawsWindowShadow => false;
 }

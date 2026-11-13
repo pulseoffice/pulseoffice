@@ -18,6 +18,8 @@ public interface IWindowChrome
     bool ShowsTitleText { get; }
 
     bool DrawsCaptionButtons { get; }
+
+    bool DrawsWindowShadow { get; }
 }
 
 public interface IWindowChromeProvider

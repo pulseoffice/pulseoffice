@@ -13,4 +13,6 @@ public sealed class LinuxWindowChrome : IWindowChrome
     public bool ShowsTitleText => true;
 
     public bool DrawsCaptionButtons => true;
+
+    public bool DrawsWindowShadow => true;
 }
