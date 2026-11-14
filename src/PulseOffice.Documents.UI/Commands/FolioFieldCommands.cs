@@ -9,6 +9,7 @@ using PulseOffice.Platform;
 using PulseOffice.Text.Rich;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls;
+using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Documents.UI.Commands;
 
@@ -87,7 +88,8 @@ public sealed class FolioFieldCommands(
     FolioFieldCatalog catalog,
     ITabbedForms tabbed,
     IFolioLinks links,
-    IFolioFieldsDialog dialog) : FolioCommandSet(context)
+    IFolioFieldsDialog dialog,
+    IStatusBarService status) : FolioCommandSet(context)
 {
     private const string HeadingBookmark = "__RefHeading__";
 
@@ -102,13 +104,13 @@ public sealed class FolioFieldCommands(
             EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && FieldAtCaret(editor) is not null,
             Execute = (_, ct) => EditFieldAsync(ct),
         },
-        Action(Editing("folio.tools.updateFields") with { DefaultGesture = "F9" }, editor => refresh.UpdateFields(editor)),
+        Action(Editing("folio.tools.updateFields") with { DefaultGesture = "F9" }, editor => Refreshed(refresh.UpdateFields(editor))),
         Action(Editing("folio.tools.updateField") with
         {
             Surface = CommandSurface.Advanced,
             EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && Selected(editor).Count > 0,
         }, editor => refresh.UpdateFields(editor, Selected(editor).Select(hit => hit.ParagraphId).ToHashSet(StringComparer.Ordinal))),
-        Action(Editing("folio.tools.updateAll") with { DefaultGesture = "Ctrl+Shift+F9" }, editor => refresh.UpdateAll(editor)),
+        Action(Editing("folio.tools.updateAll") with { DefaultGesture = "Ctrl+Shift+F9" }, editor => Refreshed(refresh.UpdateAll(editor))),
         Action(Editing("folio.tools.fieldToText") with
         {
             Surface = CommandSurface.Advanced,
@@ -298,4 +300,9 @@ public sealed class FolioFieldCommands(
 
     private void RemoveLink(FolioEditor editor) =>
         editor.Apply((documents, target) => documents.MapRuns(editor.Document, editor.History, target, "remove-hyperlink", run => run with { Hyperlink = null }), links.Range(editor));
+
+    private void Refreshed(bool changed)
+    {
+        if (!changed) status.Report(texts["folio.fields.upToDate"]);
+    }
 }

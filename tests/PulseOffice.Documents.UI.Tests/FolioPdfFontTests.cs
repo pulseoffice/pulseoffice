@@ -18,7 +18,7 @@ public sealed class FolioPdfFontTests
     [Fact]
     public Task IlPdfDiFolioIncorporaICaratteriConCollegamentiESegnalibri() => FolioScene.RunAsync(() =>
     {
-        var installed = new IndexedFontLocator(new PulseOffice.Platform.SystemFontDirectories(), new OpenTypeReader(), new FontMetricsReader());
+        var installed = new IndexedFontLocator(new PulseOffice.Platform.SystemFontDirectories(new PulseOffice.Platform.SystemEnvironmentVariables(), ((PulseOffice.Platform.IHostSystem)new PulseOffice.Platform.RuntimeHostSystem()).Family), new OpenTypeReader(), new FontMetricsReader());
         var located = new Substituting(installed, new PulseOffice.UI.Controls.Fonts.MetricCompatibleSubstitutes());
         var measurer = new PulseOffice.Documents.Layout.Measurement.OpenType.OpenTypeMeasurer(located, new PulseOffice.Documents.Layout.Measurement.OpenType.HorizontalHeaderMetrics(), new PulseOffice.Documents.Layout.Measurement.OpenType.ExactAdvances(), new PulseOffice.Documents.Layout.Measurement.FixedPitchMeasurer());
         var scene = new FolioScene(measurer: measurer, prepare: document =>

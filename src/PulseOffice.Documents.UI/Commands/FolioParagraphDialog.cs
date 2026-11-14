@@ -42,7 +42,7 @@ public interface IFolioParagraphDialog
     Task<ParagraphDialogAnswer?> AskAsync(ParagraphDialogScope scope, string titleKey, CancellationToken ct, int initialTab = 0);
 }
 
-public sealed class FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog texts, IBorderEditors borderEditors, IBoxBorderFrames frames) : IFolioParagraphTabs
+public sealed class FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog texts, IBorderEditors borderEditors, IBoxBorderFrames frames, PulseOffice.UI.Controls.Fills.IFillEditors fills) : IFolioParagraphTabs
 {
     public const int FlowTab = 1;
 
@@ -54,7 +54,7 @@ public sealed class FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog
 
     private readonly BorderFrameScope _scope = new(false, false, false);
 
-    public FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog texts) : this(shared, texts, new BorderEditors(texts), new BoxBorderFrames())
+    public FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog texts) : this(shared, texts, new BorderEditors(texts), new BoxBorderFrames(), new PulseOffice.UI.Controls.Fills.FillEditors(texts))
     {
     }
 
@@ -94,7 +94,7 @@ public sealed class FolioParagraphTabs(IParagraphFormatTabs shared, ITextCatalog
             [
                 new BorderEditorField("borders", texts["folio.paragraph.tab.borders"], borderEditors, _scope, frames.Frame(borders)),
                 new NumberField("border.padding", texts["folio.border.padding"], _sides.Select(borders.Padding).Max(), 0, 200) { Unit = "pt" },
-                new ColorField("background", texts["folio.paragraph.background"], current.Background is { } fill && fill >> 24 != 0 ? _colors.Hex(fill) : null),
+                new PulseOffice.UI.Controls.Fills.SolidBackgroundField("background", texts["folio.paragraph.background"], fills, current.Background is { } fill && fill >> 24 != 0 ? _colors.Hex(fill) : null),
             ]),
             new FormTab(texts["folio.paragraph.tab.dropCap"], texts["folio.paragraph.dropCap.explanation"],
             [

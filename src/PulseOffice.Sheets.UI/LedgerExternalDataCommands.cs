@@ -71,11 +71,21 @@ public sealed class LedgerExternalDataCommands(
 
         documentQueries.Grant(workbook, new Data.ExternalQueryRequest(binding.ConnectionId, binding.Query.Sql));
 
-        var before = snapshots.Capture(sheet);
-
         status.Report(texts["status.query.refreshing"]);
 
-        var outcome = await queries.RefreshAsync(workbook, sheet, binding, ct).ConfigureAwait(true);
+        Queries.QueryFetched fetched;
+        try
+        {
+            fetched = await queries.FetchAsync(workbook, sheet, binding, ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            status.Report(texts["status.query.cancelled"]);
+            return;
+        }
+
+        var before = snapshots.Capture(sheet);
+        var outcome = queries.Write(workbook, fetched);
 
         if (!outcome.Succeeded || outcome.Value is not { } refreshed)
         {

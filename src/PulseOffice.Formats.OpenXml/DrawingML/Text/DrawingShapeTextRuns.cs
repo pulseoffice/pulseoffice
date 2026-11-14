@@ -14,10 +14,14 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         if (body is null) return shape;
         var runs = new List<ShapeTextRun>();
         var items = new List<ShapeListItem?>();
+        var directions = new List<PulseOffice.Text.Rich.Bidi.TextDirection?>();
         var first = true;
         foreach (var paragraph in body.Elements<D.Paragraph>())
         {
             items.Add(listCodec.Read(paragraph.ParagraphProperties));
+            directions.Add(paragraph.ParagraphProperties?.RightToLeft?.HasValue == true
+                ? paragraph.ParagraphProperties.RightToLeft.Value ? PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft : PulseOffice.Text.Rich.Bidi.TextDirection.LeftToRight
+                : null);
             if (!first) runs.Add(runs.Count > 0 ? runs[^1] with { Text = "\n" } : new ShapeTextRun("\n"));
             first = false;
             foreach (var child in paragraph.ChildElements)
@@ -29,11 +33,13 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         }
 
         var read = editing.WithRuns(shape, runs);
-        if (items.Any(item => item is not null)) return lists.WithItems(read.Text is null ? shape : read, items);
+        var directed = directions.Any(direction => direction is not null);
+        if (items.Any(item => item is not null) || directed)
+            return lists.WithDirections(lists.WithItems(read.Text is null ? shape : read, items), directions);
         return editing.Formatted(read) || Multiline(read.Text) ? read : shape;
     }
 
-    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape);
+    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape) || lists.Directed(shape);
 
     public OpenXmlElement Write(OpenXmlElement written, ShapeObject shape, IDrawingRunLinks links)
     {
@@ -48,8 +54,17 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
 
         var runs = shape.Runs is { Count: > 0 } own ? own : [new ShapeTextRun(text)];
         var items = lists.Items(shape);
+        var directions = lists.Directions(shape);
         var index = 0;
-        D.Paragraph Next() => Paragraph(listCodec.Write(paragraphProperties, index < items.Count ? items[index++] : null));
+        D.Paragraph Next()
+        {
+            var properties = listCodec.Write(paragraphProperties, index < items.Count ? items[index] : null);
+            properties.RightToLeft = index < directions.Count && directions[index] is { } direction
+                ? direction == PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft
+                : null;
+            index++;
+            return Paragraph(properties);
+        }
         var paragraph = Next();
         body.Append(paragraph);
         foreach (var run in runs)

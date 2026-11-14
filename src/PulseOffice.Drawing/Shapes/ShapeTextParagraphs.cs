@@ -31,7 +31,22 @@ public sealed class ShapeTextParagraphs(IShapeTextLists lists, IShapeRichText ri
         ArgumentNullException.ThrowIfNull(shape);
         ArgumentNullException.ThrowIfNull(change);
         var size = shape.Style.Text.Size;
-        return lists.Apply(shape, start, end, item => Regenerated(item, rich.Item(change(rich.Listed(new TextParagraph(string.Empty) { FontSize = size }, item)))));
+        var current = rich.ToRich(shape).Paragraphs;
+        var changed = Range(current.Count, start, end, shape).Select(index => (Index: index, Paragraph: change(current[index]))).ToList();
+        var directions = lists.Directions(shape).ToList();
+        foreach (var (index, paragraph) in changed.Where(entry => entry.Index < directions.Count)) directions[index] = paragraph.Direction;
+        var listed = lists.Apply(shape, start, end, item => Regenerated(item, rich.Item(change(rich.Listed(new TextParagraph(string.Empty) { FontSize = size }, item)))));
+        return lists.WithDirections(listed, directions);
+    }
+
+    private IEnumerable<int> Range(int count, int start, int end, ShapeObject shape)
+    {
+        if (count == 0) return [];
+        if (start < 0 || end < 0) return Enumerable.Range(0, count);
+        var plain = string.Join('\n', rich.ToRich(shape).Paragraphs.Select(paragraph => paragraph.Text));
+        int At(int offset) => Math.Clamp(plain.AsSpan(0, Math.Clamp(offset, 0, plain.Length)).Count('\n'), 0, count - 1);
+        var first = At(Math.Min(start, end));
+        return Enumerable.Range(first, At(Math.Max(start, end)) - first + 1);
     }
 
     private ShapeListItem? Regenerated(ShapeListItem? before, ShapeListItem? after) =>

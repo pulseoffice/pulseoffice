@@ -26,6 +26,8 @@ public interface IFolioObjectEditing
 
     bool Order(FolioEditor editor, ObjectOrder order);
 
+    bool CanOrder(FolioEditor editor, ObjectOrder order);
+
     bool Rotate(FolioEditor editor, double degrees, bool relative);
 
     bool Flip(FolioEditor editor, bool horizontal);
@@ -88,6 +90,9 @@ public sealed class FolioObjectEditing(
             target.Contour = on ? traced : target.Contour;
         });
     }
+
+    public bool CanOrder(FolioEditor editor, ObjectOrder order) =>
+        Selected(editor) is { } item && arrangement.Moves(editor.Document, item.Id, order);
 
     public bool Order(FolioEditor editor, ObjectOrder order)
     {

@@ -84,9 +84,19 @@ public sealed class LedgerDocumentExtraCommands(
 
     private async Task RefreshAsync(Workbook workbook, Worksheet sheet, int index, QueryBinding binding)
     {
-        var before = snapshots.Capture(sheet);
         status.Report(texts["status.query.refreshing"]);
-        var outcome = await queries.RefreshAsync(workbook, sheet, binding).ConfigureAwait(true);
+        Queries.QueryFetched fetched;
+        try
+        {
+            fetched = await queries.FetchAsync(workbook, sheet, binding).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            status.Report(texts["status.query.cancelled"]);
+            return;
+        }
+        var before = snapshots.Capture(sheet);
+        var outcome = queries.Write(workbook, fetched);
         if (!outcome.Succeeded || outcome.Value is not { } refreshed)
         {
             if (outcome.Diagnostics.Any(diagnostic => diagnostic.Code == Queries.QueryRefresher.DeclinedCode)) status.Report(texts["status.query.declined"]);

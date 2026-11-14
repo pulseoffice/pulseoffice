@@ -59,7 +59,11 @@ public sealed class FolioToolCommands(IActiveFolioContext context, FolioToolServ
         Action(Editing("folio.tools.autoFormatApply") with { Surface = CommandSurface.Advanced }, editor => Format(editor, tracked: false)),
         Action(Editing("folio.tools.autoFormatApplyTracked") with { Surface = CommandSurface.Advanced }, editor => Format(editor, tracked: true)),
         Action(Viewing("folio.tools.repaginate") with { Surface = CommandSurface.Advanced }, Repaginate),
-        Action(Viewing("folio.tools.updateCharts") with { Surface = CommandSurface.Advanced }, editor => editor.Reflow()),
+        Action(Viewing("folio.tools.updateCharts") with
+        {
+            Surface = CommandSurface.Advanced,
+            EnabledWhen = _ => Editor is { } editor && editor.Document.Objects.All.Any(item => item.Content is PulseOffice.Documents.Objects.EmbeddedContent { Value: PulseOffice.Charts.ChartDefinition }),
+        }, editor => editor.Reflow()),
         Viewing("folio.tools.calculate") with
         {
             Surface = CommandSurface.Advanced,

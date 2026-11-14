@@ -51,6 +51,7 @@ public sealed class FolioFieldRefresh(IFieldUpdater fields, IIndexEditing indexe
     private bool Run(FolioEditor editor, string description, Action<PulseOffice.Documents.Editing.EditRecorder, IFieldLayoutFacts> refresh)
     {
         if (editor.ReadOnly()) return false;
+        var any = false;
         using (editor.History.BeginTransaction(description))
         {
             for (var pass = 0; pass < Passes; pass++)
@@ -59,11 +60,12 @@ public sealed class FolioFieldRefresh(IFieldUpdater fields, IIndexEditing indexe
                 refresh(recorder, Facts(editor));
                 var changed = recorder.HasChanges;
                 recorder.Commit(editor.History);
+                any |= changed;
                 if (!changed) break;
             }
         }
         editor.Refresh();
-        return true;
+        return any;
     }
 }
 

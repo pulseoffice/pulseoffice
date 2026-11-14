@@ -79,6 +79,42 @@ public class QueryRefresherTests : IDisposable
         return address;
     }
 
+    private static async Task<PulseOffice.Foundation.Diagnostics.OperationResult<QueryBinding>> Refresh(
+        IQueryRefresher refresher, Workbook book, Worksheet sheet, QueryBinding binding, CancellationToken ct) =>
+        refresher.Write(book, await refresher.FetchAsync(book, sheet, binding, ct));
+
+    [Fact]
+    public async Task Fetching_reads_the_database_without_touching_the_sheet_and_only_writing_fills_it()
+    {
+        var book = new Workbook();
+        var sheet = book.AddSheet("Dati");
+        var refresher = Refresher();
+
+        var fetched = await refresher.FetchAsync(book, sheet, Binding("SELECT zona FROM vendite"), TestContext.Current.CancellationToken);
+
+        Assert.Empty(sheet.CellAddresses);
+        Assert.NotNull(fetched.Result);
+        Assert.True(refresher.Write(book, fetched).Succeeded);
+        Assert.Equal("zona", sheet[A("A1")].Value.ToString());
+    }
+
+    [Fact]
+    public async Task A_sheet_deleted_while_the_query_runs_is_not_written()
+    {
+        var book = new Workbook();
+        var sheet = book.AddSheet("Dati");
+        book.AddSheet("Altro");
+        var refresher = Refresher();
+
+        var fetched = await refresher.FetchAsync(book, sheet, Binding("SELECT zona FROM vendite"), TestContext.Current.CancellationToken);
+        book.RemoveSheet(sheet);
+        var outcome = refresher.Write(book, fetched);
+
+        Assert.False(outcome.Succeeded);
+        Assert.Equal("QRY007", outcome.Diagnostics[0].Code);
+        Assert.Empty(sheet.CellAddresses);
+    }
+
     private IQueryRefresher Refresher() => new QueryRefresher(_providers, new Directory(_connection), new RecordingQueryGate(allow: true));
 
     private QueryBinding Binding(string sql, bool headers = true) => new()
@@ -100,7 +136,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        var outcome = await Refresher().RefreshAsync(book, sheet, Binding(sql), TestContext.Current.CancellationToken);
+        var outcome = await Refresh(Refresher(), book, sheet, Binding(sql), TestContext.Current.CancellationToken);
 
         Assert.False(outcome.Succeeded);
         Assert.Equal("QRY004", outcome.Diagnostics[0].Code);
@@ -119,7 +155,7 @@ public class QueryRefresherTests : IDisposable
         var sheet = book.AddSheet("Dati");
         var binding = Binding("SELECT zona, totale FROM vendite ORDER BY totale") with { Anchor = new CellAddress(CellAddress.MaxRows - 2, 0) };
 
-        var outcome = await Refresher().RefreshAsync(book, sheet, binding, TestContext.Current.CancellationToken);
+        var outcome = await Refresh(Refresher(), book, sheet, binding, TestContext.Current.CancellationToken);
 
         Assert.True(outcome.Succeeded);
         Assert.Contains(outcome.Diagnostics, diagnostic => diagnostic.Code == "QRY005");
@@ -134,7 +170,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        var outcome = await Refresher().RefreshAsync(
+        var outcome = await Refresh(Refresher(), 
             book, sheet, Binding("SELECT zona, totale FROM vendite ORDER BY totale"),
             TestContext.Current.CancellationToken);
 
@@ -153,7 +189,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        await Refresher().RefreshAsync(
+        await Refresh(Refresher(), 
             book, sheet, Binding("SELECT zona FROM vendite ORDER BY zona", headers: false),
             TestContext.Current.CancellationToken);
 
@@ -166,7 +202,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        var outcome = await Refresher().RefreshAsync(
+        var outcome = await Refresh(Refresher(), 
             book, sheet, Binding("SELECT zona, mese, totale FROM vendite"),
             TestContext.Current.CancellationToken);
 
@@ -185,10 +221,10 @@ public class QueryRefresherTests : IDisposable
         var sheet = book.AddSheet("Dati");
         var refresher = Refresher();
 
-        var first = await refresher.RefreshAsync(
+        var first = await Refresh(refresher, 
             book, sheet, Binding("SELECT zona FROM vendite"), TestContext.Current.CancellationToken);
 
-        var second = await refresher.RefreshAsync(
+        var second = await Refresh(refresher, 
             book, sheet, first.Value! with { Query = new QueryDefinition { Sql = "SELECT zona FROM vendite WHERE zona = 'Sud'" } },
             TestContext.Current.CancellationToken);
 
@@ -204,7 +240,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        await Refresher().RefreshAsync(
+        await Refresh(Refresher(), 
             book, sheet, Binding("SELECT attiva, mese FROM vendite ORDER BY mese, zona"),
             TestContext.Current.CancellationToken);
 
@@ -218,7 +254,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        var outcome = await Refresher().RefreshAsync(
+        var outcome = await Refresh(Refresher(), 
             book, sheet, Binding("SELECT 1") with { ConnectionId = "assente" },
             TestContext.Current.CancellationToken);
 
@@ -232,7 +268,7 @@ public class QueryRefresherTests : IDisposable
         var book = new Workbook();
         var sheet = book.AddSheet("Dati");
 
-        var outcome = await Refresher().RefreshAsync(
+        var outcome = await Refresh(Refresher(), 
             book, sheet, Binding("SELECT * FROM tabella_che_non_esiste"),
             TestContext.Current.CancellationToken);
 
@@ -248,8 +284,8 @@ public class QueryRefresherTests : IDisposable
 
         sheet.QueryBindings.AddOrUpdate(Binding("SELECT zona FROM vendite"));
 
-        var outcome = await Refresher().RefreshAllAsync(
-            workbook, TestContext.Current.CancellationToken);
+        var refresher = Refresher();
+        var outcome = refresher.Apply(workbook, await refresher.FetchAllAsync(workbook, TestContext.Current.CancellationToken));
 
         Assert.Equal(1, outcome.Value);
         Assert.Equal("zona", sheet[A("A1")].Value.ToString());

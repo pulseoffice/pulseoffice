@@ -102,7 +102,9 @@
     <Project Path="tests/PulseOffice.UI.Controls.Tests/PulseOffice.UI.Controls.Tests.csproj" />
     <Project Path="tests/PulseOffice.Shell.Tests/PulseOffice.Shell.Tests.csproj" />
     <Project Path="tests/PulseOffice.Desktop.Tests/PulseOffice.Desktop.Tests.csproj" />
-    <Project Path="tests/PulseOffice.Desktop.Sweep.Tests/PulseOffice.Desktop.Sweep.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Desktop.Sweep.Documents.Tests/PulseOffice.Desktop.Sweep.Documents.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Desktop.Sweep.Presentations.Tests/PulseOffice.Desktop.Sweep.Presentations.Tests.csproj" />
+    <Project Path="tests/PulseOffice.Desktop.Sweep.Sheets.Tests/PulseOffice.Desktop.Sweep.Sheets.Tests.csproj" />
     <Project Path="tests/PulseOffice.Robustness.Tests/PulseOffice.Robustness.Tests.csproj" />
     <Project Path="tests/PulseOffice.Remote.Tests/PulseOffice.Remote.Tests.csproj" />
     <Project Path="tests/PulseOffice.Architecture.Tests/PulseOffice.Architecture.Tests.csproj" />

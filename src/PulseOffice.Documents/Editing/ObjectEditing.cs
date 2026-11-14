@@ -22,6 +22,8 @@ public interface IObjectArrangement
     DocumentEdit Reanchor(TextDocument document, UndoStack history, string objectId, ObjectAnchor anchor, ObjectPlacement placement, DocumentPosition? markAt);
 
     DocumentEdit Order(TextDocument document, UndoStack history, string objectId, ObjectOrder order);
+
+    bool Moves(TextDocument document, string objectId, ObjectOrder order);
 }
 
 public sealed class ObjectArrangement(IStoryCatalog stories, IParagraphText text) : IObjectArrangement
@@ -50,7 +52,7 @@ public sealed class ObjectArrangement(IStoryCatalog stories, IParagraphText text
     public DocumentEdit Order(TextDocument document, UndoStack history, string objectId, ObjectOrder order)
     {
         var recorder = new EditRecorder(document, "order-object");
-        var sorted = document.Objects.All.Select((item, index) => (item, index)).OrderBy(pair => pair.item.ZOrder).ThenBy(pair => pair.index).Select(pair => pair.item).ToList();
+        var sorted = Stacked(document);
         var position = sorted.FindIndex(item => item.Id == objectId);
         if (position < 0) throw new KeyNotFoundException($"Object '{objectId}' not found.");
         var moved = sorted[position];
@@ -71,6 +73,17 @@ public sealed class ObjectArrangement(IStoryCatalog stories, IParagraphText text
         }
         return recorder.Commit(history);
     }
+
+    public bool Moves(TextDocument document, string objectId, ObjectOrder order)
+    {
+        var sorted = Stacked(document);
+        var position = sorted.FindIndex(item => item.Id == objectId);
+        if (position < 0) return false;
+        return order is ObjectOrder.Front or ObjectOrder.Forward ? position < sorted.Count - 1 : position > 0;
+    }
+
+    private static List<AnchoredObject> Stacked(TextDocument document) =>
+        document.Objects.All.Select((item, index) => (item, index)).OrderBy(pair => pair.item.ZOrder).ThenBy(pair => pair.index).Select(pair => pair.item).ToList();
 }
 
 public interface ISequenceFields

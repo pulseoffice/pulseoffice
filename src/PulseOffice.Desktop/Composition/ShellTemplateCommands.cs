@@ -106,6 +106,23 @@ public sealed class ShellTemplateCommands(
             await openRouter.EditAsync(chosen.Path, ct).ConfigureAwait(true);
     }
 
+    private async Task<bool> ConfirmReplaceAsync(string fileName, CancellationToken ct)
+    {
+        var chosen = await dialogs.ShowAsync<object>(
+            new ChoicePromptView(
+                texts.Format("template.exists", fileName),
+                Folder,
+                [
+                    new PromptChoice(texts["template.replace"], true),
+                    new PromptChoice(texts["prompt.cancel"], false, IsDefault: true, IsCancel: true),
+                ],
+                texts),
+            new DialogOptions { TitleKey = "command.shell.file.saveAsTemplate.title" },
+            ct).ConfigureAwait(true);
+
+        return chosen is true;
+    }
+
     private async Task SaveAsTemplateAsync(CancellationToken ct)
     {
         if (workspace.Active is not { } document || operations.For(document) is not { } module) return;
@@ -131,6 +148,7 @@ public sealed class ShellTemplateCommands(
         Directory.CreateDirectory(Folder);
         var asOffice = values.TryGetValue("format", out var format) && Convert.ToInt64(format, System.Globalization.CultureInfo.InvariantCulture) == 1;
         var path = Path.Combine(Folder, $"{name}.{(asOffice ? module.OfficeTemplateExtension : module.TemplateExtension)}");
+        if (File.Exists(path) && !await ConfirmReplaceAsync(Path.GetFileName(path), ct).ConfigureAwait(true)) return;
 
         var written = module.WriteTo(document, path);
         status.Report(

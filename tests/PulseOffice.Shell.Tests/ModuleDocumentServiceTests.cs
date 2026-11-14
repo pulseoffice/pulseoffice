@@ -99,10 +99,18 @@ public sealed class ModuleDocumentServiceTests : IDisposable
     {
         public Action? DuringCommit { get; set; }
 
+        public Func<MemoryStream, (UnlockOutcome, UnlockedDocument?)>? Locked { get; set; }
+
+        public int Asked { get; private set; }
+
         public bool IsProtected(string path) => false;
 
-        public Task<(UnlockOutcome Outcome, UnlockedDocument? Document)> UnlockAsync(MemoryStream buffer, string documentName, CancellationToken ct) =>
-            Task.FromResult<(UnlockOutcome, UnlockedDocument?)>((UnlockOutcome.Unlocked, new UnlockedDocument(new MemoryStream(buffer.ToArray()), null)));
+        public Task<(UnlockOutcome Outcome, UnlockedDocument? Document)> UnlockAsync(MemoryStream buffer, string documentName, CancellationToken ct)
+        {
+            Asked++;
+            return Task.FromResult<(UnlockOutcome, UnlockedDocument?)>(Locked?.Invoke(buffer)
+                ?? (UnlockOutcome.Unlocked, new UnlockedDocument(new MemoryStream(buffer.ToArray()), null)));
+        }
 
         public Task<ProtectionChoice?> ChooseProtectionAsync(string documentName, CancellationToken ct) => Task.FromResult<ProtectionChoice?>(null);
 
@@ -175,6 +183,33 @@ public sealed class ModuleDocumentServiceTests : IDisposable
 
     private OpenDocument Untitled(string title) =>
         new(ModuleKind.Sheets, title, new Avalonia.Controls.Panel(), new PulseOffice.Document.Commands.UndoStack()) { Model = new Probe { Text = "dati" } };
+
+    [Fact]
+    public async Task Opening_an_encrypted_template_as_new_goes_through_the_password_gate()
+    {
+        var template = Path.Combine(_folder, "cifrato.ots");
+        await File.WriteAllTextAsync(template, "cifrato", TestContext.Current.CancellationToken);
+        _passwords.Locked = _ => (UnlockOutcome.Unlocked, new UnlockedDocument(new MemoryStream(Encoding.UTF8.GetBytes("in chiaro")), null));
+
+        var opened = await Service().OpenAsNewAsync(template, TestContext.Current.CancellationToken);
+
+        Assert.True(opened);
+        Assert.Equal(1, _passwords.Asked);
+        Assert.Equal("in chiaro", ((Probe)Assert.Single(_workspace.Documents).Model!).Text);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_password_of_a_template_opens_nothing()
+    {
+        var template = Path.Combine(_folder, "cifrato.ots");
+        await File.WriteAllTextAsync(template, "cifrato", TestContext.Current.CancellationToken);
+        _passwords.Locked = _ => (UnlockOutcome.Cancelled, null);
+
+        var opened = await Service().OpenAsNewAsync(template, TestContext.Current.CancellationToken);
+
+        Assert.False(opened);
+        Assert.Empty(_workspace.Documents);
+    }
 
     [Fact]
     public async Task Il_salvataggio_scrive_fuori_dal_thread_chiamante_con_l_interfaccia_bloccata()

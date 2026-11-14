@@ -36,6 +36,24 @@ public sealed class ObjectEditingTests
     }
 
     [Fact]
+    public void An_object_already_on_top_cannot_move_forward_and_one_at_the_bottom_cannot_move_back()
+    {
+        _f.Type("uno");
+        foreach (var id in new[] { "a", "b" })
+        {
+            var item = Picture(id, new ParagraphAnchor(_f.First.Id));
+            item.ZOrder = _f.Document.Objects.All.Count;
+            _f.Document.Objects.Add(item);
+        }
+
+        Assert.False(_arrangement.Moves(_f.Document, "b", ObjectOrder.Front));
+        Assert.False(_arrangement.Moves(_f.Document, "b", ObjectOrder.Forward));
+        Assert.True(_arrangement.Moves(_f.Document, "b", ObjectOrder.Backward));
+        Assert.False(_arrangement.Moves(_f.Document, "a", ObjectOrder.Back));
+        Assert.True(_arrangement.Moves(_f.Document, "a", ObjectOrder.Front));
+    }
+
+    [Fact]
     public void LOrdineMetteDavantiEDietroESiAnnulla()
     {
         _f.Type("uno");

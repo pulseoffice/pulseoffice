@@ -8,13 +8,12 @@ namespace PulseOffice.Sheets.Queries;
 
 public interface IQueryRefresher
 {
-    Task<OperationResult<QueryBinding>> RefreshAsync(
+    Task<QueryFetched> FetchAsync(
         Workbook workbook, Worksheet sheet, QueryBinding binding, CancellationToken ct = default);
 
-    Task<OperationResult<int>> RefreshAllAsync(
-        Workbook workbook, CancellationToken ct = default);
-
     Task<QueryFetch> FetchAllAsync(Workbook workbook, CancellationToken ct = default);
+
+    OperationResult<QueryBinding> Write(Workbook workbook, QueryFetched fetched);
 
     OperationResult<int> Apply(Workbook workbook, QueryFetch fetch);
 }
@@ -47,19 +46,25 @@ public sealed class QueryRefresher : IQueryRefresher
         _values = new QueryValueConverter(toSerial);
     }
 
-    public async Task<OperationResult<QueryBinding>> RefreshAsync(
+    public async Task<QueryFetched> FetchAsync(
         Workbook workbook, Worksheet sheet, QueryBinding binding, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(sheet);
         ArgumentNullException.ThrowIfNull(binding);
 
-        var fetched = await GatedAsync(workbook, [(sheet, binding)], ct).ConfigureAwait(false);
-        return Written(workbook, fetched[0]);
+        return (await GatedAsync(workbook, [(sheet, binding)], ct).ConfigureAwait(false))[0];
     }
 
-    public async Task<OperationResult<int>> RefreshAllAsync(
-        Workbook workbook, CancellationToken ct = default) =>
-        Apply(workbook, await FetchAllAsync(workbook, ct).ConfigureAwait(false));
+    public OperationResult<QueryBinding> Write(Workbook workbook, QueryFetched fetched)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+        ArgumentNullException.ThrowIfNull(fetched);
+
+        if (!workbook.Sheets.Contains(fetched.Sheet))
+            return OperationResult<QueryBinding>.Fail(Diagnostic.Error("QRY007", "The sheet of the query was deleted while the query was running."));
+
+        return Written(workbook, fetched);
+    }
 
     public async Task<QueryFetch> FetchAllAsync(Workbook workbook, CancellationToken ct = default)
     {

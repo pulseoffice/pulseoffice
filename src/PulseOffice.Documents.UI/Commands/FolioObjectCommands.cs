@@ -73,7 +73,7 @@ public sealed class FolioObjectCommands(
         Toggle("folio.object.wrap.firstParagraph", item => Floating(item) && item.Anchor is not PageAnchor, item => item.WrapFirstParagraph, (editor, on) => objects.Change(editor, item => item.WrapFirstParagraph = on)),
         Action(Contextual("folio.object.toForeground", item => Floating(item) && item.InBackground), editor => objects.Change(editor, item => item.InBackground = false)),
         Action(Contextual("folio.object.toBackground", item => Floating(item) && !item.InBackground), editor => objects.Change(editor, item => item.InBackground = true)),
-        .. _orders.Select(order => Action(Contextual($"folio.object.order.{order.Key}", Floating), editor => objects.Order(editor, order.Order))),
+        .. _orders.Select(order => Action(Contextual($"folio.object.order.{order.Key}", item => Floating(item) && objects.CanOrder(Editor!, order.Order)), editor => objects.Order(editor, order.Order))),
         Action(Contextual("folio.object.rotateLeft", _ => true), editor => objects.Rotate(editor, -90, true)),
         Action(Contextual("folio.object.rotateRight", _ => true), editor => objects.Rotate(editor, 90, true)),
         Action(Contextual("folio.object.rotate180", _ => true), editor => objects.Rotate(editor, 180, true)),

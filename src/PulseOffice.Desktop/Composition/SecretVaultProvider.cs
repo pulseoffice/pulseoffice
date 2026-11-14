@@ -5,19 +5,19 @@ using PulseOffice.Platform.Windows;
 
 namespace PulseOffice.Desktop.Composition;
 
-public sealed class SecretVaultProvider(IHostSystem host) : ISecretVaultProvider
+public sealed class SecretVaultProvider(IHostSystem host, IExternalProcess processes, IExecutableResolver executables) : ISecretVaultProvider
 {
-    private readonly Lazy<ISecretVault> _vault = new(() => Select(host));
+    private ISecretVault? _vault;
 
-    public ISecretVault Current => _vault.Value;
+    public ISecretVault Current => _vault ??= Select();
 
-    private static ISecretVault Select(IHostSystem host)
+    private ISecretVault Select()
     {
         ISecretVault vault = host.IsMacOS
-            ? new KeychainSecretVault()
+            ? new KeychainSecretVault(processes, executables)
             : host.IsWindows
                 ? new CredentialManagerVault()
-                : new SecretToolVault();
+                : new SecretToolVault(processes, executables);
 
         return vault.IsAvailable ? vault : new SessionSecretVault();
     }

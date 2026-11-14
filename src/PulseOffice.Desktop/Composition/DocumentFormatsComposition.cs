@@ -80,7 +80,9 @@ internal static class DocumentFormatsComposition
         services.AddSingleton<ISaveNameCorrection, SaveNameCorrection>();
         services.AddSingleton<PulseOffice.UI.Controls.Printing.IPageImageCapture, PulseOffice.UI.Controls.Printing.PageImageCapture>();
         services.AddSingleton<IDocumentFormatFamily, DocumentFormatFamily>();
-        services.AddSingleton<IExecutableLocator, PathExecutableLocator>();
+        services.AddSingleton<PathExecutableLocator>();
+        services.AddSingleton<IExecutableLocator>(s => s.GetRequiredService<PathExecutableLocator>());
+        services.AddSingleton<IExecutableResolver>(s => s.GetRequiredService<PathExecutableLocator>());
         services.AddSingleton<IFileDialogService>(s => new PulseOffice.UI.Controls.Services.ReportingFileDialogService(
             new PulseOffice.UI.Controls.Services.LocalizedFileDialogService(
                 new AvaloniaFileDialogService(() => s.GetRequiredService<ShellWindow>(), s.GetRequiredService<ISaveNameCorrection>(),

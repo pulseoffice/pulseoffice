@@ -8,7 +8,7 @@ public interface ICommandRecorder
 
     void Start();
 
-    IReadOnlyList<CommandId> Stop();
+    RecordedCommands Stop();
 
     void Note(CommandDefinition command);
 
@@ -47,9 +47,12 @@ public sealed class ScriptableCommandPolicy : IScriptableCommandPolicy
     }
 }
 
-public sealed class CommandRecorder(IScriptableCommandPolicy policy) : ICommandRecorder
+public sealed record RecordedCommands(OpenDocument? Owner, IReadOnlyList<CommandId> Commands);
+
+public sealed class CommandRecorder(IScriptableCommandPolicy policy, IDocumentWorkspace workspace) : ICommandRecorder
 {
     private readonly List<CommandId> _recorded = [];
+    private OpenDocument? _owner;
 
     public bool IsRecording { get; private set; }
 
@@ -58,15 +61,17 @@ public sealed class CommandRecorder(IScriptableCommandPolicy policy) : ICommandR
     public void Start()
     {
         _recorded.Clear();
+        _owner = workspace.Active;
         IsRecording = true;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public IReadOnlyList<CommandId> Stop()
+    public RecordedCommands Stop()
     {
         IsRecording = false;
-        var recorded = _recorded.ToList();
+        var recorded = new RecordedCommands(_owner, [.. _recorded]);
         _recorded.Clear();
+        _owner = null;
         Changed?.Invoke(this, EventArgs.Empty);
         return recorded;
     }
@@ -74,7 +79,7 @@ public sealed class CommandRecorder(IScriptableCommandPolicy policy) : ICommandR
     public void Note(CommandDefinition command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (IsRecording && policy.Allows(command)) _recorded.Add(command.Id);
+        if (IsRecording && ReferenceEquals(workspace.Active, _owner) && policy.Allows(command)) _recorded.Add(command.Id);
     }
 }
 

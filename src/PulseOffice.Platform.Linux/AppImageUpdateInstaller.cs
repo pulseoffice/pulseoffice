@@ -9,6 +9,7 @@ public sealed class AppImageUpdateInstaller(IAppImageLocation location, int proc
 {
     private const string SwapScript = """
         #!/bin/sh
+        exec >/dev/null 2>&1
         while kill -0 "$1" 2>/dev/null; do sleep 1; done
         current="$2"
         staged="$3"
@@ -54,7 +55,7 @@ public sealed class AppImageUpdateInstaller(IAppImageLocation location, int proc
         var script = Path.Combine(Path.GetTempPath(), $"pulseoffice-update-{Guid.NewGuid():N}.sh");
         File.WriteAllText(script, SwapScript.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n");
 
-        var start = new ProcessStartInfo("/bin/sh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+        var start = new ProcessStartInfo("/bin/sh") { UseShellExecute = false };
         foreach (var argument in new[] { script, processId.ToString(CultureInfo.InvariantCulture), current, staged.StagedPath })
             start.ArgumentList.Add(argument);
         using var _ = Process.Start(start) ?? throw new InvalidOperationException("The update helper could not start.");

@@ -54,6 +54,8 @@ public sealed record ShapeObject : EmbeddedObject, IDrawingObject
 
     public IReadOnlyList<ShapeListItem?>? Lists { get; init; }
 
+    public IReadOnlyList<PulseOffice.Text.Rich.Bidi.TextDirection?>? Directions { get; init; }
+
     public DimensionLine? Dimension { get; init; }
 
     public override EmbeddedObjectKind Kind => EmbeddedObjectKind.Shape;

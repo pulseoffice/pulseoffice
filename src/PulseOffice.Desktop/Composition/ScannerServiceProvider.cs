@@ -3,21 +3,21 @@ using PulseOffice.Platform.Windows;
 
 namespace PulseOffice.Desktop.Composition;
 
-public sealed class ScannerServiceProvider(IExecutableLocator executables, IHostSystem host) : IScannerServiceProvider
+public sealed class ScannerServiceProvider(IExecutableLocator executables, IHostSystem host, IExternalProcess processes) : IScannerServiceProvider
 {
-    private readonly Lazy<IScannerService> _scanner = new(() => Select(executables, host));
+    private IScannerService? _scanner;
 
-    public IScannerService Current => _scanner.Value;
+    public IScannerService Current => _scanner ??= Select();
 
-    private static IScannerService Select(IExecutableLocator executables, IHostSystem host)
+    private IScannerService Select()
     {
         if (host.IsWindows)
         {
-            var wia = new WiaScannerService();
+            var wia = new WiaScannerService(processes);
             return wia.IsAvailable ? wia : new UnavailableScannerService("WIA");
         }
 
-        var sane = new SaneScannerService(executables);
+        var sane = new SaneScannerService(executables, processes);
 
         if (sane.IsAvailable) return sane;
 

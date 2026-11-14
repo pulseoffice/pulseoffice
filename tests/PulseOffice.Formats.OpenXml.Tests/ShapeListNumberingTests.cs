@@ -38,6 +38,26 @@ public sealed class ShapeListNumberingTests
     }
 
     [Fact]
+    public void The_direction_of_each_shape_paragraph_crosses_XLSX_and_ODS()
+    {
+        var rtl = PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft;
+        var ltr = PulseOffice.Text.Rich.Bidi.TextDirection.LeftToRight;
+        var workbook = Workbook(new ShapeObject
+        {
+            Id = "Forma",
+            Shape = ShapeKind.Rectangle,
+            Text = "שלום\nHello\nplain",
+            Directions = [rtl, ltr],
+        });
+
+        foreach (var shape in new[] { RoundTripXlsx(workbook), RoundTripOds(workbook), RoundTripXlsx(Workbook(RoundTripOds(Workbook(RoundTripXlsx(workbook))))) })
+        {
+            Assert.Equal("שלום\nHello\nplain", shape.Text);
+            Assert.Equal([rtl, ltr], shape.Directions!);
+        }
+    }
+
+    [Fact]
     public void Lo_schema_XLSX_e_l_inizio_si_leggono_e_si_riscrivono()
     {
         using var stream = new MemoryStream();

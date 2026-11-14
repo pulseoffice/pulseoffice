@@ -116,6 +116,7 @@ public sealed class FolioListCommands(IActiveFolioContext context, IListEditing 
         },
         Editing("folio.list.continue") with
         {
+            EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && lists.CanContinue(editor.Document, editor.ParagraphRange()),
             Execute = (_, _) => Run(editor => lists.Continue(editor.Document, editor.History, editor.ParagraphRange())),
         },
         InList("folio.list.none") with

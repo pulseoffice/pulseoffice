@@ -20,9 +20,9 @@ public sealed class LedgerShellViewCommands(
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
-        Toggle("ledger.view.formulaBar", () => options.FormulaBarVisible = !options.FormulaBarVisible),
-        Toggle("ledger.view.sheetTabs", () => options.SheetTabsVisible = !options.SheetTabsVisible),
-        Toggle("ledger.view.headers", () => options.HeadersVisible = !options.HeadersVisible),
+        Toggle("ledger.view.formulaBar", () => options.FormulaBarVisible, () => options.FormulaBarVisible = !options.FormulaBarVisible),
+        Toggle("ledger.view.sheetTabs", () => options.SheetTabsVisible, () => options.SheetTabsVisible = !options.SheetTabsVisible),
+        Toggle("ledger.view.headers", () => options.HeadersVisible, () => options.HeadersVisible = !options.HeadersVisible),
         Focus("ledger.view.focusNameBox", SheetInputArea.NameBox, "Ctrl+Shift+F5"),
         Focus("ledger.view.focusFormulaBar", SheetInputArea.FormulaBar, "Ctrl+Shift+F2"),
     ];
@@ -42,7 +42,7 @@ public sealed class LedgerShellViewCommands(
             },
         };
 
-    private CommandDefinition Toggle(string id, Action run, string? gesture = null) =>
+    private CommandDefinition Toggle(string id, Func<bool> isOn, Action run, string? gesture = null) =>
         Prototype(id) with
         {
             MenuPath = "view/show",
@@ -50,6 +50,7 @@ public sealed class LedgerShellViewCommands(
             Surface = CommandSurface.Advanced,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => Context.HasTarget,
+            CheckedWhen = _ => Context.HasTarget && isOn(),
             Execute = (_, _) =>
             {
                 run();

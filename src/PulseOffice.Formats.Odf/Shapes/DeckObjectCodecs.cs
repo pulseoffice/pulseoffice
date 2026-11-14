@@ -253,7 +253,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
                 StyleName = styleName is not null && definitions.TryGetValue(styleName, out var automatic)
                     ? (string?)automatic.Attribute(Style + "parent-style-name")
                     : null,
-            }, name => definitions.TryGetValue(name, out var text) && (string?)text.Attribute(Style + "family") == "text" ? text : null,
+            }, (name, family) => definitions.TryGetValue(name, out var text) && (string?)text.Attribute(Style + "family") == family ? text : null,
                 _runs.Lists(definitions.Where(pair => pair.Key.StartsWith(OdfShapeTextLists.KeyPrefix, StringComparison.Ordinal)).Select(pair => pair.Value))), geometry), geometry, bounds.Width, bounds.Height),
         };
     }

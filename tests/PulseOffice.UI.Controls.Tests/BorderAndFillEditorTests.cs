@@ -40,6 +40,25 @@ public sealed class BorderAndFillEditorTests
     }
 
     [Fact]
+    public Task A_solid_background_field_gives_back_its_colour_or_nothing() => Session.Dispatch(() =>
+    {
+        var coloured = new SolidBackgroundField("background", "Sfondo", new FillEditors(_texts), "#eeeeee").Create(_texts, _metrics);
+        var empty = new SolidBackgroundField("background", "Sfondo", new FillEditors(_texts), null).Create(_texts, _metrics);
+        var changed = 0;
+        coloured.Observe!(() => changed++);
+
+        Assert.Equal("#EEEEEE", coloured.Read());
+        Assert.Equal(string.Empty, empty.Read());
+
+        var editor = (FillEditor)coloured.Editor;
+        editor.Model.SetColor("#123456");
+        Assert.Equal("#123456", coloured.Read());
+        editor.Model.ShowPage(FillPage.None);
+        Assert.Equal(string.Empty, coloured.Read());
+        Assert.True(changed > 0);
+    }, CancellationToken.None);
+
+    [Fact]
     public Task IlClicSulLatoAltoDelloSchemaLoAccende() => Session.Dispatch(() =>
     {
         var (_, editor) = OpenBorders(new BorderFrameScope(false, false, true));

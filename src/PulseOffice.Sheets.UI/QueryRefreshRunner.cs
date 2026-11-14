@@ -33,7 +33,16 @@ public sealed class QueryRefreshRunner(
 
         var engine = context.Engine;
         var history = context.History;
-        var fetch = await queries.FetchAllAsync(workbook, ct).ConfigureAwait(true);
+        Queries.QueryFetch fetch;
+        try
+        {
+            fetch = await queries.FetchAllAsync(workbook, ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            status.Report(texts["status.query.cancelled"]);
+            return;
+        }
 
         if (Locked(workbook)) return;
 

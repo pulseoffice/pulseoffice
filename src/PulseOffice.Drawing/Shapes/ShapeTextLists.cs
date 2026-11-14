@@ -13,6 +13,12 @@ public interface IShapeTextLists
     ShapeObject Apply(ShapeObject shape, int start, int end, Func<ShapeListItem?, ShapeListItem?> change);
 
     ShapeObject Spliced(ShapeObject shape, string before, int offset, string removed, string inserted);
+
+    IReadOnlyList<PulseOffice.Text.Rich.Bidi.TextDirection?> Directions(ShapeObject shape);
+
+    bool Directed(ShapeObject shape);
+
+    ShapeObject WithDirections(ShapeObject shape, IEnumerable<PulseOffice.Text.Rich.Bidi.TextDirection?> directions);
 }
 
 public sealed class ShapeTextLists(IListNumberFormats numbers) : IShapeTextLists
@@ -63,15 +69,45 @@ public sealed class ShapeTextLists(IListNumberFormats numbers) : IShapeTextLists
     public ShapeObject Spliced(ShapeObject shape, string before, int offset, string removed, string inserted)
     {
         ArgumentNullException.ThrowIfNull(shape);
-        if (shape.Lists is not { Count: > 0 } lists) return shape;
+        var spliced = shape.Lists is { Count: > 0 } lists ? WithItems(shape, Realigned(lists, before, offset, removed, inserted)) : shape;
+        return shape.Directions is { Count: > 0 } directions
+            ? WithDirections(spliced, Realigned(directions, before, offset, removed, inserted))
+            : spliced;
+    }
+
+    public IReadOnlyList<PulseOffice.Text.Rich.Bidi.TextDirection?> Directions(ShapeObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        var count = Paragraphs(Plain(shape));
+        var own = shape.Directions ?? [];
+        return [.. Enumerable.Range(0, count).Select(index => index < own.Count ? own[index] : null)];
+    }
+
+    public bool Directed(ShapeObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return shape.Directions?.Any(direction => direction is not null) == true;
+    }
+
+    public ShapeObject WithDirections(ShapeObject shape, IEnumerable<PulseOffice.Text.Rich.Bidi.TextDirection?> directions)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        ArgumentNullException.ThrowIfNull(directions);
+        var kept = directions.Take(Paragraphs(Plain(shape))).ToList();
+        while (kept.Count > 0 && kept[^1] is null) kept.RemoveAt(kept.Count - 1);
+        return shape with { Directions = kept.Count == 0 ? null : kept };
+    }
+
+    private List<T?> Realigned<T>(IReadOnlyList<T?> own, string before, int offset, string removed, string inserted)
+    {
         var at = Paragraph(before, offset);
         var merged = removed.Count(character => character == '\n');
         var added = inserted.Count(character => character == '\n');
-        var items = Enumerable.Range(0, Paragraphs(before)).Select(index => index < lists.Count ? lists[index] : null).ToList();
+        var items = Enumerable.Range(0, Paragraphs(before)).Select(index => index < own.Count ? own[index] : default).ToList();
         var carried = items[at];
         items.RemoveRange(at + 1, Math.Min(merged, items.Count - at - 1));
         items.InsertRange(at + 1, Enumerable.Repeat(carried, added));
-        return WithItems(shape, items);
+        return items;
     }
 
     public const double LargestIndent = 1584;

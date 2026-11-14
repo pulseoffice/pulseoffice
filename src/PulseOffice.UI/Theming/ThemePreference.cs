@@ -17,16 +17,19 @@ public interface IThemeService
     event EventHandler? ThemeChanged;
 }
 
-public sealed class ThemeService : IThemeService
+public sealed class ThemeService : IThemeService, IDisposable
 {
     private readonly Application _application;
 
     public ThemeService(Application application)
     {
         _application = application;
-
-        _application.ActualThemeVariantChanged += (_, _) => ThemeChanged?.Invoke(this, EventArgs.Empty);
+        _application.ActualThemeVariantChanged += OnVariantChanged;
     }
+
+    public void Dispose() => _application.ActualThemeVariantChanged -= OnVariantChanged;
+
+    private void OnVariantChanged(object? sender, EventArgs e) => ThemeChanged?.Invoke(this, EventArgs.Empty);
 
     public ThemePreference Preference { get; private set; } = ThemePreference.System;
 

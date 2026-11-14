@@ -61,9 +61,29 @@ public sealed class StatusBarView : ContentControl
             .Themed(Border.BackgroundProperty, Palette.Keys.SurfaceRaised)
             .Themed(Border.BorderBrushProperty, Palette.Keys.Border);
 
-        _status.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
+        _status.Changed += OnStatusChanged;
+        AttachedToVisualTree += (_, _) =>
+        {
+            _status.Changed -= OnStatusChanged;
+            _status.Changed += OnStatusChanged;
+            Refresh();
+        };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _status.Changed -= OnStatusChanged;
+            _pendingRefresh?.Abort();
+            _pendingRefresh = null;
+        };
 
         Refresh();
+    }
+
+    private Avalonia.Threading.DispatcherOperation? _pendingRefresh;
+
+    private void OnStatusChanged(object? sender, EventArgs e)
+    {
+        if (_pendingRefresh is { Status: Avalonia.Threading.DispatcherOperationStatus.Pending }) return;
+        _pendingRefresh = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(Refresh);
     }
 
     public void UseHistory(Control button) => _historySlot.Content = button;

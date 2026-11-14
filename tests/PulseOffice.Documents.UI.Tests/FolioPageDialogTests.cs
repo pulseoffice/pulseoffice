@@ -10,7 +10,7 @@ namespace PulseOffice.Documents.UI.Tests;
 public sealed class FolioPageDialogTests
 {
     private FolioPageTabs Tabs() =>
-        new(new FolioPageServices(null!, null!, null!, null!, new BoxBorderFrames(), null!, null!, null!, new TextCatalog(UiLanguage.Italian)));
+        new(new FolioPageServices(null!, null!, null!, null!, null!, new BoxBorderFrames(), null!, null!, null!, new TextCatalog(UiLanguage.Italian)));
 
     [Fact]
     public void MarginiPiuLarghiDellaPaginaLascianoSempreUnCorpoDiTesto()

@@ -8,7 +8,7 @@ public interface ISharingProcessRunner
     Task<OperationResult<bool>> RunAsync(string executable, IReadOnlyList<string> arguments, CancellationToken ct);
 }
 
-public sealed class SharingProcessRunner : ISharingProcessRunner
+public sealed class SharingProcessRunner(IExternalProcess processes) : ISharingProcessRunner
 {
     public async Task<OperationResult<bool>> RunAsync(
         string executable, IReadOnlyList<string> arguments, CancellationToken ct)
@@ -17,7 +17,7 @@ public sealed class SharingProcessRunner : ISharingProcessRunner
 
         try
         {
-            var outcome = await new ExternalProcess().RunAsync(executable, arguments, ct: ct).ConfigureAwait(false);
+            var outcome = await processes.RunAsync(executable, arguments, ct: ct).ConfigureAwait(false);
             if (outcome is null) return OperationResult<bool>.Fail(Diagnostic.Error("SHARE002", executable).With(executable));
 
             return outcome.Succeeded

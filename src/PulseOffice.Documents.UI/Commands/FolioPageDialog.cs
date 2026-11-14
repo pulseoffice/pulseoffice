@@ -47,6 +47,7 @@ public sealed record FolioPageServices(
     IPageMarginsEditors Margins,
     IColumnLayoutEditors Columns,
     IBorderEditors Borders,
+    PulseOffice.UI.Controls.Fills.IFillEditors Fills,
     IBoxBorderFrames Frames,
     IPageSketchLayout Sketches,
     ITextFormatPreviews Previews,
@@ -113,7 +114,7 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
             [
                 new BorderEditorField("pborders", texts["folio.paragraph.tab.borders"], services.Borders, _scope, services.Frames.Frame(borders)),
                 new NumberField("pborder.padding", texts["folio.border.padding"], _sides.Select(borders.Padding).Max(), 0, 200) { Unit = "pt" },
-                new ColorField("pbackground", texts["folio.paragraph.background"], style.Background is { } fill && fill >> 24 != 0 ? _colors.Hex(fill) : null),
+                new PulseOffice.UI.Controls.Fills.SolidBackgroundField("pbackground", texts["folio.paragraph.background"], services.Fills, style.Background is { } fill && fill >> 24 != 0 ? _colors.Hex(fill) : null),
             ]), style),
             Previewed(Region("header", style.Header, texts["folio.page.tab.header"],
             [

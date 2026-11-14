@@ -41,7 +41,7 @@ public sealed class QueryToSheetTests
         var book = new Workbook();
         var sheet = book.AddSheet("Clienti");
 
-        var outcome = await refresher.RefreshAsync(
+        var fetched = await refresher.FetchAsync(
             book,
             sheet,
             new QueryBinding
@@ -56,6 +56,7 @@ public sealed class QueryToSheetTests
                 Anchor = A("A1"),
             },
             TestContext.Current.CancellationToken);
+        var outcome = refresher.Write(book, fetched);
 
         Assert.True(outcome.Succeeded, string.Join("; ", outcome.Diagnostics.Select(d => d.Message)));
 

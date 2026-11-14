@@ -17,6 +17,8 @@ public interface IListEditing
 
     DocumentEdit Continue(TextDocument document, UndoStack history, DocumentRange range);
 
+    bool CanContinue(TextDocument document, DocumentRange range);
+
     string? NextInLevel(TextDocument document, string paragraphId, int direction);
 
     bool CanMove(TextDocument document, DocumentRange range, int direction, bool withSubpoints);
@@ -108,20 +110,29 @@ public sealed class ListEditing(IStoryCatalog stories, IStyleResolver resolver) 
 
     public DocumentEdit Continue(TextDocument document, UndoStack history, DocumentRange range)
     {
+        var recorder = new EditRecorder(document, "list-continue");
+        foreach (var (paragraph, changed) in Continued(document, range))
+        {
+            recorder.Touch(paragraph);
+            paragraph.Content = changed;
+        }
+        return recorder.Commit(history);
+    }
+
+    public bool CanContinue(TextDocument document, DocumentRange range) => Continued(document, range).Any();
+
+    private IEnumerable<(ParagraphBlock Paragraph, TextParagraph Changed)> Continued(TextDocument document, DocumentRange range)
+    {
         var span = Selected(document, range, false);
         var previous = span.Container.Blocks.Take(span.First).OfType<ParagraphBlock>().LastOrDefault(paragraph => paragraph.Content.ListStyleName is not null)?.Content;
-        var recorder = new EditRecorder(document, "list-continue");
-        foreach (var paragraph in Paragraphs(span))
+        foreach (var paragraph in Paragraphs(span).ToList())
         {
             var content = paragraph.Content;
             var changed = content.ListStyleName is null && previous is not null
                 ? Flags(document, content with { ListStyleName = previous.ListStyleName, BulletLevel = previous.BulletLevel, ListRestart = null, ListId = previous.ListId }, true)
                 : content with { ListRestart = null, ListId = previous is not null && previous.ListStyleName == content.ListStyleName ? previous.ListId : content.ListId };
-            if (changed == content) continue;
-            recorder.Touch(paragraph);
-            paragraph.Content = changed;
+            if (changed != content) yield return (paragraph, changed);
         }
-        return recorder.Commit(history);
     }
 
     public string? NextInLevel(TextDocument document, string paragraphId, int direction)

@@ -52,4 +52,26 @@ public sealed class Round136UpdateInstallerTests : IDisposable
         Assert.Equal("new", await File.ReadAllTextAsync(staged.StagedPath, TestContext.Current.CancellationToken));
         Assert.Null(new FileInfo(staged.StagedPath).LinkTarget);
     }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task The_appimage_helper_swaps_the_image_and_starts_the_new_one_after_the_app_exits()
+    {
+        var current = Path.Combine(_folder, "PulseOffice.AppImage");
+        await File.WriteAllTextAsync(current, "#!/bin/sh\n", TestContext.Current.CancellationToken);
+        var marker = Path.Combine(_folder, "started");
+        var package = Path.Combine(_folder, "package");
+        await File.WriteAllTextAsync(package, $"#!/bin/sh\necho new > '{marker}'\n", TestContext.Current.CancellationToken);
+        using var exited = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/bin/sh", ["-c", "exit 0"]) { UseShellExecute = false })!;
+        await exited.WaitForExitAsync(TestContext.Current.CancellationToken);
+        var installer = new AppImageUpdateInstaller(new Location(current), exited.Id);
+
+        installer.InstallAfterExit(await installer.StageAsync(package, TestContext.Current.CancellationToken));
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (!File.Exists(marker) && watch.Elapsed < TimeSpan.FromSeconds(20))
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.Equal("new\n", await File.ReadAllTextAsync(marker, TestContext.Current.CancellationToken));
+        Assert.StartsWith("#!/bin/sh\necho new", await File.ReadAllTextAsync(current, TestContext.Current.CancellationToken));
+    }
 }

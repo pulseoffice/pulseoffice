@@ -63,14 +63,18 @@ public sealed class ShellMacroRecorderCommands(
             return;
         }
 
-        var recorded = recorder.Stop();
+        var (owner, recorded) = recorder.Stop();
         if (recorded.Count == 0)
         {
             status.Report(texts["macro.recording.empty"], NotificationSeverity.Warning);
             return;
         }
 
-        if (workspace.Active is not { Model: IMacroDocument macros } document) return;
+        if (owner is not { Model: IMacroDocument macros } document || !workspace.Documents.Contains(owner))
+        {
+            status.Report(texts["macro.recording.closed"], NotificationSeverity.Warning);
+            return;
+        }
 
         string name;
         var explanation = texts.Format("macro.recording.save", recorded.Count);

@@ -125,7 +125,7 @@ public sealed class DictionaryCatalogTests : IDisposable
     [Fact]
     public void LeCartelleDiSistemaNonCercanoNelleAltreSuite()
     {
-        var folders = new SystemDictionaryDirectories().Directories;
+        var folders = new SystemDictionaryDirectories(new PulseOffice.Platform.SystemEnvironmentVariables(), ((PulseOffice.Platform.IHostSystem)new PulseOffice.Platform.RuntimeHostSystem()).Family).Directories;
 
         Assert.NotEmpty(folders);
         Assert.DoesNotContain(folders, folder => folder.Contains("libreoffice", StringComparison.OrdinalIgnoreCase));

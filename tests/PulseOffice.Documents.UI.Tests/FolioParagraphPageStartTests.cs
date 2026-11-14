@@ -25,6 +25,7 @@ public sealed class FolioParagraphPageStartTests
                 NumberField number => number.Initial,
                 ChoiceField choice => choice.Initial,
                 ColorField color => new ColorFieldValue().Normalize(color.Initial),
+            PulseOffice.UI.Controls.Fills.SolidBackgroundField background => new ColorFieldValue().Normalize(background.InitialHex),
                 FontField font => font.Initial,
                 TabStopsField stops => stops.Initial,
                 PulseOffice.UI.Controls.Borders.BorderEditorField borders => borders.Initial,

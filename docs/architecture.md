@@ -433,8 +433,11 @@ patterns and boundaries.
 - Folio commands that call services with `editor.Document, editor.History`: move them to editor methods.
 - Convenience constructors with `new` in the formats (`DocxWriter`, `OdtReader`/`OdtWriter`, `PdfExporter`) and in the views.
 - Abstract `PulseOffice.Formats` depending on the module models; concrete `OdsReader` in `LedgerSheetExtraCommands`.
-- The command sweep (`PulseOffice.Desktop.Sweep.Tests`) takes about half an hour: it should be split per module into parallel
-  runs or made selectable, not shortened by removing contexts.
+- The command sweep is split per module (2026-11-14): `PulseOffice.Desktop.Sweep.{Sheets,Documents,Presentations}.Tests`
+  compile the shared `tests/PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs` and each runs only the module named by
+  its `<SweepModule>` (assembly metadata `PulseOffice.SweepModule`). Every case builds the whole app, so one process for
+  all sixty cases grew to 5.4 GB; one process per module keeps each run smaller and lets a module be run alone.
+  No context was removed.
 
 ## Reuse across modules (2026-10)
 

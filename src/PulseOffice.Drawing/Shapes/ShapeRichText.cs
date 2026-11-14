@@ -27,14 +27,17 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
         var paragraphs = new List<TextParagraph>();
         var current = new List<TextRun>();
         var items = lists.Items(shape);
+        var directions = lists.Directions(shape);
 
         void Close()
         {
             var item = paragraphs.Count < items.Count ? items[paragraphs.Count] : null;
+            var direction = paragraphs.Count < directions.Count ? directions[paragraphs.Count] : null;
             paragraphs.Add(Listed(new TextParagraph(string.Concat(current.Select(run => run.Text)))
             {
                 FontSize = style.Size,
                 Runs = [.. current.Where(run => run.Text.Length > 0)],
+                Direction = direction,
             }, item));
             current = [];
         }
@@ -77,8 +80,9 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
         }
 
         var rebuilt = shape with { Style = shape.Style with { Text = style }, Text = string.Concat(runs.Select(run => run.Text)), Runs = runs };
-        if (rebuilt.Text.Length == 0) return shape with { Text = null, Runs = null, Lists = null };
-        return lists.WithItems(editing.Format(rebuilt, 0, 0, run => run), text.Paragraphs.Select(Item));
+        if (rebuilt.Text.Length == 0) return shape with { Text = null, Runs = null, Lists = null, Directions = null };
+        var listed = lists.WithItems(editing.Format(rebuilt, 0, 0, run => run), text.Paragraphs.Select(Item));
+        return lists.WithDirections(listed, text.Paragraphs.Select(paragraph => paragraph.Direction));
     }
 
     public TextParagraph Listed(TextParagraph paragraph, ShapeListItem? item)

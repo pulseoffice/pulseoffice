@@ -92,6 +92,7 @@ internal sealed class GridCellPainter(
         var geometry = viewport.Geometry;
         var engine = viewport.Engine;
         var pen = new Pen(lineBrush);
+        var rules = conditional.Begin(sheet);
 
         for (var row = visible.FirstRow; row <= visible.LastRow; row++)
         {
@@ -127,9 +128,9 @@ internal sealed class GridCellPainter(
                 var cell = sheet[address] with { StyleId = sheet.StyleIdAt(address) };
                 var style = engine.Workbook.Styles.Get(cell.StyleId);
 
-                var appearance = sheet.ConditionalRules.Count == 0
+                var appearance = rules.IsEmpty
                     ? ConditionalAppearance.None
-                    : conditional.Evaluate(sheet, address, engine.ContextAt(new SheetCell(viewport.SheetIndex, address)));
+                    : rules.At(address, engine.ContextAt(new SheetCell(viewport.SheetIndex, address)));
                 style = appearance.Over(style);
 
                 decorations.DrawStyleBackground(context, style, bounds);
@@ -151,14 +152,14 @@ internal sealed class GridCellPainter(
             }
         }
 
-        PaintTexts(context, sheet, visible, foreground, offset);
+        PaintTexts(context, sheet, rules, visible, foreground, offset);
     }
 
     private CellAddress DrawingAnchor(CellRange region, VisibleRange visible) => new(
         Math.Max(region.Start.Row, visible.FirstRow),
         Math.Max(region.Start.Column, visible.FirstColumn));
 
-    private void PaintTexts(DrawingContext context, Worksheet sheet, VisibleRange visible, IBrush foreground, Vector offset)
+    private void PaintTexts(DrawingContext context, Worksheet sheet, ConditionalFormattingPass rules, VisibleRange visible, IBrush foreground, Vector offset)
     {
         var geometry = viewport.Geometry;
         var engine = viewport.Engine;
@@ -194,9 +195,9 @@ internal sealed class GridCellPainter(
 
                 cell = cell with { StyleId = sheet.StyleIdAt(address) };
                 var style = engine.Workbook.Styles.Get(cell.StyleId);
-                if (sheet.ConditionalRules.Count > 0)
+                if (!rules.IsEmpty)
                 {
-                    var appearance = conditional.Evaluate(sheet, address, engine.ContextAt(new SheetCell(viewport.SheetIndex, address)));
+                    var appearance = rules.At(address, engine.ContextAt(new SheetCell(viewport.SheetIndex, address)));
                     if (appearance.HideValue) continue;
                     style = appearance.Over(style);
                     if (appearance.IconIndex is not null) bounds = bounds.Deflate(new Thickness(icons.Reserve(bounds), 0, 0, 0));

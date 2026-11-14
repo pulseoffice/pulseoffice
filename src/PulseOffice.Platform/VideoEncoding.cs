@@ -40,7 +40,7 @@ public sealed class FfmpegVideoEncoder(IExecutableLocator executables, IFfmpegEn
             return OperationResult<string>.Fail(Diagnostic.Error("VIDEO004", "Frames do not match the declared size."));
 
         if (await encoders.ChooseAsync(ct).ConfigureAwait(false) is not { } encoder)
-            return OperationResult<string>.Fail(Diagnostic.Error("VIDEO006", "ffmpeg offers no H.264 or MPEG-4 encoder.").With("ffmpeg offers no H.264 or MPEG-4 encoder."));
+            return OperationResult<string>.Fail(Diagnostic.Error("VIDEO007", "ffmpeg offers no H.264 or MPEG-4 encoder.").With("ffmpeg offers no H.264 or MPEG-4 encoder."));
 
         Process? process = null;
 

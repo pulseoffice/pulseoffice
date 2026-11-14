@@ -57,6 +57,14 @@ public sealed class ListEditingTests
     }
 
     [Fact]
+    public void Continuing_is_possible_only_where_it_changes_something()
+    {
+        Assert.False(_lists.CanContinue(_f.Document, DocumentRange.At(_f.At(4, 0))));
+        _lists.Restart(_f.Document, _f.History, DocumentRange.At(_f.At(4, 0)), 7);
+        Assert.True(_lists.CanContinue(_f.Document, DocumentRange.At(_f.At(4, 0))));
+    }
+
+    [Fact]
     public void LaVoceSenzaNumeroELaRipartenzaSiAnnullano()
     {
         _lists.SetNumbered(_f.Document, _f.History, DocumentRange.At(_f.At(3, 0)), false);

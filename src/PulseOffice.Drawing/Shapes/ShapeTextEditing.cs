@@ -147,7 +147,7 @@ public sealed class ShapeTextEditing(IShapeTextLists lists) : IShapeTextEditing
         }
 
         var plain = string.Concat(merged.Select(run => run.Text));
-        if (plain.Length == 0) return shape with { Text = null, Runs = null, Lists = null };
+        if (plain.Length == 0) return shape with { Text = null, Runs = null, Lists = null, Directions = null };
         var plainRuns = merged.Count == 1 && merged[0] == new ShapeTextRun(plain);
         return shape with { Text = plain, Runs = plainRuns ? null : merged };
     }

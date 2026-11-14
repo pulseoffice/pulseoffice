@@ -86,8 +86,8 @@ public sealed class OdfShapeMapper
             .ToDictionary(group => group.Key, group => group.First());
 
         var texts = Named(content, Namespaces.Style + "style")
-            .Where(style => (string?)style.Attribute(Namespaces.Style + "family") == "text")
-            .GroupBy(style => (string?)style.Attribute(Namespaces.Style + "name") ?? string.Empty)
+            .Where(style => (string?)style.Attribute(Namespaces.Style + "family") is "text" or "paragraph")
+            .GroupBy(style => (string?)style.Attribute(Namespaces.Style + "family") + ":" + ((string?)style.Attribute(Namespaces.Style + "name") ?? string.Empty))
             .ToDictionary(group => group.Key, group => group.First());
 
         var lists = _lists.Styles(Named(content, Namespaces.Text + "list-style").Concat(Named(styleDocument, Namespaces.Text + "list-style")));

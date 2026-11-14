@@ -33,7 +33,7 @@ internal sealed class SheetShapeReadContext(
     public XElement? GraphicStyle(string name) =>
         styles.TryGetValue(name, out var declared) ? declared : definitions.TryGetValue(name, out var defined) ? defined : null;
 
-    public XElement? TextStyle(string name) => textStyles.TryGetValue(name, out var declared) ? declared : null;
+    public XElement? TextStyle(string name, string family) => textStyles.TryGetValue(family + ":" + name, out var declared) ? declared : null;
 
     public bool Declares(string? name, XName properties, XName attribute) =>
         name is not null && styles.TryGetValue(name, out var declared)

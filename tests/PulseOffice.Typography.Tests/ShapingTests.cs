@@ -9,7 +9,7 @@ namespace PulseOffice.Typography.Tests;
 public sealed class ShapingTests
 {
     private static readonly Lazy<IndexedFontLocator> Installed = new(() =>
-        new IndexedFontLocator(new SystemFontDirectories(), new OpenTypeReader(), new FontMetricsReader()));
+        new IndexedFontLocator(new SystemFontDirectories(new PulseOffice.Platform.SystemEnvironmentVariables(), ((PulseOffice.Platform.IHostSystem)new PulseOffice.Platform.RuntimeHostSystem()).Family), new OpenTypeReader(), new FontMetricsReader()));
 
     private static FontMetricsFace? Face(int codePoint, params string[] families) =>
         families.Select(family => Installed.Value.Find(family, false, false))

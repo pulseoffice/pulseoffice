@@ -34,11 +34,6 @@ public interface IScannerServiceProvider
 
 public sealed class SaneScannerService(IExecutableLocator executables, IExternalProcess processes) : IScannerService
 {
-    public SaneScannerService(IExecutableLocator executables)
-        : this(executables, new ExternalProcess())
-    {
-    }
-
     public string DisplayName => "SANE";
 
     public bool IsAvailable => executables.Exists("scanimage");

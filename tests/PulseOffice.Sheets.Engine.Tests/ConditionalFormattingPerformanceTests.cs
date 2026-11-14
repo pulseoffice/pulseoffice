@@ -54,6 +54,41 @@ public class ConditionalFormattingPerformanceTests(EngineFixture fixture) : ICla
     }
 
     [Fact]
+    public void A_paint_pass_orders_the_rules_by_priority_and_honours_stop_if_true_like_a_single_evaluation()
+    {
+        var sheet = new Worksheet("Order");
+        var range = new CellRange(new CellAddress(0, 0), new CellAddress(4, 0));
+        for (var row = 0; row < 5; row++) sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
+        var low = CellStyle.Default with { BackgroundHex = "#00FF00" };
+        sheet.ConditionalRules.Add(new ConditionalRule { Range = range, Operator = ConditionOperator.GreaterThan, Operands = ["0"], Priority = 3, Style = Marked });
+        sheet.ConditionalRules.Add(new ConditionalRule { Range = range, Operator = ConditionOperator.GreaterThan, Operands = ["2"], Priority = 1, Style = low, StopIfTrue = true });
+        sheet.ConditionalRules.Add(new ConditionalRule { Range = range, Visual = ConditionalVisual.DataBar, Priority = 2 });
+        var evaluator = new ConditionalFormattingEvaluator(fixture.Evaluator);
+
+        var pass = evaluator.Begin(sheet);
+
+        for (var row = 0; row < 5; row++)
+        {
+            var address = new CellAddress(row, 0);
+            Assert.Equal(evaluator.Evaluate(sheet, address), pass.At(address));
+            Assert.Equal(pass.At(address), pass.At(address));
+        }
+        Assert.Equal(low, pass.At(new CellAddress(4, 0)).Style);
+        Assert.Null(pass.At(new CellAddress(4, 0)).BarFraction);
+        Assert.Equal(Marked, pass.At(new CellAddress(1, 0)).Style);
+        Assert.NotNull(pass.At(new CellAddress(1, 0)).BarFraction);
+    }
+
+    [Fact]
+    public void A_sheet_without_rules_gives_an_empty_pass()
+    {
+        var pass = new ConditionalFormattingEvaluator(fixture.Evaluator).Begin(new Worksheet("Empty"));
+
+        Assert.True(pass.IsEmpty);
+        Assert.Equal(ConditionalAppearance.None, pass.At(CellAddress.First));
+    }
+
+    [Fact]
     public void AnEditedValueIsSeenByTheNextEvaluation()
     {
         var sheet = new Worksheet("Small");

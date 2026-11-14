@@ -7,11 +7,6 @@ public sealed class SecretToolVault(IExternalProcess processes, IExecutableResol
 {
     private const string EndOfOptions = "--";
 
-    public SecretToolVault()
-        : this(new ExternalProcess(), new PathExecutableLocator())
-    {
-    }
-
     public override string DisplayName => "Secret Service";
 
     protected override string Executable => "secret-tool";

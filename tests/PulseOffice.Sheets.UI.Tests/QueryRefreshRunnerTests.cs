@@ -75,17 +75,73 @@ public sealed class QueryRefreshRunnerTests
         Assert.Equal(7, sheet[CellAddress.First].Value.AsNumber());
     }
 
+    [Fact]
+    public async Task A_cancelled_refresh_says_so_and_writes_nothing()
+    {
+        var workbook = Workbook.CreateDefault();
+        workbook.Sheets[0].QueryBindings.AddOrUpdate(new QueryBinding
+        {
+            Id = "q",
+            DisplayName = "q",
+            ConnectionId = "c",
+            Query = new QueryDefinition { Sql = "SELECT 1" },
+            Anchor = new CellAddress(0, 1),
+        });
+        var engine = new ServiceCollection().AddSheetsEngine().BuildServiceProvider().GetRequiredService<ICalculationEngineFactory>().Create(workbook);
+        var context = new ActiveSheetContext();
+        context.Attach(new SheetTarget
+        {
+            Workbook = workbook,
+            SheetIndex = 0,
+            History = new UndoStack(),
+            Engine = engine,
+            Selection = () => CellRange.Single(CellAddress.First),
+            WriteSelection = _ => { },
+            ReadViewOption = _ => false,
+            WriteViewOption = (_, _) => { },
+            Refresh = () => { },
+            FreezePanes = (_, _) => { },
+            SplitPanes = (_, _) => { },
+            ReadPanesSplit = () => false,
+            ApplyRowFilter = (_, _) => { },
+            ReadZoom = () => 1,
+            WriteZoom = _ => { },
+            ReadSelectedObject = () => null,
+            ReadSelectedObjects = () => [],
+            WriteSelectedObjects = _ => { },
+            SelectSheet = _ => { },
+            WriteSelectedObject = _ => { },
+        });
+        var refresher = new SlowRefresher();
+        var status = new PulseOffice.UI.Controls.Services.StatusBarService(
+            TimeProvider.System, new PulseOffice.UI.Controls.Notifications.NotificationCenter(TimeProvider.System),
+            new PulseOffice.UI.Controls.Notifications.NotificationHistory(TimeProvider.System));
+        var texts = new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English);
+        var runner = new QueryRefreshRunner(context, refresher, new WorkbookCheckpoints(new SheetSnapshots()), status, texts);
+
+        var running = runner.RefreshAsync(CancellationToken.None);
+        refresher.Cancel();
+        await running;
+
+        Assert.False(refresher.Applied);
+        Assert.Contains(status.Segments, segment => segment.Text == texts["status.query.cancelled"]);
+    }
+
     private sealed class SlowRefresher : IQueryRefresher
     {
         private readonly TaskCompletionSource _gate = new();
 
+        public bool Applied { get; private set; }
+
         public void Release() => _gate.SetResult();
 
-        public Task<OperationResult<QueryBinding>> RefreshAsync(Workbook workbook, Worksheet sheet, QueryBinding binding, CancellationToken ct = default) =>
+        public void Cancel() => _gate.SetCanceled();
+
+        public Task<QueryFetched> FetchAsync(Workbook workbook, Worksheet sheet, QueryBinding binding, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public async Task<OperationResult<int>> RefreshAllAsync(Workbook workbook, CancellationToken ct = default) =>
-            Apply(workbook, await FetchAllAsync(workbook, ct));
+        public OperationResult<QueryBinding> Write(Workbook workbook, QueryFetched fetched) =>
+            throw new NotSupportedException();
 
         public async Task<QueryFetch> FetchAllAsync(Workbook workbook, CancellationToken ct = default)
         {
@@ -95,6 +151,7 @@ public sealed class QueryRefreshRunnerTests
 
         public OperationResult<int> Apply(Workbook workbook, QueryFetch fetch)
         {
+            Applied = true;
             workbook.Sheets[0][new CellAddress(0, 1)] = new Cell { Value = CellValue.Number(42) };
             return OperationResult<int>.Ok(1);
         }

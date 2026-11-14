@@ -33,6 +33,13 @@ public interface IHostSystem
         : StringComparison.Ordinal;
 
     string ExecutableName(string baseName) => IsWindows ? baseName + ".exe" : baseName;
+
+    PlatformFamily Family => Kind switch
+    {
+        HostSystemKind.MacOS => PlatformFamily.MacOS,
+        HostSystemKind.Windows => PlatformFamily.Windows,
+        _ => PlatformFamily.Linux,
+    };
 }
 
 public sealed class RuntimeHostSystem : IHostSystem

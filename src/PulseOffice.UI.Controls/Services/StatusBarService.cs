@@ -117,8 +117,18 @@ public interface IStatusBarService
     void EndActivity(BackgroundActivity activity);
 }
 
-public sealed class StatusBarService(TimeProvider time, INotificationCenter notifications, INotificationHistory history) : IStatusBarService
+public sealed class StatusBarService(TimeProvider time, INotificationCenter notifications, INotificationHistory history) : IStatusBarService, IDisposable
 {
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            ++_transientGeneration;
+            _transientTimer?.Dispose();
+            _transientTimer = null;
+        }
+    }
+
     private const string TransientSegmentId = "shell.transient";
     private static readonly TimeSpan DefaultDuration = TimeSpan.FromSeconds(6);
 

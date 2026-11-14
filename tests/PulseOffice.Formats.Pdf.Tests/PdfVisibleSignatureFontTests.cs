@@ -17,7 +17,7 @@ namespace PulseOffice.Formats.Pdf.Tests;
 public sealed class PdfVisibleSignatureFontTests
 {
     private static readonly Lazy<IndexedFontLocator> Installed = new(() =>
-        new IndexedFontLocator(new SystemFontDirectories(), new OpenTypeReader(), new FontMetricsReader()));
+        new IndexedFontLocator(new SystemFontDirectories(new PulseOffice.Platform.SystemEnvironmentVariables(), ((PulseOffice.Platform.IHostSystem)new PulseOffice.Platform.RuntimeHostSystem()).Family), new OpenTypeReader(), new FontMetricsReader()));
 
     private sealed class OneLine : IPrintableDocument
     {

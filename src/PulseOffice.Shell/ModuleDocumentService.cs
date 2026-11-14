@@ -95,10 +95,7 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
             }
 
             using var buffer = buffered.Value;
-            var read = formats.Read(path, buffer);
-            if (read.Succeeded) return read.Value;
-            Fail("status.open.failed", read.Diagnostics);
-            return null;
+            return (await DecodeAsync(buffer, path, Path.GetFileName(path), ct).ConfigureAwait(true))?.Result.Value;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -239,28 +236,40 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
         }
     }
 
-    private async Task LoadAsync(MemoryStream buffer, string path, string name, CancellationToken ct)
+    private sealed record Decoded(OperationResult<TModel> Result, PulseOffice.Formats.Packaging.Encryption.OdfProtection? Protection);
+
+    private async Task<Decoded?> DecodeAsync(MemoryStream buffer, string path, string name, CancellationToken ct)
     {
         var (outcome, unlocked) = await context.Passwords.UnlockAsync(buffer, name, ct).ConfigureAwait(true);
-        if (outcome == UnlockOutcome.Cancelled) return;
+        if (outcome == UnlockOutcome.Cancelled) return null;
         if (outcome == UnlockOutcome.Unsupported || unlocked is null)
         {
             context.Status.Report(context.Texts.Format("status.open.failed", context.Texts["password.unsupported"]), NotificationSeverity.Error);
-            return;
+            return null;
         }
 
-        using var package = unlocked.Package;
-        if (await ReaderAsync(path, package, ct).ConfigureAwait(true) is not { } read) return;
-        var result = await Task.Run(() => read(package), ct).ConfigureAwait(true);
+        using var package = ReferenceEquals(unlocked.Package, buffer) ? null : unlocked.Package;
+        var content = unlocked.Package;
+        if (await ReaderAsync(path, content, ct).ConfigureAwait(true) is not { } read) return null;
+        var result = await Task.Run(() => read(content), ct).ConfigureAwait(true);
         if (!result.Succeeded || result.Value is null)
         {
             Fail("status.open.failed", result.Diagnostics);
-            return;
+            return null;
         }
 
-        Opened(result.Value, path);
-        var document = CreateDocument(result.Value, name);
-        document.Protection = unlocked.Protection;
+        return new Decoded(result, unlocked.Protection);
+    }
+
+    private async Task LoadAsync(MemoryStream buffer, string path, string name, CancellationToken ct)
+    {
+        if (await DecodeAsync(buffer, path, name, ct).ConfigureAwait(true) is not { } decoded) return;
+        var result = decoded.Result;
+        var model = result.Value!;
+
+        Opened(model, path);
+        var document = CreateDocument(model, name);
+        document.Protection = decoded.Protection;
         document.MarkSaved(path, name);
         context.Workspace.Open(document);
         context.Recent.Remember(path, name);
@@ -269,7 +278,7 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
             ? context.Texts.Format("status.opened.warnings", name, result.Diagnostics.Count)
             : context.Texts.Format("status.opened", name),
             result.HasWarnings ? NotificationSeverity.Warning : NotificationSeverity.Info);
-        Loaded(result.Value);
+        Loaded(model);
     }
 
     protected virtual void Loaded(TModel model)

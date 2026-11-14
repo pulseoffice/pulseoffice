@@ -94,7 +94,7 @@ internal static class ProofingComposition
         services.AddSingleton<PulseOffice.UI.Controls.Spelling.IDictionaryLanguageNames, PulseOffice.UI.Controls.Spelling.DictionaryLanguageNames>();
         services.AddSingleton<PulseOffice.UI.Controls.Spelling.ISpellingLanguagePicker, PulseOffice.UI.Controls.Spelling.SpellingLanguagePicker>();
 
-        services.AddSingleton<PulseOffice.Platform.ISystemDictionaryDirectories, PulseOffice.Platform.SystemDictionaryDirectories>();
+        services.AddSingleton<PulseOffice.Platform.ISystemDictionaryDirectories>(provider => new PulseOffice.Platform.SystemDictionaryDirectories(provider.GetRequiredService<PulseOffice.Platform.IEnvironmentVariables>(), provider.GetRequiredService<PulseOffice.Platform.IHostSystem>().Family));
         services.AddSingleton<IDictionaryLocations>(provider => new DictionaryLocations(
             paths.Configuration("dictionaries"),
             provider.GetRequiredService<PulseOffice.Platform.ISystemDictionaryDirectories>()));

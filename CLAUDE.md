@@ -151,8 +151,10 @@ Central package management in `Directory.Packages.props`: **versions are never w
     (locked cells, objects, merges of a protected sheet: `LedgerProtectionGuard`; paragraphs of a protected section:
     `FolioProtectedContentGuard`) undoes back to the history's starting point and says so in the status bar. It is the net
     that also holds commands written without checking protection; checks at the source remain where needed
-    (permissions to insert rows and columns, filter). The sweep of all commands in several contexts is in
-    `tests/PulseOffice.Desktop.Sweep.Tests` (50-minute watchdog with `TestProcessLifetimeMinutes`).
+    (permissions to insert rows and columns, filter). The sweep of all commands in several contexts is split per module into
+    `tests/PulseOffice.Desktop.Sweep.{Sheets,Documents,Presentations}.Tests`, which compile the shared
+    `tests/PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs` and run only the module of their `<SweepModule>`
+    (30-minute watchdog each with `TestProcessLifetimeMinutes`).
 
 20. **GPL-3.0-only license and packages** (2026-11-02): text in `LICENSE`, `PackageLicenseExpression` in
     `Directory.Build.props`, which also holds `<Version>`. `pulse-cmd.py` (all in English) bumps the version and produces
@@ -218,7 +220,8 @@ Central package management in `Directory.Packages.props`: **versions are never w
     L1/L2) in `PulseOffice.Text.Rich.Bidi`; Folio's `LineComposer` splits runs at level changes and RTL atoms, places
     them visually per tab segment and mirrors RTL paragraphs (`ILineBidi`); glyph runs carry their `Level`, hit-testing
     and caret Left/Right are visual, selection stays logical. Deck and Ledger shape text use Avalonia's own bidi through
-    `FlowDirection`. Log: docs/deep-audit/round-94-bidi.md.
+    `FlowDirection`; a drawn shape keeps one direction per paragraph in `ShapeObject.Directions` (aligned with the
+    paragraphs like `Lists`; XLSX/PPTX `a:pPr/@rtl`, ODS/ODP `style:writing-mode`), since round 140. Log: docs/deep-audit/round-94-bidi.md.
 
 28. **Ledger object anchoring** (2026-11-07): every placed object has `ObjectAnchoring` (MoveAndSize, Move, Fixed;
     Move is the default for objects created in the app). The model keeps one geometry (anchor cell, offset, size) and the
@@ -356,6 +359,9 @@ native macOS menu, modal service, settings schema.
    `static`s remain pure computations and private helpers of a service.
 2. **Never commit or push unless the user asks** (2026-11-04): the user says when and how; commits may carry the
    `Co-Authored-By` line (allowed since 2026-11-04).
+2-ter. **Work on the local branch `work`**: all work happens on a local branch named `work`, with a commit after each
+   piece of work (these local commits need no request). Only when the user says so, the branch is squashed into a
+   single commit and merged into `main`; pushing still follows rule 2 and needs the whole test suite green first.
 2-bis. **Restructure instead of patching**: if a change requires redoing the
    structure, it is redone. A sequence of minimal patches on a structure that no longer holds
    produces unmaintainable code precisely while the project grows.

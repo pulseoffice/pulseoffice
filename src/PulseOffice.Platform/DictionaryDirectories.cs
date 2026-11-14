@@ -9,11 +9,6 @@ public sealed class SystemDictionaryDirectories(IEnvironmentVariables environmen
 {
     private static readonly string[] LinuxFolders = ["hunspell", "myspell", Path.Combine("myspell", "dicts"), "hyphen", "mythes"];
 
-    public SystemDictionaryDirectories()
-        : this(new SystemEnvironmentVariables(), new RunningPlatform().Family)
-    {
-    }
-
     public IReadOnlyList<string> Directories => [.. Candidates().Distinct(StringComparer.Ordinal)];
 
     private IEnumerable<string> Candidates()

@@ -5,11 +5,6 @@ namespace PulseOffice.Platform.MacOS;
 public sealed class KeychainSecretVault(IExternalProcess processes, IExecutableResolver executables)
     : CommandLineSecretVault(processes, executables)
 {
-    public KeychainSecretVault()
-        : this(new ExternalProcess(), new PathExecutableLocator())
-    {
-    }
-
     public override string DisplayName => "macOS Keychain";
 
     protected override string Executable => "/usr/bin/security";

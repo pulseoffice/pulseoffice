@@ -31,8 +31,8 @@ public sealed class DeckLayoutCommands(
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.Target is { } t && t.CurrentSlide() is not null,
-            RibbonControl = new ChoiceSpec(Choices, Current) { Look = RibbonChoiceLook.Band, Band = Band() },
-            Execute = (ctx, _) => Apply(ctx.Argument as string),
+            RibbonControl = new ChoiceSpec(Choices, Current) { Look = RibbonChoiceLook.Band, Band = Band(), MoreCommandId = "deck.view.master" },
+            Execute = (ctx, _) => ctx.Argument is string key ? Apply(key) : ShowLayouts(),
         },
 
         Manage("deck.layouts.rename", custom: true, RenameAsync),
@@ -59,6 +59,12 @@ public sealed class DeckLayoutCommands(
             t.Actions.Layouts.AddSlide(choice.Master, choice.Layout, t.CurrentIndex());
         else if (key is null)
             t.Actions.AddSlide(SlideLayout.TitleAndContent, t.CurrentIndex());
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLayouts()
+    {
+        Context.Target?.SetViewMode(DeckViewMode.Master);
         return Task.CompletedTask;
     }
 

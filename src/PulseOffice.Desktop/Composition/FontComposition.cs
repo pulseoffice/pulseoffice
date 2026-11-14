@@ -52,7 +52,7 @@ internal static class FontComposition
 
         services.AddSingleton(_ => new PulseOffice.Typography.Sources.FileFontServiceOptionsStore(
             paths.Configuration("fonts.json")).Load());
-        services.AddSingleton<ISystemFontDirectories, SystemFontDirectories>();
+        services.AddSingleton<ISystemFontDirectories>(provider => new SystemFontDirectories(provider.GetRequiredService<IEnvironmentVariables>(), provider.GetRequiredService<IHostSystem>().Family));
         services.AddSingleton<PulseOffice.Typography.OpenType.OpenTypeReader>();
         services.AddSingleton<PulseOffice.Typography.OpenType.IOpenTypeReader>(provider => provider.GetRequiredService<PulseOffice.Typography.OpenType.OpenTypeReader>());
         services.AddSingleton<PulseOffice.Typography.OpenType.IFontFileExtractor, PulseOffice.Typography.OpenType.FontFileExtractor>();

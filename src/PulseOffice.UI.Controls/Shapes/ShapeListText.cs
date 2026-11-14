@@ -30,7 +30,7 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
     {
     }
 
-    public bool Draws(ShapeObject shape) => lists.Listed(shape);
+    public bool Draws(ShapeObject shape) => lists.Listed(shape) || lists.Directed(shape);
 
     public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null)
     {

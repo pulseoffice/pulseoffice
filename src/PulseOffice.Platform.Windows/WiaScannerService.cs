@@ -3,7 +3,7 @@ using PulseOffice.Foundation.Diagnostics;
 
 namespace PulseOffice.Platform.Windows;
 
-public sealed class WiaScannerService : IScannerService
+public sealed class WiaScannerService(IExternalProcess processes) : IScannerService
 {
     private const string ListScript =
         """
@@ -79,11 +79,11 @@ public sealed class WiaScannerService : IScannerService
     private static string Quoted(string? value) =>
         "'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
 
-    private static async Task<OperationResult<string>> RunAsync(string script, CancellationToken ct)
+    private async Task<OperationResult<string>> RunAsync(string script, CancellationToken ct)
     {
         try
         {
-            var outcome = await new ExternalProcess().RunAsync(
+            var outcome = await processes.RunAsync(
                 "powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script))], ct: ct).ConfigureAwait(false);
             if (outcome is null)
                 return OperationResult<string>.Fail(Diagnostic.Error("SCAN002", "powershell").With("powershell"));

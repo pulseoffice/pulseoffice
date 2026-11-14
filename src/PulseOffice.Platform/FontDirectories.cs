@@ -9,11 +9,6 @@ public sealed class SystemFontDirectories(IEnvironmentVariables environment, Pla
 {
     private static readonly string[] FlatpakHostFonts = ["/run/host/fonts", "/run/host/local-fonts", "/run/host/user-fonts"];
 
-    public SystemFontDirectories()
-        : this(new SystemEnvironmentVariables(), new RunningPlatform().Family)
-    {
-    }
-
     public IReadOnlyList<string> Directories => [.. Candidates().Where(Directory.Exists)];
 
     public IReadOnlyList<string> Candidates()

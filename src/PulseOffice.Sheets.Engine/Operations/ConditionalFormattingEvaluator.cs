@@ -40,13 +40,24 @@ public sealed class ConditionalFormattingEvaluator
     {
         ArgumentNullException.ThrowIfNull(sheet);
 
-        if (sheet.ConditionalRules.Count == 0) return ConditionalAppearance.None;
+        return sheet.ConditionalRules.Count == 0 ? ConditionalAppearance.None : Begin(sheet).At(address, context);
+    }
 
+    public ConditionalFormattingPass Begin(Worksheet sheet)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+
+        return new ConditionalFormattingPass(this, sheet, [.. sheet.ConditionalRules.OrderBy(rule => rule.Priority)]);
+    }
+
+    internal ConditionalAppearance Compose(IReadOnlyList<ConditionalRule> ordered, ConditionalCell cell)
+    {
         var result = ConditionalAppearance.None;
-        var cell = new ConditionalCell(sheet, address, sheet[address].Value, context);
 
-        foreach (var rule in sheet.ConditionalRules.Where(r => r.Covers(address)).OrderBy(r => r.Priority))
+        foreach (var rule in ordered)
         {
+            if (!rule.Covers(cell.Address)) continue;
+
             var appearance = _renditions.GetValueOrDefault(rule.Visual, _fallback).Render(rule, cell);
             if (appearance.IsEmpty) continue;
 
@@ -66,6 +77,33 @@ public sealed class ConditionalFormattingEvaluator
         }
 
         return result;
+    }
+}
+
+public sealed class ConditionalFormattingPass
+{
+    private readonly ConditionalFormattingEvaluator _evaluator;
+    private readonly Worksheet _sheet;
+    private readonly IReadOnlyList<ConditionalRule> _ordered;
+    private readonly Dictionary<CellAddress, ConditionalAppearance> _seen = [];
+
+    internal ConditionalFormattingPass(ConditionalFormattingEvaluator evaluator, Worksheet sheet, IReadOnlyList<ConditionalRule> ordered)
+    {
+        _evaluator = evaluator;
+        _sheet = sheet;
+        _ordered = ordered;
+    }
+
+    public bool IsEmpty => _ordered.Count == 0;
+
+    public ConditionalAppearance At(CellAddress address, Evaluation.IEvaluationContext? context = null)
+    {
+        if (_ordered.Count == 0) return ConditionalAppearance.None;
+        if (_seen.TryGetValue(address, out var known)) return known;
+
+        var appearance = _evaluator.Compose(_ordered, new ConditionalCell(_sheet, address, _sheet[address].Value, context));
+        _seen[address] = appearance;
+        return appearance;
     }
 }
 

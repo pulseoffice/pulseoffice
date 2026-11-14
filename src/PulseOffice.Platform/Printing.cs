@@ -45,14 +45,16 @@ public interface IPrintServiceProvider
     IPrintService Current { get; }
 }
 
-public sealed class PrintServiceProvider : IPrintServiceProvider
+public sealed class PrintServiceProvider(IHostSystem host, IExternalProcess processes) : IPrintServiceProvider
 {
-    public IPrintService Current { get; } = OperatingSystem.IsWindows()
-        ? new WindowsPrintService()
-        : new CupsPrintService();
+    private IPrintService? _current;
+
+    public IPrintService Current => _current ??= host.IsWindows
+        ? new WindowsPrintService(processes)
+        : new CupsPrintService(processes);
 }
 
-public sealed class CupsPrintService : IPrintService
+public sealed class CupsPrintService(IExternalProcess processes) : IPrintService
 {
     public PrintCapabilities Capabilities { get; } = new(ChoosePrinter: true, Duplex: true, NativeCopies: true, NativeCollate: true, Verified: true);
 
@@ -107,12 +109,12 @@ public sealed class CupsPrintService : IPrintService
             : OperationResult<bool>.Fail(Diagnostic.Error("PRN001", result.Diagnostics[0].Message).With(result.Diagnostics[0].Message));
     }
 
-    private static async Task<OperationResult<string>> RunAsync(
+    private async Task<OperationResult<string>> RunAsync(
         string command, IReadOnlyList<string> arguments, CancellationToken ct)
     {
         try
         {
-            var outcome = await new ExternalProcess().RunAsync(
+            var outcome = await processes.RunAsync(
                 command, arguments, new Dictionary<string, string> { ["LC_ALL"] = "C", ["LANG"] = "C" }, ct: ct).ConfigureAwait(false);
             if (outcome is null) return OperationResult<string>.Fail(Diagnostic.Error("PRN002", command).With(command));
 
@@ -127,7 +129,7 @@ public sealed class CupsPrintService : IPrintService
     }
 }
 
-public sealed class WindowsPrintService : IPrintService
+public sealed class WindowsPrintService(IExternalProcess processes) : IPrintService
 {
     private const string ListingScript =
         "Get-CimInstance Win32_Printer | ForEach-Object { $_.Name + [char]9 + $_.Default }";
@@ -138,7 +140,7 @@ public sealed class WindowsPrintService : IPrintService
     {
         try
         {
-            var outcome = await new ExternalProcess().RunAsync(
+            var outcome = await processes.RunAsync(
                 "powershell", ["-NoProfile", "-NonInteractive", "-Command", ListingScript], new Dictionary<string, string>(), ct: ct).ConfigureAwait(false);
             if (outcome is null || !outcome.Succeeded) return [];
             return [.. outcome.Output

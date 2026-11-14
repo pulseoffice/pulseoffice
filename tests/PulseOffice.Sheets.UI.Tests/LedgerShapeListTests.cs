@@ -128,6 +128,22 @@ public sealed class LedgerShapeListTests
     }, CancellationToken.None);
 
     [Fact]
+    public Task Right_to_left_shape_text_is_stored_checked_and_undone() => Session.Dispatch(async () =>
+    {
+        var parts = new Parts();
+        var commands = new LedgerShapeListCommands(parts.Context, new Answering(new ListLevelFormat(ListNumbering.None), 0), new ParagraphListFormats(), parts.Texts).GetCommands().ToList();
+        var rightToLeft = commands.Single(command => command.Id.Value == "ledger.shapeText.rightToLeft");
+
+        await rightToLeft.Execute(Run, CancellationToken.None);
+
+        Assert.All(parts.Shape.Directions!, direction => Assert.Equal(PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft, direction));
+        Assert.True(rightToLeft.CheckedWhen!(Run));
+        parts.History.Undo();
+        Assert.Null(parts.Shape.Directions);
+        Assert.False(rightToLeft.CheckedWhen!(Run));
+    }, CancellationToken.None);
+
+    [Fact]
     public Task Numerare_e_poi_togliere_l_elenco_riporta_il_testo_semplice() => Session.Dispatch(async () =>
     {
         var parts = new Parts();

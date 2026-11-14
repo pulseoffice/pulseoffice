@@ -13486,7 +13486,7 @@ macOS. Now 359 passed, 1 skipped.
 - **Deck mp4 export failed on Fedora** (serious, product): the ffmpeg encoder always asked for `libx264`, which
   Fedora's ffmpeg does not ship. New `IFfmpegEncoderChoice` (`FfmpegEncoderChoice`, Platform) reads
   `ffmpeg -encoders` once and takes `libx264`, then `libopenh264`, then `mpeg4`, each with its own options; none of them
-  gives `VIDEO006`. Four tests in `VideoEncodingRegressionTests`; the Deck export test encodes with the real ffmpeg.
+  gives `VIDEO007`. Four tests in `VideoEncodingRegressionTests`; the Deck export test encodes with the real ffmpeg.
 - **Folio accessibility test pressed Meta** for the primary modifier: it now uses `ShortcutGesture.Primary` (Ctrl on
   Linux and Windows), also for Cmd+B, which passed by chance.
 - **Ledger merged-cell text test** counted pixels darker than a fixed sum of 200; with the substitute font the text is
@@ -13497,3 +13497,61 @@ macOS. Now 359 passed, 1 skipped.
   check on a Mac: in the old theme golden the accent line of Aurora and Laguna was teal, now it is lighter.
 - Headless frames show black where nothing paints a background, because the test composition does not load the theme
   tokens; the real app paints them.
+
+## Open items from the deep audit (2026-11-14)
+
+After a full reading of the documentation, the open items it still listed were taken in turn.
+
+- **Query refresh wrote cells off the UI thread** (serious, Ledger): `IQueryRefresher.RefreshAsync`/`RefreshAllAsync`
+  awaited the database with `ConfigureAwait(false)` and then wrote the sheet. The interface now separates the two
+  steps: `FetchAsync`/`FetchAllAsync` read only, `Write`/`Apply` write and are called by the commands after an
+  `await ... ConfigureAwait(true)`. Two related defects fixed with it: the undo "before" snapshot was taken before the
+  wait, so undo also erased edits made while the query ran (now taken just before writing), and a cancelled refresh
+  left the status bar on "Refreshing data…" (new `status.query.cancelled`). A sheet deleted while the query runs is not
+  written (`QRY007`). Tests in `QueryRefresherTests` and `QueryRefreshRunnerTests`.
+- **Conditional formatting re-sorted the rules for every painted cell** (serious, performance): `GridCellPainter`
+  called `ConditionalFormattingEvaluator.Evaluate` twice per cell (background and text), each call filtering and
+  sorting all the sheet's rules. New `ConditionalFormattingPass` (`Begin(sheet)`): rules sorted once per paint, each
+  cell's appearance computed once and reused by the text pass. `Evaluate` keeps its contract.
+- **Encrypted template opened as new skipped the password** (medium, shell): `ModuleDocumentService.ReadAsync`, used
+  by "open as new" (templates, versions) and by Folio's subdocuments, read the file directly, skipping both the
+  password gate and the module's `ReaderAsync`. Opening and reading now share `DecodeAsync`.
+- **Macro recorder lost steps or saved them into the wrong document** (medium, shell): `CommandRecorder` noted commands
+  of whichever document was active and the macro went to the document active at stop. The recorder now belongs to the
+  document where it started (`RecordedCommands.Owner`), ignores commands run in other tabs and, if that document was
+  closed, says so (`macro.recording.closed`) instead of dropping the steps silently.
+- **"Save as template" overwrote silently** (minor, shell): now asks (`template.exists`, `template.replace`); new
+  `TemplateSaveTests`.
+- **Folio paragraph and page backgrounds** now use the shared `FillEditor` through `SolidBackgroundField`
+  (`UI.Controls/Fills`, together with the general `FillEditorField`), with the None and Solid pages as Ledger's cell
+  background: the Folio model holds one colour, so no format change.
+- **Found already closed**, the audit notes were behind the code: `HeadlessIsolationTests` and `ShellScannerCommandsTests`
+  pass in the full Desktop run; Folio's table sort already uses the shared `ISortLevelsDialog`; the slide background
+  already uses `FillEditor`; the Character dialog's "Default" language is offered and applied
+  (`CharacterChange.DefaultLanguage`).
+- **Live checks** cannot be driven from this Linux machine (`uiprobe` and `windowshot` are macOS tools); they are left to
+  the user.
+
+## Round 140: the command sweep and the platform layer on Linux (2026-11-14)
+
+First audit round run on Linux (Fedora, GNOME through XWayland), on the local branch `work`, one commit per piece of
+work. Log: [deep-audit/round-140-linux-sweep.md](deep-audit/round-140-linux-sweep.md).
+
+- **The command sweep was red on Linux, on `main` too**: ten cases, with commands that ran without effect and without
+  a reason. On macOS they had passed through incidental changes of the rendered frame. Fixed at the source: Ledger's
+  formula bar, sheet tabs and headers toggles gained their checked state; Folio's object ordering and list
+  continuation are disabled where they cannot act; field updates say when everything is already up to date (the
+  refresh used to report a change every time); "update charts" needs a chart; the slide layout gallery without a
+  choice opens the master and layouts view. Folio's case conversions, clear formatting and "no character style" on
+  plain Latin text joined the sweep's list of commands already in their state, as their Ledger equivalents.
+- **AppImage update helper** (medium): its output went to pipes that close when the app exits, so an error from `mv`
+  could stop it before restarting the app; it now discards its own output.
+- **Platform services built outside the container** (rule 1): secret vaults, print services, scanners, the sharing
+  runner and the font and dictionary folders built their own process runner, environment or platform probe; they now
+  come from the container, `IHostSystem.Family` replaces `RunningPlatform`, and the CUPS arguments are tested without
+  a printer.
+- **Row insertion timing test**: compared with a full recalculation on the same machine instead of an absolute limit
+  that only a fast machine met (here the recalculation alone takes 5.4 s).
+- **Process**: the full suite run on this machine shows timing tests that fail only when every project runs at once
+  and pass alone; this round runs heavy jobs one after another. Live clicks are not possible here (`uiprobe` is a macOS
+  tool).

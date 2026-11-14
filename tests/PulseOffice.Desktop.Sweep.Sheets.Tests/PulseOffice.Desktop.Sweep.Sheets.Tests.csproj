@@ -2,9 +2,13 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <TestProcessLifetimeMinutes>50</TestProcessLifetimeMinutes>
+    <TestProcessLifetimeMinutes>30</TestProcessLifetimeMinutes>
     <AvaloniaTestThreading>HeadlessCollection</AvaloniaTestThreading>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="PulseOffice.SweepModule" Value="sheets" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -19,13 +23,11 @@
     <Content Include="../PulseOffice.Desktop.Tests/xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../PulseOffice.Desktop.Tests/HeadlessDesktopSession.cs" Link="Shared/HeadlessDesktopSession.cs" />
     <Compile Include="../PulseOffice.Desktop.Tests/ClipboardProbe.cs" Link="Shared/ClipboardProbe.cs" />
+    <Compile Include="../PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs" Link="Shared/CommandSweepTests.cs" />
+    <Compile Include="../Shared/UiThreadSession.cs" Link="Shared/UiThreadSession.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/PulseOffice.Desktop/PulseOffice.Desktop.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="../Shared/UiThreadSession.cs" Link="Shared/UiThreadSession.cs" />
   </ItemGroup>
 </Project>

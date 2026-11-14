@@ -19,13 +19,6 @@ public enum PlatformFamily
     Linux,
 }
 
-public sealed class RunningPlatform
-{
-    public PlatformFamily Family =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? PlatformFamily.MacOS
-        : RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? PlatformFamily.Windows
-        : PlatformFamily.Linux;
-}
 
 public sealed class XdgDataDirectories(IEnvironmentVariables environment)
 {

@@ -104,6 +104,28 @@ public sealed class CommandSweepTests : IDisposable
 
     private readonly NoFileDialogs _fileDialogs = new();
 
+    private sealed class NoUpdates : PulseOffice.Updates.IUpdateService
+    {
+        public bool AutomaticCheckIsDue => false;
+
+        public Uri ReleasesPage { get; } = new("https://example.invalid/releases");
+
+        public Task<PulseOffice.Updates.UpdateCheck> CheckAsync(CancellationToken ct) =>
+            Task.FromResult(new PulseOffice.Updates.UpdateCheck(PulseOffice.Updates.UpdateCheckKind.UpToDate));
+
+        public bool IsSkipped(PulseOffice.Updates.ReleaseVersion version) => false;
+
+        public void Skip(PulseOffice.Updates.ReleaseVersion version)
+        {
+        }
+
+        public Task<PulseOffice.Updates.VerifiedPackage> DownloadAsync(PulseOffice.Updates.UpdateCheck check, IProgress<double>? progress, CancellationToken ct) =>
+            throw new InvalidOperationException("The sweep never downloads updates.");
+
+        public Task InstallAfterExitAsync(PulseOffice.Updates.VerifiedPackage package, CancellationToken ct) =>
+            throw new InvalidOperationException("The sweep never installs updates.");
+    }
+
     private ServiceCollection Register()
     {
         var services = ServiceConfiguration.Register(Application.Current!, NullLoggerFactory.Instance, new FontFamilyMappingTable());
@@ -116,6 +138,7 @@ public sealed class CommandSweepTests : IDisposable
         services.AddSingleton<IScannerServiceProvider>(new NoScanner());
         services.AddSingleton<ISecretVaultProvider>(new NoVault());
         services.AddSingleton<IQuitTarget>(new NoQuit());
+        services.AddSingleton<PulseOffice.Updates.IUpdateService>(new NoUpdates());
         return services;
     }
 
@@ -158,6 +181,12 @@ public sealed class CommandSweepTests : IDisposable
         ["ledger.draw.curveFilled"] = "arms the tool for the next drag on the grid",
         ["ledger.draw.freehand"] = "arms the tool for the next drag on the grid",
         ["ledger.draw.freehandFilled"] = "arms the tool for the next drag on the grid",
+        ["folio.case.katakana"] = "Latin text has no kana to convert, as in other office suites",
+        ["folio.case.hiragana"] = "Latin text has no kana to convert, as in other office suites",
+        ["folio.case.halfWidth"] = "the text is already half width",
+        ["folio.case.sentence"] = "the text already starts with a capital and goes on in lower case",
+        ["folio.format.clear"] = "the text carries no direct formatting",
+        ["folio.charStyle.none"] = "the text has no character style",
     };
 
     public sealed record SweepStage(ServiceProvider Provider, ShellWindow Window, IDocumentWorkspace Workspace)
@@ -359,8 +388,11 @@ public sealed class CommandSweepTests : IDisposable
     public static TheoryData<string, string, int> Slices()
     {
         var data = new TheoryData<string, string, int>();
+        var assemblyModule = typeof(CommandSweepTests).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>()
+            .Single(attribute => attribute.Key == "PulseOffice.SweepModule").Value;
         foreach (var scenario in Scenarios)
-            foreach (var module in new[] { "sheets", "documents", "presentations" }.Where(scenario.Modules.Contains))
+            foreach (var module in new[] { "sheets", "documents", "presentations" }.Where(scenario.Modules.Contains).Where(module => module == assemblyModule))
                 for (var part = 0; part < scenario.Parts; part++) data.Add(module, scenario.Name, part);
         return data;
     }
@@ -471,6 +503,10 @@ public sealed class CommandSweepTests : IDisposable
             var document = workspace.Active;
             var changes = 0;
             void Count(object? sender, EventArgs e) => changes++;
+            var notices = 0;
+            void Notice(object? sender, PulseOffice.UI.Controls.Notifications.NotificationChange e) => notices++;
+            var notifications = provider.GetRequiredService<PulseOffice.UI.Controls.Notifications.INotificationCenter>();
+            notifications.Changed += Notice;
             if (document is not null) document.History.Changed += Count;
             var before = Frame();
             var checkedBefore = command.CheckedWhen?.Invoke(context);
@@ -510,6 +546,7 @@ public sealed class CommandSweepTests : IDisposable
             }
 
             if (document is not null) document.History.Changed -= Count;
+            notifications.Changed -= Notice;
             while (host.IsDialogOpen) { waited.Add("dialog"); host.Close(null); Dispatcher.UIThread.RunJobs(); }
 
             Assert.True(window.PlatformImpl is not null, $"{id} closed the window");
@@ -525,6 +562,7 @@ public sealed class CommandSweepTests : IDisposable
             if (changes > 0) effects.Add("history");
             if (workspace.Documents.Count != documents || !ReferenceEquals(workspace.Active, document)) effects.Add("workspace");
             if (outcome.Notes.Count > 0) effects.Add("message");
+            if (notices > 0) effects.Add("notification");
             if (_fileDialogs.Asked != asked) effects.Add("file");
             if (panel.IsOpen != panelBefore) effects.Add("panel");
             Dispatcher.UIThread.RunJobs();
