@@ -1,3 +1,4 @@
+using PulseOffice.Documents.Annotations;
 using PulseOffice.Documents.Blocks;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Documents.Fields;
@@ -35,6 +36,19 @@ public sealed class IndexTests
     private SectionBlock Index => _f.IndexEditing.Indexes(_f.Document).Single();
 
     private IReadOnlyList<string> Lines => [.. _f.Tree.Paragraphs(Index.Content).Select(paragraph => paragraph.Text)];
+
+    [Fact]
+    public void AnIndexGoesOnlyIntoTheBodyNeverIntoANote()
+    {
+        Build(("", DefaultStyleNames.TextBody), ("Uno", DefaultStyleNames.HeadingLevel(1)));
+        _f.Editor.InsertNote(_f.Document, _f.History, new DocumentPosition("p101", 3), NoteKind.Footnote, "fonte");
+        var inNote = new DocumentPosition(_f.Document.Notes.All[0].Content.Blocks.OfType<ParagraphBlock>().Single().Id, 2);
+
+        Assert.True(_f.IndexEditing.CanInsert(_f.Document, new DocumentPosition("p100", 0)));
+        Assert.False(_f.IndexEditing.CanInsert(_f.Document, inNote));
+        Assert.Throws<InvalidOperationException>(() => _f.IndexEditing.Insert(_f.Document, _f.History, inNote, new IndexDefinition(IndexKind.Contents), _pages));
+        Assert.Empty(_f.Document.Notes.All[0].Content.Blocks.OfType<SectionBlock>());
+    }
 
     [Fact]
     public void IlSommarioRaccoglieLeIntestazioniConLePagineEIlCollegamento()

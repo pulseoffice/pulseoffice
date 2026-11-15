@@ -313,11 +313,26 @@ internal sealed class CommandScorer
     private readonly IReadOnlyList<(int Score, Func<CommandText, string, bool> Matches)> _rules =
     [
         (100, (text, term) => text.Title.StartsWith(term, StringComparison.Ordinal)),
-        (60, (text, term) => text.Title.Contains(term, StringComparison.Ordinal)),
-        (40, (text, term) => text.Keywords.Any(keyword => keyword.Contains(term, StringComparison.Ordinal))),
-        (20, (text, term) => text.Description?.Contains(term, StringComparison.Ordinal) == true),
-        (10, (text, term) => text.Trail?.Contains(term, StringComparison.Ordinal) == true),
+        (60, (text, term) => StartsAWord(text.Title, term)),
+        (40, (text, term) => text.Keywords.Any(keyword => StartsAWord(keyword, term))),
+        (20, (text, term) => text.Description is { } description && StartsAWord(description, term)),
+        (10, (text, term) => text.Trail is { } trail && StartsAWord(trail, term)),
+        (8, (text, term) => text.Title.Contains(term, StringComparison.Ordinal)),
+        (4, (text, term) => text.Keywords.Any(keyword => keyword.Contains(term, StringComparison.Ordinal))),
+        (2, (text, term) => text.Description?.Contains(term, StringComparison.Ordinal) == true),
+        (1, (text, term) => text.Trail?.Contains(term, StringComparison.Ordinal) == true),
     ];
+
+    private static bool StartsAWord(string text, string term)
+    {
+        for (var at = text.IndexOf(term, StringComparison.Ordinal); at >= 0;
+             at = text.IndexOf(term, at + 1, StringComparison.Ordinal))
+        {
+            if (at == 0 || !char.IsLetterOrDigit(text[at - 1])) return true;
+        }
+
+        return false;
+    }
 
     private const int PhraseScore = 90;
 

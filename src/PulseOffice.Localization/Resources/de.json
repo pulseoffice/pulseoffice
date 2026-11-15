@@ -4488,7 +4488,7 @@
   "data.table.empty": "Keine Daten",
   "dialog.findReplace.description": "Suchen und Ersetzen im Tabellenblatt",
   "document.defaultName": "Dokument",
-  "command.shell.tools.options.keywords": "Einstellungen, Optionen, Konfiguration",
+  "command.shell.tools.options.keywords": "Einstellungen, Optionen, Konfiguration, Design, dunkles Design, helles Design, Sprache, Darstellung",
   "setting.appearance.theme.keywords": "dunkel, hell, Farben, Nacht",
   "setting.interface.ribbonVisible.keywords": "Leiste, Menüband, Ribbon",
   "setting.interface.statusBarVisible.keywords": "Statusleiste",

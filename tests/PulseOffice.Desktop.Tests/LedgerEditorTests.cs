@@ -281,6 +281,51 @@ public sealed class LedgerEditorTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
+    public Task Ordinare_dal_solo_cursore_ordina_la_regione_corrente() => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        ledger.Type("3");
+        ledger.Type("1");
+        ledger.Type("2");
+
+        ledger.Select(1, 0, 1, 0);
+        Assert.True(ledger.CanRun("ledger.data.sortAscending"));
+        Assert.True(ledger.CanRun("ledger.data.sortDescending"));
+        await ledger.Run("ledger.data.sortAscending");
+
+        Assert.Equal([1d, 2d, 3d], [ledger.Value(0, 0).AsNumber(), ledger.Value(1, 0).AsNumber(), ledger.Value(2, 0).AsNumber()]);
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task Rimuovere_i_filtri_dal_solo_cursore() => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        ledger.Type("Zona");
+        ledger.Type("Nord");
+        ledger.Type("Sud");
+        ledger.Active.AutoFilter.Activate(new CellRange(new CellAddress(0, 0), new CellAddress(2, 0)), true);
+        ledger.Active.AutoFilter.Set(new ColumnFilter(0) { AllowedValues = new HashSet<string>(["Nord"], StringComparer.Ordinal) });
+
+        ledger.Select(1, 0, 1, 0);
+        Assert.True(ledger.CanRun("ledger.data.filterClear"));
+        await ledger.Run("ledger.data.filterClear");
+
+        Assert.Empty(ledger.Active.AutoFilter.Filters);
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task Il_testo_delle_celle_misura_i_punti_come_la_carta() => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        var measure = ledger.Service<PulseOffice.Sheets.Formatting.ICellTextMeasure>();
+        var font = PulseOffice.Sheets.Styling.CellFont.Default with { Size = 72 };
+
+        var line = measure.Measure("M", font, null, 0);
+
+        Assert.True(line.Height >= 96, $"a 72 pt line is one inch, 96 pixels, at least; measured {line.Height}");
+    }, CancellationToken.None);
+
+    [Fact]
     public Task Scrivere_in_cella_riempire_ordinare_e_annullare() => Session.Dispatch(async () =>
     {
         await using var ledger = await Open();

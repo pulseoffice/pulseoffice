@@ -58,6 +58,27 @@ public sealed class CommentsRound113Tests
     }
 
     [Fact]
+    public void A_docx_comment_with_only_its_range_end_is_anchored_as_a_point()
+    {
+        using var source = new MemoryStream();
+        using (var package = WordprocessingDocument.Create(source, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
+        {
+            var main = package.AddMainDocumentPart();
+            Feed(main, $"<w:document xmlns:w=\"{Word}\"><w:body><w:p><w:r><w:t>testo</w:t></w:r><w:commentRangeEnd w:id=\"1\"/></w:p></w:body></w:document>");
+            Feed(main.AddNewPart<WordprocessingCommentsPart>(), $"<w:comments xmlns:w=\"{Word}\"><w:comment w:id=\"1\" w:author=\"a\"><w:p><w:r><w:t>uno</w:t></w:r></w:p></w:comment></w:comments>");
+        }
+        source.Position = 0;
+
+        var document = ReadDocx(source);
+
+        var comment = Assert.Single(document.Comments.All);
+        var mark = Assert.Single(document.Body.Blocks.OfType<ParagraphBlock>().SelectMany(paragraph => paragraph.Marks).OfType<CommentMark>());
+        Assert.Equal(comment.Id, mark.CommentId);
+        Assert.Equal(MarkEdge.Point, mark.Edge);
+        Assert.Equal(5, mark.Offset);
+    }
+
+    [Fact]
     public void A_docx_reply_cycle_keeps_one_anchored_thread()
     {
         using var source = new MemoryStream();

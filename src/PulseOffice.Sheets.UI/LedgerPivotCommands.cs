@@ -131,6 +131,9 @@ public sealed class LedgerPivotCommands(
             ? texts.Format("status.pivot.created", choice.DestinationSheet)
             : Describe(result.Diagnostics[0]), result.Succeeded ? NotificationSeverity.Success : NotificationSeverity.Error);
 
+        if (result.Succeeded && workbook.Sheets.ToList().FindIndex(target => target.Name == choice.DestinationSheet) is var destination and >= 0)
+            Context.SelectSheet(destination);
+
         Context.RequestRefresh();
     }
 

@@ -60,4 +60,32 @@ public sealed class DeckStageKeysTests : IDisposable
         Assert.Equal(before, slide.Elements.Count);
         window.Close();
     }, CancellationToken.None);
+
+    [Fact]
+    public Task EscapeClearsTheObjectSelection() => _session.Dispatch(async () =>
+    {
+        await using var provider = ServiceConfiguration.Register(Application.Current!, NullLoggerFactory.Instance, new FontFamilyMappingTable())
+            .BuildServiceProvider(ServiceConfiguration.ProviderOptions);
+        var registry = new ShellComposition(provider).Compose();
+        var window = provider.GetRequiredService<ShellWindow>();
+        window.Show();
+        var workspace = provider.GetRequiredService<IDocumentWorkspace>();
+        await provider.GetRequiredService<CommandExecutor>().ExecuteAsync(registry.Find(new CommandId("shell.file.new.presentations"))!, workspace.Context);
+        Dispatcher.UIThread.RunJobs();
+
+        var target = provider.GetRequiredService<IActiveDeckContext>().Target!;
+        var view = (DeckView)workspace.Active!.View;
+        var slide = target.CurrentSlide()!;
+        target.Select([.. slide.Elements.Take(2)]);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotEmpty(target.SelectedMany());
+
+        view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(target.SelectedMany());
+        Assert.Null(target.Selected());
+        Assert.Equal(slide.Elements.Count, target.CurrentSlide()!.Elements.Count);
+        window.Close();
+    }, CancellationToken.None);
 }

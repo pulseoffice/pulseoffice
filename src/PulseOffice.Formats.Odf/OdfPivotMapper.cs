@@ -190,7 +190,7 @@ public sealed class OdfPivotMapper
 
             var fields = new List<PivotField>();
             var order = new Dictionary<PivotArea, int>();
-            var layout = PivotLayout.Compact;
+            var layout = PivotLayout.Tabular;
             var repeat = false;
 
             foreach (var field in element.Elements(Namespaces.Table + "data-pilot-field"))

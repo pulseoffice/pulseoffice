@@ -78,6 +78,12 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
             return;
         }
         if (_text.Editor is not null || _state.Current is null || _state.Selected is null) return;
+        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
+        {
+            _canvas.ClearSelection();
+            e.Handled = true;
+            return;
+        }
         if (_state.Current.Find(_state.Selected.Id) is not { } element) return;
 
         var ids = _canvas.Selection.Select(s => s.Id).ToList();

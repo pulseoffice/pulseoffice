@@ -29,6 +29,7 @@ never as a code base.
 | [pulse-cmd.py](pulse-cmd.py) | Version and packages: notarized dmgs, Windows installer, Linux AppImage, update signing key, signed checksums, GitHub release |
 | [tools/mcp-client](tools/mcp-client) | Test MCP client and stdio↔HTTP bridge for Claude Desktop (`pulse-mcp`) |
 | [tools/corpus-audit](tools/corpus-audit) | Automatic ODF/OOXML round trip over the external test corpus: versioned list, results and summary |
+| [tools/onlyoffice](tools/onlyoffice) | OnlyOffice's converter run headless from its flatpak, a second OOXML reader for cross-checks; `tools/reference-suite/run` starts the reference suite natively or from its flatpak |
 | [tools/verify-signatures](tools/verify-signatures) | Headless verification, with the reference suite, of digital signatures in ODF and OOXML files |
 
 Reference material (outside the repo, not versioned), used as a test corpus:
@@ -42,6 +43,35 @@ dotnet build PulseOffice.slnx          # builds everything
 dotnet test PulseOffice.slnx           # runs the tests
 dotnet run --project src/PulseOffice.Desktop   # starts the app
 ```
+
+### Building and testing with bounded memory (user decision, 2026-11-14)
+
+The development machine (Fedora, 19 GB) had the session killed twice by running out of memory during full test runs.
+The rules below apply to every build and test run, by hand or by agents:
+
+- **Run the tests with `tools/run-tests.py`** (Python, so it can be adapted to Windows and macOS; replaced
+  `run-tests.sh` on 2026-11-15), never with a bare `dotnet test PulseOffice.slnx`: the bare command runs
+  every test project in parallel and builds the whole app several times at once. **After a fix, run only what it can
+  break**: `tools/run-tests.py --changed [base]` (default `main`) selects the test projects that depend, through
+  `ProjectReference` and linked source files, on the files changed since `base` plus the uncommitted ones, and builds
+  only those; `--files <path …>` prints the test projects a file affects, `--list` prints the selection without
+  running. A change to `Directory.*.props`, `PulseOffice.slnx` or `global.json` selects everything. After merging an
+  agent's branch, `--changed` against the commit before the merge; the full run is started only when the user asks (user rule, 2026-11-15), also before a push, which is verified with `--changed main`. `tools/run-tests.py [--no-build] [fragment …]` runs one
+  project at a time, splits each project into chunks of test classes (`--list-tests`, then a
+  `FullyQualifiedName~Class.` filter per chunk), and runs every chunk in its own `systemd-run --user --scope` with
+  `MemoryMax` (default 6G) and `MemorySwapMax=0`: a runaway chunk is killed alone, never the session (on systems
+  without `systemd-run`, macOS and Windows for now, chunks run uncapped with a warning; `MemoryCap` is the one place
+  to add a cap there). Each chunk's
+  result, counts, memory peak (`memory.peak` of its cgroup) and duration go to `summary.tsv` under
+  `artifacts/test-runs/<timestamp>/`. Knobs: `TESTS_MEMORY_MAX`, `TESTS_CLASSES_PER_CHUNK` (default 40),
+  `TESTS_BUILD_NODES` (default 2), `TESTS_OUT`.
+- **Build with few nodes and no resident servers**: `-m:2`, `-nodeReuse:false` and `MSBUILDDISABLENODEREUSE=1` (no
+  MSBuild worker processes left behind), `-p:UseSharedCompilation=false` (no VBCSCompiler server holding 1–2 GB), and
+  `dotnet build-server shutdown` after the build.
+- **Test processes use the workstation GC and give memory back**: `DOTNET_gcServer=0`, `DOTNET_GCConserveMemory=7`,
+  `DOTNET_TieredPGO=0`; inside a chunk `RunConfiguration.MaxCpuCount=1`.
+- **At most two agents at a time**, never nested, and never two app builds or two full test runs in parallel; live
+  tests with `tools/uiprobe-linux` use one virtual display per agent.
 
 ## Verified environment
 
@@ -154,10 +184,12 @@ Central package management in `Directory.Packages.props`: **versions are never w
     (permissions to insert rows and columns, filter). The sweep of all commands in several contexts is split per module into
     `tests/PulseOffice.Desktop.Sweep.{Sheets,Documents,Presentations}.Tests`, which compile the shared
     `tests/PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs` and run only the module of their `<SweepModule>`
-    (30-minute watchdog each with `TestProcessLifetimeMinutes`).
+    (watchdog with `TestProcessLifetimeMinutes`: 30 minutes, 45 for the sheets sweep, which takes about 28 alone).
 
 20. **GPL-3.0-only license and packages** (2026-11-02): text in `LICENSE`, `PackageLicenseExpression` in
-    `Directory.Build.props`, which also holds `<Version>`. `pulse-cmd.py` (all in English) bumps the version and produces
+    `Directory.Build.props`, which also holds `<Version>`. Every package is published self-contained with **ReadyToRun** (2026-11-15:
+    time to the main window 1.86 s → 1.0 s on Linux x64, published folder 171 → 264 MB; the JIT stays as fallback, which
+    IronPython, pythonnet and the built-in COM interop need, so Native AOT was not chosen). `pulse-cmd.py` (all in English) bumps the version and produces
     signed and notarized dmgs (arm64 and x64; certificate chosen from the keychain, notarytool credentials only in the
     keychain), NSIS installers in the five languages with a license page, Linux AppImages (x86_64 and aarch64, built in
     Docker with `appimagetool`; replaced the Flatpak bundle on 2026-11-08 because its sandbox hides `lp`, `ffmpeg` and

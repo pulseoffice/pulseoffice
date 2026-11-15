@@ -393,3 +393,34 @@ if desired, on keyboard and screen readers in Folio (see log, "Audit, diciannove
   left by round 119 fixed at the root (nested tables, mixed inline formatting, border longhands), borders now
   written by the Folio HTML writer and Ledger's fragment; medium and minor defects fixed; log in
   docs/deep-audit/round-121-html-tables.md.
+- Deep audit, round 140 (2026-11-14): command sweep and platform layer on Linux. One serious (shape paragraph direction
+  never stored) and medium defects fixed, among them closed shell windows never released (the sweep grew to 5.4 GB).
+  Log: [deep-audit/round-140-linux-sweep.md](deep-audit/round-140-linux-sweep.md). **Status: medium and serious found.**
+- Deep audit, round 141 (2026-11-14): Ledger, shell, Folio, Deck and exchange live on Linux with `tools/uiprobe-linux`.
+  Medium defects fixed. Logs: [deep-audit/round-141-ledger-shell-linux.md](deep-audit/round-141-ledger-shell-linux.md),
+  [deep-audit/round-141-folio-deck-linux.md](deep-audit/round-141-folio-deck-linux.md). **Status: medium found.**
+- Deep audit, round 142 (2026-11-15): the full suite with `tools/run-tests.sh`. Two medium fixed: ODP shapes read in
+  quadratic time with one automatic style per shape, and async headless tests that could hang. Log:
+  [deep-audit/round-142-full-suite.md](deep-audit/round-142-full-suite.md). **Status: medium found**; the areas left
+  by round 141 remain open.
+- Deep audit, round 143 (2026-11-15): the areas left by round 141, live on Linux (filters, sort, pivot, conditional
+  formatting, theme, language, crash recovery, recent files, ODT/ODP, PDF). Four medium fixed: quick sort and Clear
+  filters disabled on the cursor, cell text drawn at three quarters of its size, bold PDF text exported regular with a
+  regular-only face. Log: [deep-audit/round-143-live-areas.md](deep-audit/round-143-live-areas.md). **Status: medium
+  found**, none open.
+- Deep audit, round 144 (2026-11-15): the full suite after round 143. One medium fixed (HarfBuzz shaping read font
+  data the GC could move: lost glyphs and crashes). Log:
+  [deep-audit/round-144-full-suite-after-143.md](deep-audit/round-144-full-suite-after-143.md). **Status: medium found.**
+- Deep audit, round 145 (2026-11-15): OOXML cross-check with OnlyOffice (`tools/onlyoffice/x2t`) and the reference
+  suite from their flatpaks. Two serious (OnlyOffice files refused: nanosecond core dates, duplicate group ids) and one
+  medium (ODF pivot default layout) fixed; two minor open. Log:
+  [deep-audit/round-145-ooxml-cross-check.md](deep-audit/round-145-ooxml-cross-check.md). **Status: serious found**,
+  none serious or medium open.
+- Deep audit, round 146 (2026-11-15): automatic corpus round on Linux over the whole list. LOSS 0, DECL 127 → 125
+  (a file gone from the clone, now reported as `MISSING`). Round 145's two minor items fixed; one medium fixed
+  (quadratic ODS group check). Log: [deep-audit/round-146-corpus.md](deep-audit/round-146-corpus.md). **Status: medium
+  found**, none serious or medium open.
+- Deep audit, round 147 (2026-11-15): focused code audit of external data (pivot and query refresh, document data
+  loader, web-query tabular sources), the CSV/HTML codecs and OMML/MathML. Two medium fixed (vanished pivot fields
+  read another column, HTML row spans ignored) and one minor. Log:
+  [deep-audit/round-147-external-data.md](deep-audit/round-147-external-data.md). **Status: medium found**, none open.

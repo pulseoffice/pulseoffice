@@ -1,0 +1,9 @@
+#!/bin/sh
+for candidate in /Applications/LibreOffice.app/Contents/MacOS/soffice /usr/bin/soffice /usr/local/bin/soffice /opt/libreoffice/program/soffice; do
+  [ -x "$candidate" ] && exec "$candidate" "$@"
+done
+if command -v flatpak > /dev/null 2>&1 && flatpak info org.libreoffice.LibreOffice > /dev/null 2>&1; then
+  exec flatpak run --filesystem=/tmp --command=libreoffice org.libreoffice.LibreOffice "$@"
+fi
+echo "reference suite not found: install it natively or as the org.libreoffice.LibreOffice flatpak" >&2
+exit 127

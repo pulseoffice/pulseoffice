@@ -45,7 +45,7 @@ public sealed class LedgerFilterCommands(
             MenuPath = "data",
             Surface = CommandSurface.Common,
             RequiredState = DocumentState.DocumentOpen,
-            RequiredSelection = SelectionKind.CellRange,
+            RequiredSelection = SelectionKind.Cell | SelectionKind.CellRange,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.Workbook is { } workbook
                 && workbook.Sheets[Context.SheetIndex].AutoFilter.Filters.Count > 0,

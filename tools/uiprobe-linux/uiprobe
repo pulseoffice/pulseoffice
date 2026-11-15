@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE="${UIPROBE_STATE:-${XDG_RUNTIME_DIR:-/tmp}/uiprobe-linux}"
+DISPLAY_NUMBER="${UIPROBE_DISPLAY:-:99}"
+SIZE="${UIPROBE_SIZE:-1600x1000}"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+usage() {
+  cat <<'EOF'
+uiprobe start [--build]           virtual display, throwaway data folder, PulseOffice on it
+uiprobe stop                      closes PulseOffice and the virtual display
+uiprobe status                    pids, display, data folder, log
+uiprobe shot out.png              captures the virtual display (only PulseOffice lives there)
+uiprobe click X Y [--right|--double|--move|--scroll N] [--mods ctrl,shift,alt]
+uiprobe drag X1 Y1 X2 Y2 [--mods ctrl,shift,alt]
+uiprobe type "text"               types text
+uiprobe key ctrl+s [Return ...]   presses keys (xdotool key names)
+uiprobe log [N]                   last N lines of the app log of this run
+uiprobe run -- command ...        runs a command against the virtual display
+EOF
+}
+
+on_display() { DISPLAY="$DISPLAY_NUMBER" "$@"; }
+
+running() { [[ -f "$STATE/$1.pid" ]] && kill -0 "$(cat "$STATE/$1.pid")" 2>/dev/null; }
+
+wait_for_window() {
+  for _ in $(seq 1 120); do
+    if on_display xdotool search --onlyvisible --pid "$(cat "$STATE/app.pid")" >/dev/null 2>&1; then return 0; fi
+    sleep 0.5
+  done
+  echo "no PulseOffice window after 60 s" >&2
+  return 1
+}
+
+focus_window() {
+  local window
+  window="$(on_display xdotool search --onlyvisible --pid "$(cat "$STATE/app.pid")" 2>/dev/null | tail -1 || true)"
+  [[ -n "$window" ]] && on_display xdotool windowfocus --sync "$window" 2>/dev/null || true
+}
+
+modifiers() {
+  local mods="" spec="$1"
+  [[ -z "$spec" ]] && return
+  IFS=',' read -ra parts <<<"$spec"
+  for part in "${parts[@]}"; do mods+="${part} "; done
+  echo "$mods"
+}
+
+start() {
+  mkdir -p "$STATE"
+  if running app; then echo "already running (pid $(cat "$STATE/app.pid"))"; return; fi
+  if [[ "${1:-}" == "--build" ]]; then dotnet build "$REPO/src/PulseOffice.Desktop" -v q -nologo; fi
+
+  local data
+  data="${UIPROBE_DATA:-$(mktemp -d "${TMPDIR:-/tmp}/uiprobe-data.XXXXXX")}"
+  echo "$data" >"$STATE/data"
+
+  if ! running xvfb; then
+    Xvfb "$DISPLAY_NUMBER" -screen 0 "${SIZE}x24" -nolisten tcp >"$STATE/xvfb.log" 2>&1 &
+    echo $! >"$STATE/xvfb.pid"
+    sleep 1
+  fi
+
+  local app="$REPO/src/PulseOffice.Desktop/bin/Debug/net10.0/PulseOffice"
+  env -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE \
+    DISPLAY="$DISPLAY_NUMBER" PULSEOFFICE_DATA_HOME="$data" XDG_CURRENT_DESKTOP=X-Uiprobe \
+    dbus-run-session -- "$app" >"$STATE/app.out" 2>&1 &
+  echo $! >"$STATE/session.pid"
+
+  for _ in $(seq 1 60); do
+    local pid
+    pid="$(pgrep -n -f "^$app" || true)"
+    if [[ -n "$pid" ]]; then echo "$pid" >"$STATE/app.pid"; break; fi
+    sleep 0.5
+  done
+  [[ -f "$STATE/app.pid" ]] || { echo "PulseOffice did not start; see $STATE/app.out" >&2; return 1; }
+
+  wait_for_window
+  local window
+  window="$(on_display xdotool search --onlyvisible --pid "$(cat "$STATE/app.pid")" | tail -1)"
+  on_display xdotool windowmove "$window" 0 0 windowsize "$window" "${SIZE%x*}" "${SIZE#*x}" 2>/dev/null || true
+  focus_window
+  status
+}
+
+stop() {
+  for name in app session xvfb; do
+    if running "$name"; then kill "$(cat "$STATE/$name.pid")" 2>/dev/null || true; fi
+    rm -f "$STATE/$name.pid"
+  done
+  echo "stopped"
+}
+
+status() {
+  echo "display:  $DISPLAY_NUMBER ($SIZE)"
+  echo "xvfb:     $(running xvfb && cat "$STATE/xvfb.pid" || echo down)"
+  echo "app:      $(running app && cat "$STATE/app.pid" || echo down)"
+  echo "data:     $(cat "$STATE/data" 2>/dev/null || echo -)"
+}
+
+shot() {
+  [[ $# -eq 1 ]] || { usage; exit 2; }
+  on_display import -window root "$1"
+  echo "$1"
+}
+
+click() {
+  local x="$1" y="$2"; shift 2
+  local button=1 repeat=1 move_only=0 scroll=0 mods=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --right) button=3 ;;
+      --double) repeat=2 ;;
+      --move) move_only=1 ;;
+      --scroll) scroll="$2"; shift ;;
+      --mods) mods="$(modifiers "$2")"; shift ;;
+      *) usage; exit 2 ;;
+    esac
+    shift
+  done
+  focus_window
+  on_display xdotool mousemove --sync "$x" "$y"
+  sleep 0.05
+  [[ $move_only -eq 1 ]] && return
+  if [[ "$scroll" != 0 ]]; then
+    local wheel=5 count="${scroll#-}"
+    [[ "$scroll" == -* ]] && wheel=4
+    on_display xdotool click --repeat "$count" --delay 40 "$wheel"
+    return
+  fi
+  for mod in $mods; do on_display xdotool keydown "$mod"; done
+  on_display xdotool click --repeat "$repeat" --delay 80 "$button"
+  for mod in $mods; do on_display xdotool keyup "$mod"; done
+}
+
+drag() {
+  local x1="$1" y1="$2" x2="$3" y2="$4"; shift 4
+  local mods=""
+  [[ "${1:-}" == "--mods" ]] && mods="$(modifiers "$2")"
+  focus_window
+  for mod in $mods; do on_display xdotool keydown "$mod"; done
+  on_display xdotool mousemove --sync "$x1" "$y1" mousedown 1
+  local steps=12
+  for i in $(seq 1 $steps); do
+    on_display xdotool mousemove --sync $((x1 + (x2 - x1) * i / steps)) $((y1 + (y2 - y1) * i / steps))
+    sleep 0.02
+  done
+  on_display xdotool mouseup 1
+  for mod in $mods; do on_display xdotool keyup "$mod"; done
+}
+
+type_text() {
+  focus_window
+  on_display xdotool type --delay 30 -- "$1"
+}
+
+key() {
+  focus_window
+  on_display xdotool key --delay 60 -- "$@"
+}
+
+log() {
+  local data
+  data="$(cat "$STATE/data")"
+  find "$data" -name '*.log' -newer "$STATE/session.pid" -print0 2>/dev/null | xargs -0 -r tail -n "${1:-40}"
+}
+
+command="${1:-}"
+[[ -n "$command" ]] && shift
+case "$command" in
+  start) start "$@" ;;
+  stop) stop ;;
+  status) status ;;
+  shot) shot "$@" ;;
+  click) click "$@" ;;
+  drag) drag "$@" ;;
+  type) type_text "$@" ;;
+  key) key "$@" ;;
+  log) log "$@" ;;
+  run) [[ "${1:-}" == "--" ]] && shift; on_display "$@" ;;
+  *) usage; exit 2 ;;
+esac

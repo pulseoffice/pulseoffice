@@ -16,8 +16,12 @@ public sealed class UiThreadSession
     public Task<TResult> Dispatch<TResult>(Func<TResult> action, CancellationToken cancellationToken) =>
         _session.Dispatch(action, cancellationToken);
 
-    public async Task Dispatch(Func<Task> action, CancellationToken cancellationToken) =>
-        await await _session.Dispatch(action, cancellationToken);
+    public Task Dispatch(Func<Task> action, CancellationToken cancellationToken) =>
+        _session.Dispatch(async () =>
+        {
+            await action();
+            return true;
+        }, cancellationToken);
 
     public Task<TResult> Dispatch<TResult>(Func<Task<TResult>> action, CancellationToken cancellationToken) =>
         _session.Dispatch(action, cancellationToken);

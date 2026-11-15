@@ -108,11 +108,36 @@ public sealed class PdfShapingTests
     {
         if (Family('a', "Helvetica", "Arial", "DejaVu Sans", "Liberation Sans") is not { } family) return;
         var face = Installed.Value.Find(family, false, false)!;
-        var resource = new EmbeddedFontResource("F1", face, EmbeddingMode.TrueTypeSubset, false, false, new TrueTypeSubsetter(), new ToUnicodeWriter());
+        var resource = new EmbeddedFontResource("F1", face, EmbeddingMode.TrueTypeSubset, new TrueTypeSubsetter(), new ToUnicodeWriter());
         var a = resource.Use('a');
 
         var shown = resource.Show([a, resource.Use('b') with { Advance = 0, OffsetX = -300 }, a]);
 
         Assert.Matches(@"^<00010002> -?\d+(\.\d+)? <0001>$|^<0001> 300 <0002> -?\d+(\.\d+)? <0001>$", shown);
+    }
+
+    private sealed class RegularOnly(FontMetricsFace face) : IPdfFaceLocator
+    {
+        public FontMetricsFace? Requested(string family, bool bold, bool italic) => face;
+
+        public FontMetricsFace? Exact(string family, bool bold, bool italic) => face;
+    }
+
+    [Fact]
+    public void BoldTextWithOnlyARegularFaceIsEmboldened()
+    {
+        if (Family('a', "Noto Sans", "DejaVu Sans", "Liberation Sans", "Arial", "Helvetica") is not { } family) return;
+        var regular = Installed.Value.Find(family, false, false)!;
+        Assert.False(regular.Bold);
+
+        using var stream = new MemoryStream();
+        var result = new PdfExporter(new PdfFontSetFactory(
+            new RegularOnly(regular), new PdfFallbackFonts(), new TrueTypeSubsetter(), new ToUnicodeWriter(),
+            new PdfFontMetrics(), new HarfBuzzTextShaper(), new ComplexScriptSegmenter())).Write(
+            new Runs([new PrintGlyphRun("Titolo", 50, 100, new PrintFont(family, 40, Bold: true), PrintColor.Black, [.. "Titolo".Select(_ => 20.0)])]),
+            stream, new PdfExportOptions("Prova", Compress: false));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(" w 2 Tr", Encoding.Latin1.GetString(stream.ToArray()), StringComparison.Ordinal);
     }
 }

@@ -97,13 +97,11 @@ public sealed class EmbeddedFontResource : IPdfFontResource
     private readonly Dictionary<int, string> _text = [];
     private readonly double _scale;
 
-    public EmbeddedFontResource(string name, FontMetricsFace face, EmbeddingMode mode, bool bold, bool italic, ITrueTypeSubsetter subsetter, IToUnicodeWriter unicode)
+    public EmbeddedFontResource(string name, FontMetricsFace face, EmbeddingMode mode, ITrueTypeSubsetter subsetter, IToUnicodeWriter unicode)
     {
         Name = name;
         _face = face;
         Mode = mode;
-        Bold = bold;
-        Italic = italic;
         _subsetter = subsetter;
         _unicode = unicode;
         _scale = 1000.0 / face.UnitsPerEm;
@@ -120,9 +118,9 @@ public sealed class EmbeddedFontResource : IPdfFontResource
 
     public bool Embedded => true;
 
-    public bool Bold { get; }
+    public bool Bold => _face.Bold;
 
-    public bool Italic { get; }
+    public bool Italic => _face.Italic;
 
     public int GlyphsUsed => _glyphs.Count;
 

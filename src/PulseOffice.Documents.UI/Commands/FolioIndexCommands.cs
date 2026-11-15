@@ -38,8 +38,8 @@ public sealed class FolioIndexCommands(
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
-        Action(Editing("folio.insert.tableOfContents"), editor => Insert(editor, Defaults(IndexKind.Contents, editor))),
-        Editing("folio.insert.index") with { Execute = (_, ct) => InsertIndexAsync(ct) },
+        Action(Indexing("folio.insert.tableOfContents"), editor => Insert(editor, Defaults(IndexKind.Contents, editor))),
+        Indexing("folio.insert.index") with { Execute = (_, ct) => InsertIndexAsync(ct) },
         Editing("folio.index.edit") with
         {
             Surface = CommandSurface.Advanced,
@@ -142,9 +142,12 @@ public sealed class FolioIndexCommands(
 
     private bool IsTable(string sequence) => sequence is "Table" or "Tabella" or "Tabelle" or "Tabla" or "Tableau";
 
+    private CommandDefinition Indexing(string id) =>
+        Editing(id) with { EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && indexes.CanInsert(editor.Document, editor.Caret) };
+
     private void Insert(FolioEditor editor, IndexDefinition definition)
     {
-        if (editor.RefusesEdit()) return;
+        if (editor.RefusesEdit() || !indexes.CanInsert(editor.Document, editor.Caret)) return;
         var at = editor.Caret;
         using (editor.History.BeginTransaction("insert-index"))
         {

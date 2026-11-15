@@ -46,6 +46,21 @@ public sealed class PaletteSearchTests
     }
 
     [Fact]
+    public void A_word_in_the_menu_trail_outranks_the_same_letters_inside_a_keyword()
+    {
+        _texts.Add("menu.insert", "Inserisci");
+        _texts.Add("menu.insert.chart", "Grafico");
+        var registry = Registry(
+            Command("ledger.spelling.check", "Ortografia…", "correttore, controllo ortografico"),
+            Command("ledger.chart.column", "Istogramma", menuPath: "insert/chart"));
+
+        var results = registry.Search("grafico", Deck()).ToList();
+
+        Assert.Equal("ledger.chart.column", results[0].Id.Value);
+        Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
     public void La_ricerca_ignora_maiuscole_e_accenti()
     {
         var registry = Registry(Command("deck.present", "Présentation à l'écran"));

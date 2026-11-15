@@ -25,6 +25,30 @@ public sealed class TabularSourcesTests
     }
 
     [Fact]
+    public void ACellSpanningRowsKeepsTheNextRowsInTheirColumns()
+    {
+        const string html = "<table><tr><td rowspan=\"2\">North</td><td>Q1</td><td>4</td></tr>"
+            + "<tr><td>Q2</td><td>5</td></tr><tr><td>South</td><td>Q1</td><td>6</td></tr></table>";
+
+        var data = _sources.For(ExternalDataFormat.Html).Read(html, "HTML_1");
+
+        Assert.Equal(["North", "Q1", "4"], data.Rows[0]);
+        Assert.Equal(["", "Q2", "5"], data.Rows[1]);
+        Assert.Equal(["South", "Q1", "6"], data.Rows[2]);
+    }
+
+    [Fact]
+    public void ARowAndColumnSpanReservesTheWholeBlock()
+    {
+        const string html = "<table><tr><td rowspan=2 colspan=2>A</td><td>b</td></tr><tr><td>c</td></tr></table>";
+
+        var data = _sources.For(ExternalDataFormat.Html).Read(html, "HTML_1");
+
+        Assert.Equal(["A", "", "b"], data.Rows[0]);
+        Assert.Equal(["", "", "c"], data.Rows[1]);
+    }
+
+    [Fact]
     public void IRecordXmlDiventanoRighe()
     {
         const string xml = "<ordini><ordine id=\"1\"><cliente>Ada</cliente><totale>10</totale></ordine><ordine id=\"2\"><cliente>Bea</cliente></ordine></ordini>";

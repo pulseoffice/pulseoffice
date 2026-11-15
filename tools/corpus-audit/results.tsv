@@ -132,8 +132,7 @@ sw/qa/extras/ooxmlexport/data/rprchange_closed.docx	.odt	comments	3	0	DECL	DOCX1
 sw/qa/extras/ooxmlexport/data/rprchange_closed.docx	.odt	revisions	2	0	DECL	DOCX117
 sw/qa/extras/ooxmlexport/data/tdf133771.odt	-	-	0	0	READFAIL	ODF004
 sw/qa/extras/ooxmlexport/data/tdf143269_emptyChart.odt	-	-	0	0	READFAIL	ODT101
-sw/qa/extras/ooxmlexport/data/tdf146955.odt	.docx	images	136	5	DECL	ODF176
-sw/qa/extras/ooxmlexport/data/tdf146955.odt	.odt	images	136	5	DECL	ODF176
+sw/qa/extras/ooxmlexport/data/tdf146955.odt	-	-	0	0	MISSING	-
 sw/qa/extras/ooxmlexport/data/tdf148671.docx	.docx	images	4	0	DECL	DOCX102
 sw/qa/extras/ooxmlexport/data/tdf148671.docx	.odt	images	4	0	DECL	DOCX102
 sw/qa/extras/ooxmlexport/data/tdf155736_PageNumbers_footer.docx	.docx	links	1	0	DECL	DOCX170

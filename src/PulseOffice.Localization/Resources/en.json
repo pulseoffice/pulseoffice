@@ -4488,7 +4488,7 @@
   "data.table.empty": "No data",
   "dialog.findReplace.description": "Find and replace in the sheet",
   "document.defaultName": "document",
-  "command.shell.tools.options.keywords": "settings, preferences, configuration, options",
+  "command.shell.tools.options.keywords": "settings, preferences, configuration, options, theme, dark theme, light theme, language, appearance",
   "setting.appearance.theme.keywords": "dark, light, colours, night",
   "setting.interface.ribbonVisible.keywords": "bar, ribbon, toolbar",
   "setting.interface.statusBarVisible.keywords": "status bar",

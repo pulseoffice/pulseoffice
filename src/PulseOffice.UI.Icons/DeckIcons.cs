@@ -15,6 +15,7 @@ public sealed class DeckIcons() : DictionaryIconCatalog(Shapes)
         ("deck.slide.moveDown", "M12 19l5-5h-3V5h-4v9H7z"),
         ("deck.navigate.goTo", "M3 5h12v10H3z M13 19h8 M18 16l3 3-3 3 M6 9h6 M6 12h4"),
 
+        ("deck.layouts.gallery", "M4 5h16v14H4z M6 8h12 M6 11h5v7H6z M13 11h5v7h-5z"),
         ("deck.layout.titleSlide", "M4 5h16v14H4z M7 10h10 M9 13h6"),
         ("deck.layout.titleAndContent", "M4 5h16v14H4z M6 8h12 M6 12h12 M6 15h8"),
         ("deck.layout.sectionHeader", "M4 5h16v14H4z M6 14h9 M6 17h6"),

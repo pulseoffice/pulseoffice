@@ -98,8 +98,10 @@ public sealed class HarfBuzzTextShaper(TextShaperOptions options) : ITextShaper,
         public ShapingFace(FontMetricsFace metrics)
         {
             Metrics = metrics;
-            using var stream = new MemoryStream(metrics.Tables.Whole(), writable: false);
-            _blob = Blob.FromStream(stream);
+            var data = metrics.Tables.Whole();
+            var memory = System.Runtime.InteropServices.Marshal.AllocHGlobal(data.Length);
+            System.Runtime.InteropServices.Marshal.Copy(data, 0, memory, data.Length);
+            _blob = new Blob(memory, data.Length, MemoryMode.ReadOnly, () => System.Runtime.InteropServices.Marshal.FreeHGlobal(memory));
             _face = new Face(_blob, 0);
             Font = new HarfBuzzFont(_face);
             Font.SetScale(metrics.UnitsPerEm, metrics.UnitsPerEm);

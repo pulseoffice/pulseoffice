@@ -212,21 +212,27 @@ public sealed class OpenXmlLargeDocumentPerformanceTests(ITestOutputHelper outpu
     [Fact]
     public void A_slide_with_thirty_thousand_linked_shapes_writes_and_reads_in_linear_time()
     {
+        RoundTrip(SlideOfLinkedShapes(3_000));
+        var (smallWrite, smallRead, _) = RoundTrip(SlideOfLinkedShapes(3_000));
+        var (write, load, read) = RoundTrip(SlideOfLinkedShapes(30_000));
+
+        Assert.True(write < 40 * Math.Max(smallWrite, 25), $"write {write} ms against {smallWrite} ms for a tenth of the shapes");
+        Assert.True(load < 40 * Math.Max(smallRead, 25), $"read {load} ms against {smallRead} ms for a tenth of the shapes");
+        Assert.Equal(30_000, read.Slides[0].Interactions.Count(action => action.Kind == InteractionKind.Hyperlink));
+        Assert.Contains(read.Slides[0].Interactions, action => action.Reference == "https://example.com/29999");
+    }
+
+    private Presentation SlideOfLinkedShapes(int count)
+    {
         var deck = Deck();
         var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
-        for (var index = 0; index < 30_000; index++)
+        for (var index = 0; index < count; index++)
         {
             slide.Add(Shape("s" + index, index));
             slide.AddInteraction(new InteractiveAction { TargetId = "s" + index, Kind = InteractionKind.Hyperlink, Reference = "https://example.com/" + index });
         }
         deck.AddExisting(slide);
-
-        var (write, load, read) = RoundTrip(deck);
-
-        Assert.True(write < 2_500, $"write {write} ms");
-        Assert.True(load < 6_000, $"read {load} ms");
-        Assert.Equal(30_000, read.Slides[0].Interactions.Count(action => action.Kind == InteractionKind.Hyperlink));
-        Assert.Contains(read.Slides[0].Interactions, action => action.Reference == "https://example.com/29999");
+        return deck;
     }
 
     [Fact]

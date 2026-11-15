@@ -5,6 +5,15 @@ namespace PulseOffice.Documents.Editing;
 
 public sealed record ParagraphLocation(ParagraphBlock Paragraph, BlockLocation Location, BlockContainer Story);
 
+public enum StoryRole
+{
+    Body,
+    Note,
+    Comment,
+    Object,
+    HeaderFooter,
+}
+
 public interface IStoryCatalog
 {
     IEnumerable<BlockContainer> Stories(TextDocument document);
@@ -12,6 +21,10 @@ public interface IStoryCatalog
     ParagraphLocation Find(TextDocument document, string paragraphId);
 
     IEnumerable<ParagraphBlock> Paragraphs(TextDocument document);
+
+    StoryRole RoleOf(TextDocument document, string paragraphId);
+
+    bool AcceptsNotes(TextDocument document, string paragraphId);
 }
 
 public sealed class StoryCatalog(IBlockTree tree) : IStoryCatalog
@@ -49,4 +62,16 @@ public sealed class StoryCatalog(IBlockTree tree) : IStoryCatalog
     }
 
     public IEnumerable<ParagraphBlock> Paragraphs(TextDocument document) => Stories(document).SelectMany(tree.Paragraphs);
+
+    public StoryRole RoleOf(TextDocument document, string paragraphId)
+    {
+        var story = Find(document, paragraphId).Story;
+        if (ReferenceEquals(story, document.Body)) return StoryRole.Body;
+        if (document.Notes.All.Any(note => ReferenceEquals(note.Content, story))) return StoryRole.Note;
+        if (document.Comments.All.Any(comment => ReferenceEquals(comment.Content, story))) return StoryRole.Comment;
+        if (document.Objects.All.Any(item => ReferenceEquals(item.Content.Story, story))) return StoryRole.Object;
+        return StoryRole.HeaderFooter;
+    }
+
+    public bool AcceptsNotes(TextDocument document, string paragraphId) => RoleOf(document, paragraphId) is StoryRole.Body or StoryRole.Object;
 }

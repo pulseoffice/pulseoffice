@@ -1,14 +1,15 @@
 # Corpus audit summary
 
-Files: 5016; copies written: 9948
+Files: 5016; copies written: 9946
 
 ## Status
 
+- MISSING: 1
 - NOTZIP: 14
-- OK: 9948
+- OK: 9946
 - READFAIL: 28
 
-## Losses: LOSS 0, DECL 127
+## Losses: LOSS 0, DECL 125
 
 | Pair | Feature | LOSS | DECL |
 |---|---|---|---|
@@ -41,9 +42,9 @@ Files: 5016; copies written: 9948
 | .ods->.xlsx | merges | 0 | 2 |
 | .odt->.docx | fields | 0 | 1 |
 | .odt->.docx | groups | 0 | 1 |
-| .odt->.docx | images | 0 | 4 |
+| .odt->.docx | images | 0 | 3 |
 | .odt->.docx | links | 0 | 1 |
-| .odt->.odt | images | 0 | 4 |
+| .odt->.odt | images | 0 | 3 |
 | .odt->.odt | links | 0 | 1 |
 | .odt->.odt | macros | 0 | 16 |
 | .xlsx->.ods | pivots | 0 | 1 |

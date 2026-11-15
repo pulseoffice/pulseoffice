@@ -118,7 +118,7 @@ public sealed class SummaryWriter : ISummaryWriter
                      .OrderBy(group => group.Key.Pair, StringComparer.Ordinal).ThenBy(group => group.Key.Feature, StringComparer.Ordinal))
             text.AppendLine($"| {group.Key.Pair} | {group.Key.Feature} | {group.Count(row => row.Class == "LOSS")} | {group.Count(row => row.Class == "DECL")} |");
         text.AppendLine().AppendLine("## Failures").AppendLine();
-        foreach (var row in copies.Where(row => row.Class is not ("OK" or "READFAIL" or "NOTZIP")))
+        foreach (var row in copies.Where(row => row.Class is not ("OK" or "READFAIL" or "NOTZIP" or "MISSING")))
             text.AppendLine($"- {row.File} -> {row.Target}: {row.Class}");
         return text.ToString();
     }

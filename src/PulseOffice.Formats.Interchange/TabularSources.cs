@@ -94,6 +94,7 @@ public sealed class HtmlTabularSource : ITabularSource
     private readonly Regex _rows = new(@"<tr\b[^>]*>(.*?)(?=<tr\b|</table|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromSeconds(2));
     private readonly Regex _cells = new(@"<t([dh])\b([^>]*)>(.*?)(?=<t[dh]\b|</tr|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromSeconds(2));
     private readonly Regex _span = new(@"colspan\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+    private readonly Regex _rowSpan = new(@"rowspan\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
     private readonly Regex _tags = new(@"<[^>]*>", RegexOptions.Singleline, TimeSpan.FromSeconds(2));
     private readonly Regex _breaks = new(@"<br\s*/?>", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
     private readonly Regex _spaces = new(@"[ \t\r\n ]+", RegexOptions.None, TimeSpan.FromSeconds(1));
@@ -140,18 +141,47 @@ public sealed class HtmlTabularSource : ITabularSource
 
     private IEnumerable<IReadOnlyList<string>> RowsOf(string body)
     {
+        var covered = new Dictionary<int, int>();
+
         foreach (Match row in _rows.Matches(body))
         {
             var cells = new List<string>();
+            var started = new Dictionary<int, int>();
+
             foreach (Match cell in _cells.Matches(row.Groups[1].Value))
             {
-                var span = _span.Match(cell.Groups[2].Value) is { Success: true } found ? Math.Clamp(int.Parse(found.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), 1, 64) : 1;
-                cells.Add(Clean(cell.Groups[3].Value));
-                for (var extra = 1; extra < span; extra++) cells.Add(string.Empty);
+                SkipCovered(cells, covered);
+                var columns = Span(_span, cell.Groups[2].Value);
+                var rows = Span(_rowSpan, cell.Groups[2].Value);
+                for (var offset = 0; offset < columns; offset++)
+                {
+                    if (rows > 1) started[cells.Count] = rows - 1;
+                    cells.Add(offset == 0 ? Clean(cell.Groups[3].Value) : string.Empty);
+                }
             }
-            if (cells.Count > 0) yield return cells;
+
+            if (cells.Count == 0) continue;
+
+            while (covered.Keys.Any(column => column >= cells.Count)) cells.Add(string.Empty);
+
+            foreach (var column in covered.Keys.ToList())
+                if (--covered[column] == 0) covered.Remove(column);
+            foreach (var (column, left) in started) covered[column] = left;
+
+            yield return cells;
         }
     }
+
+    private void SkipCovered(List<string> cells, Dictionary<int, int> covered)
+    {
+        while (covered.ContainsKey(cells.Count)) cells.Add(string.Empty);
+    }
+
+    private int Span(Regex attribute, string attributes) =>
+        attribute.Match(attributes) is { Success: true } found
+            && int.TryParse(found.Groups[1].Value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var span)
+            ? Math.Clamp(span, 1, 64)
+            : 1;
 
     private string Clean(string html)
     {

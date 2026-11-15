@@ -121,6 +121,7 @@ public sealed class XlsxWriter
 
         var context = new XlsxWriteContext(workbook, new XlsxStyleMapper(), new XlsxConditionalMapper(), new SharedStrings());
         context.Styles.DeclareNamedStyles(workbook.NamedStyles, workbook);
+        context.Styles.DeclareDefaultFormat(workbook);
 
         if (workbook.Protection.Structure)
         {

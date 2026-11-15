@@ -50,6 +50,7 @@ public sealed class ColumnAutoWidth(ICellTextMeasure measure, ICellPresenter pre
 public static class CellBoxMetrics
 {
     public const double PixelsPerTwip = 96.0 / Twip.PerInch;
+    public const double PixelsPerPoint = 96.0 / 72.0;
     public const double VerticalPadding = 4;
     public const double CellPadding = 3;
     public const double IndentStep = 8;

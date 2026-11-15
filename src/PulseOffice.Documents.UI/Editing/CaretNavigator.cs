@@ -18,6 +18,8 @@ public enum CaretMotion
     DocumentEnd,
     PageUp,
     PageDown,
+    ParagraphUp,
+    ParagraphDown,
 }
 
 public sealed record CaretTarget(DocumentPosition Position, double? PreferredX);
@@ -70,6 +72,8 @@ public sealed class CaretNavigator(IStoryCatalog stories, IParagraphOrder order,
         CaretMotion.LineEnd => new(Edge(layout, caret, start: false), null),
         CaretMotion.DocumentStart => new(new DocumentPosition(order.StoryOf(document, caret.ParagraphId)[0].Id, 0), null),
         CaretMotion.DocumentEnd => new(End(order.StoryOf(document, caret.ParagraphId)[^1]), null),
+        CaretMotion.ParagraphUp => new(ParagraphStart(document, caret, -1), null),
+        CaretMotion.ParagraphDown => new(ParagraphStart(document, caret, 1), null),
         _ => new(caret, preferredX),
     };
 
@@ -83,6 +87,16 @@ public sealed class CaretNavigator(IStoryCatalog stories, IParagraphOrder order,
         if (index < 0) return caret;
         if (direction < 0) return index > 0 ? End(story[index - 1]) : caret;
         return index + 1 < story.Count ? new DocumentPosition(story[index + 1].Id, 0) : caret;
+    }
+
+    private DocumentPosition ParagraphStart(TextDocument document, DocumentPosition caret, int direction)
+    {
+        var story = order.StoryOf(document, caret.ParagraphId);
+        var index = IndexIn(story, caret.ParagraphId);
+        if (index < 0) return caret;
+        if (direction < 0)
+            return new DocumentPosition(story[caret.Offset > 0 || index == 0 ? index : index - 1].Id, 0);
+        return index + 1 < story.Count ? new DocumentPosition(story[index + 1].Id, 0) : End(story[index]);
     }
 
     private DocumentPosition Visual(TextDocument document, DocumentLayout layout, DocumentPosition caret, int direction)

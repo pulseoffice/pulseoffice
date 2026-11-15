@@ -11,6 +11,8 @@ public abstract class FolioKeyAction
 
 public sealed class MotionKeyAction(CaretMotion motion, bool extend) : FolioKeyAction
 {
+    public CaretMotion Motion => motion;
+
     public override void Apply(FolioView view) => view.Editor.Move(motion, extend, view.Canvas.VisibleLines());
 }
 
@@ -74,6 +76,10 @@ public sealed class FolioKeyMap : IFolioKeyMap
         Motion(Key.Right, KeyModifiers.Meta, CaretMotion.LineEnd);
         Motion(Key.Up, KeyModifiers.Meta, CaretMotion.DocumentStart);
         Motion(Key.Down, KeyModifiers.Meta, CaretMotion.DocumentEnd);
+        Motion(Key.Up, KeyModifiers.Control, CaretMotion.ParagraphUp);
+        Motion(Key.Down, KeyModifiers.Control, CaretMotion.ParagraphDown);
+        Motion(Key.Up, KeyModifiers.Alt, CaretMotion.ParagraphUp);
+        Motion(Key.Down, KeyModifiers.Alt, CaretMotion.ParagraphDown);
         Motion(Key.Home, KeyModifiers.Control, CaretMotion.DocumentStart);
         Motion(Key.End, KeyModifiers.Control, CaretMotion.DocumentEnd);
 

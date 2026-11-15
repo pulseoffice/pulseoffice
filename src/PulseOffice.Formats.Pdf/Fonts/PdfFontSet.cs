@@ -263,7 +263,7 @@ public sealed class PdfFontSet(IPdfFaceLocator faces, IPdfFallbackFonts fallback
     {
         var key = (font.Family, font.Bold, font.Italic);
         if (_primary.TryGetValue(key, out var found)) return found;
-        found = faces.Requested(font.Family, font.Bold, font.Italic) is { } face ? Embedded(face, font.Bold, font.Italic, announce: true) : null;
+        found = faces.Requested(font.Family, font.Bold, font.Italic) is { } face ? Embedded(face, announce: true) : null;
         _primary[key] = found;
         return found;
     }
@@ -276,17 +276,17 @@ public sealed class PdfFontSet(IPdfFaceLocator faces, IPdfFallbackFonts fallback
             .Select(family => faces.Exact(family, font.Bold, font.Italic))
             .OfType<FontMetricsFace>()
             .Distinct(ReferenceEqualityComparer.Instance).Cast<FontMetricsFace>()
-            .Select(face => Embedded(face, font.Bold, font.Italic, announce: false))
+            .Select(face => Embedded(face, announce: false))
             .OfType<IPdfFontResource>()];
         _fallbacks[key] = list;
         return list;
     }
 
-    private IPdfFontResource? Embedded(FontMetricsFace face, bool bold, bool italic, bool announce)
+    private IPdfFontResource? Embedded(FontMetricsFace face, bool announce)
     {
         if (_embedded.TryGetValue(face, out var resource)) return resource;
         resource = Mode(face, announce) is { } mode
-            ? Register(new EmbeddedFontResource($"F{_resources.Count + 1}", face, mode, bold, italic, subsetter, unicode))
+            ? Register(new EmbeddedFontResource($"F{_resources.Count + 1}", face, mode, subsetter, unicode))
             : null;
         _embedded[face] = resource;
         return resource;

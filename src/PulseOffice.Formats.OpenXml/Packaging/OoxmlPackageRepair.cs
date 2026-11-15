@@ -15,6 +15,7 @@ internal sealed class OoxmlPackageRepair
         new ContentTypeRepair(),
         new UndeclaredPartRepair(),
         new DeepNestingRepair(),
+        new CorePropertiesDateRepair(),
     ];
 
     public Stream Repair(Stream stream) => Repair(stream, []);

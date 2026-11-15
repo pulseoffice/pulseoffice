@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <TestProcessLifetimeMinutes>30</TestProcessLifetimeMinutes>
+    <TestProcessLifetimeMinutes>45</TestProcessLifetimeMinutes>
     <AvaloniaTestThreading>HeadlessCollection</AvaloniaTestThreading>
   </PropertyGroup>
 

@@ -66,8 +66,8 @@ public sealed class FolioInsertCommands(
         Editing("folio.insert.symbol") with { Execute = (_, ct) => SymbolAsync(ct) },
         .. _characters.Select(Character),
         .. _fields.Select(Field),
-        Action(Editing("folio.insert.footnote"), editor => Note(editor, NoteKind.Footnote)),
-        Action(Editing("folio.insert.endnote"), editor => Note(editor, NoteKind.Endnote)),
+        Action(Noting("folio.insert.footnote"), editor => Note(editor, NoteKind.Footnote)),
+        Action(Noting("folio.insert.endnote"), editor => Note(editor, NoteKind.Endnote)),
         Editing("folio.insert.bookmark") with { Execute = (_, ct) => BookmarkAsync(ct) },
         Editing("folio.insert.comment") with { Execute = (_, ct) => CommentAsync(ct) },
         Editing("folio.insert.hyperlink") with { DefaultGesture = "Ctrl+K", Execute = (_, ct) => HyperlinkAsync(ct) },
@@ -103,8 +103,12 @@ public sealed class FolioInsertCommands(
             editor.PlaceCaret(new DocumentPosition(created, 0), false);
         }, label);
 
+    private CommandDefinition Noting(string id) =>
+        Editing(id) with { EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && editor.Services.Stories.AcceptsNotes(editor.Document, editor.Caret.ParagraphId) };
+
     private void Note(FolioEditor editor, NoteKind kind)
     {
+        if (!editor.Services.Stories.AcceptsNotes(editor.Document, editor.Caret.ParagraphId)) return;
         if (editor.Insert((documents, at) => documents.InsertNote(editor.Document, editor.History, at, kind, string.Empty), "insert-note"))
             editor.EnterNote(editor.Document.Notes.All[^1]);
     }

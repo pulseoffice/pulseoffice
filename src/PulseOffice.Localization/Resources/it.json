@@ -4488,7 +4488,7 @@
   "data.table.empty": "Nessun dato",
   "dialog.findReplace.description": "Ricerca e sostituzione nel foglio",
   "document.defaultName": "documento",
-  "command.shell.tools.options.keywords": "impostazioni, preferenze, configurazione, opzioni",
+  "command.shell.tools.options.keywords": "impostazioni, preferenze, configurazione, opzioni, tema, tema scuro, tema chiaro, lingua, aspetto",
   "setting.appearance.theme.keywords": "scuro, chiaro, colori, notte",
   "setting.interface.ribbonVisible.keywords": "barra, ribbon, nastro",
   "setting.interface.statusBarVisible.keywords": "barra di stato",

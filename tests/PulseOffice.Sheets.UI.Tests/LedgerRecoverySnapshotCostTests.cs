@@ -52,7 +52,7 @@ public sealed class LedgerRecoverySnapshotCostTests
         var serialized = clock.Elapsed;
         Record($"ledger cells=1000000 capture={captured.TotalMilliseconds:0.0} serialization={serialized.TotalMilliseconds:0} bytes={stream.Length}");
 
-        Assert.True(captured < TimeSpan.FromMilliseconds(150), $"capture {captured.TotalMilliseconds:0.0} ms");
+        Assert.True(captured < serialized / 20, $"capture {captured.TotalMilliseconds:0.0} ms against serialization {serialized.TotalMilliseconds:0} ms");
     }
 
     [Fact]

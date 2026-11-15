@@ -278,6 +278,14 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
 
     public IReadOnlyList<SlideElement> Selection => _selection;
 
+    public void ClearSelection()
+    {
+        if (_selection.Count == 0 && _primary is null) return;
+        SelectedElement = null;
+        SelectionChanged?.Invoke(this, null);
+        InvalidateVisual();
+    }
+
     public void EnsureSelected(SlideElement element)
     {
         ArgumentNullException.ThrowIfNull(element);

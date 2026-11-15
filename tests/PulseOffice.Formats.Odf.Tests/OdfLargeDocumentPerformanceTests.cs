@@ -207,32 +207,35 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
     [Fact]
     public void A_slide_with_twenty_thousand_shapes_without_z_index_reads_in_linear_time()
     {
-        var deck = Deck();
-        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
-        for (var index = 0; index < 20_000; index++) slide.Add(Shape("s" + index, index));
-        deck.AddExisting(slide);
-
-        var (write, load, read) = RoundTrip(deck);
+        RoundTrip(SlideOfShapes(2_000, grouped: false));
+        var (_, small, _) = RoundTrip(SlideOfShapes(2_000, grouped: false));
+        var (write, load, read) = RoundTrip(SlideOfShapes(20_000, grouped: false));
 
         Assert.True(write < 30_000, $"write {write} ms");
-        Assert.True(load < 4_000, $"read {load} ms");
+        Assert.True(load < 40 * Math.Max(small, 25), $"read {load} ms against {small} ms for a tenth of the shapes");
         Assert.Equal(20_000, read.Slides[0].Elements.OfType<ObjectElement>().Count());
     }
 
     [Fact]
     public void A_group_of_twenty_thousand_shapes_reads_in_linear_time()
     {
-        var deck = Deck();
-        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
-        for (var index = 0; index < 20_000; index++) slide.Add(Shape("s" + index, index));
-        slide.AddGroup(new SlideGroup("g", [.. Enumerable.Range(0, 20_000).Select(index => "s" + index)]));
-        deck.AddExisting(slide);
-
-        var (write, load, read) = RoundTrip(deck);
+        RoundTrip(SlideOfShapes(2_000, grouped: true));
+        var (_, small, _) = RoundTrip(SlideOfShapes(2_000, grouped: true));
+        var (write, load, read) = RoundTrip(SlideOfShapes(20_000, grouped: true));
 
         Assert.True(write < 30_000, $"write {write} ms");
-        Assert.True(load < 4_000, $"read {load} ms");
+        Assert.True(load < 40 * Math.Max(small, 25), $"read {load} ms against {small} ms for a tenth of the shapes");
         Assert.Equal(20_000, read.Slides[0].Elements.OfType<ObjectElement>().Count());
+    }
+
+    private Presentation SlideOfShapes(int count, bool grouped)
+    {
+        var deck = Deck();
+        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
+        for (var index = 0; index < count; index++) slide.Add(Shape("s" + index, index));
+        if (grouped) slide.AddGroup(new SlideGroup("g", [.. Enumerable.Range(0, count).Select(index => "s" + index)]));
+        deck.AddExisting(slide);
+        return deck;
     }
 
     [Fact]

@@ -147,6 +147,7 @@ class Publisher:
             "-c", "Release",
             "-r", runtime,
             "--self-contained", "true",
+            "-p:PublishReadyToRun=true",
             f"-p:Version={version}",
             "-p:DebugType=None",
             "-p:DebugSymbols=false",

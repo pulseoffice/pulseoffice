@@ -106,6 +106,8 @@ public interface IIndexEditing
 
     SectionBlock? Around(TextDocument document, string paragraphId);
 
+    bool CanInsert(TextDocument document, DocumentPosition at);
+
     DocumentEdit Insert(TextDocument document, UndoStack history, DocumentPosition at, IndexDefinition definition, IFieldLayoutFacts facts);
 
     DocumentEdit Update(TextDocument document, UndoStack history, IFieldLayoutFacts facts, string? sectionId = null);
@@ -125,9 +127,14 @@ public sealed class IndexEditing(IStoryCatalog stories, IBlockTree tree, IIndexC
     public SectionBlock? Around(TextDocument document, string paragraphId) =>
         Indexes(document).FirstOrDefault(section => tree.Paragraphs(section.Content).Any(paragraph => paragraph.Id == paragraphId));
 
+    public bool CanInsert(TextDocument document, DocumentPosition at) =>
+        stories.RoleOf(document, at.ParagraphId) == StoryRole.Body;
+
     public DocumentEdit Insert(TextDocument document, UndoStack history, DocumentPosition at, IndexDefinition definition, IFieldLayoutFacts facts)
     {
         var found = stories.Find(document, at.ParagraphId);
+        if (!CanInsert(document, at))
+            throw new InvalidOperationException($"An index can only be inserted into the document body, not at paragraph '{at.ParagraphId}'.");
         var container = found.Location.Container;
         var index = found.Location.Index + (at.Offset > 0 && at.Offset >= found.Paragraph.Length ? 1 : 0);
         var recorder = new EditRecorder(document, "insert-index").Touch(container);

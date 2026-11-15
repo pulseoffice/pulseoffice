@@ -14,4 +14,6 @@ self-signed certificate), whether it is partial (always true for OOXML) and the 
 
 Calibration: the reference suite's own signed test documents give valid and invalid signatures as expected. A storage
 opened in package or OOXML mode hides the signature streams and reports zero signatures. `REFERENCE_SUITE` overrides
-the path of the reference suite's binary.
+the path of the reference suite's binary; by default `tools/reference-suite/run` starts a native installation when
+one exists and otherwise the reference suite's flatpak, with `/tmp` shared so the throw-away profile is visible. The
+script runs under bash (it used zsh before 2026-11-15).

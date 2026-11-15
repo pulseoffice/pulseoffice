@@ -103,6 +103,12 @@ public sealed class XlsxStyleMapper
     public uint? NamedFormatOf(string? name) =>
         name is not null && _namedIndex.TryGetValue(name, out var index) ? index : null;
 
+    public void DeclareDefaultFormat(PulseOffice.Sheets.Workbook workbook)
+    {
+        if (_cellFormatCount > 0) throw new InvalidOperationException("The default cell format must be the first one.");
+        StyleIndexOf(StyleCatalog.DefaultStyleId, workbook);
+    }
+
     public uint StyleIndexOf(int styleId, PulseOffice.Sheets.Workbook workbook)
     {
         var style = workbook.Styles.Get(styleId);

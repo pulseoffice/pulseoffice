@@ -1,0 +1,8 @@
+#!/bin/sh
+id=org.onlyoffice.desktopeditors
+converter=/app/bin/opt/onlyoffice/desktopeditors/converter
+[ $# -eq 2 ] || { echo "usage: x2t input output" >&2; exit 2; }
+command -v flatpak > /dev/null 2>&1 && flatpak info "$id" > /dev/null 2>&1 || { echo "OnlyOffice flatpak $id not installed" >&2; exit 127; }
+input=$(realpath "$1")
+output=$(realpath -m "$2")
+exec flatpak run --command=sh --env=LD_LIBRARY_PATH="$converter" "$id" -c 'cd "$1" && exec ./x2t "$2" "$3"' x2t "$converter" "$input" "$output"

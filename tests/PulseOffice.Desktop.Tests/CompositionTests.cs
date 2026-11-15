@@ -91,6 +91,18 @@ public sealed class CompositionTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
+    public Task Every_ribbon_command_has_an_icon() => Session.Dispatch(async () =>
+    {
+        await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);
+        var registry = new ShellComposition(provider).Compose();
+        var icons = provider.GetRequiredService<PulseOffice.UI.Icons.IIconCatalog>();
+
+        Assert.Empty(registry.All
+            .Where(command => command.Surface.HasFlag(PulseOffice.UI.Commands.CommandSurface.Ribbon) && !icons.Contains(command.Id.Value))
+            .Select(command => command.Id.Value));
+    }, CancellationToken.None);
+
+    [Fact]
     public Task La_disposizione_dell_interfaccia_si_sceglie_nelle_impostazioni_da_due_miniature() => Session.Dispatch(async () =>
     {
         await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);

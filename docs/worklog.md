@@ -13555,3 +13555,77 @@ work. Log: [deep-audit/round-140-linux-sweep.md](deep-audit/round-140-linux-swee
 - **Process**: the full suite run on this machine shows timing tests that fail only when every project runs at once
   and pass alone; this round runs heavy jobs one after another. Live clicks are not possible here (`uiprobe` is a macOS
   tool).
+
+## Round 142: the full suite on Linux (2026-11-15)
+
+Log: [deep-audit/round-142-full-suite.md](deep-audit/round-142-full-suite.md).
+
+- **ODP shapes read in quadratic time** (medium): each custom shape scanned the whole style table for list styles;
+  with one automatic style per shape, 20,000 shapes took 3.5 s. The list source is now built once per style table
+  (0.55 s). The 20,000-shape tests compare the read with a tenth of the shapes, so a quadratic read fails them.
+- **Async headless tests could hang** (medium, test harness): `UiThreadSession.Dispatch(Func<Task>)` did not run the
+  dispatcher until the body completed; it now uses Avalonia's overload that does.
+
+## Round 143: the areas left by round 141, live on Linux (2026-11-15)
+
+Log: [deep-audit/round-143-live-areas.md](deep-audit/round-143-live-areas.md).
+
+- **Quick sort and Clear filters disabled on the cursor** (medium, two defects): both commands required a range
+  selection although they work from the cursor (the sort planner expands it to the current region); they now accept a
+  single cell.
+- **Cell text drawn at three quarters of its size** (medium): the cell text composer used points as pixels while the
+  grid uses 96 pixels per inch, so the screen, the cell editor, automatic row heights and column widths disagreed with
+  the PDF. Points are now converted in the composer.
+- **Bold PDF text exported regular** (medium): embedded font resources reported the requested weight instead of the
+  face's, so synthetic bold never applied; with Fedora's variable Noto Sans a Deck title lost its bold.
+- **Pivot result sheet** (minor): selected after creation.
+- **Probe**: GTK file chooser on the virtual display (`XDG_CURRENT_DESKTOP`), `UIPROBE_DATA` to restart after a crash.
+- Clean live: autofilter, conditional formatting, dark theme, language switch, crash recovery, recent files, ODS/ODT/ODP
+  save and reopen, Ledger and Folio PDF.
+
+## Round 144: the full suite after round 143 (2026-11-15)
+
+Log: [deep-audit/round-144-full-suite-after-143.md](deep-audit/round-144-full-suite-after-143.md).
+
+- **HarfBuzz read moved memory** (medium): faces built with `Blob.FromStream` left the font bytes where the GC could
+  move them, so complex-script shaping lost glyphs or crashed the process. The data now lives in unmanaged memory.
+- The PPTX 30,000 linked shapes test compares with a tenth of the shapes instead of an absolute limit.
+- The Ledger command sweep takes 27.8 of its 30 minutes alone: to be split.
+
+## Round 145: OOXML cross-check with OnlyOffice and the reference suite (2026-11-15)
+
+Log: [deep-audit/round-145-ooxml-cross-check.md](deep-audit/round-145-ooxml-cross-check.md).
+
+- **Tooling**: `tools/reference-suite/run` (native installation, else the flatpak with `/tmp` shared) is the default
+  for the fixture scripts and the verify tools; `verify-signatures` runs under bash; `tools/onlyoffice/x2t` runs
+  OnlyOffice's converter headless from its flatpak as a second OOXML reader.
+- 51 corpus files written by PulseOffice as DOCX, XLSX and PPTX were read by both applications without refusal.
+- **Nanosecond core dates refused the file** (serious): OOXML core-property dates with more than seven fractional
+  digits made the package fail to open; a package repair step trims them.
+- **Duplicate group ids refused an ODP** (serious): two groups sharing an `xml:id` on one slide threw; the repeat is
+  read as an anonymous group.
+- **ODF pivots without layout info** (medium) were read as compact instead of tabular, the ODF default.
+- Two minor items open on malformed OnlyOffice files (duplicate shape ids, a comment with only its range end).
+
+## Round 146: automatic corpus round on Linux (2026-11-15)
+
+Log: [deep-audit/round-146-corpus.md](deep-audit/round-146-corpus.md).
+
+- Whole list (5016 files) with one worker at a time, after updating the clone: **LOSS 0** (as round 145), DECL
+  127 → 125 only because the clone no longer has one ODT of the list; `corpus-audit` reports such a file as `MISSING`
+  instead of a crash.
+- Round 145's two minor items fixed: ODP shapes sharing an id stay in their own groups; a DOCX comment with only its
+  range end is anchored as a point and reaches the ODT copy.
+- **Quadratic ODS group check** (medium): unsupported objects were searched under every nested group; a 100,000-level
+  nesting took over four minutes and its test chunk was killed by the idle watchdog. Only outermost groups now.
+
+## Round 147: external data and formula interchange (2026-11-15)
+
+Log: [deep-audit/round-147-external-data.md](deep-audit/round-147-external-data.md).
+
+- **External pivot refresh** (medium): a field whose column left the query result kept its old index and summarised
+  another column; it is now dropped, and new columns become unused fields.
+- **HTML tables as external data** (medium): `rowspan` was ignored and shifted the rows below; a huge `colspan`
+  threw. Covered slots are tracked per column.
+- **Document data loader** (minor): driver failures other than `DbException` escaped instead of being reported.
+- OMML/MathML round trips, the CSV codec and `QueryRefresher` checked without defects.

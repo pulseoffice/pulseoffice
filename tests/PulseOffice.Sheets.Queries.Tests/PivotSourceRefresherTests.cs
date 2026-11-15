@@ -107,6 +107,22 @@ public class PivotSourceRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task AFieldWhoseColumnLeftTheSourceIsDroppedInsteadOfReadingAnotherColumn()
+    {
+        var workbook = WorkbookWith(new PivotExternalSource { Kind = PivotExternalKind.Sql, ConnectionId = "sales-db", Command = "SELECT amount AS total, region FROM sales" });
+        var refresher = Refresher();
+
+        refresher.Apply(workbook, await refresher.FetchAsync(workbook, TestContext.Current.CancellationToken));
+
+        var fields = workbook.Pivots[0].Fields;
+        Assert.DoesNotContain(fields, field => field.SourceName == "amount");
+        Assert.Equal(1, fields.Single(field => field.SourceName == "region").SourceColumnIndex);
+        var total = fields.Single(field => field.SourceName == "total");
+        Assert.Equal(0, total.SourceColumnIndex);
+        Assert.Equal(PivotArea.Unused, total.Area);
+    }
+
+    [Fact]
     public async Task ASqlSourceFindsItsConnectionById()
     {
         var workbook = WorkbookWith(new PivotExternalSource { Kind = PivotExternalKind.Sql, ConnectionId = "sales-db", Command = "SELECT region, amount FROM sales WHERE amount > 4" });

@@ -66,7 +66,7 @@ public partial class App : Application
             if (customized > 0)
                 _services.GetRequiredService<ILoggerFactory>().CreateLogger<App>().LogInformation("Custom shortcuts applied: {Count}", customized);
 
-            ReportMissingTexts(registry);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ReportMissingTexts(registry), Avalonia.Threading.DispatcherPriority.Background);
 
             var recent = new RecentDocumentsCoordinator(
                 _services.GetRequiredService<IRecentDocuments>(),

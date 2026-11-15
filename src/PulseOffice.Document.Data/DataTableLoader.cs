@@ -48,7 +48,7 @@ public sealed class DataTableLoader(
                 },
                 ct);
         }
-        catch (System.Data.Common.DbException failure)
+        catch (Exception failure) when (failure is not (OperationCanceledException or OutOfMemoryException))
         {
             return OperationResult<DataSnapshot>.Fail(Diagnostic.Error("data.query.failed", failure.Message).With(failure.Message));
         }

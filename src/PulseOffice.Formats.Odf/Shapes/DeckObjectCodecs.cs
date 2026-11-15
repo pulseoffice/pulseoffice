@@ -155,6 +155,10 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
     private readonly OdfArcGeometry _arcs = new();
     private readonly OdfLiteralEnhancedPath _literal = new(presets);
     private readonly OdfComputedGeometry _computed = new();
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<IReadOnlyDictionary<string, XElement>, OdfShapeListSource> _lists = new();
+
+    private OdfShapeListSource ListsOf(IReadOnlyDictionary<string, XElement> definitions) =>
+        _lists.GetValue(definitions, all => _runs.Lists(all.Where(pair => pair.Key.StartsWith(OdfShapeTextLists.KeyPrefix, StringComparison.Ordinal)).Select(pair => pair.Value)));
     private readonly OdfShapeTextRuns _runs = new(paragraphs);
     private readonly OdfDimensionLines _dimensions = new();
 
@@ -254,7 +258,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
                     ? (string?)automatic.Attribute(Style + "parent-style-name")
                     : null,
             }, (name, family) => definitions.TryGetValue(name, out var text) && (string?)text.Attribute(Style + "family") == family ? text : null,
-                _runs.Lists(definitions.Where(pair => pair.Key.StartsWith(OdfShapeTextLists.KeyPrefix, StringComparison.Ordinal)).Select(pair => pair.Value))), geometry), geometry, bounds.Width, bounds.Height),
+                ListsOf(definitions)), geometry), geometry, bounds.Width, bounds.Height),
         };
     }
 }

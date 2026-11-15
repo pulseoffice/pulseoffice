@@ -133,7 +133,7 @@ public sealed class LedgerEditDataCommands(
         DefaultGesture = gesture,
         Surface = CommandSurface.Common,
         RequiredState = DocumentState.DocumentOpen,
-        RequiredSelection = SelectionKind.CellRange,
+        RequiredSelection = SelectionKind.Cell | SelectionKind.CellRange,
         ForbiddenState = DocumentState.ReadOnly,
         EnabledWhen = _ => formatting.CanFormat && (enabled?.Invoke() ?? true),
         Execute = (_, _) =>

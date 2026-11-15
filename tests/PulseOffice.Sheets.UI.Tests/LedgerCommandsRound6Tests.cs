@@ -42,6 +42,8 @@ public class LedgerCommandsRound6Tests
         public ActiveSheetContext Context { get; } = new();
         public Engine.Recalculation.CalculationEngine Engine { get; }
 
+        public int? SelectedSheet { get; private set; }
+
         public Scene()
         {
             Engine = Engines.Create(Workbook);
@@ -65,7 +67,7 @@ public class LedgerCommandsRound6Tests
                 ReadSelectedObject = () => null,
                 ReadSelectedObjects = () => [],
                 WriteSelectedObjects = _ => { },
-                SelectSheet = _ => { },
+                SelectSheet = index => SelectedSheet = index,
                 WriteSelectedObject = _ => { },
             });
         }
@@ -225,6 +227,22 @@ public class LedgerCommandsRound6Tests
                 Status(), Texts, new Engine.Operations.WorkbookCheckpoints(new Engine.Operations.SheetSnapshots()), Kit(), engine,
                 new WorksheetTabPolicy())
             .GetCommands().Single(command => command.Id.Value == "ledger.data.pivotCreate");
+    }
+
+    [Fact]
+    public async Task The_new_pivot_sheet_becomes_the_active_sheet()
+    {
+        var scene = FilterScene();
+        var fields = new List<PulseOffice.Sheets.Pivot.PivotField>
+        {
+            new() { SourceName = "Name", SourceColumnIndex = 0, Area = PulseOffice.Sheets.Pivot.PivotArea.Row },
+            new() { SourceName = "Amount", SourceColumnIndex = 1, Area = PulseOffice.Sheets.Pivot.PivotArea.Value },
+        };
+
+        await PivotCreate(scene, new PivotChoice(fields, "Pivot1")).Execute(null!, CancellationToken.None);
+
+        Assert.Equal(scene.Workbook.Sheets.ToList().FindIndex(sheet => sheet.Name == "Pivot1"), scene.SelectedSheet);
+        Assert.NotEqual(0, scene.SelectedSheet);
     }
 
     [Theory]

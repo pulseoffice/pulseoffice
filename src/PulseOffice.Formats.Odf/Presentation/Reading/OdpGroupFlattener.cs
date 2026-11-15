@@ -30,7 +30,9 @@ internal sealed class OdpGroupFlattener
         var members = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var shapes = new List<OdpGroupShape>();
         var anonymous = 0;
-        foreach (var group in page.Elements(_group).ToList()) Collect(group, members, shapes, ref anonymous, 0);
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var shapeIds = page.Elements().Where(element => element.Name != _group).Select(IdOf).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        foreach (var group in page.Elements(_group).ToList()) Collect(group, members, shapes, keys, shapeIds, ref anonymous, 0);
 
         while (page.Elements(_group).FirstOrDefault() is { } group)
         {
@@ -48,12 +50,12 @@ internal sealed class OdpGroupFlattener
         return page;
     }
 
-    private (string Key, List<string> Leaves) Collect(XElement group, Dictionary<string, IReadOnlyList<string>> members, List<OdpGroupShape> shapes, ref int anonymous, int depth)
+    private (string Key, List<string> Leaves) Collect(XElement group, Dictionary<string, IReadOnlyList<string>> members, List<OdpGroupShape> shapes, HashSet<string> keys, HashSet<string> shapeIds, ref int anonymous, int depth)
     {
         var leaves = new List<string>();
         var direct = new List<string>();
-        var groupId = IdOf(group);
-        var key = groupId ?? $"pulseoffice-group-{++anonymous}";
+        var groupId = IdOf(group) is { } declared && keys.Add(declared) ? declared : null;
+        var key = groupId ?? Anonymous(keys, ref anonymous);
         var index = 0;
         foreach (var child in group.Elements())
         {
@@ -61,15 +63,17 @@ internal sealed class OdpGroupFlattener
             if (child.Name == _group && depth >= MaximumDepth) continue;
             if (child.Name == _group)
             {
-                var nested = Collect(child, members, shapes, ref anonymous, depth + 1);
+                var nested = Collect(child, members, shapes, keys, shapeIds, ref anonymous, depth + 1);
                 leaves.AddRange(nested.Leaves);
                 direct.Add(nested.Key);
                 continue;
             }
-            if (IdOf(child) is not { } id)
+            if (IdOf(child) is not { } id || !shapeIds.Add(id))
             {
                 id = $"{key}.{index}";
+                child.SetAttributeValue(_xmlId, null);
                 child.SetAttributeValue(_drawId, id);
+                shapeIds.Add(id);
             }
             leaves.Add(id);
             direct.Add(id);
@@ -78,6 +82,14 @@ internal sealed class OdpGroupFlattener
         var rotation = double.TryParse((string?)group.Attribute(_rotation), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var degrees) && double.IsFinite(degrees) ? degrees : 0;
         shapes.Add(new OdpGroupShape(key, (string?)group.Attribute(_name), direct, rotation));
         return (key, leaves);
+    }
+
+    private string Anonymous(HashSet<string> keys, ref int anonymous)
+    {
+        string key;
+        do key = $"pulseoffice-group-{++anonymous}";
+        while (!keys.Add(key));
+        return key;
     }
 
     private string? IdOf(XElement element) => (string?)element.Attribute(_xmlId) ?? (string?)element.Attribute(_drawId);

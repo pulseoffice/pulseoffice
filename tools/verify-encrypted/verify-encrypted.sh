@@ -2,7 +2,7 @@
 set -u
 here=${0:A:h}
 root=${here:h:h}
-soffice=${REFERENCE_SUITE:-/Applications/LibreOffice.app/Contents/MacOS/soffice}
+soffice=${REFERENCE_SUITE:-${0:A:h:h}/reference-suite/run}
 work=$(mktemp -d "${TMPDIR:-/tmp}/pulseoffice-reference-encrypted.XXXXXX")
 samples=$work/samples
 profile=$work/profile

@@ -117,7 +117,12 @@ public sealed class FolioFieldCommands(
             EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && Selected(editor).Count > 0,
         }, editor => editor.Change(() => fields.ToText(editor.Document, editor.History, Selected(editor)))),
         Editing("folio.insert.crossReference") with { Execute = (_, ct) => CrossReferenceAsync(ct) },
-        Editing("folio.insert.footnoteDialog") with { Surface = CommandSurface.Advanced, Execute = (_, ct) => SpecialNoteAsync(ct) },
+        Editing("folio.insert.footnoteDialog") with
+        {
+            Surface = CommandSurface.Advanced,
+            EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && editor.Services.Stories.AcceptsNotes(editor.Document, editor.Caret.ParagraphId),
+            Execute = (_, ct) => SpecialNoteAsync(ct),
+        },
         Editing("folio.edit.footnote") with
         {
             Surface = CommandSurface.Advanced,
@@ -219,7 +224,7 @@ public sealed class FolioFieldCommands(
     {
         if (Editor is not { } editor) return;
         var values = await forms.AskAsync("command.folio.insert.footnoteDialog.title", "folio.note.explanation", NoteFields(NoteKind.Footnote, null), ct).ConfigureAwait(true);
-        if (values is null) return;
+        if (values is null || !editor.Services.Stories.AcceptsNotes(editor.Document, editor.Caret.ParagraphId)) return;
         var kind = values.Choice("kind", 2) == 0 ? NoteKind.Footnote : NoteKind.Endnote;
         var citation = values.Flag("custom") && values.Text("citation").Trim() is { Length: > 0 } custom ? custom : null;
         if (editor.Insert((documents, at) =>

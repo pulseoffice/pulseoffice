@@ -333,6 +333,8 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
     public DocumentEdit InsertNote(TextDocument document, UndoStack history, DocumentPosition at, NoteKind kind, string value)
     {
         at = Snapped(document, at);
+        if (!stories.AcceptsNotes(document, at.ParagraphId))
+            throw new InvalidOperationException($"A note cannot be inserted at paragraph '{at.ParagraphId}': notes belong to the body and its frames.");
         var found = stories.Find(document, at.ParagraphId);
         var style = kind == NoteKind.Footnote ? document.Notes.FootnoteSettings.ParagraphStyleName : document.Notes.EndnoteSettings.ParagraphStyleName;
         var note = new Note(document.NextId(kind == NoteKind.Footnote ? "fn" : "en"), kind,

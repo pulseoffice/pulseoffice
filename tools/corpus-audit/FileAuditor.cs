@@ -41,7 +41,9 @@ public sealed class FileAuditor(IEnumerable<IAuditFamily> families, IFeatureCoun
     {
         var extension = Path.GetExtension(relative).ToLowerInvariant();
         var family = families.First(candidate => candidate.Extensions.Contains(extension));
-        var package = File.ReadAllBytes(Path.Combine(root, relative));
+        var path = Path.Combine(root, relative);
+        if (!File.Exists(path)) return [new AuditRow(relative, None, None, 0, 0, "MISSING", None)];
+        var package = File.ReadAllBytes(path);
         var before = counter.Count(package, extension);
         if (before is null) return [new AuditRow(relative, None, None, 0, 0, "NOTZIP", None)];
         var source = family.RoundTrip(extension, package);

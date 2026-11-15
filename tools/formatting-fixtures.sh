@@ -4,7 +4,7 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 target="$repo/tests/PulseOffice.Formats.OpenXml.Tests/Fixtures/Formatting"
 work=$(mktemp -d)
 profile=$(mktemp -d)
-soffice=${SOFFICE:-/Applications/LibreOffice.app/Contents/MacOS/soffice}
+soffice=${SOFFICE:-$(dirname "$0")/reference-suite/run}
 PULSE_FORMATTING_FIXTURES="$work" dotnet test "$repo/tests/PulseOffice.Formats.OpenXml.Tests" --filter "FullyQualifiedName~IFileDiPartenzaSonoQuelliDelCampione" > /dev/null
 convert() {
   mkdir -p "$work/out"

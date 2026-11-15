@@ -133,8 +133,22 @@ public sealed class PivotSourceRefresher(
         Records = [.. result.Rows.Select(row => (IReadOnlyList<CellValue>)[.. row.Select(_values.Convert)])],
     };
 
-    private IReadOnlyList<PivotField> Rebound(IReadOnlyList<PivotField> fields, IReadOnlyList<string> headers) =>
-        [.. fields.Select(field => IndexOf(headers, field.SourceName) is var at and >= 0 ? field with { SourceColumnIndex = at } : field)];
+    private IReadOnlyList<PivotField> Rebound(IReadOnlyList<PivotField> fields, IReadOnlyList<string> headers)
+    {
+        var kept = fields
+            .Select(field => field.IsCalculated ? field
+                : IndexOf(headers, field.SourceName) is var at and >= 0 ? field with { SourceColumnIndex = at }
+                : null)
+            .OfType<PivotField>()
+            .ToList();
+
+        var added = headers
+            .Select((header, index) => (Header: header, Index: index))
+            .Where(column => !fields.Any(field => !field.IsCalculated && string.Equals(field.SourceName, column.Header, StringComparison.OrdinalIgnoreCase)))
+            .Select(column => new PivotField { SourceName = column.Header, SourceColumnIndex = column.Index });
+
+        return [.. kept, .. added];
+    }
 
     private int IndexOf(IReadOnlyList<string> headers, string name)
     {

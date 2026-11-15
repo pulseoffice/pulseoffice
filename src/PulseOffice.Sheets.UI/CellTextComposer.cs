@@ -25,7 +25,7 @@ public sealed class CellTextComposer : ICellTextComposer
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(font);
 
-        var size = font.Size;
+        var size = font.Size * CellBoxMetrics.PixelsPerPoint;
         if (font.Script is CellScript.Superscript or CellScript.Subscript) size *= ScriptScale;
 
         var formatted = new FormattedText(

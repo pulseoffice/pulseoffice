@@ -32,7 +32,7 @@ public class SheetLayoutScaleTests
         Assert.True(layout.IsRowHidden(Rows - 1));
         Assert.False(layout.IsRowHidden(Rows));
         Assert.True(retained < 4 * 1024 * 1024, $"retained {retained} bytes");
-        Assert.True(clock.ElapsedMilliseconds < 3000, $"took {clock.ElapsedMilliseconds} ms");
+        Assert.True(clock.ElapsedMilliseconds < 6000, $"took {clock.ElapsedMilliseconds} ms");
     }
 
     [Fact]

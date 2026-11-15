@@ -318,6 +318,8 @@ public sealed class OdfShapesAuditTests
             parent.Add(innermost);
         });
 
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         Assert.True(new OdsReader().Read(stream).Succeeded);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(90), $"reading took {clock.Elapsed}");
     }
 }

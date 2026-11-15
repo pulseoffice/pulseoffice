@@ -13,6 +13,7 @@ internal sealed class OdsGroupedObjects
 
     public bool Present(XDocument content) =>
         content.Descendants(Namespaces.Table + "table").Descendants(Namespaces.Draw + "g")
+            .Where(group => group.Parent?.Name != Namespaces.Draw + "g")
             .Any(group => group.Descendants().Any(Unsupported));
 
     private bool Unsupported(XElement element) =>
