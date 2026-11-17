@@ -199,6 +199,20 @@ public abstract class CommandSweepTests : IDisposable
 
     private const int Parts = 4;
 
+    private static readonly IReadOnlySet<string> VolatileParts = new HashSet<string>(StringComparer.Ordinal) { "settings.xml" };
+
+    private static readonly System.Text.RegularExpressions.Regex VolatileMeta = new(
+        "<(meta:creation-date|dc:date|meta:editing-duration|meta:print-date)>[^<]*</\\1>", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string Diff(string expected, string actual)
+    {
+        var start = 0;
+        while (start < expected.Length && start < actual.Length && expected[start] == actual[start]) start++;
+        var from = Math.Max(0, start - 60);
+        string Around(string text) => text.Length <= from ? string.Empty : text.Substring(from, Math.Min(200, text.Length - from));
+        return $"at {start}: expected «{Around(expected)}» but was «{Around(actual)}»";
+    }
+
     private static readonly CommandId RepeatCommand = new("shell.edit.repeat");
 
     private const int LargeParts = 12;
@@ -563,9 +577,41 @@ public abstract class CommandSweepTests : IDisposable
                 frame);
         }
 
+        IReadOnlyDictionary<string, string> Content()
+        {
+            var model = workspace.Active?.Model;
+            using var stream = new MemoryStream();
+            var written = model switch
+            {
+                PulseOffice.Sheets.Workbook workbook => provider.GetRequiredService<PulseOffice.Formats.ISpreadsheetFormatRegistry>() is var sheets
+                    ? sheets.WriterFor(sheets.Native)!.Write(workbook, stream) : null,
+                PulseOffice.Documents.TextDocument text => provider.GetRequiredService<PulseOffice.Formats.ITextDocumentFormatRegistry>() is var texts
+                    ? texts.WriterFor("content" + texts.Native.Extensions[0])!.Write(text, stream) : null,
+                PulseOffice.Presentations.Presentation deck => provider.GetRequiredService<PulseOffice.Formats.IPresentationFormatRegistry>() is var decks
+                    ? decks.WriterFor("content" + decks.Native.Extensions[0])!.Write(deck, stream) : null,
+                _ => null,
+            };
+            if (written is null) return new Dictionary<string, string>();
+            if (!written.Succeeded) return new Dictionary<string, string> { ["write"] = string.Join(" ", written.Diagnostics.Select(note => note.Message)) };
+            stream.Position = 0;
+            using var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read);
+            var parts = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var entry in archive.Entries.Where(entry => !VolatileParts.Contains(entry.FullName) && !entry.FullName.StartsWith("Thumbnails/", StringComparison.Ordinal)))
+            {
+                using var reader = new StreamReader(entry.Open());
+                var text = reader.ReadToEnd();
+                parts[entry.FullName] = entry.FullName == "meta.xml" ? VolatileMeta.Replace(text, string.Empty) : text;
+            }
+            return parts;
+        }
+
         OpenDocument? prepared = null;
         object? preparedPoint = null;
         string? preparedPrint = null;
+        IReadOnlyDictionary<string, string>? preparedContent = null;
+        var undoChecked = 0;
+        var undoUnreachable = 0;
+        var undoFailures = new List<string>();
         var restores = 0;
         var rebuilds = 0;
 
@@ -576,6 +622,7 @@ public abstract class CommandSweepTests : IDisposable
             prepared = workspace.Active;
             preparedPoint = prepared?.History.StatePoint;
             preparedPrint = Fingerprint();
+            preparedContent = null;
         }
 
         bool Restore()
@@ -631,7 +678,11 @@ public abstract class CommandSweepTests : IDisposable
             void Notice(object? sender, PulseOffice.UI.Controls.Notifications.NotificationChange e) => notices++;
             var notifications = provider.GetRequiredService<PulseOffice.UI.Controls.Notifications.INotificationCenter>();
             notifications.Changed += Notice;
-            if (document is not null) document.History.Changed += Count;
+            var outsideHistory = 0;
+            void Outside(object? sender, EventArgs e) => outsideHistory++;
+            var pointBefore = document?.History.StatePoint;
+            if (document is not null && preparedContent is null && ReferenceEquals(pointBefore, preparedPoint)) preparedContent = Content();
+            if (document is not null) { document.History.Changed += Count; document.History.ChangedOutsideHistory += Outside; }
             var before = Frame();
             var checkedBefore = command.CheckedWhen?.Invoke(context);
             var documents = workspace.Documents.Count;
@@ -670,7 +721,7 @@ public abstract class CommandSweepTests : IDisposable
                 Dispatcher.UIThread.RunJobs();
             }
 
-            if (document is not null) document.History.Changed -= Count;
+            if (document is not null) { document.History.Changed -= Count; document.History.ChangedOutsideHistory -= Outside; }
             notifications.Changed -= Notice;
             while (host.IsDialogOpen) { waited.Add("dialog"); host.Close(null); Dispatcher.UIThread.RunJobs(); }
 
@@ -701,6 +752,35 @@ public abstract class CommandSweepTests : IDisposable
             if (effects.Count == 0 && AlreadyInThatState.TryGetValue(id.Value, out var reason)) effects.Add(reason);
             rows.Add(new SweepRow(id.Value, outcome.Kind.ToString(), string.Join("+", effects), outcome.Reason ?? string.Empty));
             Trace(rows[^1], watch.Elapsed);
+            if (document is not null && ReferenceEquals(workspace.Active, document) && workspace.Documents.Count == documents && !command.OutsideHistory && outsideHistory == 0
+                && preparedContent is not null && ReferenceEquals(pointBefore, preparedPoint) && !ReferenceEquals(document.History.StatePoint, pointBefore))
+                CheckUndo(id.Value, document);
+        }
+
+        void CheckUndo(string command, OpenDocument document)
+        {
+            while (host.IsDialogOpen) { host.Close(null); Dispatcher.UIThread.RunJobs(); }
+            if (panel.IsOpen) panel.Toggle();
+            Dispatcher.UIThread.RunJobs();
+            var after = Content();
+            var stack = document.History;
+            var count = 0;
+            for (; count < 64 && !ReferenceEquals(stack.StatePoint, preparedPoint) && stack.CanUndo; count++) stack.Undo();
+            Dispatcher.UIThread.RunJobs();
+            if (!ReferenceEquals(stack.StatePoint, preparedPoint)) { undoUnreachable++; return; }
+            undoChecked++;
+            Report("undo", Content(), preparedContent!);
+            for (var step = 0; step < count && stack.CanRedo; step++) stack.Redo();
+            Dispatcher.UIThread.RunJobs();
+            Report("redo", Content(), after);
+
+            void Report(string what, IReadOnlyDictionary<string, string> actual, IReadOnlyDictionary<string, string> expected)
+            {
+                var differing = actual.Keys.Union(expected.Keys).Where(key => actual.GetValueOrDefault(key) != expected.GetValueOrDefault(key)).ToList();
+                if (differing.Count == 0) return;
+                restorable = false;
+                undoFailures.Add($"{command} [{module}/{context}]: {what} does not restore the content: " + string.Join("; ", differing.Select(key => $"{key} {Diff(expected.GetValueOrDefault(key) ?? "", actual.GetValueOrDefault(key) ?? "")}")));
+            }
         }
 
         await clipboard.SetAsync(new ClipboardContent { Text = string.Empty });
@@ -708,13 +788,14 @@ public abstract class CommandSweepTests : IDisposable
         {
             Directory.CreateDirectory(output);
             File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.tsv"), rows.Select(row => $"{row.Command}\t{row.Outcome}\t{row.Effect}\t{row.Detail.Replace('\t', ' ').Replace('\n', ' ')}"));
-            File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.timings.tsv"), timings.Append($"#\trestores\t{restores}\trebuilds\t{rebuilds}"));
+            File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.timings.tsv"), timings.Append($"#\trestores\t{restores}\trebuilds\t{rebuilds}\tundoChecked\t{undoChecked}\tundoUnreachable\t{undoUnreachable}"));
         }
 
         Assert.True(rows.Count > 0 || scenario is not TypicalScenario, "the typical context runs no command");
         var failed = rows.Where(row => row.Outcome is "Failed" or "Hang").Select(row => $"{row.Command}: {row.Outcome} {row.Effect} {row.Detail}").ToList();
+        var undoBroken = undoFailures;
         var silent = rows.Where(row => row.Outcome == "Ran" && row.Effect.Length == 0).Select(row => $"{row.Command}: no effect and no reason").ToList();
-        Assert.True(failed.Count + silent.Count == 0, string.Join("\n", failed.Concat(silent)));
+        Assert.True(failed.Count + silent.Count + undoBroken.Count == 0, string.Join("\n", failed.Concat(silent).Concat(undoBroken)));
         window.Close();
     }, CancellationToken.None);
 }

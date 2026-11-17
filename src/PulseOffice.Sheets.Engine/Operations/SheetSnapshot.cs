@@ -46,6 +46,10 @@ public sealed record SheetSnapshot(
     public IReadOnlyList<LabelRange> Labels { get; init; } = [];
 
     public FrozenPanes Frozen { get; init; } = FrozenPanes.None;
+
+    public int RepeatedPrintRows { get; init; }
+
+    public int RepeatedPrintColumns { get; init; }
 }
 
 public interface ISheetSnapshots
@@ -90,6 +94,8 @@ public sealed class SheetSnapshots : ISheetSnapshots
             QueryBindings = [.. sheet.QueryBindings.All],
             Labels = [.. sheet.Labels.All],
             Frozen = sheet.Frozen,
+            RepeatedPrintRows = sheet.RepeatedPrintRows,
+            RepeatedPrintColumns = sheet.RepeatedPrintColumns,
         };
     }
 
@@ -156,6 +162,8 @@ public sealed class SheetSnapshots : ISheetSnapshots
         sheet.Labels.Clear();
         foreach (var label in snapshot.Labels) sheet.Labels.Add(label);
         sheet.Frozen = snapshot.Frozen;
+        sheet.RepeatedPrintRows = snapshot.RepeatedPrintRows;
+        sheet.RepeatedPrintColumns = snapshot.RepeatedPrintColumns;
 
         if (snapshot.AutoFilter is { } autoFilter) sheet.AutoFilter.Restore(autoFilter);
         foreach (var (owner, filter) in snapshot.RangeFilters) owner.RangeFilter = filter;

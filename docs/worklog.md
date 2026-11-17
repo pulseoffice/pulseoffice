@@ -13783,3 +13783,34 @@ Log: [deep-audit/round-153-ledger-rule-references.md](deep-audit/round-153-ledge
 - **ODP notes/handout header and footer** (medium): tabs and repeated spaces not written as markup nor read.
 - Fontwork, equations, ODT change notes, watermarks and inline chart data cells left as low/open.
   Log: docs/deep-audit/round-152-plain-text.md.
+
+## Command sweep: undo and redo check (2026-11-17)
+
+The command sweep (decision 19) checked only that each enabled command does something or refuses with a reason; a
+deliberately broken undo of `deck.slide.hide` stayed green. Now, after every command that added a history step, the
+sweep undoes back to the prepared history point and compares a content fingerprint with the one taken before the
+command, then redoes and compares with the one after it.
+
+- **Which commands**: those after which the history's `StatePoint` moved away from the prepared point, with no
+  `ChangedOutsideHistory` raised, not declared `OutsideHistory` (decision 21: protection and change recording), and with
+  the workspace still on the same document. View toggles, dialogs, files, print and export never move the `StatePoint`,
+  so they are skipped by the same test, with no list. Commands whose step merged into the prepared one (the point can no
+  longer be reached) are counted as unreachable, not checked (one per module).
+- **Fingerprint**: the module's native ODF writer into memory; every package part as text except `settings.xml` (view
+  state: active sheet, zoom, cursor) and `Thumbnails/`, with `meta:creation-date`, `dc:date`, `meta:editing-duration`
+  and `meta:print-date` removed from `meta.xml` (the writer stamps the current time when the document has none, the
+  only false positive found). Taken once per prepared state. A failure names command, context, undo or redo, and for
+  each differing part the offset and about 200 characters around the first difference; it also forces a rebuild, so
+  the next command does not inherit the wrong state.
+- **Checked**: 199 commands and contexts in Ledger, 125 in Folio, 161 in Deck.
+- **Defect found**: `ledger.print.repeatRows` (medium): undo left the print titles, since `SheetSnapshot` carried neither
+  `RepeatedPrintRows` nor `RepeatedPrintColumns`; both are now in the snapshot (`SheetSnapshotPrintTitlesTests`). No
+  other undo or redo defect showed up.
+- **Proof**: a scratch commit made the undo of `deck.slide.hide` do nothing and dropped the merges from the sheet
+  snapshot restore; the sweep failed naming `deck.slide.hide [presentations/typical]`, `ledger.merge.cells` and
+  `ledger.merge.centre [sheets/typical]`, then the commit was reverted.
+- **Timings** (sum of chunk times, slowest chunk): Sheets 1023 s, 183 s (was 953 s); Documents 623 s, 113 s (was
+  581 s); Presentations 373 s, 73 s (was 319 s). Every chunk well under 600 s and every slice under 60 s.
+
+Not verified: commands that change the document only outside the history while also adding a step (none known), and
+content the ODF writer does not serialize (it would be a format defect under rule 7 first).

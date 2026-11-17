@@ -225,6 +225,14 @@ Central package management in `Directory.Packages.props`: **versions are never w
     prepared one and the command opened no dialog or panel; otherwise the document is rebuilt. Repeat always starts
     from a rebuild, since it depends on the last command run. `PULSEOFFICE_SWEEP_OUT=<folder>` writes per-slice
     results and per-command timings (`*.timings.tsv`: prepare, before, execution, total, prepare steps).
+    The sweep also checks **undo and redo** (2026-11-17): after a command that added a history step (the history's
+    `StatePoint` moved away from the prepared point, no `ChangedOutsideHistory` was raised, the command is not
+    `OutsideHistory`, and the workspace still shows the same document), it undoes back to the prepared point and compares
+    a content fingerprint with the one taken before the command, then redoes and compares with the one after it; a
+    difference fails with command, context and the first differing text of each package part. The fingerprint is the
+    module's native ODF writer into memory: every package part except `settings.xml` (view state) and `Thumbnails/`, with
+    the volatile dates removed from `meta.xml`. Commands that do not go through the history (view, dialogs, files, print,
+    export) are skipped by that same test, not by a list; there is no per-command exception.
 
 20. **GPL-3.0-only license and packages** (2026-11-02): text in `LICENSE`, `PackageLicenseExpression` in
     `Directory.Build.props`, which also holds `<Version>`. Every package is published self-contained with **ReadyToRun** (2026-11-15:
