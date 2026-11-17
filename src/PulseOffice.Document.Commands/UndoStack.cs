@@ -140,6 +140,13 @@ public sealed class UndoStack
             : new CompositeAction(description ?? string.Empty, actions));
     }
 
+    public void DiscardRedo()
+    {
+        if (_undone.Count == 0 || _transaction is not null) return;
+        _undone.Clear();
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     public void Clear()
     {
         _base = _done.Count > 0 ? new object() : _base;

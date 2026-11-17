@@ -14,7 +14,7 @@ public sealed class PptxWriter : IPresentationWriter
     private readonly PptxThemeWriter _theme;
     private readonly PptxMasterWriter _master;
     private readonly SlideListWriter _slides;
-    private readonly PptxCommentMapper _comments = new(new PulseOffice.Formats.Packaging.XmlCharacterFilter());
+    private readonly PptxCommentMapper _comments = new(new PulseOffice.Formats.Packaging.XmlCharacterFilter(), new DrawingML.DrawingPlainText());
     private readonly ShowPropertiesWriter _show = new();
     private readonly PptxFidelityRules _fidelity;
     private readonly PptxPrintMasters _print = new();

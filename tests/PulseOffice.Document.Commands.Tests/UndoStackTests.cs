@@ -9,6 +9,25 @@ public class UndoStackTests
     new DelegateAction(name, () => log.Add($"+{name}"), () => log.Add($"-{name}"));
 
     [Fact]
+    public void ScartareIlRipristinoLasciaIntattoCioCheSiPuoAnnullare()
+    {
+        var log = new List<string>();
+        var stack = new UndoStack();
+        stack.Push(Action(log, "uno"));
+        stack.Push(Action(log, "due"));
+        var point = stack.StatePoint;
+        stack.Push(Action(log, "tre"));
+        stack.Undo();
+
+        stack.DiscardRedo();
+
+        Assert.False(stack.CanRedo);
+        Assert.Same(point, stack.StatePoint);
+        stack.Redo();
+        Assert.Equal(["-tre"], log);
+    }
+
+    [Fact]
     public void UnaCronologiaVuotaNonAnnullaNulla()
     {
         var stack = new UndoStack();

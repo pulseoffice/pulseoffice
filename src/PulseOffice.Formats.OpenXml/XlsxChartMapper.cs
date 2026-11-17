@@ -29,7 +29,7 @@ public sealed class XlsxChartMapper
     {
         var families = new ChartFamilies();
         _builder = new ChartSpaceBuilder(families);
-        _reader = new ChartSpaceReader(families);
+        _reader = new ChartSpaceReader(families, new PulseOffice.Formats.OpenXml.DrawingML.DrawingPlainText());
     }
 
     public IEnumerable<OpenXmlCompositeElement> BuildAnchors(

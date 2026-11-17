@@ -16,6 +16,39 @@ public class SheetRenameAndDuplicateTests(EngineFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public void Renaming_a_sheet_rewrites_the_rules_and_validations_that_point_to_it()
+    {
+        var (workbook, engine) = fixture.CreateWorkbook();
+        var data = workbook.Sheets[0];
+        var summary = workbook.AddSheet("Summary");
+        summary.ConditionalRules.Add(new PulseOffice.Sheets.Formatting.ConditionalRule
+        {
+            Range = new CellRange(A("A1"), A("A5")),
+            Formula = "Sheet1.A1>0",
+        });
+        summary.Validations.Add(new DataValidation
+        {
+            Range = new CellRange(A("B1"), A("B5")),
+            Kind = ValidationKind.List,
+            FirstFormula = "Sheet1.$A$1:$A$5",
+        });
+
+        var renaming = new SheetRenaming();
+        var plan = renaming.Plan(workbook, data, "Data");
+        renaming.Apply(engine, plan);
+
+        Assert.Contains("Data", summary.ConditionalRules[0].Formula);
+        Assert.DoesNotContain("Sheet1", summary.ConditionalRules[0].Formula);
+        Assert.Contains("Data", summary.Validations[0].FirstFormula);
+        Assert.DoesNotContain("Sheet1", summary.Validations[0].FirstFormula);
+
+        renaming.Revert(engine, plan);
+
+        Assert.Equal("Sheet1.A1>0", summary.ConditionalRules[0].Formula);
+        Assert.Equal("Sheet1.$A$1:$A$5", summary.Validations[0].FirstFormula);
+    }
+
+    [Fact]
     public void RinominareUnFoglioRiscriveLeFormuleEINomi()
     {
         var (workbook, engine) = fixture.CreateWorkbook();

@@ -35,7 +35,7 @@ public class OdfPackageHardeningTests
     {
         XNamespace legacy = "http://openoffice.org/2000/text";
         var nested = new XElement(legacy + "span");
-        for (var depth = 0; depth < 100_000; depth++) nested = new XElement(legacy + "span", nested);
+        for (var depth = 0; depth < SmallStackThread.DeeperThanAnyRecursionFits; depth++) nested = new XElement(legacy + "span", nested);
         var document = new XDocument(new XElement(Packaging.Legacy.LegacyVocabulary.LegacyOffice + "document-content", nested));
 
         Exception? failure = null;

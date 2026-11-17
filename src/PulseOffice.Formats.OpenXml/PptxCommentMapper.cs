@@ -7,7 +7,7 @@ using P = DocumentFormat.OpenXml.Presentation;
 
 namespace PulseOffice.Formats.OpenXml;
 
-public sealed class PptxCommentMapper(PulseOffice.Formats.Packaging.XmlCharacterFilter characters)
+public sealed class PptxCommentMapper(PulseOffice.Formats.Packaging.XmlCharacterFilter characters, PulseOffice.Formats.OpenXml.DrawingML.IDrawingPlainText plainText)
 {
 
     private readonly Dictionary<string, uint> _authorIds = new(StringComparer.Ordinal);
@@ -87,7 +87,7 @@ public sealed class PptxCommentMapper(PulseOffice.Formats.Packaging.XmlCharacter
     public const int MaximumReplies = 10_000;
 
     private string BodyText(M.TextBodyType? body) =>
-        body is null ? string.Empty : string.Join("\n", body.Elements<A.Paragraph>().Select(paragraph => string.Concat(paragraph.Descendants<A.Text>().Select(run => run.Text))));
+        plainText.Body(body);
 
     private IEnumerable<SlideComment> Legacy(SlidePart slidePart, PresentationPart presentationPart, string slideId)
     {

@@ -7,7 +7,7 @@ namespace PulseOffice.Sheets.UI;
 
 public sealed class LedgerDrawCommands(IActiveSheetContext context, IDrawingToolState tools) : LedgerCommandSet(context)
 {
-    private static readonly (string Id, DrawingTool Tool, bool Filled)[] Pens =
+    internal static readonly (string Id, DrawingTool Tool, bool Filled)[] Pens =
     [
         ("ledger.draw.polygon", DrawingTool.Polygon, false),
         ("ledger.draw.polygonFilled", DrawingTool.Polygon, true),
@@ -30,7 +30,7 @@ public sealed class LedgerDrawCommands(IActiveSheetContext context, IDrawingTool
             {
                 IconKey = id,
                 MenuPath = "insert/draw",
-                Surface = CommandSurface.Advanced,
+                Surface = CommandSurface.Palette,
                 RequiredState = DocumentState.DocumentOpen,
                 ForbiddenState = DocumentState.ReadOnly,
                 EnabledWhen = _ => Context.HasTarget,

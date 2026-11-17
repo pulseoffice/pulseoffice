@@ -24,8 +24,8 @@ public sealed class OdfDeckChartMapper
     public OdfDeckChartMapper()
     {
         var vocabulary = new OdfChartVocabulary();
-        _builder = new InlineChartDocumentBuilder(vocabulary, _units);
-        _reader = new InlineChartDocumentReader(vocabulary);
+        _builder = new InlineChartDocumentBuilder(vocabulary, _units, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
+        _reader = new InlineChartDocumentReader(vocabulary, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
     }
 
     public XElement BuildFrame(ObjectElement element, string href) =>

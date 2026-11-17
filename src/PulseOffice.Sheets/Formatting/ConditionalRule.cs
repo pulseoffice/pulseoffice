@@ -133,6 +133,26 @@ public sealed record ConditionalRule
 
     public int IconCount => IconSetName.Length > 0 && int.TryParse(IconSetName.AsSpan(0, 1), out var count) && count >= 3 ? count : 3;
 
+    public ConditionalRule WithFormulas(Func<string?, string?> rewrite)
+    {
+        ArgumentNullException.ThrowIfNull(rewrite);
+        var thresholds = Thresholds
+            .Select(threshold => threshold.Formula is null ? threshold : threshold with { Formula = rewrite(threshold.Formula) })
+            .ToList();
+        return this with
+        {
+            Formula = rewrite(Formula),
+            Thresholds = thresholds.SequenceEqual(Thresholds) ? Thresholds : thresholds,
+        };
+    }
+
+    public bool SameFormulas(ConditionalRule other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return Formula == other.Formula
+            && Thresholds.Select(threshold => threshold.Formula).SequenceEqual(other.Thresholds.Select(threshold => threshold.Formula));
+    }
+
     public string Describe() => Visual switch
     {
         ConditionalVisual.DataBar => $"DataBar {RangeText}",

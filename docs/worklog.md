@@ -13629,3 +13629,157 @@ Log: [deep-audit/round-147-external-data.md](deep-audit/round-147-external-data.
   threw. Covered slots are tracked per column.
 - **Document data loader** (minor): driver failures other than `DbException` escaped instead of being reported.
 - OMML/MathML round trips, the CSV codec and `QueryRefresher` checked without defects.
+
+## Round 148: HTML export of merges over hidden cells (2026-11-16)
+
+Log: [deep-audit/round-148-html-merges.md](deep-audit/round-148-html-merges.md).
+
+- **HTML export of a merge starting in a hidden row or column** (minor, left by round 147): the block lost its text;
+  the first visible cell now carries the anchor's value and the visible spans. The CSV item stays open.
+
+## Round 149: Ledger data validation (2026-11-16)
+
+Log: [deep-audit/round-149-ledger-validation.md](deep-audit/round-149-ledger-validation.md).
+
+- **ODS validation shared by scattered cells** (medium): read as the bounding box, so it spread to the cells between
+  them; now one rule per rectangle, anchored to `table:base-cell-address`.
+- **Deleting the first rows or columns of a validation range** (medium): relative limits became `#REF!` and the rule
+  accepted everything; formulas are re-anchored to the first surviving cell (`IValidationAnchoring`, shared with
+  placement and the ODS reader).
+- Open: the same clipped-start case for conditional formats and the per-cell linear name lookup in the ODS writer.
+
+## Deep audit, round 151 (2026-11-16): Deck notes and comments, Folio comments
+- **ODP speaker notes** (medium): whitespace elements dropped on read and not written; now the shared paragraph text
+  codec both ways.
+- **PPTX notes and modern comments** (medium): `a:br` ignored; new shared `IDrawingPlainText`.
+- Folio DOCX/ODT comments and notes read without defects. Log: docs/deep-audit/round-151-deck-notes.md.
+
+## Shape picker: one Insert › Shape… entry in the three modules (2026-11-16)
+
+The Insert menu of Folio had a Shape submenu with six family galleries, Line, Dimension line and a Drawing submenu;
+Deck and Ledger had their own variants (quick shapes, two or three family galleries, freeform pens). Each module now
+has **one** menu entry, «Shape…» (`folio.insert.shape`, `deck.insert.shape.gallery`, `ledger.shape.gallery`), that
+opens the shared `ShapePickerView` (`PulseOffice.UI.Controls.Shapes`) through `IShapeChooser`.
+
+- The modal (with the usual veil) has a left rail of sections with counts — All shapes, Recently used (only when not
+  empty), Basic shapes, Block arrows, Stars, Callouts, Symbols, Flowchart, Lines and drawing — a heading, a search box
+  that switches to All and matches shape names and section names, and a grid of tiles built on `ThumbnailGallery`
+  (real previews drawn from `ShapeGeometry` in the accent colour, captions and tooltips, arrow keys, Home/End, Enter and
+  double-click insert, Down from the search box enters the grid, Up/Down move along the rail). The footer has Cancel,
+  the name of the selected shape and Insert.
+- `ShapePickerModel` is UI-free and tested; `RecentShapes` keeps the last twelve choices for the session.
+- «Lines and drawing» holds Line plus module tools passed as `ShapeTool` (dimension line; Folio's and Deck's
+  freeform, curve and polygon pens; Folio's three connectors; Ledger's pens). A tool choice runs the same action as its
+  command; Ledger's connectors join two selected objects, so they stay where they were.
+- The old commands keep their ids for macros, the MCP agent and the palette: family galleries, line, dimension line and
+  pens are now `CommandSurface.Palette` (Deck and Ledger quick shapes keep the ribbon too), and their menu layout rules
+  were removed, because a menu rule puts a command back on the menu. Deck's clipart Gallery moved to Insert › Gallery.
+- Verified live on Linux (uiprobe): Folio's Insert menu shows a single «Forma…», the ribbon button opens the picker,
+  searching «stell» lists the four stars, double-click inserts a five-point star.
+## Round 150: Ledger range-bound rules (2026-11-16)
+
+Log: [deep-audit/round-150-ledger-range-rules.md](deep-audit/round-150-ledger-range-rules.md).
+
+- **Conditional formats with a clipped start** (medium): deleting the first rows or columns of a range broke the
+  relative formula; re-anchored to the first surviving cell through `SurvivingStart`, shared with validations.
+- **ODS writer validation lookup** (medium, performance): quadratic in the number of rules (x11 time for x4 rules);
+  now indexed by row band, with a relative performance test.
+- **Sheet renaming** (medium): conditional-format and validation formulas kept the old sheet name; now part of the
+  rename plan, undoable.
+- Open: formula thresholds of data bars, colour scales and icon sets do not follow structure edits or renaming.
+
+## Faster test runs: direct xUnit runner, balanced parallel chunks, result cache, slow-test report (2026-11-17)
+
+Measured on the Fedora machine (16 cores, 19 GB). Before: last full run 83 min (sweeps 62 min,
+`Desktop.Tests` 578 s, `Formats.OpenXml` 176 s, `Formats.Odf` 154 s, `Sheets.Engine` 115 s, `Documents.UI` 56 s),
+every chunk through `dotnet test` (MSBuild evaluation, vstest host, `--list-tests` 2.4 s per project).
+
+- **Runner** (`tools/run-tests.py`): the selection is built in one MSBuild invocation (generated `selection.slnf`)
+  instead of one `dotnet build` per project; each chunk runs the test assembly with its own xUnit v3 runner
+  (`dotnet exec <Tests>.dll -class … -xml`), classes are listed the same way (0.2 s); chunks are balanced by the
+  per-class durations kept in `artifacts/test-runs/cache.json` and up to three run at once under a 12 GB budget (4 GB
+  cap each; the highest peak seen is 2.7 GB); a project whose `bin` folder is unchanged since its last green run is
+  skipped (not for the three projects that read the source tree); every test over 5 s is printed and written to
+  `slow.tsv`, the cheap guard for the rule that new tests are designed for speed. The sweep projects are untouched.
+- **Desktop.Tests** was one serial headless collection in one process. The two exchange theories that took 400 of
+  its 568 s (`ExchangeMatrixTests` crossings, 45 rows of about 7 s; `ExchangeTests` object crossings, 45 rows of
+  about 2.3 s, each composing the whole app) are split into five classes each over a shared abstract base
+  (`ExchangeCrossing*Tests`, `ExchangeObjectCrossing*Tests`): same rows, same assertions, now spread over processes.
+- **Slow fixtures and oversized inputs**, every assertion kept: the million-row workbook of
+  `WholeColumnMillionRowPerformanceTests` is built once per class (`MillionRowWorkbook` class fixture) instead of
+  once per theory row; the deep-nesting ODF tests (100,000 or 50,000 levels, quadratic because every top-down
+  `XContainer.Add` walks its ancestors) use 10,000 levels on a 512 KB stack (`SmallStackThread`), where a recursive
+  reader cannot fit, so they still prove the point; `Round53` fuzzes 200 edits over 300 rows instead of 600 over
+  900 (same density); the subtotal and row-insert relative checks use 1,000 and 2,000 rows (a recalculation per edit
+  would still miss the bounds by an order of magnitude); the styled-columns ODS write uses 30,000 rows (a
+  rows-times-columns writer would still exceed 4 s).
+- Kept on purpose: the exhaustive malformed-attribute fuzzers (every attribute times every garbage value) and the
+  million-cell XLSX/ODS round trip, whose point is their size.
+- **Commits forced full rebuilds**: the SDK put the commit hash in every assembly's informational version and
+  queried source control for source link, so after each commit (agents commit after every piece of work) the next
+  build recompiled all projects: 4 min 13 s. Debug builds now skip both; the build after a commit takes 11 s. The
+  About dialog already dropped the part after `+`; Release builds are unchanged.
+- **Hard limits**: a chunk over 10 minutes is killed (`timeout`), a test running over 60 s kills its chunk (`hang`,
+  from xUnit's long-running reports), both are failures; `summary.tsv` has a column with each chunk's slowest test.
+  Verified with low thresholds: the scopes are killed and no test process is left behind.
+- After (same machine): `--changed` on the three touched projects 343 s with build, against 847 s of their test
+  time before; `Desktop.Tests` alone 260 s with build (13 chunks, peaks under 650 MB); a rerun with nothing changed
+  7 s (build check plus cache); full run without the sweeps (40 projects, 10,948 tests, cache off) 444 s of tests
+  in 77 chunks, against about 1,355 s before (1,255 s of chunks plus listing), plus the build; no-op build of the selection 7–12 s.
+
+## Command sweep speed (2026-11-17)
+
+The three command sweeps (decision 19) took about 28 min (Sheets), 19 (Documents) and 11 (Presentations), each as one
+process. Measured per command and context with `PULSEOFFICE_SWEEP_OUT` (new `*.timings.tsv`: prepare, before,
+execution, total, prepare steps): on Presentations the loop spent 142 s preparing, 17 s capturing the state before and
+21 s running commands, and most of the rest of the 585 s went to rebuilding the prepared document for commands that then
+turned out to be disabled. Rebuilding a Ledger document costs about 0.9 s (0.4 s creating the view, 0.5 s typing the four
+cells). No single command was an outlier worth an app fix: the slowest (rehearse, spelling language) take about 1 s.
+
+- **Prepared state reused**: while no command has run on the prepared state, the next command starts from it as is, so
+  disabled commands cost nothing.
+- **Restore instead of rebuild**: after a command, the harness undoes back to the prepared history point, drops the redo
+  steps (`UndoStack.DiscardRedo`, new, with a test) and accepts the restore only if a fingerprint (documents, read-only,
+  redo, dialog, panel, focus, selection, objects, enabled and checked state of every command except Repeat, rendered
+  frame) equals the prepared one and the command opened no dialog or panel; otherwise it rebuilds. Repeat always starts
+  from a rebuild, because the executor's last repeatable command is not part of the document. A first version without
+  the dialog rule let `folio.macro.editor` precede `folio.view.printLayout` and exposed an older order dependence: Folio's
+  view mode is shared by all documents, so a rebuild never reset it either; `folio.view.printLayout` is now declared
+  "already in that state" like `folio.view.singlePage`. In the last run 333 commands started from a restore and 1671 from
+  a rebuild.
+- **Shards**: `CommandSweepShard1..6` over the abstract `CommandSweepTests`; the typical, protected sheet and protected
+  section contexts are cut into twelve slices, the others into four, and slices are dealt round-robin to the shards.
+  The sweep projects have their own `xunit.runner.json` with `preEnumerateTheories`, otherwise the direct xUnit runner
+  sees each shard as a single test and kills it at the 60 s hang limit. Slowest slice 37 s, slowest chunk 175 s.
+- **`tools/run-tests.py`**: `<TestClassesPerChunk>` in a .csproj caps its chunks (the sweeps use 1, so each shard is
+  its own chunk even before the duration cache knows it); `SweepRule` selects a sweep under `--changed` and `--files`
+  only for changes to its module UI project, to Shell, Desktop and the shared UI projects, to files named after
+  commands, menus, ribbon, toolbar or shortcuts, to the sweep projects or to global build files, prints why the others
+  were skipped, and `--sweeps` forces them.
+
+Timings (sum of chunk times, then wall time with the default three jobs): Sheets 953 s, about 5.5 min wall (was 28 min);
+Documents 581 s, about 3.5 min (was 19); Presentations 319 s, about 2 min (was 11). All three together, build included,
+642 s.
+
+Proof that the sweep still catches defects: a scratch commit made `deck.slide.duplicate` a no-op and broke the undo of
+`deck.slide.hide`; the Presentations sweep failed with "deck.slide.duplicate: no effect and no reason", then the commit
+was reverted. The broken undo was **not** caught: the sweep checks that a command does something or refuses with a
+reason, not that its undo restores the state (the restore merely fell back to a rebuild). An undo check would need a
+fingerprint that ignores legitimate post-undo differences (selection, focus); left open.
+
+## Round 153: Ledger rule references (2026-11-17)
+
+Log: [deep-audit/round-153-ledger-rule-references.md](deep-audit/round-153-ledger-rule-references.md).
+
+- **Formula thresholds** (medium): data bar, colour scale and icon set thresholds now follow structure edits, range
+  moves and renames through `ConditionalRule.WithFormulas`, shared by every rule rewrite.
+- **Pivot tables on sheet rename** (medium): source and destination sheet names are now part of the undoable rename
+  plan.
+- Checked: sheet duplication keeps rules consistent with the copied cell formulas; the model has no protection ranges.
+## Deep audit, round 152 (2026-11-16): plain-text shortcuts in the codecs
+- **Chart and axis titles** (medium, ODF and OOXML): raw text one way, paragraph value or concatenated `a:t` the other;
+  multi-line titles lost their lines. Now `IOdfParagraphText` and `IDrawingPlainText` (one `a:p` per line).
+- **ODS tracked changes** (medium): previous cell text and comment lost breaks and later paragraphs.
+- **ODP notes/handout header and footer** (medium): tabs and repeated spaces not written as markup nor read.
+- Fontwork, equations, ODT change notes, watermarks and inline chart data cells left as low/open.
+  Log: docs/deep-audit/round-152-plain-text.md.

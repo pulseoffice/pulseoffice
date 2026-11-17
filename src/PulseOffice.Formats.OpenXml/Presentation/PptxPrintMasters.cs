@@ -3,12 +3,13 @@ using System.Xml.Linq;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using PulseOffice.Presentations;
+using PulseOffice.Formats.OpenXml.DrawingML;
 using D = DocumentFormat.OpenXml.Drawing;
 using P = DocumentFormat.OpenXml.Presentation;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed class PptxPrintMasters(IHandoutLayout layout)
+internal sealed class PptxPrintMasters(IHandoutLayout layout, IDrawingPlainText plainText)
 {
     public const long PageWidth = 7560000;
     public const long PageHeight = 10692000;
@@ -23,7 +24,7 @@ internal sealed class PptxPrintMasters(IHandoutLayout layout)
     private static readonly PageBox FooterBox = new(0.057, 0.945, 0.43, 0.035);
     private static readonly PageBox NumberBox = new(0.513, 0.945, 0.43, 0.035);
 
-    public PptxPrintMasters() : this(new HandoutLayout()) { }
+    public PptxPrintMasters() : this(new HandoutLayout(), new DrawingPlainText()) { }
 
     public void Write(PptxWriteSession session, PptxThemeWriter themes)
     {
@@ -118,8 +119,7 @@ internal sealed class PptxPrintMasters(IHandoutLayout layout)
                 && shape.NonVisualShapeProperties?.ApplicationNonVisualDrawingProperties?.PlaceholderShape is null
                 && shape.TextBody.Descendants<D.Text>().Any(run => run.Text.Trim().Length > 0));
         if (body?.TextBody is not { } text) return null;
-        var lines = text.Elements<D.Paragraph>().Select(paragraph => string.Concat(paragraph.Descendants<D.Text>().Select(run => run.Text)));
-        var joined = string.Join("\n", lines);
+        var joined = plainText.Body(text);
         return joined.Trim().Length == 0 ? null : joined;
     }
 

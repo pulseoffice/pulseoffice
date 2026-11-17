@@ -62,7 +62,7 @@ public sealed class OdpReader : IPresentationReader
                 new OdpHiddenShapes(new OdpElementVisibility()),
                 new GroupReader(),
                 new AnimationReader(new OdfAnimationMapper()),
-                new NotesReader(),
+                new NotesReader(paragraphText),
                 new CommentReader(paragraphText),
             ]);
     }

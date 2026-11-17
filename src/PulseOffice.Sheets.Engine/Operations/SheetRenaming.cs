@@ -15,7 +15,18 @@ public sealed record SheetRenamePlan(
     string? PageStyleAfter)
 {
     public IReadOnlyList<ChartReferenceChange> Charts { get; init; } = [];
+
+    public IReadOnlyList<SheetRuleRename> Rules { get; init; } = [];
+
+    public IReadOnlyList<(Pivot.PivotDefinition Before, Pivot.PivotDefinition After)> Pivots { get; init; } = [];
 }
+
+public sealed record SheetRuleRename(
+    Worksheet Sheet,
+    IReadOnlyList<Formatting.ConditionalRule> RulesBefore,
+    IReadOnlyList<Formatting.ConditionalRule> RulesAfter,
+    IReadOnlyList<DataValidation> ValidationsBefore,
+    IReadOnlyList<DataValidation> ValidationsAfter);
 
 public interface ISheetRenaming
 {
@@ -61,6 +72,16 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
             pageStyle ? sheet.PageStyleName : null, pageStyle ? newName : null)
         {
             Charts = charts.Renamed(workbook, oldName, newName),
+            Rules = [.. workbook.Sheets
+                .Select(owner => RenamedRules(owner, oldName, newName))
+                .OfType<SheetRuleRename>()],
+            Pivots = [.. workbook.Pivots
+                .Select(pivot => (Before: pivot, After: pivot with
+                {
+                    SourceSheet = Same(pivot.SourceSheet, oldName) ? newName : pivot.SourceSheet,
+                    DestinationSheet = Same(pivot.DestinationSheet, oldName) ? newName : pivot.DestinationSheet,
+                }))
+                .Where(pair => pair.After != pair.Before)],
         };
     }
 
@@ -98,6 +119,20 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
 
         charts.Apply(plan.Charts, forward);
 
+        foreach (var (before, after) in plan.Pivots)
+        {
+            var index = workbook.Pivots.IndexOf(forward ? before : after);
+            if (index >= 0) workbook.Pivots[index] = forward ? after : before;
+        }
+
+        foreach (var rename in plan.Rules)
+        {
+            rename.Sheet.ConditionalRules.Clear();
+            rename.Sheet.ConditionalRules.AddRange(forward ? rename.RulesAfter : rename.RulesBefore);
+            rename.Sheet.Validations.Clear();
+            rename.Sheet.Validations.AddRange(forward ? rename.ValidationsAfter : rename.ValidationsBefore);
+        }
+
         foreach (var (owner, address, before, after) in plan.Formulas)
         {
             var index = workbook.IndexOf(owner);
@@ -107,6 +142,32 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
         }
 
         engine.RecalculateAll();
+    }
+
+    private bool Same(string? sheet, string name) => string.Equals(sheet, name, StringComparison.CurrentCultureIgnoreCase);
+
+    private SheetRuleRename? RenamedRules(Worksheet owner, string oldName, string newName)
+    {
+        var rules = owner.ConditionalRules.Select(rule => rule.WithFormulas(text => RenamedBare(text, oldName, newName))).ToList();
+        var validations = owner.Validations.Select(validation => validation with
+        {
+            FirstFormula = RenamedBare(validation.FirstFormula, oldName, newName),
+            SecondFormula = RenamedBare(validation.SecondFormula, oldName, newName),
+        }).ToList();
+
+        return rules.SequenceEqual(owner.ConditionalRules) && validations.SequenceEqual(owner.Validations)
+            ? null
+            : new SheetRuleRename(owner, [.. owner.ConditionalRules], rules, [.. owner.Validations], validations);
+    }
+
+    private string? RenamedBare(string? formula, string oldName, string newName)
+    {
+        if (string.IsNullOrEmpty(formula)) return formula;
+
+        var prefixed = formula.StartsWith('=');
+        return Rewritten(prefixed ? formula : "=" + formula, oldName, newName) is { } rewritten
+            ? prefixed ? rewritten : rewritten[1..]
+            : formula;
     }
 
     private DefinedName Renamed(DefinedName name, string oldName, string newName)

@@ -290,7 +290,7 @@ public sealed class OdfRootAuditTests
     [Fact]
     public void Un_nome_di_funzione_con_prefissi_ripetuti_si_importa_senza_traboccare()
     {
-        var formula = "of:=" + string.Concat(Enumerable.Repeat("COM.MICROSOFT.", 50_000)) + "XLOOKUP(1;2;3)";
+        var formula = "of:=" + string.Concat(Enumerable.Repeat("COM.MICROSOFT.", SmallStackThread.DeeperThanAnyRecursionFits)) + "XLOOKUP(1;2;3)";
 
         Exception? failure = null;
         string? imported = null;

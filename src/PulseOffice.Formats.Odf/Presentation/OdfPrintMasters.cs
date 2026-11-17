@@ -4,7 +4,7 @@ using PulseOffice.Presentations;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed class OdfPrintMasters(IHandoutLayout layout)
+internal sealed class OdfPrintMasters(IHandoutLayout layout, PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText paragraphs)
 {
     public const string PageLayoutName = "PL2";
 
@@ -23,7 +23,7 @@ internal sealed class OdfPrintMasters(IHandoutLayout layout)
     private static readonly PageBox FooterBox = new(0.057, 0.945, 0.43, 0.035);
     private static readonly PageBox NumberBox = new(0.513, 0.945, 0.43, 0.035);
 
-    public OdfPrintMasters() : this(new HandoutLayout()) { }
+    public OdfPrintMasters() : this(new HandoutLayout(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()) { }
 
     public XElement PageLayout() =>
         new(Style + "page-layout",
@@ -56,11 +56,11 @@ internal sealed class OdfPrintMasters(IHandoutLayout layout)
                 new XAttribute(Fo + "font-size", master.FontSize.ToString("0.##", CultureInfo.InvariantCulture) + "pt"))));
     }
 
-    public XElement SlideNotes(NotesMaster master, string notes, string styleName)
+    public XElement SlideNotes(NotesMaster master, IEnumerable<XElement> paragraphs, string styleName)
     {
         ArgumentException.ThrowIfNullOrEmpty(styleName);
         ArgumentNullException.ThrowIfNull(master);
-        ArgumentNullException.ThrowIfNull(notes);
+        ArgumentNullException.ThrowIfNull(paragraphs);
 
         return new XElement(Presentation + "notes",
             Thumbnail(master.SlideBox, "page"),
@@ -69,8 +69,7 @@ internal sealed class OdfPrintMasters(IHandoutLayout layout)
                 new XAttribute(Draw + "layer", "layout"),
                 new XAttribute(Presentation + "class", "notes"),
                 Geometry(master.NotesBox),
-                new XElement(Draw + "text-box",
-                    notes.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => new XElement(Text + "p", line)))));
+                new XElement(Draw + "text-box", paragraphs)));
     }
 
     private double? NamedNotesSize(XElement masterStyles, XElement? namedStyles)
@@ -141,8 +140,7 @@ internal sealed class OdfPrintMasters(IHandoutLayout layout)
 
     private XElement Frame(PageBox box, string kind, string? text, XAttribute? extra = null, XElement? field = null)
     {
-        var paragraph = new XElement(Text + "p");
-        if (!string.IsNullOrEmpty(text)) paragraph.Add(text);
+        var paragraph = string.IsNullOrEmpty(text) ? new XElement(Text + "p") : paragraphs.Paragraph(text);
         if (field is not null) paragraph.Add(field);
 
         return new XElement(Draw + "frame",
@@ -179,7 +177,7 @@ internal sealed class OdfPrintMasters(IHandoutLayout layout)
     private string? Class(XElement frame) => (string?)frame.Attribute(Presentation + "class");
 
     private string TextOf(XElement owner, string kind) =>
-        Frames(owner).FirstOrDefault(frame => Class(frame) == kind)?.Descendants(Text + "p").FirstOrDefault()?.Value.Trim() ?? string.Empty;
+        Frames(owner).FirstOrDefault(frame => Class(frame) == kind)?.Descendants(Text + "p").FirstOrDefault() is { } paragraph ? paragraphs.Line(paragraph).Trim(' ') : string.Empty;
 
     private string Cm(double value) => value.ToString("0.###", CultureInfo.InvariantCulture) + "cm";
 }

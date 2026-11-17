@@ -287,11 +287,11 @@ public sealed class OdfShapesAuditTests
             var parent = row.Parent!;
             row.Remove();
             XElement innermost = row;
-            for (var level = 0; level < 100_000; level++) innermost = new XElement(table + "table-row-group", innermost);
+            for (var level = 0; level < SmallStackThread.DeeperThanAnyRecursionFits; level++) innermost = new XElement(table + "table-row-group", innermost);
             parent.Add(innermost);
         });
 
-        var back = new OdpReader(_themes, _masters).Read(stream);
+        var back = new SmallStackThread().Run(() => new OdpReader(_themes, _masters).Read(stream));
         Assert.True(back.Succeeded);
     }
 
@@ -314,12 +314,12 @@ public sealed class OdfShapesAuditTests
             var parent = custom.Parent!;
             custom.Remove();
             XElement innermost = custom;
-            for (var level = 0; level < 100_000; level++) innermost = new XElement(_draw + "g", innermost);
+            for (var level = 0; level < SmallStackThread.DeeperThanAnyRecursionFits; level++) innermost = new XElement(_draw + "g", innermost);
             parent.Add(innermost);
         });
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        Assert.True(new OdsReader().Read(stream).Succeeded);
+        Assert.True(new SmallStackThread().Run(() => new OdsReader().Read(stream)).Succeeded);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(90), $"reading took {clock.Elapsed}");
     }
 }

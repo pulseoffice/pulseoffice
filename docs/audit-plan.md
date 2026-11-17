@@ -424,3 +424,24 @@ if desired, on keyboard and screen readers in Folio (see log, "Audit, diciannove
   loader, web-query tabular sources), the CSV/HTML codecs and OMML/MathML. Two medium fixed (vanished pivot fields
   read another column, HTML row spans ignored) and one minor. Log:
   [deep-audit/round-147-external-data.md](deep-audit/round-147-external-data.md). **Status: medium found**, none open.
+- Deep audit, round 148 (2026-11-16): round 147's open minors. The HTML export of a merge starting in a hidden row or
+  column now keeps its text; the CSV number-looking text item stays open. Log:
+  [deep-audit/round-148-html-merges.md](deep-audit/round-148-html-merges.md). **Status: minor only.**
+- Deep audit, round 149 (2026-11-16): Ledger data validation (codecs, structure edits, placement). Two medium fixed:
+  ODS validations shared by scattered cells read as their bounding box, and relative limits broken by deleting the
+  first rows or columns of a rule. Log: [deep-audit/round-149-ledger-validation.md](deep-audit/round-149-ledger-validation.md).
+  **Status: medium found**; the clipped start of conditional formats remains to be probed.
+- Deep audit, round 151 (2026-11-16): Deck speaker notes and comments, Folio comments. Two medium fixed: ODP notes
+  dropped `text:s`/`text:tab`/`text:line-break`, PPTX notes and modern comments ignored `a:br`. Log:
+  [deep-audit/round-151-deck-notes.md](deep-audit/round-151-deck-notes.md). **Status: medium found.**
+- Deep audit, round 150 (2026-11-16): Ledger range-bound rules after round 149. Three medium fixed: conditional
+  formats with a clipped start, the quadratic ODS validation-name lookup, and rule and validation formulas left on the
+  old name by sheet renaming. Log: [deep-audit/round-150-ledger-range-rules.md](deep-audit/round-150-ledger-range-rules.md).
+  **Status: medium found**; formula thresholds of data bars, colour scales and icon sets remain to be probed.
+- Deep audit, round 153 (2026-11-17): Ledger rule references. Two medium fixed: formula thresholds of data bars,
+  colour scales and icon sets ignored structure edits, moves and renames; sheet renaming left pivot tables on the old
+  name. Log: [deep-audit/round-153-ledger-rule-references.md](deep-audit/round-153-ledger-rule-references.md).
+  **Status: medium found**, none open in scope.
+- Deep audit, round 152 (2026-11-16): plain-text shortcuts in the codecs. Four medium fixed: chart and axis titles
+  (ODF and OOXML), ODS tracked-change previous text and comment, ODP print-master header and footer. Log:
+  [deep-audit/round-152-plain-text.md](deep-audit/round-152-plain-text.md). **Status: medium found.**

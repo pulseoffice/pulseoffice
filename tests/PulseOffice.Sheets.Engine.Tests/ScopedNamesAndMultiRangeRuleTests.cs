@@ -141,6 +141,42 @@ public class ScopedNamesAndMultiRangeRuleTests(EngineFixture fixture) : IClassFi
         Assert.Empty(rule.AdditionalRanges);
         Assert.Equal("C1>0", rule.Formula);
     }
+
+    [Fact]
+    public void Deleting_the_first_rows_of_a_rule_keeps_its_relative_formula_on_the_surviving_cells()
+    {
+        var (workbook, engine) = fixture.CreateWorkbook();
+        var sheet = workbook.Sheets[0];
+        sheet.ConditionalRules.Add(new ConditionalRule
+        {
+            Range = new CellRange(A("A1"), A("A10")),
+            Formula = "B1>50",
+        });
+
+        new SheetStructure().DeleteRows(engine, 0, 0, 2);
+
+        var rule = Assert.Single(sheet.ConditionalRules);
+        Assert.Equal(new CellRange(A("A1"), A("A8")), rule.Range);
+        Assert.Equal("B1>50", rule.Formula);
+    }
+
+    [Fact]
+    public void Deleting_the_first_columns_of_a_rule_keeps_its_relative_formula_on_the_surviving_cells()
+    {
+        var (workbook, engine) = fixture.CreateWorkbook();
+        var sheet = workbook.Sheets[0];
+        sheet.ConditionalRules.Add(new ConditionalRule
+        {
+            Range = new CellRange(A("B1"), A("E1")),
+            Formula = "B2>0",
+        });
+
+        new SheetStructure().DeleteColumns(engine, 0, 1, 1);
+
+        var rule = Assert.Single(sheet.ConditionalRules);
+        Assert.Equal(new CellRange(A("B1"), A("D1")), rule.Range);
+        Assert.Equal("B2>0", rule.Formula);
+    }
 }
 
 public class ScopedNamesSheetRemovalTests

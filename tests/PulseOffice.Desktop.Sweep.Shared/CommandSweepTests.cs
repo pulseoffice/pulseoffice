@@ -18,13 +18,60 @@ using Xunit;
 namespace PulseOffice.Desktop.Tests;
 
 [Collection(HeadlessDesktopCollection.Name)]
-public sealed class CommandSweepTests : IDisposable
+public sealed class CommandSweepShard1(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 0)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard2(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 1)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard3(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 2)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard4(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 3)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard5(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 4)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard6(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 5)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+public abstract class CommandSweepTests : IDisposable
 {
     private readonly UiThreadSession Session;
 
     private readonly string _dataHome = Path.Combine(Path.GetTempPath(), "pulseoffice-sweep-" + Guid.NewGuid().ToString("N"));
 
-    public CommandSweepTests(HeadlessDesktopSession headless)
+    protected CommandSweepTests(HeadlessDesktopSession headless)
     {
         Session = headless.Session;
         Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, _dataHome);
@@ -32,6 +79,7 @@ public sealed class CommandSweepTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, null);
         if (Directory.Exists(_dataHome)) Directory.Delete(_dataHome, recursive: true);
     }
@@ -151,6 +199,12 @@ public sealed class CommandSweepTests : IDisposable
 
     private const int Parts = 4;
 
+    private static readonly CommandId RepeatCommand = new("shell.edit.repeat");
+
+    private const int LargeParts = 12;
+
+    private const int Shards = 6;
+
     private static readonly IReadOnlyDictionary<string, string> AlreadyInThatState = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["ledger.view.zoomReset"] = "the zoom is already 100%",
@@ -167,6 +221,7 @@ public sealed class CommandSweepTests : IDisposable
         ["ledger.text.hiragana"] = "Latin text has no kana to convert, as in other office suites",
         ["ledger.text.halfWidth"] = "the text is already half width",
         ["folio.view.singlePage"] = "the view already shows one page at a time",
+        ["folio.view.printLayout"] = "the view is already the print layout",
         ["folio.view.selectionStandard"] = "the selection mode is already standard",
         ["deck.spelling.hyphenation"] = "a short word has no hyphenation points",
         ["folio.object.alignTop"] = "a new frame already sits at the top of its anchor",
@@ -225,7 +280,7 @@ public sealed class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets", "documents", "presentations" };
 
-        public int Parts => CommandSweepTests.Parts;
+        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry) => Task.CompletedTask;
 
@@ -254,7 +309,7 @@ public sealed class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets" };
 
-        public int Parts => CommandSweepTests.Parts;
+        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -342,7 +397,7 @@ public sealed class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "documents" };
 
-        public int Parts => CommandSweepTests.Parts;
+        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -385,21 +440,21 @@ public sealed class CommandSweepTests : IDisposable
         new PresentingScenario(),
     ];
 
-    public static TheoryData<string, string, int> Slices()
+    public static TheoryData<string, string, int> Slices(int shard)
     {
         var data = new TheoryData<string, string, int>();
+        var slice = 0;
         var assemblyModule = typeof(CommandSweepTests).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
             .Cast<System.Reflection.AssemblyMetadataAttribute>()
             .Single(attribute => attribute.Key == "PulseOffice.SweepModule").Value;
         foreach (var scenario in Scenarios)
             foreach (var module in new[] { "sheets", "documents", "presentations" }.Where(scenario.Modules.Contains).Where(module => module == assemblyModule))
-                for (var part = 0; part < scenario.Parts; part++) data.Add(module, scenario.Name, part);
+                for (var part = 0; part < scenario.Parts; part++)
+                    if (slice++ % Shards == shard) data.Add(module, scenario.Name, part);
         return data;
     }
 
-    [Theory]
-    [MemberData(nameof(Slices))]
-    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Session.Dispatch(async () =>
+    protected Task Sweep(string module, string context, int part) => Session.Dispatch(async () =>
     {
         var scenario = Scenarios.Single(candidate => candidate.Name == context);
         await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);
@@ -412,16 +467,21 @@ public sealed class CommandSweepTests : IDisposable
         var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<PulseOffice.UI.Controls.DialogHost>().Single();
         var kind = module switch { "sheets" => ModuleKind.Sheets, "documents" => ModuleKind.Documents, _ => ModuleKind.Presentations };
 
+        var steps = new System.Diagnostics.Stopwatch();
+        var prepareSteps = string.Empty;
         async Task Prepare(bool arrange = true)
         {
+            steps.Restart();
             while (host.IsDialogOpen) { host.Close(null); Dispatcher.UIThread.RunJobs(); }
             if (panel.IsOpen) panel.Toggle();
             foreach (var open in workspace.Documents.ToList()) workspace.Close(open);
             Dispatcher.UIThread.RunJobs();
+            var closed = steps.ElapsedMilliseconds;
             await executor.ExecuteAsync(registry.Find(new CommandId($"shell.file.new.{module}"))!, workspace.Context);
             Dispatcher.UIThread.RunJobs();
             ((PulseOffice.UI.Controls.Services.IDocumentFocusTarget)workspace.Active!.View).FocusDocument();
             Dispatcher.UIThread.RunJobs();
+            var created = steps.ElapsedMilliseconds;
             foreach (var line in module == "sheets" ? new[] { "10", "20", "=A1+A2", "Testo DI prova" } : module == "documents" ? new[] { "Uno due tre" } : [])
             {
                 window.KeyTextInput(line);
@@ -440,7 +500,9 @@ public sealed class CommandSweepTests : IDisposable
                 window.KeyPress(Key.End, RawInputModifiers.Shift, PhysicalKey.End, null);
             }
             Dispatcher.UIThread.RunJobs();
+            var typed = steps.ElapsedMilliseconds;
             if (arrange) await scenario.ArrangeAsync(new SweepStage(provider, window, workspace), executor, registry);
+            prepareSteps = $"{closed}/{created - closed}/{typed - created}/{steps.ElapsedMilliseconds - typed}";
         }
 
         var clipboard = new ClipboardProbe(provider.GetRequiredService<PulseOffice.Exchange.IExchangeClipboard>());
@@ -476,15 +538,72 @@ public sealed class CommandSweepTests : IDisposable
                 deck?.IsTyping());
         }
 
-        void Trace(SweepRow row, TimeSpan elapsed)
+        var phases = new System.Diagnostics.Stopwatch();
+        var timings = new List<string>();
+        long prepareMs = 0, beforeMs = 0;
+        void Trace(SweepRow row, TimeSpan elapsed) =>
+            timings.Add($"{module}\t{context}\t{part}\t{row.Command}\t{row.Outcome}\t{prepareMs}\t{beforeMs}\t{elapsed.TotalMilliseconds:0}\t{phases.ElapsedMilliseconds}\t{prepareSteps}");
+
+        string Fingerprint()
         {
-            if (Environment.GetEnvironmentVariable("PULSEOFFICE_SWEEP_OUT") is { Length: > 0 } folder)
-                File.AppendAllText(Path.Combine(folder, $"{module}-{context}-{part}.trace"), $"{row.Command}\t{row.Outcome}\t{elapsed.TotalMilliseconds:0}\n");
+            var active = workspace.Active;
+            var frame = Frame();
+            var current = workspace.Context;
+            var sheetContext = provider.GetRequiredService<PulseOffice.Sheets.UI.IActiveSheetContext>();
+            return string.Join("\n",
+                workspace.Documents.Count,
+                active?.IsReadOnly,
+                active?.History.CanRedo,
+                host.IsDialogOpen,
+                panel.IsOpen,
+                window.FocusManager?.GetFocusedElement()?.GetType().FullName,
+                sheetContext.HasTarget ? sheetContext.Selection.ToString() : null,
+                Objects(),
+                string.Join(",", registry.All.Where(command => command.Id != RepeatCommand).Select(command => (command.IsEnabled(current) ? "+" : "-") + (command.CheckedWhen?.Invoke(current) is true ? "!" : ""))),
+                frame);
+        }
+
+        OpenDocument? prepared = null;
+        object? preparedPoint = null;
+        string? preparedPrint = null;
+        var restores = 0;
+        var rebuilds = 0;
+
+        async Task Rebuild()
+        {
+            await Prepare();
+            rebuilds++;
+            prepared = workspace.Active;
+            preparedPoint = prepared?.History.StatePoint;
+            preparedPrint = Fingerprint();
+        }
+
+        bool Restore()
+        {
+            while (host.IsDialogOpen) { host.Close(null); Dispatcher.UIThread.RunJobs(); }
+            if (panel.IsOpen) panel.Toggle();
+            if (prepared is null || workspace.Documents.Count != 1 || !ReferenceEquals(workspace.Active, prepared)) return false;
+            var history = prepared.History;
+            for (var guard = 0; guard < 64 && !ReferenceEquals(history.StatePoint, preparedPoint) && history.CanUndo; guard++)
+            {
+                history.Undo();
+                Dispatcher.UIThread.RunJobs();
+            }
+            if (!ReferenceEquals(history.StatePoint, preparedPoint)) return false;
+            history.DiscardRedo();
+            ((PulseOffice.UI.Controls.Services.IDocumentFocusTarget)prepared.View).FocusDocument();
+            Dispatcher.UIThread.RunJobs();
+            if (Fingerprint() != preparedPrint) return false;
+            restores++;
+            return true;
         }
 
         await Prepare(arrange: false);
         var typical = registry.All.Where(command => command.IsEnabled(workspace.Context)).Select(command => command.Id).ToHashSet();
-        await Prepare();
+        await Rebuild();
+        var createCommand = executor.LastRepeatable?.Id;
+        var pristine = true;
+        var restorable = false;
         var rows = new List<SweepRow>();
         var ids = registry.All
             .Where(command => command.Module == kind || command.Module == ModuleKind.Shell)
@@ -495,10 +614,15 @@ public sealed class CommandSweepTests : IDisposable
         foreach (var id in ids)
         {
             if (Unsafe.Contains(id.Value)) continue;
-            await Prepare();
+            phases.Restart();
+            if (id == RepeatCommand ? !pristine || executor.LastRepeatable?.Id != createCommand : !pristine && (!restorable || !Restore())) await Rebuild();
+            pristine = true;
+            prepareMs = phases.ElapsedMilliseconds;
             var command = registry.Find(id)!;
             var context = workspace.Context;
             if (!command.IsEnabled(context)) continue;
+            pristine = false;
+            restorable = false;
 
             var document = workspace.Active;
             var changes = 0;
@@ -519,6 +643,7 @@ public sealed class CommandSweepTests : IDisposable
             var objectsBefore = Objects();
             await clipboard.SetAsync(new ClipboardContent { Text = "sweep" });
             var clipped = await Clipboard();
+            beforeMs = phases.ElapsedMilliseconds - prepareMs;
             var waited = new List<string>();
             var running = executor.ExecuteAsync(command, context);
             var watch = System.Diagnostics.Stopwatch.StartNew();
@@ -558,6 +683,7 @@ public sealed class CommandSweepTests : IDisposable
             }
 
             var outcome = await running;
+            restorable = waited.Count == 0;
             var effects = waited.Distinct().ToList();
             if (changes > 0) effects.Add("history");
             if (workspace.Documents.Count != documents || !ReferenceEquals(workspace.Active, document)) effects.Add("workspace");
@@ -579,7 +705,11 @@ public sealed class CommandSweepTests : IDisposable
 
         await clipboard.SetAsync(new ClipboardContent { Text = string.Empty });
         if (Environment.GetEnvironmentVariable("PULSEOFFICE_SWEEP_OUT") is { Length: > 0 } output)
+        {
+            Directory.CreateDirectory(output);
             File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.tsv"), rows.Select(row => $"{row.Command}\t{row.Outcome}\t{row.Effect}\t{row.Detail.Replace('\t', ' ').Replace('\n', ' ')}"));
+            File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.timings.tsv"), timings.Append($"#\trestores\t{restores}\trebuilds\t{rebuilds}"));
+        }
 
         Assert.True(rows.Count > 0 || scenario is not TypicalScenario, "the typical context runs no command");
         var failed = rows.Where(row => row.Outcome is "Failed" or "Hang").Select(row => $"{row.Command}: {row.Outcome} {row.Effect} {row.Detail}").ToList();

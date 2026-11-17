@@ -236,8 +236,8 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
         new C.ShowBubbleSize { Val = false });
 
     private C.Title Title(string text) =>
-        new(new C.ChartText(new C.RichText(new A.BodyProperties(), new A.ListStyle(),
-                new A.Paragraph(new A.Run(new A.Text(text))))),
+        new(new C.ChartText(new C.RichText([new A.BodyProperties(), new A.ListStyle(),
+                .. text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => new A.Paragraph(new A.Run(new A.Text(line))))])),
             new C.Overlay { Val = false });
 
     private C.LegendPositionValues Legend(LegendPosition position) => position switch
@@ -354,7 +354,7 @@ internal sealed class DeclaredChartType
             .FirstOrDefault(type => type is not null);
 }
 
-internal sealed class ChartSpaceReader(ChartFamilies families)
+internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Formats.OpenXml.DrawingML.IDrawingPlainText plainText)
 {
     private readonly DeclaredChartType _declared = new();
 
@@ -398,7 +398,7 @@ internal sealed class ChartSpaceReader(ChartFamilies families)
     private string? TextOf(C.Title? title)
     {
         if (title is null) return null;
-        var text = string.Concat(title.Descendants<A.Text>().Select(run => run.Text));
+        var text = title.GetFirstChild<C.ChartText>()?.GetFirstChild<C.RichText>() is { } rich ? plainText.Body(rich) : string.Empty;
         if (text.Length == 0 && title.GetFirstChild<C.ChartText>()?.GetFirstChild<C.StringReference>() is { } reference)
             text = string.Concat(reference.Descendants<C.StringPoint>().Select(point => point.NumericValue?.Text));
         return text.Length > 0 ? text : null;

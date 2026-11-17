@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Xml.Linq;
 using PulseOffice.Charts;
+using PulseOffice.Formats.Odf.TextCodecs;
 using PulseOffice.Foundation.Units;
 using PulseOffice.Sheets;
 using PulseOffice.Sheets.Addressing;
@@ -37,7 +38,7 @@ internal abstract class OdfChartXml
     protected const string Hairline = "#b3b3b3";
 }
 
-internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units) : OdfChartXml
+internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units, IOdfParagraphText paragraphs) : OdfChartXml
 {
     public XDocument Build(ChartDefinition definition, ChartData data, DocumentSize frame) =>
         Build(definition, data, frame, CultureInfo.InvariantCulture);
@@ -78,7 +79,7 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
             new XAttribute(Svg + "height", units.Cm(size.Height)));
 
         if (definition.ChartTitle is { Length: > 0 } title)
-            chart.Add(new XElement(Chart + "title", new XElement(Text + "p", title)));
+            chart.Add(new XElement(Chart + "title", paragraphs.Paragraphs(title)));
         if (definition.Legend != LegendPosition.None)
             chart.Add(new XElement(Chart + "legend",
                 new XAttribute(Chart + "legend-position", vocabulary.LegendName(definition.Legend)),
@@ -117,7 +118,7 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     {
         var axis = new XElement(Chart + "axis", new XAttribute(Chart + "dimension", dimension), new XAttribute(Chart + "name", $"primary-{dimension}"),
             new XAttribute(Chart + "style-name", AxisStyleName));
-        if (title is { Length: > 0 }) axis.Add(new XElement(Chart + "title", new XElement(Text + "p", title)));
+        if (title is { Length: > 0 }) axis.Add(new XElement(Chart + "title", paragraphs.Paragraphs(title)));
         if (grid) axis.Add(new XElement(Chart + "grid", new XAttribute(Chart + "style-name", GridStyleName), new XAttribute(Chart + "class", "major")));
         return axis;
     }
@@ -193,8 +194,8 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     }
 }
 
-internal sealed class SheetChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units)
-    : OdfChartDocumentBuilder(vocabulary, units)
+internal sealed class SheetChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units, IOdfParagraphText paragraphs)
+    : OdfChartDocumentBuilder(vocabulary, units, paragraphs)
 {
     private readonly SeriesSourceAddresses _sources = new();
 
@@ -268,8 +269,8 @@ internal sealed class SheetChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     }
 }
 
-internal sealed class InlineChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units)
-    : OdfChartDocumentBuilder(vocabulary, units)
+internal sealed class InlineChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units, IOdfParagraphText paragraphs)
+    : OdfChartDocumentBuilder(vocabulary, units, paragraphs)
 {
     protected override IEnumerable<XAttribute> PlotAttributes(ChartDefinition definition) => [];
 

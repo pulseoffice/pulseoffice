@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.Odf.Tests;
 
 public sealed class OdfDeepGroupTests
 {
-    private const int Depth = 50_000;
+    private const int Depth = SmallStackThread.DeeperThanAnyRecursionFits;
 
     private const string Namespaces = "xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" "
         + "xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" "
@@ -19,16 +19,16 @@ public sealed class OdfDeepGroupTests
     public void Gruppi_annidati_a_dismisura_in_una_presentazione_non_fermano_il_processo()
     {
         var page = "<draw:page draw:name=\"p1\">" + Nested() + "</draw:page>";
-        var read = new OdpReader(new ThemeCatalog(), new MasterFactory()).Read(Package("application/vnd.oasis.opendocument.presentation",
-            $"<office:document-content {Namespaces} office:version=\"1.3\"><office:body><office:presentation>{page}</office:presentation></office:body></office:document-content>"));
+        var read = new SmallStackThread().Run(() => new OdpReader(new ThemeCatalog(), new MasterFactory()).Read(Package("application/vnd.oasis.opendocument.presentation",
+            $"<office:document-content {Namespaces} office:version=\"1.3\"><office:body><office:presentation>{page}</office:presentation></office:body></office:document-content>")));
         Assert.NotNull(read);
     }
 
     [Fact]
     public void Gruppi_annidati_a_dismisura_in_un_testo_non_fermano_il_processo()
     {
-        var read = new OdtReader().Read(Package("application/vnd.oasis.opendocument.text",
-            $"<office:document-content {Namespaces} office:version=\"1.3\"><office:body><office:text><text:p>{Nested()}</text:p></office:text></office:body></office:document-content>"));
+        var read = new SmallStackThread().Run(() => new OdtReader().Read(Package("application/vnd.oasis.opendocument.text",
+            $"<office:document-content {Namespaces} office:version=\"1.3\"><office:body><office:text><text:p>{Nested()}</text:p></office:text></office:body></office:document-content>")));
         Assert.NotNull(read);
     }
 

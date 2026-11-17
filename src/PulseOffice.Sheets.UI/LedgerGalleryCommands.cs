@@ -63,7 +63,7 @@ public sealed class LedgerGalleryCommands(
     {
         IconKey = id,
         MenuPath = "insert/shape",
-        Surface = CommandSurface.Advanced,
+        Surface = CommandSurface.Palette,
         RequiredState = DocumentState.DocumentOpen,
         ForbiddenState = DocumentState.ReadOnly,
         EnabledWhen = _ => Context.HasTarget,

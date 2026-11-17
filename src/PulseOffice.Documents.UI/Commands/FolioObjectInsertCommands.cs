@@ -27,7 +27,9 @@ public sealed class FolioObjectInsertCommands(
     IFormControlNaming naming,
     IAssetLibrary assets,
     PulseOffice.UI.Controls.Forms.IFormDesignMode design,
-    IDimensionLineTemplate dimensions) : FolioCommandSet(context)
+    IDimensionLineTemplate dimensions,
+    IFolioDrawingTools drawing,
+    IShapeChooser shapes) : FolioCommandSet(context)
 {
     private readonly IReadOnlyList<(string Key, IReadOnlyList<ShapeKind> Kinds)> _families =
     [
@@ -42,12 +44,10 @@ public sealed class FolioObjectInsertCommands(
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Action(Insertion("folio.insert.textFrame"), editor => objects.InsertTextFrame(editor, Size(8, 3))),
-        Asynchronous("folio.insert.shape", ct => ShapeAsync(null, ct)),
-        .. _families.Select(family => Asynchronous($"folio.insert.{family.Key}", ct => ShapeAsync(family.Kinds, ct)) with { Surface = CommandSurface.Advanced }),
-        Action(Insertion("folio.insert.line") with { Surface = CommandSurface.Advanced }, editor =>
-            objects.Insert(editor, new ObjectInsertion(new ShapeObject { Id = Id(editor), Shape = ShapeKind.Line }, Size(6, 0.5), ObjectAnchorKind.Paragraph, WrapMode.Through))),
-        Action(Insertion("folio.insert.dimensionLine") with { Surface = CommandSurface.Advanced }, editor =>
-            objects.Insert(editor, new ObjectInsertion(dimensions.Create(Id(editor)), dimensions.Size, ObjectAnchorKind.Paragraph, WrapMode.Through))),
+        Asynchronous("folio.insert.shape", ChooseShapeAsync),
+        .. _families.Select(family => Asynchronous($"folio.insert.{family.Key}", ct => ShapeAsync(family.Kinds, ct)) with { Surface = CommandSurface.Palette }),
+        Action(Insertion("folio.insert.line") with { Surface = CommandSurface.Palette }, InsertLine),
+        Action(Insertion("folio.insert.dimensionLine") with { Surface = CommandSurface.Palette }, InsertDimensionLine),
         Asynchronous("folio.insert.chart", ChartAsync),
         Asynchronous("folio.insert.formula", FormulaAsync),
         Asynchronous("folio.insert.fontwork", FontworkAsync),
@@ -78,9 +78,40 @@ public sealed class FolioObjectInsertCommands(
             new ShapeGalleryView(texts, kinds),
             new DialogOptions { TitleKey = "dialog.shapeGallery.title", PreferredWidth = 560 },
             ct).ConfigureAwait(true);
-        if (chosen is not ShapeKind kind || Editor is not { } editor) return;
+        if (chosen is ShapeKind kind) InsertShape(kind);
+    }
+
+    private async Task ChooseShapeAsync(CancellationToken ct)
+    {
+        if (await shapes.ChooseAsync(ShapeTools(), ct).ConfigureAwait(true) is { } kind) InsertShape(kind);
+    }
+
+    private IReadOnlyList<ShapeTool> ShapeTools() =>
+    [
+        Tool("folio.insert.dimensionLine", () => { if (Editor is { } editor) InsertDimensionLine(editor); }),
+        .. FolioDrawCommands.Pens.Where(pen => pen.Id.StartsWith("folio.draw.", StringComparison.Ordinal))
+            .Select(pen => Tool(pen.Id, () => drawing.Choose(pen.Tool, pen.Filled))),
+        .. FolioDrawCommands.Connectors.Select(connector => Tool(connector.Id, () => drawing.ChooseConnector(connector.Kind))),
+    ];
+
+    private ShapeTool Tool(string id, Action run) => new(id, $"command.{id}.title", id, run);
+
+    private void InsertShape(ShapeKind kind)
+    {
+        if (Editor is not { } editor) return;
+        if (kind == ShapeKind.Line)
+        {
+            InsertLine(editor);
+            return;
+        }
         objects.Insert(editor, new ObjectInsertion(new ShapeObject { Id = Id(editor), Shape = kind }, Size(4, 3), ObjectAnchorKind.Paragraph, WrapMode.Parallel));
     }
+
+    private void InsertLine(FolioEditor editor) =>
+        objects.Insert(editor, new ObjectInsertion(new ShapeObject { Id = Id(editor), Shape = ShapeKind.Line }, Size(6, 0.5), ObjectAnchorKind.Paragraph, WrapMode.Through));
+
+    private void InsertDimensionLine(FolioEditor editor) =>
+        objects.Insert(editor, new ObjectInsertion(dimensions.Create(Id(editor)), dimensions.Size, ObjectAnchorKind.Paragraph, WrapMode.Through));
 
     private async Task ChartAsync(CancellationToken ct)
     {

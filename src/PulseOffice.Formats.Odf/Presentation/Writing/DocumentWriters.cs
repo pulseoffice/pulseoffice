@@ -8,6 +8,7 @@ namespace PulseOffice.Formats.Odf;
 
 internal sealed class OdpPageWriter(
     ISlideLayoutRegistry layouts,
+    IOdfParagraphText paragraphText,
     PageStyleBuilder pageStyles,
     TextFrameWriter text,
     MediaFrameWriter media,
@@ -96,7 +97,7 @@ internal sealed class OdpPageWriter(
                     new XAttribute(Draw + "stroke", "none")),
                 new XElement(Style + "text-properties",
                     new XAttribute(Fo + "font-size", session.Deck.NotesMaster.FontSize.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "pt"))));
-            page.Add(new OdfPrintMasters().SlideNotes(session.Deck.NotesMaster, slide.Notes, notesStyle));
+            page.Add(new OdfPrintMasters().SlideNotes(session.Deck.NotesMaster, paragraphText.Paragraphs(slide.Notes), notesStyle));
         }
         return page;
     }

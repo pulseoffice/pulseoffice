@@ -30,8 +30,8 @@ public sealed class OdfChartMapper
     {
         _placement = placement ?? new SheetPlacement();
         var vocabulary = new OdfChartVocabulary();
-        _builder = new SheetChartDocumentBuilder(vocabulary, _units);
-        _reader = new SheetChartDocumentReader(vocabulary, new CellRangeAddresses());
+        _builder = new SheetChartDocumentBuilder(vocabulary, _units, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
+        _reader = new SheetChartDocumentReader(vocabulary, new CellRangeAddresses(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
     }
 
     public IReadOnlyList<(string Path, XDocument Content)> Objects => _objects;

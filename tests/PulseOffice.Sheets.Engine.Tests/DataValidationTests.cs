@@ -193,4 +193,27 @@ public class DataValidationTests(EngineFixture fixture) : IClassFixture<EngineFi
 
         Assert.True(Validator.Validate(engine, 0, new CellAddress(2, 0), CellValue.Number(50)).IsValid);
     }
+
+    [Fact]
+    public void Deleting_the_first_rows_of_a_rule_keeps_its_relative_limits_on_the_surviving_cells()
+    {
+        var (workbook, engine) = fixture.CreateWorkbook();
+        workbook.Sheets[0].Validations.Add(new DataValidation
+        {
+            Range = Range(0, 0, 9, 0),
+            Kind = ValidationKind.Decimal,
+            Operator = ValidationOperator.Less,
+            FirstFormula = "B1",
+        });
+        for (var row = 0; row < 10; row++)
+            engine.SetValue(new SheetCell(0, new CellAddress(row, 1)), CellValue.Number((row + 1) * 10));
+
+        new SheetStructure().DeleteRows(engine, 0, 0, 2);
+
+        var rule = Assert.Single(workbook.Sheets[0].Validations);
+        Assert.Equal(Range(0, 0, 7, 0), rule.Range);
+        Assert.True(Validator.Validate(engine, 0, CellAddress.First, CellValue.Number(25)).IsValid);
+        Assert.False(Validator.Validate(engine, 0, CellAddress.First, CellValue.Number(35)).IsValid);
+        Assert.False(Validator.Validate(engine, 0, new CellAddress(3, 0), CellValue.Number(65)).IsValid);
+    }
 }

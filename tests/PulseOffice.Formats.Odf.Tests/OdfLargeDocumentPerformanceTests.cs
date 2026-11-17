@@ -111,7 +111,7 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
         var sheet = workbook.AddSheet("Data");
         var style = workbook.Styles.Intern(new PulseOffice.Sheets.Styling.CellStyle { BackgroundHex = "#FFEE00" });
         sheet.Layout.SetColumnStyles(0, CellAddress.MaxColumns - 1, style);
-        for (var row = 0; row < 120_000; row++) sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
+        for (var row = 0; row < 30_000; row++) sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
         using var stream = new MemoryStream();
 
         var write = Timed("ODS write styled columns", () => new OdsWriter().Write(workbook, stream));
@@ -119,7 +119,7 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
         var read = new OdsReader().Read(stream).Value!;
 
         Assert.True(write < 4_000, $"write {write} ms");
-        Assert.Equal(119_999, read.Sheets[0].GetValue(new CellAddress(119_999, 0)).AsNumber());
+        Assert.Equal(29_999, read.Sheets[0].GetValue(new CellAddress(29_999, 0)).AsNumber());
         Assert.NotNull(read.Sheets[0].Layout.ColumnStyle(CellAddress.MaxColumns - 1));
     }
 

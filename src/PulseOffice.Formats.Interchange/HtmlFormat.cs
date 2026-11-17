@@ -114,14 +114,16 @@ public sealed class HtmlSpreadsheetWriter(ICellPresenter presenter) : ISpreadshe
             {
                 if (sheet.Layout.IsColumnHidden(column)) continue;
 
-                var address = new CellAddress(row, column);
+                var position = new CellAddress(row, column);
+                var merged = sheet.Merges.At(position);
+                var span = merged is { } region ? VisiblePart(sheet, region, used) : null;
 
-                if (sheet.Merges.IsCovered(address)) continue;
+                if (span is { } part && part.Start != position) continue;
 
+                var address = merged?.Start ?? position;
                 var cell = sheet[address] with { StyleId = sheet.StyleIdAt(address) };
                 var shown = presenter.Present(cell, styles, sheet.Owner?.NumberFormats ?? _builtInFormats, 12);
                 var style = styles.Get(cell.StyleId);
-                var span = sheet.Merges.At(address);
 
                 table.Append("<td");
 
@@ -129,11 +131,11 @@ public sealed class HtmlSpreadsheetWriter(ICellPresenter presenter) : ISpreadshe
                 if (alignRight)
                     table.Append(" class=\"n\"");
 
-                if (span is { } region && region.Start == address)
+                if (span is { } visible)
                 {
-                    var columns = Enumerable.Range(region.Start.Column, region.End.Column - region.Start.Column + 1)
+                    var columns = Enumerable.Range(visible.Start.Column, visible.End.Column - visible.Start.Column + 1)
                         .Count(index => !sheet.Layout.IsColumnHidden(index));
-                    var rows = Enumerable.Range(region.Start.Row, region.End.Row - region.Start.Row + 1)
+                    var rows = Enumerable.Range(visible.Start.Row, visible.End.Row - visible.Start.Row + 1)
                         .Count(index => !sheet.Layout.IsRowHidden(index));
 
                     if (columns > 1) table.Append(CultureInfo.InvariantCulture, $" colspan=\"{columns}\"");
@@ -150,6 +152,21 @@ public sealed class HtmlSpreadsheetWriter(ICellPresenter presenter) : ISpreadshe
         }
 
         return table.Append("</table>\n").ToString();
+    }
+
+    private static CellRange? VisiblePart(Worksheet sheet, CellRange region, CellRange used)
+    {
+        var top = Math.Max(region.Start.Row, used.Start.Row);
+        var bottom = Math.Min(region.End.Row, used.End.Row);
+        var left = Math.Max(region.Start.Column, used.Start.Column);
+        var right = Math.Min(region.End.Column, used.End.Column);
+
+        while (top <= bottom && sheet.Layout.IsRowHidden(top)) top++;
+        while (bottom >= top && sheet.Layout.IsRowHidden(bottom)) bottom--;
+        while (left <= right && sheet.Layout.IsColumnHidden(left)) left++;
+        while (right >= left && sheet.Layout.IsColumnHidden(right)) right--;
+
+        return top <= bottom && left <= right ? new CellRange(new CellAddress(top, left), new CellAddress(bottom, right)) : null;
     }
 
     private static string Inline(CellStyle style, bool standalone, bool alignRight)

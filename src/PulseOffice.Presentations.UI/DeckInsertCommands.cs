@@ -27,7 +27,9 @@ public sealed class DeckInsertCommands(
     IHyperlinkPrompt hyperlinks,
     PulseOffice.Foundation.Identity.IUserIdentity identity,
     IDimensionLineTemplate dimensions,
-    PulseOffice.Text.Rich.ITextCultures cultures) : DeckCommandSet(context)
+    PulseOffice.Text.Rich.ITextCultures cultures,
+    IDeckDrawingState drawing,
+    IShapeChooser shapes) : DeckCommandSet(context)
 {
     private static readonly (string Id, ShapeKind Kind)[] Shapes =
     [
@@ -47,9 +49,9 @@ public sealed class DeckInsertCommands(
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         .. Shapes.Select(entry => Insert($"deck.insert.shape.{entry.Id}",
-            _ => new ShapeObject { Id = NewId(), Shape = entry.Kind }, 8, 5)),
+            _ => new ShapeObject { Id = NewId(), Shape = entry.Kind }, 8, 5) with { Surface = CommandSurface.Ribbon | CommandSurface.Palette }),
         Insert("deck.insert.shape.dimensionLine", _ => dimensions.Create(NewId()),
-            dimensions.Size.Width.ToCentimeters(), dimensions.Size.Height.ToCentimeters()),
+            dimensions.Size.Width.ToCentimeters(), dimensions.Size.Height.ToCentimeters()) with { Surface = CommandSurface.Ribbon | CommandSurface.Palette },
 
         Prototype("deck.insert.textBox") with
         {
@@ -70,7 +72,7 @@ public sealed class DeckInsertCommands(
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.Target is { } t && t.CurrentSlide() is not null,
-            Execute = (_, ct) => GalleryAsync(ct),
+            Execute = (_, ct) => ChooseShapeAsync(ct),
         },
         Gallery("deck.insert.symbolShapes", ShapeFamilies.Symbols),
         Gallery("deck.insert.flowChartShapes", ShapeFamilies.FlowChart),
@@ -267,7 +269,7 @@ public sealed class DeckInsertCommands(
     private CommandDefinition Gallery(string id, IReadOnlyList<ShapeKind> kinds) =>
         Prototype(id) with
         {
-            Surface = CommandSurface.Advanced,
+            Surface = CommandSurface.Palette,
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.Target is { } t && t.CurrentSlide() is not null,
@@ -294,6 +296,24 @@ public sealed class DeckInsertCommands(
 
         InsertContent(t, slide, new ShapeObject { Id = NewId(), Shape = kind }, 8, 5);
     }
+
+    private async Task ChooseShapeAsync(CancellationToken ct)
+    {
+        if (await shapes.ChooseAsync(ShapeTools(), ct).ConfigureAwait(true) is not { } kind) return;
+        if (Context.Target is not { } t || t.CurrentSlide() is not { } slide) return;
+
+        InsertContent(t, slide, new ShapeObject { Id = NewId(), Shape = kind }, 8, 5);
+    }
+
+    private IReadOnlyList<ShapeTool> ShapeTools() =>
+    [
+        new("deck.insert.shape.dimensionLine", "command.deck.insert.shape.dimensionLine.title", "deck.insert.shape.dimensionLine", () =>
+        {
+            if (Context.Target is { } t && t.CurrentSlide() is { } slide)
+                InsertContent(t, slide, dimensions.Create(NewId()), dimensions.Size.Width.ToCentimeters(), dimensions.Size.Height.ToCentimeters());
+        }),
+        .. DeckDrawCommands.Pens.Select(pen => new ShapeTool($"deck.draw.{pen.Id}", $"command.deck.draw.{pen.Id}.title", pen.IconKey, () => drawing.Choose(pen.Pen, pen.Filled))),
+    ];
 
     private async Task ChartAsync(CancellationToken ct)
     {

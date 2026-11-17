@@ -5,8 +5,10 @@ using static PulseOffice.Formats.Packaging.OdfPackage;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed class OdfCellValueCodec
+internal sealed class OdfCellValueCodec(PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText paragraphs)
 {
+    public OdfCellValueCodec() : this(new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()) { }
+
     public void Write(XElement cell, CellValue value)
     {
         switch (value.Kind)
@@ -21,7 +23,7 @@ internal sealed class OdfCellValueCodec
                     new XAttribute(Namespaces.Office + "boolean-value", value.AsBoolean() ? "true" : "false"));
                 break;
             default:
-                cell.Add(new XAttribute(Namespaces.Office + "value-type", "string"), new XElement(Namespaces.Text + "p", value.ToString()));
+                cell.Add(new XAttribute(Namespaces.Office + "value-type", "string"), paragraphs.Paragraphs(value.ToString()));
                 break;
         }
     }
@@ -33,7 +35,7 @@ internal sealed class OdfCellValueCodec
                 ? CellValue.Number(number)
                 : CellValue.Empty,
         "boolean" => CellValue.Boolean(OdfBooleanValue.Parse(cell.Attribute(Namespaces.Office + "boolean-value")?.Value)),
-        "string" => CellValue.Text(string.Concat(cell.Elements(Namespaces.Text + "p").Select(paragraph => paragraph.Value))),
+        "string" => CellValue.Text(paragraphs.Read(cell)),
         _ => CellValue.Empty,
     };
 }

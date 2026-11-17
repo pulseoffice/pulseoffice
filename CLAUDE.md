@@ -56,20 +56,51 @@ The rules below apply to every build and test run, by hand or by agents:
   `ProjectReference` and linked source files, on the files changed since `base` plus the uncommitted ones, and builds
   only those; `--files <path …>` prints the test projects a file affects, `--list` prints the selection without
   running. A change to `Directory.*.props`, `PulseOffice.slnx` or `global.json` selects everything. After merging an
-  agent's branch, `--changed` against the commit before the merge; the full run is started only when the user asks (user rule, 2026-11-15), also before a push, which is verified with `--changed main`. `tools/run-tests.py [--no-build] [fragment …]` runs one
-  project at a time, splits each project into chunks of test classes (`--list-tests`, then a
-  `FullyQualifiedName~Class.` filter per chunk), and runs every chunk in its own `systemd-run --user --scope` with
-  `MemoryMax` (default 6G) and `MemorySwapMax=0`: a runaway chunk is killed alone, never the session (on systems
-  without `systemd-run`, macOS and Windows for now, chunks run uncapped with a warning; `MemoryCap` is the one place
-  to add a cap there). Each chunk's
-  result, counts, memory peak (`memory.peak` of its cgroup) and duration go to `summary.tsv` under
-  `artifacts/test-runs/<timestamp>/`. Knobs: `TESTS_MEMORY_MAX`, `TESTS_CLASSES_PER_CHUNK` (default 40),
-  `TESTS_BUILD_NODES` (default 2), `TESTS_OUT`.
+  agent's branch, `--changed` against the commit before the merge; the full run is started only when the user asks (user rule, 2026-11-15), also before a push, which is verified with `--changed main`. `tools/run-tests.py [--no-build] [--no-cache] [fragment …]`
+  builds the selection in **one** MSBuild invocation (a generated `selection.slnf`; the whole solution only for a full
+  run), then runs each test assembly **directly with its own xUnit v3 runner** (`dotnet exec <Tests>.dll -class … -xml`,
+  no `dotnet test`, no vstest, no MSBuild per chunk; listing the classes takes 0.2 s instead of 2.4 s). Each project is
+  split into chunks of test classes **balanced by the per-class durations recorded in `artifacts/test-runs/cache.json`**
+  (aiming at `TESTS_CHUNK_SECONDS`, default 60, and at most `TESTS_CLASSES_PER_CHUNK`, default 40), so a serial headless
+  project such as `Desktop.Tests` is spread over several processes; up to `TESTS_JOBS` (default 3) chunks run at
+  once, longest first, each in its own `systemd-run --user --scope` with `MemoryMax` = `TESTS_MEMORY_TOTAL_GB`
+  (default 12) divided by the jobs, at most 6G (override with `TESTS_MEMORY_MAX`), and `MemorySwapMax=0`: a runaway
+  chunk is killed alone, never the session, and the running chunks together stay within the budget (on systems without
+  `systemd-run`, macOS and Windows for now, chunks run uncapped with a warning; `MemoryCap` is the one place to add a
+  cap there). **Result cache**: a project whose build output (size and time of every file in its `bin` folder) is
+  unchanged since its last green run is skipped; projects that read the source tree (`Architecture`, `Localization`,
+  `Robustness`) always run; `--no-cache` runs everything. Each chunk's result, counts, memory peak (`memory.peak` of
+  its cgroup) and duration go to `summary.tsv` under `artifacts/test-runs/<timestamp>/`, and **every test slower than
+  `TESTS_SLOW_SECONDS` (default 5) is printed and listed in `slow.tsv`**: a new test that shows up there is redesigned
+  for speed (smallest input that proves the point, shared fixtures, no sleeps). **Hard limits** (user rule): a chunk running over `TESTS_CHUNK_TIMEOUT` (default 600 s) is killed with its scope
+  and marked `timeout`; a chunk where one test runs over `TESTS_HANG_SECONDS` (default 60 s, read from xUnit's
+  `-longRunning` reports, so it is caught within 60–80 s) is killed and marked `hang`; both count as failures and
+  `summary.tsv` names the slowest test of every chunk. Other knobs: `TESTS_BUILD_NODES`
+  (default 2), `TESTS_OUT`, `TESTS_CACHE`. The xUnit classes are the unit of a chunk: a theory that costs minutes is
+  split into several classes over a shared abstract base (as `ExchangeCrossing*Tests`), so it can spread too. A project
+  can cap its chunks with `<TestClassesPerChunk>` in its .csproj (the sweeps use 1). **Command sweeps under `--changed`
+  and `--files`** follow `SweepRule` in the script: a sweep is selected only by changes to its module UI project
+  (`Sheets.UI`, `Documents.UI`, `Presentations.UI`), to Shell, Desktop, UI, UI.Commands, UI.Controls and the other
+  shared UI projects, to files named after commands, menus, ribbon, toolbar or shortcuts in any `src` project, to the
+  sweep projects and their harness, or to global build files; pure codec or engine changes skip them and the script
+  prints why. `--sweeps` forces them.
+- **A commit does not rebuild everything**: Debug builds set `IncludeSourceRevisionInInformationalVersion` and
+  `EnableSourceControlManagerQueries` to false (`Directory.Build.props`); with them on, every commit changed the
+  generated assembly attributes and source-link data of every project and the next build took 4 minutes instead of
+  11 seconds. Release packages keep the commit in their version.
+- **Tests are written for speed first** (user rule, 2026-11-17): every new or changed test is designed first of all for
+  its run time: the smallest input that proves the point, shared fixtures (collection fixtures for app composition and the
+  headless Avalonia session), no sleeps or fixed waits, no per-test rebuild of expensive state, performance tests with
+  relative checks on modest sizes. A slow new test is a defect to fix before merging.
+- **No long test runs** (user rule, 2026-11-17): no test or chunk may run for half an hour or an hour. A long-running
+  one is stopped, investigated, fixed, optimized and rerun, never waited for. `tools/run-tests.py` enforces a hard
+  per-chunk timeout (10 minutes) and a per-test hang timeout (60 seconds), and flags slow tests in `summary.tsv`; a
+  timeout is a failure.
 - **Build with few nodes and no resident servers**: `-m:2`, `-nodeReuse:false` and `MSBUILDDISABLENODEREUSE=1` (no
   MSBuild worker processes left behind), `-p:UseSharedCompilation=false` (no VBCSCompiler server holding 1–2 GB), and
   `dotnet build-server shutdown` after the build.
 - **Test processes use the workstation GC and give memory back**: `DOTNET_gcServer=0`, `DOTNET_GCConserveMemory=7`,
-  `DOTNET_TieredPGO=0`; inside a chunk `RunConfiguration.MaxCpuCount=1`.
+  `DOTNET_TieredPGO=0`.
 - **At most two agents at a time**, never nested, and never two app builds or two full test runs in parallel; live
   tests with `tools/uiprobe-linux` use one virtual display per agent.
 
@@ -184,7 +215,16 @@ Central package management in `Directory.Packages.props`: **versions are never w
     (permissions to insert rows and columns, filter). The sweep of all commands in several contexts is split per module into
     `tests/PulseOffice.Desktop.Sweep.{Sheets,Documents,Presentations}.Tests`, which compile the shared
     `tests/PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs` and run only the module of their `<SweepModule>`
-    (watchdog with `TestProcessLifetimeMinutes`: 30 minutes, 45 for the sheets sweep, which takes about 28 alone).
+    (watchdog with `TestProcessLifetimeMinutes`: 10 minutes). Since 2026-11-17 each sweep is six shard classes
+    (`CommandSweepShard1..6`) over the abstract `CommandSweepTests`, each its own chunk; a test is one slice of one
+    context (the typical, protected sheet and protected section contexts in twelve slices, the others in four), well
+    under the 60 s hang limit. A command starts from the prepared state reused while no command has run on it (disabled
+    commands cost nothing) or restored by undoing back to the prepared history point and dropping the redo steps
+    (`UndoStack.DiscardRedo`), accepted only if a fingerprint (documents, read-only, redo, dialog, panel, focus,
+    selection, objects, enabled and checked state of every command except Repeat, rendered frame) equals the
+    prepared one and the command opened no dialog or panel; otherwise the document is rebuilt. Repeat always starts
+    from a rebuild, since it depends on the last command run. `PULSEOFFICE_SWEEP_OUT=<folder>` writes per-slice
+    results and per-command timings (`*.timings.tsv`: prepare, before, execution, total, prepare steps).
 
 20. **GPL-3.0-only license and packages** (2026-11-02): text in `LICENSE`, `PackageLicenseExpression` in
     `Directory.Build.props`, which also holds `<Version>`. Every package is published self-contained with **ReadyToRun** (2026-11-15:
@@ -393,7 +433,8 @@ native macOS menu, modal service, settings schema.
    `Co-Authored-By` line (allowed since 2026-11-04).
 2-ter. **Work on the local branch `work`**: all work happens on a local branch named `work`, with a commit after each
    piece of work (these local commits need no request). Only when the user says so, the branch is squashed into a
-   single commit and merged into `main`; pushing still follows rule 2 and needs the whole test suite green first.
+   single commit and merged into `main`; pushing still follows rule 2 and needs `tools/run-tests.py --changed main` green first (the full suite only when the user asks).
+2-quater. **Releases are made only by the user** (2026-11-17): versions, tags and GitHub releases are created only by the user with `pulse-cmd.py`; agents never bump, tag or release.
 2-bis. **Restructure instead of patching**: if a change requires redoing the
    structure, it is redone. A sequence of minimal patches on a structure that no longer holds
    produces unmaintainable code precisely while the project grows.

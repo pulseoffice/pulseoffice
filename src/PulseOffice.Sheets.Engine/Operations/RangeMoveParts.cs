@@ -19,17 +19,17 @@ internal sealed class MovedRulesPart : RangeMovePart
                 var rule = rules[index];
                 if (rule.Ranges.All(range => move.Moves(sheet.Name, range)))
                 {
-                    var moved = rule with
+                    var carrier = new MoveRewriter(move, sheet.Name, move.TargetSheet);
+                    var moved = (rule with
                     {
                         Range = move.Moved(rule.Range),
                         AdditionalRanges = [.. rule.AdditionalRanges.Select(move.Moved)],
-                        Formula = edit.Rewrite(new MoveRewriter(move, sheet.Name, move.TargetSheet), rule.Formula),
-                    };
+                    }).WithFormulas(text => edit.Rewrite(carrier, text));
                     if (edit.CrossSheet) { rules.RemoveAt(index); carried.Insert(0, moved); }
                     else rules[index] = moved;
                 }
                 else if (rule.Ranges.All(range => move.Overwrites(sheet.Name, range))) rules.RemoveAt(index);
-                else rules[index] = rule with { Formula = edit.Rewrite(rewriter, rule.Formula) };
+                else rules[index] = rule.WithFormulas(text => edit.Rewrite(rewriter, text));
             }
         }
 

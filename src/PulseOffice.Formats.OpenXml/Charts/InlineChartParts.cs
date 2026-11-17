@@ -13,7 +13,7 @@ public sealed class InlineChartParts
     {
         var families = new ChartFamilies();
         _builder = new ChartSpaceBuilder(families);
-        _reader = new ChartSpaceReader(families);
+        _reader = new ChartSpaceReader(families, new PulseOffice.Formats.OpenXml.DrawingML.DrawingPlainText());
     }
 
     public string Write(OpenXmlPart owner, ChartDefinition chart)

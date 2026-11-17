@@ -140,7 +140,7 @@ public class LedgerCommandsAuditA2Tests
         sheet.Objects.AddRange([Shape("a"), Shape("b"), Shape("c")]);
         harness.SelectedObjects = [sheet.Objects[0]];
 
-        var commands = new LedgerShapeCommands(null!, null!, harness.Context, null!, Status(), null!, null!, null!, null!, null!, null!, null!, null!, null!, Texts, new PulseOffice.UI.Controls.Objects.ChosenFileReader(), new PulseOffice.Drawing.Shapes.DimensionLineTemplate());
+        var commands = new LedgerShapeCommands(null!, null!, harness.Context, null!, Status(), null!, null!, null!, null!, null!, null!, null!, null!, null!, Texts, new PulseOffice.UI.Controls.Objects.ChosenFileReader(), new PulseOffice.Drawing.Shapes.DimensionLineTemplate(), null!, null!);
         await commands.GetCommands().Single(command => command.Id.Value == "ledger.object.delete").Execute(Run, CancellationToken.None);
 
         Assert.Equal(["b", "c"], sheet.Objects.Select(placed => placed.Id));

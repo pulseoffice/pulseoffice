@@ -262,13 +262,13 @@ internal sealed class AnimationReader(OdfAnimationMapper animations) : OdpPageRe
     }
 }
 
-internal sealed class NotesReader : OdpPageReader
+internal sealed class NotesReader(IOdfParagraphText paragraphText) : OdpPageReader
 {
     public override void Read(XElement page, SlideAssembly<string> assembly, OdpReadContext context)
     {
         if (page.Element(Presentation + "notes") is not { } notes) return;
         var body = notes.Elements(Draw + "frame").FirstOrDefault(frame => (string?)frame.Attribute(Presentation + "class") == "notes") ?? notes;
-        var text = string.Join("\n", body.Descendants(Text + "p").Select(p => p.Value));
+        var text = paragraphText.Read(body);
         if (text.Trim().Length > 0) assembly.Slide.Notes = text;
     }
 }

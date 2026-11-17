@@ -112,9 +112,9 @@ public sealed class OdfTextCodecsAuditTests
     public void Elementi_annidati_senza_fine_non_fanno_traboccare_la_pila(string name)
     {
         var inner = new XElement(_text + name, "fondo");
-        for (var depth = 0; depth < 50_000; depth++) inner = new XElement(_text + name, inner);
+        for (var depth = 0; depth < SmallStackThread.DeeperThanAnyRecursionFits; depth++) inner = new XElement(_text + name, inner);
 
-        var paragraph = ReadParagraph([], new XElement(_text + "p", "inizio ", inner));
+        var paragraph = new SmallStackThread().Run(() => ReadParagraph([], new XElement(_text + "p", "inizio ", inner)));
 
         Assert.StartsWith("inizio", paragraph.Text, StringComparison.Ordinal);
     }

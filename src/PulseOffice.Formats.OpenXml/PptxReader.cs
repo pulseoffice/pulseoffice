@@ -77,7 +77,7 @@ public sealed class PptxReader : IPresentationReader
                 new PptxSoundReader(new PptxSounds(new SoundTypes()), new PptxTransitionMapper()),
                 new PptxGroupReader(),
                 new PptxAnimationReader(new PptxAnimationMapper(), new PptxSounds(new SoundTypes())),
-                new PptxCommentReader(new PptxCommentMapper(new PulseOffice.Formats.Packaging.XmlCharacterFilter())),
+                new PptxCommentReader(new PptxCommentMapper(new PulseOffice.Formats.Packaging.XmlCharacterFilter(), new DrawingML.DrawingPlainText())),
                 new BackgroundImageReader(backgrounds),
                 new NotesSlideReader(new PptxPrintMasters()),
             ],

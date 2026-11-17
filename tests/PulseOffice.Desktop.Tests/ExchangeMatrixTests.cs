@@ -23,7 +23,7 @@ namespace PulseOffice.Desktop.Tests;
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeMatrixTests : IDisposable
 {
-    private static readonly ModuleKind[] Modules = [ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations];
+    internal static readonly ModuleKind[] Modules = [ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations];
 
     private readonly UiThreadSession _session;
 
@@ -57,7 +57,7 @@ public sealed class ExchangeMatrixTests : IDisposable
         ],
     };
 
-    private static EmbeddedObject Sample(string kind, string id) => kind switch
+    internal static EmbeddedObject Sample(string kind, string id) => kind switch
     {
         "chart" => new ChartDefinition
         {
@@ -102,16 +102,7 @@ public sealed class ExchangeMatrixTests : IDisposable
         _ => new VectorGraphicObject { Id = id, Asset = new VectorAsset { Id = "a", Name = "Icona", SourceKind = default, SvgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"><rect width=\"1\" height=\"1\"/></svg>" } },
     };
 
-    public static TheoryData<string, ModuleKind> Crossings()
-    {
-        var data = new TheoryData<string, ModuleKind>();
-        foreach (var kind in new[] { "chart", "shape-lists", "image-linked", "group-links", "connector", "freeform", "fontwork", "dimension", "scene", "control", "table", "formula", "package", "signature", "vector" })
-            foreach (var from in Modules)
-                data.Add(kind, from);
-        return data;
-    }
-
-    private static async Task<ExchangePackage> Captured(ExchangeSuite suite, string kind, ModuleKind from)
+    internal static async Task<ExchangePackage> Captured(ExchangeSuite suite, string kind, ModuleKind from)
     {
         suite.Place(from, Sample(kind, "origine"));
         Assert.True(await suite.Copy(from), $"{kind} cannot be copied from {from}");
@@ -127,7 +118,7 @@ public sealed class ExchangeMatrixTests : IDisposable
         return received;
     }
 
-    private static void PasteEveryFlavourAlone(ExchangeSuite suite, ExchangePackage package, string label)
+    internal static void PasteEveryFlavourAlone(ExchangeSuite suite, ExchangePackage package, string label)
     {
         foreach (var representation in package.Representations)
         {
@@ -147,39 +138,6 @@ public sealed class ExchangeMatrixTests : IDisposable
             }
         }
     }
-
-    [Theory]
-    [MemberData(nameof(Crossings))]
-    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => _session.Dispatch(async () =>
-    {
-        await using var suite = await new ExchangeSuiteFactory().Open();
-        var package = await Captured(suite, kind, from);
-        Assert.IsType<ObjectsContent>(package.Content);
-        var original = Assert.Single(((ObjectsContent)package.Content!).Objects).Object;
-
-        foreach (var to in Modules)
-        {
-            var before = suite.Objects(to).Count;
-            Assert.True(await suite.Paste(to), $"{kind} from {from} not pasted into {to}");
-            var pasted = suite.Objects(to).Skip(before).ToList();
-            Assert.Contains(pasted, item => item.GetType() == original.GetType());
-        }
-
-        var native = new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Origin = from, Content = package.Content };
-        var serializer = suite.Service<IExchangeSerializer>();
-        var described = serializer.Read(serializer.Write(native));
-        Assert.NotNull(described);
-        foreach (var to in Modules)
-        {
-            var before = suite.Objects(to).Count;
-            suite.Activate(to);
-            Assert.True(suite.Exchange.Receive(to, described!, ExchangePasteMode.Objects) || to == from, $"{kind} described natively from {from} not pasted into {to}");
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(suite.Objects(to).Count >= before);
-        }
-
-        PasteEveryFlavourAlone(suite, package, $"{kind} from {from}");
-    }, CancellationToken.None);
 
     [Fact]
     public Task Celle_con_formule_stili_unioni_convalide_e_commenti_passano_in_ogni_modulo_con_ogni_rappresentazione() => _session.Dispatch(async () =>
@@ -273,4 +231,114 @@ public sealed class ExchangeMatrixTests : IDisposable
         Assert.Null(unknown.Content);
         foreach (var to in Modules) Assert.True(Received(suite, to, unknown), $"fallback for {kind} not pasted into {to}");
     }, CancellationToken.None);
+}
+
+public abstract class ExchangeCrossingTests : IDisposable
+{
+    private readonly UiThreadSession _session;
+
+    private readonly string _dataHome = Path.Combine(Path.GetTempPath(), "pulseoffice-exchange-matrix-" + Guid.NewGuid().ToString("N"));
+
+    protected ExchangeCrossingTests(HeadlessDesktopSession headless)
+    {
+        _session = headless.Session;
+        Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, _dataHome);
+    }
+
+    public void Dispose()
+    {
+        Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, null);
+        if (Directory.Exists(_dataHome)) Directory.Delete(_dataHome, recursive: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected static TheoryData<string, ModuleKind> Of(params string[] kinds)
+    {
+        var data = new TheoryData<string, ModuleKind>();
+        foreach (var kind in kinds)
+            foreach (var from in ExchangeMatrixTests.Modules)
+                data.Add(kind, from);
+        return data;
+    }
+
+    protected Task Cross(string kind, ModuleKind from) => _session.Dispatch(async () =>
+    {
+        await using var suite = await new ExchangeSuiteFactory().Open();
+        var package = await ExchangeMatrixTests.Captured(suite, kind, from);
+        Assert.IsType<ObjectsContent>(package.Content);
+        var original = Assert.Single(((ObjectsContent)package.Content!).Objects).Object;
+
+        foreach (var to in ExchangeMatrixTests.Modules)
+        {
+            var before = suite.Objects(to).Count;
+            Assert.True(await suite.Paste(to), $"{kind} from {from} not pasted into {to}");
+            var pasted = suite.Objects(to).Skip(before).ToList();
+            Assert.Contains(pasted, item => item.GetType() == original.GetType());
+        }
+
+        var native = new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Origin = from, Content = package.Content };
+        var serializer = suite.Service<IExchangeSerializer>();
+        var described = serializer.Read(serializer.Write(native));
+        Assert.NotNull(described);
+        foreach (var to in ExchangeMatrixTests.Modules)
+        {
+            var before = suite.Objects(to).Count;
+            suite.Activate(to);
+            Assert.True(suite.Exchange.Receive(to, described!, ExchangePasteMode.Objects) || to == from, $"{kind} described natively from {from} not pasted into {to}");
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(suite.Objects(to).Count >= before);
+        }
+
+        ExchangeMatrixTests.PasteEveryFlavourAlone(suite, package, $"{kind} from {from}");
+    }, CancellationToken.None);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeCrossingChartsTests(HeadlessDesktopSession headless) : ExchangeCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind> Crossings() => Of("chart", "shape-lists", "image-linked");
+
+    [Theory]
+    [MemberData(nameof(Crossings))]
+    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => Cross(kind, from);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeCrossingGroupsTests(HeadlessDesktopSession headless) : ExchangeCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind> Crossings() => Of("group-links", "connector", "freeform");
+
+    [Theory]
+    [MemberData(nameof(Crossings))]
+    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => Cross(kind, from);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeCrossingDrawingsTests(HeadlessDesktopSession headless) : ExchangeCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind> Crossings() => Of("fontwork", "dimension", "scene");
+
+    [Theory]
+    [MemberData(nameof(Crossings))]
+    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => Cross(kind, from);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeCrossingControlsTests(HeadlessDesktopSession headless) : ExchangeCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind> Crossings() => Of("control", "table", "formula");
+
+    [Theory]
+    [MemberData(nameof(Crossings))]
+    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => Cross(kind, from);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeCrossingPackagesTests(HeadlessDesktopSession headless) : ExchangeCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind> Crossings() => Of("package", "signature", "vector");
+
+    [Theory]
+    [MemberData(nameof(Crossings))]
+    public Task Ogni_tipo_di_oggetto_passa_in_ogni_modulo_in_forma_nativa_e_con_ogni_rappresentazione_da_sola(string kind, ModuleKind from) => Cross(kind, from);
 }

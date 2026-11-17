@@ -54,13 +54,13 @@ public sealed class OdfTablesAuditTests
         var workbook = new Workbook();
         workbook.AddSheet("Dati").SetValue(CellAddress.First, CellValue.Number(1));
 
-        var reopened = Reopened(workbook, content =>
+        var reopened = new SmallStackThread().Run(() => Reopened(workbook, content =>
         {
             var table = content.Descendants(_table + "table").First();
             var group = new XElement(_table + "table-row-group", new XElement(_table + "table-row", new XElement(_table + "table-cell")));
-            for (var depth = 0; depth < 50_000; depth++) group = new XElement(_table + "table-row-group", group);
+            for (var depth = 0; depth < SmallStackThread.DeeperThanAnyRecursionFits; depth++) group = new XElement(_table + "table-row-group", group);
             table.Add(group);
-        });
+        }));
 
         Assert.Equal(1, reopened.Sheets[0].GetValue(CellAddress.First).AsNumber());
     }

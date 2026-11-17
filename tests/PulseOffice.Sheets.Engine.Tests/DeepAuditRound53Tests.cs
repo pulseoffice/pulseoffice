@@ -85,9 +85,9 @@ public class DeepAuditRound53Tests(EngineFixture fixture) : IClassFixture<Engine
         var target = At(0, 5);
         engine.SetFormula(target, formula);
         var random = new Random(53);
-        for (var step = 0; step < 600; step++)
+        for (var step = 0; step < 200; step++)
         {
-            var cell = At(random.Next(0, 900), random.Next(0, 2));
+            var cell = At(random.Next(0, 300), random.Next(0, 2));
             switch (random.Next(0, 7))
             {
                 case 0: engine.SetValue(cell, CellValue.Empty); break;

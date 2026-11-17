@@ -13,6 +13,8 @@
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Copyright>PulseOffice — GPL-3.0-only</Copyright>
     <NeutralLanguage>it</NeutralLanguage>
+    <IncludeSourceRevisionInInformationalVersion Condition="'$(Configuration)' == 'Debug'">false</IncludeSourceRevisionInInformationalVersion>
+    <EnableSourceControlManagerQueries Condition="'$(Configuration)' == 'Debug'">false</EnableSourceControlManagerQueries>
     <RunSettingsFilePath>$(MSBuildThisFileDirectory)PulseOffice.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 </Project>

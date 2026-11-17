@@ -7,15 +7,15 @@ namespace PulseOffice.Presentations.UI;
 
 public sealed class DeckDrawCommands(IActiveDeckContext context, IDeckDrawingState drawing, IPathEditing editing) : DeckCommandSet(context)
 {
-    private static readonly (string Id, DeckPen Pen, bool Filled)[] Pens =
+    internal static readonly IReadOnlyList<(string Id, DeckPen Pen, bool Filled, string IconKey)> Pens =
     [
-        ("polygon", DeckPen.Polygon, false),
-        ("polygonFilled", DeckPen.Polygon, true),
-        ("polygon45", DeckPen.PolygonConstrained, false),
-        ("curve", DeckPen.Curve, false),
-        ("curveFilled", DeckPen.Curve, true),
-        ("freehand", DeckPen.Freehand, false),
-        ("freehandFilled", DeckPen.Freehand, true),
+        ("polygon", DeckPen.Polygon, false, "folio.draw.polygon"),
+        ("polygonFilled", DeckPen.Polygon, true, "folio.draw.polygonFilled"),
+        ("polygon45", DeckPen.PolygonConstrained, false, "folio.draw.polygon45"),
+        ("curve", DeckPen.Curve, false, "folio.draw.curve"),
+        ("curveFilled", DeckPen.Curve, true, "folio.draw.curveFilled"),
+        ("freehand", DeckPen.Freehand, false, "folio.draw.freeform"),
+        ("freehandFilled", DeckPen.Freehand, true, "folio.draw.freeformFilled"),
     ];
 
     public IEnumerable<CommandDefinition> GetCommands()
@@ -23,7 +23,7 @@ public sealed class DeckDrawCommands(IActiveDeckContext context, IDeckDrawingSta
         foreach (var entry in Pens)
             yield return Prototype($"deck.draw.{entry.Id}") with
             {
-                Surface = CommandSurface.Advanced,
+                Surface = CommandSurface.Palette,
                 RequiredState = DocumentState.DocumentOpen,
                 ForbiddenState = DocumentState.ReadOnly,
                 EnabledWhen = _ => Context.Target is { } t && t.CurrentSlide() is not null,

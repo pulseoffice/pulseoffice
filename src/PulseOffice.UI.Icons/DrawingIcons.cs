@@ -18,6 +18,8 @@ public sealed class DrawingIcons() : DictionaryIconCatalog(Shapes)
         ("ledger.gallery.symbolShapes", "M12 4l2 5 5 .5-3.7 3.4 1 5.1-4.3-2.6-4.3 2.6 1-5.1L5 9.5 10 9z M4 4h.01 M20 20h.01"),
         ("ledger.draw.polygon", "M12 3l8 6-3 10H7L4 9z"),
         ("ledger.draw.polygonFilled", "M12 3l8 6-3 10H7L4 9z M12 7l4 3-1.5 5h-5L8 10z"),
+        ("ledger.draw.polygonConstrained", "M4 18V8l6-4h8v8l-6 6z"),
+        ("ledger.draw.polygonConstrainedFilled", "M4 18V8l6-4h8v8l-6 6z M8 13h7"),
         ("ledger.draw.curve", "M4 18c4 0 5-12 9-12s7 6 7 12"),
         ("ledger.draw.curveFilled", "M4 18c4 0 5-12 9-12s7 6 7 12z"),
         ("ledger.draw.freehand", "M4 16c2-6 4 2 6-2s3 4 5 1 3-4 5-6"),

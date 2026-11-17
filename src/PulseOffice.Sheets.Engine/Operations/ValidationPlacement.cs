@@ -10,7 +10,6 @@ public interface IValidationPlacement
 public sealed class ValidationPlacement : IValidationPlacement
 {
     private readonly RangeCutter _cutter = new();
-    private readonly FormulaTranslator _translator = new();
 
     public IReadOnlyList<DataValidation> Place(IReadOnlyList<DataValidation> existing, CellRange area, DataValidation? rule)
     {
@@ -31,14 +30,33 @@ public sealed class ValidationPlacement : IValidationPlacement
     }
 
     private DataValidation Reanchored(DataValidation validation, CellRange range) =>
-        range.Start == validation.Range.Start
+        _anchoring.Reanchored(validation, range.Start, range);
+
+    private readonly ValidationAnchoring _anchoring = new();
+}
+
+public interface IValidationAnchoring
+{
+    DataValidation Reanchored(DataValidation validation, CellAddress start, CellRange range);
+}
+
+public sealed class ValidationAnchoring : IValidationAnchoring
+{
+    private readonly FormulaTranslator _translator = new();
+
+    public DataValidation Reanchored(DataValidation validation, CellAddress start, CellRange range)
+    {
+        ArgumentNullException.ThrowIfNull(validation);
+
+        return start == validation.Range.Start
             ? validation with { Range = range }
             : validation with
             {
                 Range = range,
-                FirstFormula = Shifted(validation.FirstFormula, validation.Range.Start, range.Start),
-                SecondFormula = Shifted(validation.SecondFormula, validation.Range.Start, range.Start),
+                FirstFormula = Shifted(validation.FirstFormula, validation.Range.Start, start),
+                SecondFormula = Shifted(validation.SecondFormula, validation.Range.Start, start),
             };
+    }
 
     private string? Shifted(string? formula, CellAddress from, CellAddress to)
     {

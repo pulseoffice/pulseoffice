@@ -69,7 +69,7 @@ public sealed class ExchangeTests : IDisposable
         Style = ShapeStyle.Default with { Fill = ShapeFill.Default with { ColorHex = "#DC2626" } },
     };
 
-    private static void AssertStarRuns(ShapeObject shape)
+    internal static void AssertStarRuns(ShapeObject shape)
     {
         var runs = shape.Runs ?? [];
         Assert.Contains(runs, run => run.Bold && run.Text.Contains("Ste", StringComparison.Ordinal));
@@ -93,17 +93,7 @@ public sealed class ExchangeTests : IDisposable
         Dispatcher.UIThread.RunJobs();
     }
 
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings()
-    {
-        var data = new TheoryData<string, ModuleKind, ModuleKind>();
-        foreach (var kind in new[] { "chart", "shape", "image", "formula", "group" })
-            foreach (var from in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
-                foreach (var to in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
-                    data.Add(kind, from, to);
-        return data;
-    }
-
-    private static EmbeddedObject Sample(string kind, string id) => kind switch
+    internal static EmbeddedObject Sample(string kind, string id) => kind switch
     {
         "chart" => new ChartDefinition
         {
@@ -192,51 +182,6 @@ public sealed class ExchangeTests : IDisposable
             Assert.Contains("Stella", string.Join("|", slide.Elements.Select(element => element is ObjectElement { Content: ShapeObject shape } ? shape.Text : element.ToString())), StringComparison.Ordinal);
             Assert.Single(slide.Elements);
         }
-    }, CancellationToken.None);
-
-    [Theory]
-    [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => _session.Dispatch(async () =>
-    {
-        await using var suite = await new ExchangeSuiteFactory().Open();
-        var original = Sample(kind, "origine");
-        suite.Place(from, original);
-        Assert.True(await suite.Copy(from));
-
-        var before = suite.Objects(to).Count;
-        Assert.True(await suite.Paste(to));
-
-        var after = suite.Objects(to);
-        Assert.Equal(before + 1, after.Count);
-        var pasted = after.Last(item => item.GetType() == original.GetType());
-        switch (pasted)
-        {
-            case ChartDefinition chart:
-                Assert.Equal(ChartType.Column, chart.Type);
-                Assert.Equal("Vendite", chart.ChartTitle);
-                Assert.Equal([12d, 30d], chart.InlineData!.Series[0].Values);
-                break;
-            case ShapeObject shape:
-                Assert.Equal(ShapeKind.Star5, shape.Shape);
-                Assert.Equal("Stella", shape.Text);
-                Assert.Equal("#DC2626", shape.Style.Fill.ColorHex);
-                AssertStarRuns(shape);
-                break;
-            case RasterImageObject image:
-                Assert.Equal(40, image.PixelWidth);
-                Assert.Equal(((RasterImageObject)original).Data.ToArray(), image.Data.ToArray());
-                break;
-            case FormulaObject formula:
-                Assert.Equal("a^2 + b^2 = c^2", formula.Expression);
-                break;
-            case ShapeGroupObject group:
-                Assert.Equal(2, group.Children.Count);
-                Assert.All(group.Children, child => AssertStarRuns(Assert.IsType<ShapeObject>(child.Content)));
-                break;
-        }
-
-        suite.Undo(to);
-        Assert.Equal(before, suite.Objects(to).Count);
     }, CancellationToken.None);
 
     [Theory]
@@ -472,4 +417,126 @@ public sealed class ExchangeTests : IDisposable
 
     private static string Text(PulseOffice.Documents.Blocks.TableBlock table) =>
         string.Join("|", table.Rows.SelectMany(row => row.Cells).SelectMany(cell => cell.Content.Blocks).OfType<PulseOffice.Documents.Blocks.ParagraphBlock>().Select(paragraph => paragraph.Text));
+}
+
+public abstract class ExchangeObjectCrossingTests : IDisposable
+{
+    private readonly UiThreadSession _session;
+
+    private readonly string _dataHome = Path.Combine(Path.GetTempPath(), "pulseoffice-exchange-" + Guid.NewGuid().ToString("N"));
+
+    protected ExchangeObjectCrossingTests(HeadlessDesktopSession headless)
+    {
+        _session = headless.Session;
+        Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, _dataHome);
+    }
+
+    public void Dispose()
+    {
+        Environment.SetEnvironmentVariable(UserDataPaths.DataHomeVariable, null);
+        if (Directory.Exists(_dataHome)) Directory.Delete(_dataHome, recursive: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected static TheoryData<string, ModuleKind, ModuleKind> Of(string kind)
+    {
+        var data = new TheoryData<string, ModuleKind, ModuleKind>();
+        foreach (var from in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
+            foreach (var to in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
+                data.Add(kind, from, to);
+        return data;
+    }
+
+    protected Task Cross(string kind, ModuleKind from, ModuleKind to) => _session.Dispatch(async () =>
+    {
+        await using var suite = await new ExchangeSuiteFactory().Open();
+        var original = ExchangeTests.Sample(kind, "origine");
+        suite.Place(from, original);
+        Assert.True(await suite.Copy(from));
+
+        var before = suite.Objects(to).Count;
+        Assert.True(await suite.Paste(to));
+
+        var after = suite.Objects(to);
+        Assert.Equal(before + 1, after.Count);
+        var pasted = after.Last(item => item.GetType() == original.GetType());
+        switch (pasted)
+        {
+            case ChartDefinition chart:
+                Assert.Equal(ChartType.Column, chart.Type);
+                Assert.Equal("Vendite", chart.ChartTitle);
+                Assert.Equal([12d, 30d], chart.InlineData!.Series[0].Values);
+                break;
+            case ShapeObject shape:
+                Assert.Equal(ShapeKind.Star5, shape.Shape);
+                Assert.Equal("Stella", shape.Text);
+                Assert.Equal("#DC2626", shape.Style.Fill.ColorHex);
+                ExchangeTests.AssertStarRuns(shape);
+                break;
+            case RasterImageObject image:
+                Assert.Equal(40, image.PixelWidth);
+                Assert.Equal(((RasterImageObject)original).Data.ToArray(), image.Data.ToArray());
+                break;
+            case FormulaObject formula:
+                Assert.Equal("a^2 + b^2 = c^2", formula.Expression);
+                break;
+            case ShapeGroupObject group:
+                Assert.Equal(2, group.Children.Count);
+                Assert.All(group.Children, child => ExchangeTests.AssertStarRuns(Assert.IsType<ShapeObject>(child.Content)));
+                break;
+        }
+
+        suite.Undo(to);
+        Assert.Equal(before, suite.Objects(to).Count);
+    }, CancellationToken.None);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeObjectCrossingChartTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("chart");
+
+    [Theory]
+    [MemberData(nameof(ObjectCrossings))]
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeObjectCrossingShapeTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("shape");
+
+    [Theory]
+    [MemberData(nameof(ObjectCrossings))]
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeObjectCrossingImageTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("image");
+
+    [Theory]
+    [MemberData(nameof(ObjectCrossings))]
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeObjectCrossingFormulaTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("formula");
+
+    [Theory]
+    [MemberData(nameof(ObjectCrossings))]
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class ExchangeObjectCrossingGroupTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
+{
+    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("group");
+
+    [Theory]
+    [MemberData(nameof(ObjectCrossings))]
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
 }

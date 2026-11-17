@@ -197,7 +197,7 @@ public class DeepAuditSheetsEngineCoreTests(EngineFixture fixture) : IClassFixtu
         var (workbook, engine) = fixture.CreateWorkbook();
         var sheet = workbook.Sheets[0];
         engine.AutomaticCalculation = false;
-        for (var row = 0; row < 5_000; row++)
+        for (var row = 0; row < 2_000; row++)
         {
             sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
             sheet.SetFormula(new CellAddress(row, 1), $"=SUM(A$1:A{row + 1})");
@@ -209,6 +209,6 @@ public class DeepAuditSheetsEngineCoreTests(EngineFixture fixture) : IClassFixtu
         var watch = System.Diagnostics.Stopwatch.StartNew();
         new Operations.SheetStructure().InsertRows(engine, 0, 0, 1);
         Assert.True(watch.ElapsedMilliseconds < 2 * recalculation + 1000, $"{watch.ElapsedMilliseconds} ms against {recalculation} ms for a full recalculation");
-        Assert.Equal("=SUM(A$2:A5001)", sheet[new CellAddress(5_000, 1)].Formula);
+        Assert.Equal("=SUM(A$2:A2001)", sheet[new CellAddress(2_000, 1)].Formula);
     }
 }

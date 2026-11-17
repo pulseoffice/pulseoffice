@@ -11,25 +11,16 @@ namespace PulseOffice.Sheets.Engine.Tests;
 public sealed class WholeColumnMillionRowPerformanceCollection;
 
 [Collection(nameof(WholeColumnMillionRowPerformanceTests))]
-public sealed class WholeColumnMillionRowPerformanceTests(EngineFixture fixture) : IClassFixture<EngineFixture>
+public sealed class WholeColumnMillionRowPerformanceTests(EngineFixture fixture, MillionRowWorkbook workbook)
+    : IClassFixture<EngineFixture>, IClassFixture<MillionRowWorkbook>
 {
-    private const int Rows = 1_000_000;
+    private const int Rows = MillionRowWorkbook.Rows;
 
-    private const int Keys = 10;
+    private const int Keys = MillionRowWorkbook.Keys;
 
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(15);
 
-    private CalculationEngine MillionRows()
-    {
-        var (_, engine) = fixture.CreateWorkbook();
-        for (var row = 0; row < Rows; row++)
-        {
-            engine.SetValue(new SheetCell(0, new CellAddress(row, 0)), CellValue.Number(row % Keys));
-            engine.SetValue(new SheetCell(0, new CellAddress(row, 1)), CellValue.Number(1));
-        }
-
-        return engine;
-    }
+    private CalculationEngine MillionRows() => workbook.Engine(fixture);
 
     [Theory]
     [InlineData("=SUMIFS(B:B,A:A,3)", Rows / Keys)]
@@ -50,5 +41,28 @@ public sealed class WholeColumnMillionRowPerformanceTests(EngineFixture fixture)
         Assert.True(value.Kind == ValueKind.Number, $"{formula} gave {value}");
         Assert.Equal(expected, value.AsNumber());
         Assert.True(clock.Elapsed < Bound, $"{formula} over {Rows} rows took {clock.Elapsed}");
+    }
+}
+
+public sealed class MillionRowWorkbook
+{
+    public const int Rows = 1_000_000;
+
+    public const int Keys = 10;
+
+    private CalculationEngine? _engine;
+
+    public CalculationEngine Engine(EngineFixture fixture)
+    {
+        if (_engine is not null) return _engine;
+        var (_, engine) = fixture.CreateWorkbook();
+        for (var row = 0; row < Rows; row++)
+        {
+            engine.SetValue(new SheetCell(0, new CellAddress(row, 0)), CellValue.Number(row % Keys));
+            engine.SetValue(new SheetCell(0, new CellAddress(row, 1)), CellValue.Number(1));
+        }
+
+        _engine = engine;
+        return engine;
     }
 }

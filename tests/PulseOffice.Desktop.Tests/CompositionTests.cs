@@ -56,6 +56,40 @@ public sealed class CompositionTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
+    public Task Each_module_offers_shapes_through_one_menu_entry_that_opens_the_shared_picker() => Session.Dispatch(async () =>
+    {
+        await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);
+        var registry = new ShellComposition(provider).Compose();
+
+        var expected = new Dictionary<ModuleKind, string>
+        {
+            [ModuleKind.Documents] = "folio.insert.shape",
+            [ModuleKind.Presentations] = "deck.insert.shape.gallery",
+            [ModuleKind.Sheets] = "ledger.shape.gallery",
+        };
+        foreach (var (module, id) in expected)
+        {
+            var onMenu = registry.All
+                .Where(command => command.Module == module && command.Surface.HasFlag(CommandSurface.Menu))
+                .Where(command => command.MenuPath is { } path && (path == "insert/shape" || path.StartsWith("insert/shape/", StringComparison.Ordinal)))
+                .Select(command => command.Id.Value);
+            Assert.Equal([id], onMenu);
+        }
+
+        string[] hidden = ["folio.insert.basicShapes", "folio.insert.line", "folio.insert.dimensionLine", "folio.draw.freeform", "folio.draw.connector",
+            "deck.insert.symbolShapes", "deck.insert.shape.rectangle", "deck.draw.curve", "ledger.gallery.flowChartShapes", "ledger.shape.rectangle", "ledger.draw.polygon"];
+        foreach (var id in hidden)
+        {
+            var command = registry.All.Single(candidate => candidate.Id.Value == id);
+            Assert.False(command.Surface.HasFlag(CommandSurface.Menu), id);
+            Assert.True(command.Surface.HasFlag(CommandSurface.Palette), id);
+        }
+        Assert.True(registry.All.Single(command => command.Id.Value == "ledger.shape.rectangle").Surface.HasFlag(CommandSurface.Ribbon));
+        Assert.True(registry.All.Single(command => command.Id.Value == "deck.insert.shape.rectangle").Surface.HasFlag(CommandSurface.Ribbon));
+        Assert.IsType<PulseOffice.UI.Controls.Shapes.ShapeChooser>(provider.GetRequiredService<PulseOffice.UI.Controls.Shapes.IShapeChooser>());
+    }, CancellationToken.None);
+
+    [Fact]
     public Task Shell_commands_surfaces_and_the_three_modules_compose() => Session.Dispatch(async () =>
     {
         await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);

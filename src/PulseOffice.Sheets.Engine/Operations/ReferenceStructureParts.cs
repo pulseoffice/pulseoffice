@@ -80,8 +80,8 @@ internal sealed class ConditionsElsewherePart : StructurePart
             for (var index = 0; index < sheet.ConditionalRules.Count; index++)
             {
                 var rule = sheet.ConditionalRules[index];
-                var formula = _bare.Rewrite(rewriter, rule.Formula);
-                if (formula != rule.Formula) sheet.ConditionalRules[index] = rule with { Formula = formula };
+                var rewritten = rule.WithFormulas(text => _bare.Rewrite(rewriter, text));
+                if (!rewritten.SameFormulas(rule)) sheet.ConditionalRules[index] = rewritten;
             }
 
             for (var index = 0; index < sheet.Validations.Count; index++)

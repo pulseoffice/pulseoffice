@@ -90,27 +90,33 @@ public sealed class OdfSheetMetadataMapper
         {
             if (workbook.FindSheet(table.Attribute(Namespaces.Table + "name")?.Value ?? string.Empty) is not { } sheet) continue;
 
-            var ranges = new Dictionary<string, (CellAddress First, CellAddress Last)>(StringComparer.Ordinal);
+            var areas = new Dictionary<string, ValidationAreas>(StringComparer.Ordinal);
             foreach (var row in _rows.In(table))
             {
                 if (row.Index >= CellAddress.MaxRows) break;
+                var lastRow = (int)Math.Min((long)row.Index + row.Repeat - 1, CellAddress.MaxRows - 1);
                 foreach (var cell in _cells.Of(row))
                 {
                     if (cell.Address.Column >= CellAddress.MaxColumns) break;
                     if (cell.Element.Attribute(Namespaces.Table + "content-validation-name")?.Value is not { } name) continue;
+                    if (!declared.ContainsKey(name)) continue;
 
-                    var last = new CellAddress(
-                        (int)Math.Min((long)row.Index + row.Repeat - 1, CellAddress.MaxRows - 1),
-                        (int)Math.Min((long)cell.Address.Column + cell.Repeat - 1, CellAddress.MaxColumns - 1));
-                    ranges[name] = ranges.TryGetValue(name, out var existing)
-                        ? (Corner(existing.First, cell.Address, Math.Min), Corner(existing.Last, last, Math.Max))
-                        : (cell.Address, last);
+                    var lastColumn = (int)Math.Min((long)cell.Address.Column + cell.Repeat - 1, CellAddress.MaxColumns - 1);
+                    if (!areas.TryGetValue(name, out var area)) areas[name] = area = new ValidationAreas();
+                    area.Add(row.Index, lastRow, cell.Address.Column, lastColumn);
                 }
             }
 
-            foreach (var (name, range) in ranges)
-                if (declared.TryGetValue(name, out var element))
-                    sheet.Validations.Add(Parse(element, new CellRange(range.First, range.Last)));
+            foreach (var (name, area) in areas)
+            {
+                var element = declared[name];
+                var rectangles = area.Rectangles();
+                var parsed = Parse(element, rectangles[0]);
+                var anchor = _ranges.Read(element.Attribute(Namespaces.Table + "base-cell-address")?.Value)?.Range.Start ?? rectangles[0].Start;
+                var anchored = parsed with { Range = new CellRange(anchor, anchor) };
+                foreach (var rectangle in rectangles)
+                    sheet.Validations.Add(_anchoring.Reanchored(anchored, rectangle.Start, rectangle));
+            }
         }
     }
 
@@ -139,15 +145,90 @@ public sealed class OdfSheetMetadataMapper
 
     private string NameOf(Worksheet sheet, int index) => string.Create(CultureInfo.InvariantCulture, $"val{index}_{sheet.Name}");
 
-    private CellAddress Corner(CellAddress first, CellAddress second, Func<int, int, int> pick) =>
-        new(pick(first.Row, second.Row), pick(first.Column, second.Column));
+    private readonly PulseOffice.Sheets.Engine.Operations.ValidationAnchoring _anchoring = new();
 }
 
-public sealed class OdfSheetValidationNames(IReadOnlyList<(CellRange Range, string Name)> validations)
+internal sealed class ValidationAreas
 {
+    private readonly List<CellRange> _closed = [];
+    private readonly List<(int First, int Last)> _spans = [];
+    private Dictionary<(int First, int Last), (int Start, int End)> _open = [];
+    private int _row = -1;
+    private int _rowLast = -1;
+
+    public void Add(int row, int rowLast, int firstColumn, int lastColumn)
+    {
+        if (row != _row)
+        {
+            Settle();
+            _row = row;
+            _rowLast = rowLast;
+        }
+
+        if (_spans.Count > 0 && _spans[^1].Last + 1 == firstColumn) _spans[^1] = (_spans[^1].First, lastColumn);
+        else _spans.Add((firstColumn, lastColumn));
+    }
+
+    public IReadOnlyList<CellRange> Rectangles()
+    {
+        Settle();
+        Close(_open);
+        _open = [];
+        return [.. _closed.OrderBy(range => range.Start.Row).ThenBy(range => range.Start.Column)];
+    }
+
+    private void Settle()
+    {
+        if (_spans.Count == 0) return;
+
+        var next = new Dictionary<(int First, int Last), (int Start, int End)>();
+        foreach (var span in _spans)
+        {
+            var continues = _open.TryGetValue(span, out var band) && band.End == _row - 1;
+            if (continues) _open.Remove(span);
+            next[span] = (continues ? band.Start : _row, _rowLast);
+        }
+        Close(_open);
+        _open = next;
+        _spans.Clear();
+    }
+
+    private void Close(Dictionary<(int First, int Last), (int Start, int End)> bands)
+    {
+        foreach (var (span, band) in bands)
+            _closed.Add(new CellRange(new CellAddress(band.Start, span.First), new CellAddress(band.End, span.Last)));
+    }
+}
+
+public sealed class OdfSheetValidationNames
+{
+    private readonly int[] _bandStarts;
+    private readonly List<(CellRange Range, string Name)>[] _bands;
+
+    public OdfSheetValidationNames(IReadOnlyList<(CellRange Range, string Name)> validations)
+    {
+        ArgumentNullException.ThrowIfNull(validations);
+
+        _bandStarts = [.. validations
+            .SelectMany(validation => new[] { validation.Range.Start.Row, validation.Range.End.Row + 1 })
+            .Distinct()
+            .Order()];
+        _bands = [.. _bandStarts.Select(_ => new List<(CellRange, string)>())];
+        foreach (var validation in validations)
+        {
+            var last = Array.BinarySearch(_bandStarts, validation.Range.End.Row + 1);
+            for (var band = Array.BinarySearch(_bandStarts, validation.Range.Start.Row); band < last; band++)
+                _bands[band].Add(validation);
+        }
+    }
+
     public string? For(CellAddress address)
     {
-        foreach (var (range, name) in validations)
+        var band = Array.BinarySearch(_bandStarts, address.Row);
+        if (band < 0) band = ~band - 1;
+        if (band < 0) return null;
+
+        foreach (var (range, name) in _bands[band])
             if (range.Contains(address)) return name;
         return null;
     }

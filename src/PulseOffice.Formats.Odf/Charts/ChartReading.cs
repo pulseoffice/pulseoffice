@@ -1,18 +1,19 @@
 using System.Globalization;
 using System.Xml.Linq;
 using PulseOffice.Charts;
+using PulseOffice.Formats.Odf.TextCodecs;
 using PulseOffice.Sheets.Addressing;
 using PulseOffice.Sheets.Engine.Operations;
 
 namespace PulseOffice.Formats.Odf;
 
-internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary) : OdfChartXml
+internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IOdfParagraphText paragraphs) : OdfChartXml
 {
     public ChartDefinition? Read(XElement chart, string id)
     {
         if (chart.Element(Chart + "plot-area") is not { } plot) return null;
 
-        var title = chart.Element(Chart + "title")?.Element(Text + "p")?.Value;
+        var title = chart.Element(Chart + "title") is { } titleElement ? paragraphs.Read(titleElement) : null;
         var chartClass = (string?)chart.Attribute(Chart + "class");
         var type = vocabulary.Declared((string?)chart.Attribute(PulseChart + "type"), chartClass,
             vocabulary.Refine(vocabulary.TypeOf(chartClass, Flags(chart, plot)), Traits(chart, plot)));
@@ -67,7 +68,7 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary) : 
         plot.Elements(Chart + "axis").FirstOrDefault(axis => (string?)axis.Attribute(Chart + "dimension") == dimension);
 
     private string? AxisTitle(XElement plot, string dimension) =>
-        Axis(plot, dimension)?.Element(Chart + "title")?.Elements(Text + "p").Select(paragraph => paragraph.Value).FirstOrDefault(text => text.Length > 0);
+        Axis(plot, dimension)?.Element(Chart + "title") is { } title && paragraphs.Read(title) is { Length: > 0 } text ? text : null;
 
     private bool HasLabels(XElement chart, XElement series)
     {
@@ -169,8 +170,8 @@ internal sealed class CellRangeAddresses
     }
 }
 
-internal sealed class SheetChartDocumentReader(OdfChartVocabulary vocabulary, CellRangeAddresses addresses)
-    : OdfChartDocumentReader(vocabulary)
+internal sealed class SheetChartDocumentReader(OdfChartVocabulary vocabulary, CellRangeAddresses addresses, IOdfParagraphText paragraphs)
+    : OdfChartDocumentReader(vocabulary, paragraphs)
 {
     protected override ChartDefinition Source(XElement chart, XElement plot, ChartDefinition common)
     {
@@ -212,7 +213,7 @@ internal sealed class SheetChartDocumentReader(OdfChartVocabulary vocabulary, Ce
     private bool Categorised(XElement plot) => plot.Descendants(Chart + "categories").Any();
 }
 
-internal sealed class InlineChartDocumentReader(OdfChartVocabulary vocabulary) : OdfChartDocumentReader(vocabulary)
+internal sealed class InlineChartDocumentReader(OdfChartVocabulary vocabulary, IOdfParagraphText paragraphs) : OdfChartDocumentReader(vocabulary, paragraphs)
 {
     private const int MostColumns = 1024;
 

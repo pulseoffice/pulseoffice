@@ -55,6 +55,7 @@ public sealed class OdpWriter : IPresentationWriter
         _content = new OdpContentBuilder(
             new OdpPageWriter(
                 layouts,
+                paragraphText,
                 new PageStyleBuilder(units, new SmilTransitionMapper()),
                 new TextFrameWriter(units, richText, listeners, frames, new OdfFreeTextShape()),
                 new MediaFrameWriter(units, new OdfMediaMapper()),

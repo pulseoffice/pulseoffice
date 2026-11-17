@@ -35,7 +35,9 @@ public sealed class LedgerShapeCommands(
     PulseOffice.UI.Controls.Shapes.IShapeStyleEditors shapeEditors,
     ITextCatalog texts,
     PulseOffice.UI.Controls.Objects.IChosenFileReader reader,
-    IDimensionLineTemplate dimensions) : LedgerCommandSet(context)
+    IDimensionLineTemplate dimensions,
+    PulseOffice.UI.Controls.Drawing.IDrawingToolState drawing,
+    IShapeChooser shapes) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() => ShapeCommands();
 
@@ -48,9 +50,9 @@ public sealed class LedgerShapeCommands(
     private IEnumerable<CommandDefinition> ShapeCommands() =>
     [
         .. QuickShapes.Select(kind => Shape(
-            $"ledger.shape.{ShapeGalleryView.Key(kind)}", kind, CommandSurface.Common)),
+            $"ledger.shape.{ShapeGalleryView.Key(kind)}", kind, CommandSurface.Ribbon | CommandSurface.Palette)),
 
-        Shape("ledger.shape.dimensionLine", ShapeKind.Line, CommandSurface.Common) with
+        Shape("ledger.shape.dimensionLine", ShapeKind.Line, CommandSurface.Ribbon | CommandSurface.Palette) with
         {
             Execute = (_, _) =>
             {
@@ -67,7 +69,7 @@ public sealed class LedgerShapeCommands(
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => formatting.CanFormat,
-            Execute = (_, ct) => InsertFromGalleryAsync(ct),
+            Execute = (_, ct) => ChooseShapeAsync(ct),
         },
 
         Prototype("ledger.image.gallery") with
@@ -427,15 +429,17 @@ public sealed class LedgerShapeCommands(
             Size = size,
         }, texts["history.shape.insert"]);
 
-    private async Task InsertFromGalleryAsync(CancellationToken ct)
+    private async Task ChooseShapeAsync(CancellationToken ct)
     {
-        var chosen = await dialogs.ShowAsync<ShapeKind>(
-            new ShapeGalleryView(texts),
-            new DialogOptions { TitleKey = "dialog.shapeGallery.title", PreferredWidth = 560 }, ct)
-            .ConfigureAwait(true);
-
-        if (chosen is { } kind) InsertShape(kind);
+        if (await shapes.ChooseAsync(ShapeTools(), ct).ConfigureAwait(true) is { } kind) InsertShape(kind);
     }
+
+    private IReadOnlyList<ShapeTool> ShapeTools() =>
+    [
+        new("ledger.shape.dimensionLine", "command.ledger.shape.dimensionLine.title", "ledger.shape.dimensionLine",
+            () => InsertObject(dimensions.Create(Guid.NewGuid().ToString("N")), dimensions.Size)),
+        .. LedgerDrawCommands.Pens.Select(pen => new ShapeTool(pen.Id, $"command.{pen.Id}.title", pen.Id, () => drawing.Choose(pen.Tool, pen.Filled))),
+    ];
 
     private async Task InsertFromLibraryAsync(CancellationToken ct)
     {

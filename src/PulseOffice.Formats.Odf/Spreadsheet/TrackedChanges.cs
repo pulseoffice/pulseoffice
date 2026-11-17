@@ -7,9 +7,12 @@ using Namespaces = PulseOffice.Formats.Packaging.OdfPackage.Namespaces;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed class OdfTrackedChangesMapper
+internal sealed class OdfTrackedChangesMapper(PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText paragraphs)
 {
-    private readonly OdfCellValueCodec _values = new();
+    public OdfTrackedChangesMapper() : this(new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()) { }
+
+    private readonly OdfCellValueCodec _values = new(paragraphs);
+    private readonly PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText _paragraphs = paragraphs;
     private readonly OdfProtectionMapper _protection = new();
     private readonly OdfFormulaSyntax _formulas = new();
     private readonly TokenMap<ChangeState> _states = new(ChangeState.Pending, "pending",
@@ -41,7 +44,7 @@ internal sealed class OdfTrackedChangesMapper
         var info = new XElement(Namespaces.Office + "change-info",
             new XElement(Namespaces.Dc + "creator", change.Author ?? string.Empty),
             new XElement(Namespaces.Dc + "date", change.At.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)));
-        if (change.Comment is { Length: > 0 } comment) info.Add(new XElement(Namespaces.Text + "p", comment));
+        if (change.Comment is { Length: > 0 } comment) info.Add(_paragraphs.Paragraphs(comment));
 
         return new XElement(Namespaces.Table + "cell-content-change",
             new XAttribute(Namespaces.Table + "id", change.Id),
@@ -112,7 +115,7 @@ internal sealed class OdfTrackedChangesMapper
             At = DateTimeOffset.TryParse(info?.Element(Namespaces.Dc + "date")?.Value, CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal, out var moment) ? moment : DateTimeOffset.Now,
             State = _states.Value((string?)element.Attribute(Namespaces.Table + "acceptance-state")),
-            Comment = info?.Elements(Namespaces.Text + "p").Select(paragraph => paragraph.Value).FirstOrDefault(),
+            Comment = info is not null && info.Elements(Namespaces.Text + "p").Any() ? _paragraphs.Read(info) : null,
         };
     }
 

@@ -449,17 +449,17 @@ internal sealed class RulesPart : StructurePart
 
         var (before, after) = survivors[0];
         var formula = rule.Formula;
-        if (formula is not null && before != rule.Range)
-            formula = Like(formula, _translator.Translate(Prefixed(formula), before.Start.Row - rule.Anchor.Row, before.Start.Column - rule.Anchor.Column));
-        if (formula is not null)
-            formula = Like(formula, new StructureRewriter(edit.Change, edit.Sheet.Name).Rewrite(Prefixed(formula)));
+        var start = _survivingStart.Of(edit, before);
+        if (formula is not null && start != rule.Anchor)
+            formula = Like(formula, _translator.Translate(Prefixed(formula), start.Row - rule.Anchor.Row, start.Column - rule.Anchor.Column));
+        var rewriter = new StructureRewriter(edit.Change, edit.Sheet.Name);
 
-        return rule with
+        return (rule with
         {
             Range = after!.Value,
             AdditionalRanges = [.. survivors.Skip(1).Select(pair => pair.After!.Value)],
             Formula = formula,
-        };
+        }).WithFormulas(text => _bare.Rewrite(rewriter, text));
     }
 
     private string Prefixed(string formula) => formula.StartsWith('=') ? formula : "=" + formula;
@@ -467,7 +467,23 @@ internal sealed class RulesPart : StructurePart
     private string Like(string original, string? rewritten) =>
         rewritten is null ? original : original.StartsWith('=') ? rewritten : rewritten.TrimStart('=');
 
+    private readonly BareFormulaRewrite _bare = new();
     private readonly FormulaTranslator _translator = new();
+    private readonly SurvivingStart _survivingStart = new();
+}
+
+internal sealed class SurvivingStart
+{
+    public CellAddress Of(StructureEdit edit, CellRange range)
+    {
+        var change = edit.Change;
+        if (change.IsInsertion || edit.Shift.Move(range.Start) is not null) return range.Start;
+
+        var firstKept = change.Index + change.Count;
+        return change.Axis == StructureAxis.Rows
+            ? new CellAddress(firstKept, range.Start.Column)
+            : new CellAddress(range.Start.Row, firstKept);
+    }
 }
 
 internal sealed class ValidationsPart : StructurePart
@@ -487,16 +503,19 @@ internal sealed class ValidationsPart : StructurePart
                 continue;
             }
 
-            validations[index] = validation with
+            var anchored = _anchoring.Reanchored(validation, _survivingStart.Of(edit, validation.Range), validation.Range);
+            validations[index] = anchored with
             {
                 Range = range,
-                FirstFormula = _bare.Rewrite(rewriter, validation.FirstFormula),
-                SecondFormula = _bare.Rewrite(rewriter, validation.SecondFormula),
+                FirstFormula = _bare.Rewrite(rewriter, anchored.FirstFormula),
+                SecondFormula = _bare.Rewrite(rewriter, anchored.SecondFormula),
             };
         }
     }
 
     private readonly BareFormulaRewrite _bare = new();
+    private readonly ValidationAnchoring _anchoring = new();
+    private readonly SurvivingStart _survivingStart = new();
 }
 
 internal sealed class CommentsPart : StructurePart
