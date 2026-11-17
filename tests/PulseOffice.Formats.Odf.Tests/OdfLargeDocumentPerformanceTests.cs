@@ -111,7 +111,7 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
         var sheet = workbook.AddSheet("Data");
         var style = workbook.Styles.Intern(new PulseOffice.Sheets.Styling.CellStyle { BackgroundHex = "#FFEE00" });
         sheet.Layout.SetColumnStyles(0, CellAddress.MaxColumns - 1, style);
-        for (var row = 0; row < 30_000; row++) sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
+        for (var row = 0; row < 6_000; row++) sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
         using var stream = new MemoryStream();
 
         var write = Timed("ODS write styled columns", () => new OdsWriter().Write(workbook, stream));
@@ -119,7 +119,7 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
         var read = new OdsReader().Read(stream).Value!;
 
         Assert.True(write < 4_000, $"write {write} ms");
-        Assert.Equal(29_999, read.Sheets[0].GetValue(new CellAddress(29_999, 0)).AsNumber());
+        Assert.Equal(5_999, read.Sheets[0].GetValue(new CellAddress(5_999, 0)).AsNumber());
         Assert.NotNull(read.Sheets[0].Layout.ColumnStyle(CellAddress.MaxColumns - 1));
     }
 
@@ -239,7 +239,16 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void A_frame_with_twelve_thousand_animated_paragraphs_reads_in_linear_time()
+    public void A_frame_with_many_animated_paragraphs_reads_in_linear_time()
+    {
+        AnimatedParagraphsRead(600);
+        var small = AnimatedParagraphsRead(600);
+        var large = AnimatedParagraphsRead(6_000);
+
+        Assert.True(large < 40 * Math.Max(small, 25), $"read {large} ms against {small} ms for a tenth of the paragraphs");
+    }
+
+    private long AnimatedParagraphsRead(int count)
     {
         var deck = Deck();
         var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
@@ -247,16 +256,16 @@ public sealed class OdfLargeDocumentPerformanceTests(ITestOutputHelper output)
         {
             Id = "box",
             Bounds = new DocumentRect(Twip.FromCentimeters(1), Twip.FromCentimeters(1), Twip.FromCentimeters(10), Twip.FromCentimeters(4)),
-            Text = new PulseOffice.Text.Rich.RichText(PulseOffice.Text.Rich.PlaceholderRole.Free, [.. Enumerable.Range(0, 12_000).Select(index => new PulseOffice.Text.Rich.TextParagraph("line " + index))]),
+            Text = new PulseOffice.Text.Rich.RichText(PulseOffice.Text.Rich.PlaceholderRole.Free, [.. Enumerable.Range(0, count).Select(index => new PulseOffice.Text.Rich.TextParagraph("line " + index))]),
         });
-        for (var index = 0; index < 12_000; index++)
+        for (var index = 0; index < count; index++)
             slide.AddAnimation(new AnimationEffect { Id = "a" + index, TargetId = "box", Paragraph = index, Trigger = AnimationTrigger.WithPrevious });
         deck.AddExisting(slide);
 
         var (_, load, read) = RoundTrip(deck);
 
-        Assert.True(load < 2_000, $"read {load} ms");
-        Assert.Equal(11_999, read.Slides[0].Animations.Max(effect => effect.Paragraph));
+        Assert.Equal(count - 1, read.Slides[0].Animations.Max(effect => effect.Paragraph));
+        return load;
     }
 
     [Fact]

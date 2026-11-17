@@ -39,8 +39,12 @@ each chunk.
 Chunks are balanced by the per-class durations recorded in the cache, aiming at TESTS_CHUNK_SECONDS each, so a long
 serial project (one headless UI collection) is spread over several processes.
 
-Environment: TESTS_JOBS (chunks at once, default 3), TESTS_MEMORY_TOTAL_GB (budget shared by the running chunks,
-default 12), TESTS_MEMORY_MAX (per chunk, default the budget divided by the jobs, at most 6G), TESTS_CHUNK_SECONDS
+Each chunk's MemoryMax is 1.5 times the highest memory peak recorded in the cache for its project (1 to 6 GB; 4 GB
+while none is recorded), and a chunk starts only when its cap fits beside those of the running chunks within
+TESTS_MEMORY_TOTAL_GB.
+
+Environment: TESTS_JOBS (chunks at once, default 5), TESTS_MEMORY_TOTAL_GB (budget shared by the running chunks,
+default 12), TESTS_MEMORY_MAX (one fixed cap for every chunk, such as 3G), TESTS_CHUNK_SECONDS
 (default 60), TESTS_CLASSES_PER_CHUNK (default 40), TESTS_BUILD_NODES (default 2), TESTS_SLOW_SECONDS (default 5),
 TESTS_OUT (default artifacts/test-runs/<timestamp>), TESTS_CACHE (default artifacts/test-runs/cache.json).
 
@@ -196,17 +200,17 @@ class ChangedFiles:
 
 
 class MemoryCap:
-    def __init__(self, limit):
-        self.limit = limit
+    def __init__(self, limit_mb):
+        self.limit_mb = limit_mb
         self.available = sys.platform.startswith("linux") and shutil.which("systemd-run") is not None
 
     def unit(self):
         return f"pulse-tests-{os.getpid()}-{random.randrange(1 << 30)}"
 
-    def wrap(self, command, unit=None):
+    def wrap(self, command, unit=None, limit_mb=None):
         if not self.available:
             return command
-        return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "-p", f"MemoryMax={self.limit}",
+        return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "-p", f"MemoryMax={limit_mb or self.limit_mb}M",
                 "-p", "MemorySwapMax=0", f"--unit={unit or self.unit()}", "--"] + command
 
     def stop(self, process, unit):
@@ -245,6 +249,55 @@ class TestAssembly:
         return digest.hexdigest()
 
 
+class MemorySize:
+    UNITS = {"": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1048576}
+
+    @staticmethod
+    def megabytes(text):
+        match = re.fullmatch(r"\s*(\d+)\s*([KMGT]?)\s*", text.upper())
+        if not match:
+            sys.exit(f"TESTS_MEMORY_MAX={text}: expected a size such as 3G or 2500M")
+        return max(1, int(int(match.group(1)) * MemorySize.UNITS[match.group(2)]))
+
+
+class MemoryBudget:
+    def __init__(self, total_mb):
+        self.total_mb = total_mb
+        self.used_mb = 0
+        self.condition = threading.Condition()
+
+    def acquire(self, mb):
+        with self.condition:
+            self.condition.wait_for(lambda: self.used_mb == 0 or self.used_mb + mb <= self.total_mb)
+            self.used_mb += mb
+
+    def release(self, mb):
+        with self.condition:
+            self.used_mb -= mb
+            self.condition.notify_all()
+
+
+class ChunkMemory:
+    MARGIN = 1.5
+    STEP_MB = 256
+    FLOOR_MB = 1024
+    CEILING_MB = 6144
+
+    def __init__(self, cache, unknown_mb, fixed_mb=None):
+        self.cache = cache
+        self.unknown_mb = unknown_mb
+        self.fixed_mb = fixed_mb
+
+    def limit_mb(self, name):
+        if self.fixed_mb:
+            return self.fixed_mb
+        peak = self.cache.peak_mb(name)
+        if not peak:
+            return self.unknown_mb
+        wanted = math.ceil(peak * self.MARGIN / self.STEP_MB) * self.STEP_MB
+        return min(self.CEILING_MB, max(self.FLOOR_MB, wanted))
+
+
 class ResultCache:
     def __init__(self, path):
         self.path = Path(path)
@@ -264,6 +317,14 @@ class ResultCache:
         with self.lock:
             self.entries.setdefault(name, {}).setdefault("classes", {}).update(seconds_by_class)
 
+    def peak_mb(self, name):
+        return self.entries.get(name, {}).get("peak_mb", 0)
+
+    def record_peak(self, name, peak_mb):
+        with self.lock:
+            entry = self.entries.setdefault(name, {})
+            entry["peak_mb"] = max(entry.get("peak_mb", 0), peak_mb)
+
     def mark_green(self, name, fingerprint):
         with self.lock:
             self.entries.setdefault(name, {})["green"] = fingerprint
@@ -282,7 +343,9 @@ class Chunk:
 
 
 class TestRunner:
-    def __init__(self, options, cap, cache, graph):
+    def __init__(self, options, cap, cache, graph, memory, budget):
+        self.memory = memory
+        self.budget = budget
         self.graph = graph
         self.options = options
         self.cap = cap
@@ -353,11 +416,20 @@ class TestRunner:
                                          "-xml", str(report)]
         for name in classes:
             command += ["-class", name]
-        started = time.monotonic()
         unit = self.cap.unit()
+        limit_mb = self.memory.limit_mb(assembly.name)
+        self.budget.acquire(limit_mb)
+        started = time.monotonic()
+        try:
+            return self._run_capped(chunk, command, log, report, unit, limit_mb, started)
+        finally:
+            self.budget.release(limit_mb)
+
+    def _run_capped(self, chunk, command, log, report, unit, limit_mb, started):
+        assembly, index = chunk.assembly, chunk.index
         stopped = None
         with log.open("w") as stream:
-            process = subprocess.Popen(self.cap.wrap(self.cap.peak_probe(command), unit), stdout=stream,
+            process = subprocess.Popen(self.cap.wrap(self.cap.peak_probe(command), unit, limit_mb), stdout=stream,
                                        stderr=subprocess.STDOUT, cwd=assembly.folder, env=self.environment(),
                                        start_new_session=True)
             while process.poll() is None:
@@ -385,15 +457,16 @@ class TestRunner:
             result = "failed"
         peak_mb = int(peak or 0) // 1048576
         self.cache.record(assembly.name, seconds_by_class)
+        self.cache.record_peak(assembly.name, limit_mb if result == "killed" else peak_mb)
         slowest = f"{slow[0][0]} ({slow[0][1]:.1f}s)" if slow else ""
         with self.write_lock:
             with self.summary.open("a") as stream:
-                stream.write(f"{assembly.name}\t{index}\t{result}\t{passed}\t{failed}\t{peak_mb}\t{seconds}\t{slowest}\n")
+                stream.write(f"{assembly.name}\t{index}\t{result}\t{passed}\t{failed}\t{peak_mb}\t{limit_mb}\t{seconds}\t{slowest}\n")
             with self.slow.open("a") as stream:
                 for name, duration in slow:
                     stream.write(f"{assembly.name}\t{duration:.1f}\t{name}\n")
             print(f"{assembly.name:<48} {index:>3} {result:<7} pass {passed:<5} fail {failed:<4} "
-                  f"peak {peak_mb:>5} MB  {seconds:>4}s", flush=True)
+                  f"peak {peak_mb:>5}/{limit_mb} MB  {seconds:>4}s", flush=True)
             for name, duration in slow:
                 print(f"    slow {duration:6.1f}s  {name}", flush=True)
         return result
@@ -442,7 +515,7 @@ class TestRunner:
 
     def run(self, projects):
         self.out.mkdir(parents=True, exist_ok=True)
-        self.summary.write_text("project\tchunk\tresult\tpassed\tfailed\tpeak_mb\tseconds\tslowest\n")
+        self.summary.write_text("project\tchunk\tresult\tpassed\tfailed\tpeak_mb\tlimit_mb\tseconds\tslowest\n")
         self.slow.write_text("project\tseconds\ttest\n")
         started = time.monotonic()
         if not self.cap.available:
@@ -463,7 +536,8 @@ class TestRunner:
             pending.append(assembly)
         chunks = [chunk for assembly in pending for chunk in self.chunks(assembly)]
         chunks.sort(key=lambda chunk: -chunk.estimate)
-        print(f"{len(chunks)} chunk(s), {self.options.jobs} at a time, {self.cap.limit} each", flush=True)
+        print(f"{len(chunks)} chunk(s), up to {self.options.jobs} at a time within {self.budget.total_mb} MB, "
+              f"each capped at 1.5 times its recorded peak", flush=True)
         with ThreadPoolExecutor(max_workers=max(1, self.options.jobs)) as pool:
             outcomes = list(pool.map(lambda chunk: (chunk.assembly.name, self.run_chunk(chunk)), chunks))
         for assembly in pending:
@@ -504,7 +578,7 @@ def main():
     runs = REPO / "artifacts" / "test-runs"
     options.out = os.environ.get("TESTS_OUT") or str(runs / datetime.now().strftime("%Y%m%d-%H%M%S"))
     options.nodes = int(os.environ.get("TESTS_BUILD_NODES", "2"))
-    options.jobs = max(1, int(os.environ.get("TESTS_JOBS", "3")))
+    options.jobs = max(1, int(os.environ.get("TESTS_JOBS", "5")))
     options.chunk_seconds = float(os.environ.get("TESTS_CHUNK_SECONDS", "60"))
     total = int(os.environ.get("TESTS_MEMORY_TOTAL_GB", "12"))
     options.classes_per_chunk = int(os.environ.get("TESTS_CLASSES_PER_CHUNK", "40"))
@@ -535,7 +609,11 @@ def main():
         print("no test project selected")
         return 0
     cache = ResultCache(os.environ.get("TESTS_CACHE") or runs / "cache.json")
-    return TestRunner(options, MemoryCap(os.environ.get("TESTS_MEMORY_MAX") or f"{min(6, total // options.jobs)}G"), cache, graph).run(projects)
+    unknown_mb = min(ChunkMemory.CEILING_MB, total * 1024 // 3)
+    fixed = os.environ.get("TESTS_MEMORY_MAX")
+    fixed_mb = MemorySize.megabytes(fixed) if fixed else None
+    memory = ChunkMemory(cache, unknown_mb, fixed_mb)
+    return TestRunner(options, MemoryCap(fixed_mb or unknown_mb), cache, graph, memory, MemoryBudget(total * 1024)).run(projects)
 
 
 if __name__ == "__main__":

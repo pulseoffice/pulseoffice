@@ -438,24 +438,29 @@ public abstract class ExchangeObjectCrossingTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    protected static TheoryData<string, ModuleKind, ModuleKind> Of(string kind)
+    private static readonly ModuleKind[] Modules = [ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations];
+
+    protected static TheoryData<string, ModuleKind> Of(string kind)
     {
-        var data = new TheoryData<string, ModuleKind, ModuleKind>();
-        foreach (var from in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
-            foreach (var to in new[] { ModuleKind.Sheets, ModuleKind.Documents, ModuleKind.Presentations })
-                data.Add(kind, from, to);
+        var data = new TheoryData<string, ModuleKind>();
+        foreach (var from in Modules)
+            data.Add(kind, from);
         return data;
     }
 
-    protected Task Cross(string kind, ModuleKind from, ModuleKind to) => _session.Dispatch(async () =>
+    protected Task Cross(string kind, ModuleKind from) => _session.Dispatch(async () =>
     {
         await using var suite = await new ExchangeSuiteFactory().Open();
         var original = ExchangeTests.Sample(kind, "origine");
         suite.Place(from, original);
         Assert.True(await suite.Copy(from));
+        foreach (var to in Modules) await PasteAndUndo(suite, original, from, to);
+    }, CancellationToken.None);
 
+    private static async Task PasteAndUndo(ExchangeSuite suite, EmbeddedObject original, ModuleKind from, ModuleKind to)
+    {
         var before = suite.Objects(to).Count;
-        Assert.True(await suite.Paste(to));
+        Assert.True(await suite.Paste(to), $"{original.GetType().Name} from {from} not pasted into {to}");
 
         var after = suite.Objects(to);
         Assert.Equal(before + 1, after.Count);
@@ -488,55 +493,55 @@ public abstract class ExchangeObjectCrossingTests : IDisposable
 
         suite.Undo(to);
         Assert.Equal(before, suite.Objects(to).Count);
-    }, CancellationToken.None);
+    }
 }
 
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeObjectCrossingChartTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
 {
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("chart");
+    public static TheoryData<string, ModuleKind> ObjectCrossings() => Of("chart");
 
     [Theory]
     [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from) => Cross(kind, from);
 }
 
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeObjectCrossingShapeTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
 {
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("shape");
+    public static TheoryData<string, ModuleKind> ObjectCrossings() => Of("shape");
 
     [Theory]
     [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from) => Cross(kind, from);
 }
 
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeObjectCrossingImageTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
 {
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("image");
+    public static TheoryData<string, ModuleKind> ObjectCrossings() => Of("image");
 
     [Theory]
     [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from) => Cross(kind, from);
 }
 
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeObjectCrossingFormulaTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
 {
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("formula");
+    public static TheoryData<string, ModuleKind> ObjectCrossings() => Of("formula");
 
     [Theory]
     [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from) => Cross(kind, from);
 }
 
 [Collection(HeadlessDesktopCollection.Name)]
 public sealed class ExchangeObjectCrossingGroupTests(HeadlessDesktopSession headless) : ExchangeObjectCrossingTests(headless)
 {
-    public static TheoryData<string, ModuleKind, ModuleKind> ObjectCrossings() => Of("group");
+    public static TheoryData<string, ModuleKind> ObjectCrossings() => Of("group");
 
     [Theory]
     [MemberData(nameof(ObjectCrossings))]
-    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from, ModuleKind to) => Cross(kind, from, to);
+    public Task Ogni_oggetto_passa_fra_ogni_coppia_di_moduli_restando_modificabile(string kind, ModuleKind from) => Cross(kind, from);
 }

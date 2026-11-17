@@ -70,8 +70,11 @@ public sealed class LanguageSwitchTests : IDisposable
         }
     }, CancellationToken.None);
 
-    [Fact]
-    public Task Nessuna_vista_dei_tre_moduli_resta_nella_lingua_precedente() => _session.Dispatch(async () =>
+    [Theory]
+    [InlineData("documents")]
+    [InlineData("sheets")]
+    [InlineData("presentations")]
+    public Task Nessuna_vista_dei_tre_moduli_resta_nella_lingua_precedente(string module) => _session.Dispatch(async () =>
     {
         await using var provider = ServiceConfiguration.Register(Application.Current!, NullLoggerFactory.Instance, new FontFamilyMappingTable())
             .BuildServiceProvider(ServiceConfiguration.ProviderOptions);
@@ -86,23 +89,20 @@ public sealed class LanguageSwitchTests : IDisposable
         var stale = new List<string>();
         try
         {
-            foreach (var module in new[] { "documents", "sheets", "presentations" })
+            texts.Use(UiLanguage.Italian);
+            await executor.ExecuteAsync(registry.Find(new CommandId($"shell.file.new.{module}"))!, workspace.Context);
+            Dispatcher.UIThread.RunJobs();
+            var side = window.GetVisualDescendants().OfType<SidePanelView>().Single();
+            foreach (var page in side.Pages)
             {
                 texts.Use(UiLanguage.Italian);
-                await executor.ExecuteAsync(registry.Find(new CommandId($"shell.file.new.{module}"))!, workspace.Context);
+                side.Show(page);
                 Dispatcher.UIThread.RunJobs();
-                var side = window.GetVisualDescendants().OfType<SidePanelView>().Single();
-                foreach (var page in side.Pages)
-                {
-                    texts.Use(UiLanguage.Italian);
-                    side.Show(page);
-                    Dispatcher.UIThread.RunJobs();
-                    window.UpdateLayout();
-                    texts.Use(UiLanguage.English);
-                    Dispatcher.UIThread.RunJobs();
-                    window.UpdateLayout();
-                    stale.AddRange(Shown(window).Where(italianOnly.Contains).Select(text => $"{module}/{page}: «{text}»"));
-                }
+                window.UpdateLayout();
+                texts.Use(UiLanguage.English);
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                stale.AddRange(Shown(window).Where(italianOnly.Contains).Select(text => $"{module}/{page}: «{text}»"));
             }
         }
         finally

@@ -148,14 +148,14 @@ public sealed class FolioViewTests
     [Fact]
     public Task IlTestoLungoVaSuPiuPagineEIlCursoreLeAttraversa() => FolioScene.Session.Dispatch(() =>
     {
-        var scene = new FolioScene();
-        for (var i = 0; i < 80; i++)
-        {
-            scene.Type("Riga di prova numero " + i);
-            scene.Press(Key.Enter);
-        }
+        var scene = new FolioScene(document => document.Body.Replace([.. Enumerable.Range(0, 79).Select(i => new PulseOffice.Documents.Blocks.ParagraphBlock("riga" + i, "Riga di prova numero " + i))]));
+        scene.Press(Key.Down, RawInputModifiers.Meta);
+        scene.Press(Key.Enter);
+        scene.Type("Riga di prova numero 79");
+        scene.Press(Key.Enter);
 
         Assert.True(scene.Editor.Layout.Pages.Count >= 2);
+        Assert.Equal("Riga di prova numero 79", Assert.IsType<PulseOffice.Documents.Blocks.ParagraphBlock>(scene.Document.Body.Blocks[79]).Text);
         scene.Press(Key.Up, RawInputModifiers.Meta);
         Assert.Equal(0, scene.Editor.Caret.Offset);
         for (var i = 0; i < 79; i++) scene.Press(Key.Down);

@@ -135,12 +135,12 @@ public sealed class HostileFileTests : IDisposable
     [Fact]
     public async Task Ordinary_seed_documents_pass_the_intake_unchanged()
     {
-        var failures = new List<(string Name, string Codes)>();
-        foreach (var seed in new SeedCorpus().Load(perExtension: 200))
+        var failures = new System.Collections.Concurrent.ConcurrentBag<(string Name, string Codes)>();
+        await Parallel.ForEachAsync(new SeedCorpus().Load(perExtension: 200), new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = TestContext.Current.CancellationToken }, async (seed, _) =>
         {
             var codes = await Codes(seed.Family, "seed" + Path.GetExtension(seed.Name), seed.Content);
             if (codes.Contains("FMT01", StringComparison.Ordinal)) failures.Add((seed.Name, codes));
-        }
+        });
 
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures.Select(failure => $"{failure.Name}: {failure.Codes}")));
     }

@@ -34,7 +34,7 @@ public sealed class ShellWindowReleaseTests : IDisposable
     public Task A_closed_window_and_its_container_are_released() => _session.Dispatch(async () =>
     {
         var windows = new List<WeakReference>();
-        for (var round = 0; round < 4; round++) windows.Add(await OpenAndCloseAsync());
+        for (var round = 0; round < 3; round++) windows.Add(await OpenAndCloseAsync());
         for (var pass = 0; pass < 3; pass++)
         {
             GC.Collect();

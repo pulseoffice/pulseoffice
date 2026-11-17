@@ -12,15 +12,16 @@ public sealed class LedgerRecoverySnapshotCostTests
 {
     private const string Corpus = "/Volumes/Dati/develop/libreoffice-ref/sc/qa";
     private const int CorpusSample = 150;
+    private const int Rows = 20_000;
 
     private static void Record(string line) =>
         File.AppendAllText(Path.Combine(Path.GetTempPath(), "pulseoffice-recovery-cost.txt"), $"{DateTimeOffset.Now:O} {line}\n");
 
-    private static Workbook MillionCells()
+    private static Workbook Cells(int rows)
     {
         var workbook = Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];
-        for (var row = 0; row < 100_000; row++)
+        for (var row = 0; row < rows; row++)
             for (var column = 0; column < 10; column++)
                 sheet.SetValue(new CellAddress(row, column), column == 0 ? CellValue.Text("r" + row) : CellValue.Number(row * column));
         return workbook;
@@ -37,10 +38,10 @@ public sealed class LedgerRecoverySnapshotCostTests
     }
 
     [Fact]
-    public async Task A_million_cell_capture_is_cheap_and_the_copy_serializes_off_the_caller()
+    public async Task A_large_capture_is_cheap_and_the_copy_serializes_off_the_caller()
     {
-        var workbook = MillionCells();
-        var capture = new LedgerRecoveryCapture(new OdsSpreadsheetWriter(), new WorkbookCopier().Copy(workbook));
+        var workbook = Cells(Rows);
+        var capture = new LedgerRecoveryCapture(new OdsSpreadsheetWriter(), new WorkbookCopier().Copy(Cells(100)));
         using (var warm = new MemoryStream()) await capture.WriteAsync(warm, TestContext.Current.CancellationToken);
 
         var clock = Stopwatch.StartNew();
@@ -50,7 +51,7 @@ public sealed class LedgerRecoverySnapshotCostTests
         using var stream = new MemoryStream();
         await new LedgerRecoveryCapture(new OdsSpreadsheetWriter(), copy).WriteAsync(stream, TestContext.Current.CancellationToken);
         var serialized = clock.Elapsed;
-        Record($"ledger cells=1000000 capture={captured.TotalMilliseconds:0.0} serialization={serialized.TotalMilliseconds:0} bytes={stream.Length}");
+        Record($"ledger cells={Rows * 10} capture={captured.TotalMilliseconds:0.0} serialization={serialized.TotalMilliseconds:0} bytes={stream.Length}");
 
         Assert.True(captured < serialized / 20, $"capture {captured.TotalMilliseconds:0.0} ms against serialization {serialized.TotalMilliseconds:0} ms");
     }

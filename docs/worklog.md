@@ -13828,3 +13828,68 @@ watermark and tracked-change notes, inline chart table cells (ODF), ODS validati
 go through `IOdfParagraphText` / `IDrawingPlainText`. Defects: four medium, four minor, all fixed with
 `Round155PlainTextTests` (Odf, OpenXml). The `--changed main` run passed. Log:
 [docs/deep-audit/round-155-plain-text-followup.md](deep-audit/round-155-plain-text-followup.md).
+
+## Faster tests outside the command sweeps (2026-11-17)
+
+Goal: no non-sweep test over 5 s, `Desktop.Tests` much cheaper. Sum of test times, run 20261117-142723 against
+20261117-170256 (both under load from other runs): Desktop 735 s → 472 s, Formats.Odf 148 → 128, Sheets.Engine 81 → 61,
+Sheets.UI 26 → 11, Scripting 24 → 13; Formats.OpenXml unchanged in sum (many small tests) but its slow cases are gone.
+
+- **Exchange crossings** (`ExchangeCrossing*Tests`, ~7.5 s → ~3.8 s a case): switching the active document costs about
+  300 ms (relayout of the whole shell), and `PasteEveryFlavourAlone` switched once per representation and module. It now
+  activates each module once and pastes every representation there; the crossing pastes, the native receive and the
+  single-representation pastes run in one pass per module. `ExchangeObjectCrossing*Tests` paste into the three modules
+  in one case per source (15 cases instead of 45, each with its own paste, checks and undo). The Folio text and the
+  Deck text box of `ExchangeMatrixTests` are two facts.
+- **Tried and dropped**: one `ExchangeSuite` shared by the cases of a class (with or without fresh documents per case).
+  It cut a class from 60 s to 26 s but the process grew to 5 GB over 27 cases (OOM in a 4 GB chunk), against 0.5 GB with
+  a suite per case. Measured: composing the shell costs ~90 ms, the three new documents ~1 s; what is retained after
+  `IDocumentWorkspace.Close` (history snapshots or views of closed documents) was not investigated and is worth a look.
+- **Relative performance checks on modest sizes**: OOXML linked shapes, shapes and groups (1 000 vs 10 000), DOCX linked
+  text boxes (300 vs 3 000) and bordered cells (200 vs 2 000 rows), XLSX/ODS crossing (500 vs 5 000 rows), ODP animated
+  paragraphs (600 vs 6 000), engine range sorting (800 vs 8 000): the large run must stay under 40 times the small one,
+  which a quadratic cost breaks. ODS styled columns keep the absolute bound with 6 000 rows (the cost to catch is per
+  column, not per row). Ledger render cost and whole-column formulas use 200 000 rows, the recovery capture 200 000
+  cells, the stack-depth chain 30 000 cells on a 256 KB thread.
+- **Fuzzing**: ODP and PPTX garbage-attribute tests mutate each distinct (grandparent, element, attribute) context once,
+  four in parallel; PPTX missing-element removes each distinct (parent, element) once. The seed intake check of
+  `HostileFileTests` reads four files at once; the memory loop of `LargeFileTests` runs 6 rounds (bound 12 MB).
+- **Split instead of shrunk**: shape style audit (ODP and PPTX facts), language switch (one case per module).
+  `FolioViewTests` builds 79 paragraphs in the model and types the 80th. `ShellWindowReleaseTests` opens three windows.
+- **Code**: `PythonDiscovery(IHostSystem, TimeSpan probeCeiling)` makes the probe ceiling injectable (the
+  unresponsive-interpreter test waits 300 ms instead of 10 s). COUNT and COUNTA read range arguments through
+  `ArgumentReader.ContentValues`, clipped to the used area like the number readers, so a whole-column COUNT no longer walks
+  a million empty cells (`WholeColumnAggregatesMatch…` COUNT 4.6 s and COUNTA 9.4 s → well under a second).
+- **Still over 5 s, justified**: the two document table-cap tests (`Molte_tabelle_DOCX_larghe…`, `Righe_DOCX_vuote…`) and
+  the HTML one must exceed the 2 000 000 / 1 000 000 cell caps, which are constants; the first exchange test of a chunk
+  pays JIT and font warm-up (`I_documenti_risultanti…`, `Gli_oggetti_copiati…`), and a few crossing cases cross 5 s only
+  when three chunks run at once.
+## Command sweep and test runner speed (2026-11-17)
+
+Goal: halve the command sweeps without checking less. Measured with `PULSEOFFICE_SWEEP_OUT` timings and a sampled
+thread-time trace.
+
+- **Where the time went**: rebuilding the prepared document (Ledger 0.85 s each, 651 rebuilds for 810 commands) was
+  85% of the Ledger sweep. Restores failed mostly on the rendered frame: a toast or the notification history badge left
+  by an earlier command, the paste commands enabled by the sweep clipboard but not in the prepared state, Folio's text
+  selection collapsed by undo, a Deck ribbon still showing the context from before the scenario (the prepared frame was
+  stale, so every restore differed), and subpixel noise in ribbon glyphs after relayout (1–32 of 255 per channel).
+- **Harness**: restore and rebuild now reset those (dismiss notifications, clear the badge, clipboard text, Folio
+  selection, ribbon shown for the current context); the frame is hashed from raw pixels instead of PNG and reused as the
+  next command's before frame; frames within rendering noise (40 of 255) count as equal for restore and for the
+  `screen` effect; a cancelled dialog no longer forces a rebuild; the rebuild opens the new document before closing the
+  old one; the first prepared state arranges the scenario on the document already typed.
+- **App**: `AccentService.SetActiveModule` replaced ten application resources on every context change (every cursor
+  move); it now returns when module and theme are unchanged. It was 17% of the Deck sweep's UI-thread time.
+- **Found**: 44 Deck shape-text format commands passed only through a false `screen` effect (the stale ribbon
+  refreshing during the command); they register a pending format for the next typed text, now observed as the
+  `pending format` effect through `ShapeTextEditor.PendingChanged`, and pending formats are a fingerprint line.
+  `ledger.select.dataArea` now reports its declared reason instead of a noise `screen` effect. Undo checks unchanged
+  (Ledger 199, Folio 121 + 1 unreachable through typing coalescence, Deck 161).
+- **Timings** (sum of chunk seconds, all green): Ledger 1023 → 414, Folio 630 → 287, Deck 365 → 241; all three
+  together 942 s, down from 2018 (−53%). Deck gains least: pending formats and enabled-state changes still force 233
+  rebuilds, and the undo check (two view syncs per command) is 15% of it.
+- **Runner**: `TESTS_JOBS` defaults to 5; each chunk's `MemoryMax` is 1.5 times its project's recorded peak (1–6 GB,
+  4 GB while unknown), and a chunk starts only when its cap fits within `TESTS_MEMORY_TOTAL_GB` (12). Five sweep or
+  engine chunks (0.3–0.5 GB) now run together; `Desktop.Tests` (3.4 GB) and `Documents.UI.Tests` (2.7 GB) still get
+  room. The three sweeps run in 359 s of wall time including the build.

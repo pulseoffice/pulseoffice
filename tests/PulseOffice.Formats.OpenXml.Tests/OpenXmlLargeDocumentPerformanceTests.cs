@@ -115,9 +115,18 @@ public sealed class OpenXmlLargeDocumentPerformanceTests(ITestOutputHelper outpu
     [Fact]
     public void A_text_with_many_linked_text_boxes_reads_in_linear_time()
     {
+        LinkedBoxesRead(300);
+        var small = LinkedBoxesRead(300);
+        var load = LinkedBoxesRead(3_000);
+
+        Assert.True(load < 40 * Math.Max(small, 25), $"read {load} ms against {small} ms for a tenth of the boxes");
+    }
+
+    private long LinkedBoxesRead(int count)
+    {
         var document = new TextDocument(new DefaultStyleSheetFactory().Create());
-        document.Body.Replace([.. Enumerable.Range(0, 6_000).Select(index => new ParagraphBlock("p" + index, "Paragraph " + index))]);
-        for (var index = 0; index < 6_000; index++)
+        document.Body.Replace([.. Enumerable.Range(0, count).Select(index => new ParagraphBlock("p" + index, "Paragraph " + index))]);
+        for (var index = 0; index < count; index++)
         {
             var size = new DocumentSize(Twip.FromCentimeters(5), Twip.FromCentimeters(2));
             var story = new BlockContainer([new ParagraphBlock("s" + index, "words " + index)]);
@@ -133,8 +142,8 @@ public sealed class OpenXmlLargeDocumentPerformanceTests(ITestOutputHelper outpu
         TextDocument? read = null;
         var load = Timed("DOCX linked boxes read", () => read = _composer.Reader(DocxFlavour.Document).Read(stream).Value);
 
-        Assert.True(load < 4_000, $"read {load} ms");
-        Assert.Equal(6_000, read!.Objects.All.Count(item => item.Content is PulseOffice.Documents.Objects.TextBoxContent { NextFrameName: not null }));
+        Assert.Equal(count, read!.Objects.All.Count(item => item.Content is PulseOffice.Documents.Objects.TextBoxContent { NextFrameName: not null }));
+        return load;
     }
 
     [Fact]
@@ -195,31 +204,40 @@ public sealed class OpenXmlLargeDocumentPerformanceTests(ITestOutputHelper outpu
     }
 
     [Fact]
-    public void A_slide_with_twenty_thousand_shapes_reads_in_linear_time()
+    public void A_slide_with_ten_thousand_shapes_reads_in_linear_time() => AssertLinear(grouped: false);
+
+    private void AssertLinear(bool grouped)
     {
-        var deck = Deck();
-        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
-        for (var index = 0; index < 20_000; index++) slide.Add(Shape("s" + index, index));
-        deck.AddExisting(slide);
-
-        var (write, load, read) = RoundTrip(deck);
-
-        Assert.True(write < 30_000, $"write {write} ms");
-        Assert.True(load < 30_000, $"read {load} ms");
-        Assert.Equal(20_000, read.Slides[0].Elements.OfType<ObjectElement>().Count());
-    }
-
-    [Fact]
-    public void A_slide_with_thirty_thousand_linked_shapes_writes_and_reads_in_linear_time()
-    {
-        RoundTrip(SlideOfLinkedShapes(3_000));
-        var (smallWrite, smallRead, _) = RoundTrip(SlideOfLinkedShapes(3_000));
-        var (write, load, read) = RoundTrip(SlideOfLinkedShapes(30_000));
+        RoundTrip(SlideOfShapes(1_000, grouped));
+        var (smallWrite, smallRead, _) = RoundTrip(SlideOfShapes(1_000, grouped));
+        var (write, load, read) = RoundTrip(SlideOfShapes(10_000, grouped));
 
         Assert.True(write < 40 * Math.Max(smallWrite, 25), $"write {write} ms against {smallWrite} ms for a tenth of the shapes");
         Assert.True(load < 40 * Math.Max(smallRead, 25), $"read {load} ms against {smallRead} ms for a tenth of the shapes");
-        Assert.Equal(30_000, read.Slides[0].Interactions.Count(action => action.Kind == InteractionKind.Hyperlink));
-        Assert.Contains(read.Slides[0].Interactions, action => action.Reference == "https://example.com/29999");
+        Assert.Equal(10_000, read.Slides[0].Elements.OfType<ObjectElement>().Count());
+    }
+
+    private Presentation SlideOfShapes(int count, bool grouped)
+    {
+        var deck = Deck();
+        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
+        for (var index = 0; index < count; index++) slide.Add(Shape("s" + index, index));
+        if (grouped) slide.AddGroup(new SlideGroup("g", [.. Enumerable.Range(0, count).Select(index => "s" + index)]));
+        deck.AddExisting(slide);
+        return deck;
+    }
+
+    [Fact]
+    public void A_slide_with_ten_thousand_linked_shapes_writes_and_reads_in_linear_time()
+    {
+        RoundTrip(SlideOfLinkedShapes(1_000));
+        var (smallWrite, smallRead, _) = RoundTrip(SlideOfLinkedShapes(1_000));
+        var (write, load, read) = RoundTrip(SlideOfLinkedShapes(10_000));
+
+        Assert.True(write < 40 * Math.Max(smallWrite, 25), $"write {write} ms against {smallWrite} ms for a tenth of the shapes");
+        Assert.True(load < 40 * Math.Max(smallRead, 25), $"read {load} ms against {smallRead} ms for a tenth of the shapes");
+        Assert.Equal(10_000, read.Slides[0].Interactions.Count(action => action.Kind == InteractionKind.Hyperlink));
+        Assert.Contains(read.Slides[0].Interactions, action => action.Reference == "https://example.com/9999");
     }
 
     private Presentation SlideOfLinkedShapes(int count)
@@ -236,20 +254,7 @@ public sealed class OpenXmlLargeDocumentPerformanceTests(ITestOutputHelper outpu
     }
 
     [Fact]
-    public void A_group_of_twenty_thousand_shapes_reads_in_linear_time()
-    {
-        var deck = Deck();
-        var slide = new SlideFactory().Create(deck.NextId(), deck.Master, SlideLayout.Blank);
-        for (var index = 0; index < 20_000; index++) slide.Add(Shape("s" + index, index));
-        slide.AddGroup(new SlideGroup("g", [.. Enumerable.Range(0, 20_000).Select(index => "s" + index)]));
-        deck.AddExisting(slide);
-
-        var (write, load, read) = RoundTrip(deck);
-
-        Assert.True(write < 30_000, $"write {write} ms");
-        Assert.True(load < 4_000, $"read {load} ms");
-        Assert.Equal(20_000, read.Slides[0].Elements.OfType<ObjectElement>().Count());
-    }
+    public void A_group_of_ten_thousand_shapes_reads_in_linear_time() => AssertLinear(grouped: true);
 
     private Presentation Deck()
     {

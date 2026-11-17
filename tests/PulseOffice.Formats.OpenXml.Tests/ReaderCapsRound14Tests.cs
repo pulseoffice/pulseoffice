@@ -132,18 +132,27 @@ public sealed class ReaderCapsRound14Tests
     [Fact]
     public void Molte_celle_DOCX_con_bordi_propri_si_leggono_in_tempo_lineare()
     {
+        BorderedRowsRead(200);
+        var small = BorderedRowsRead(200);
+        var large = BorderedRowsRead(2000);
+
+        Assert.True(large < 40 * Math.Max(small, 25), $"read {large} ms against {small} ms for a tenth of the rows");
+    }
+
+    private long BorderedRowsRead(int rows)
+    {
         W.TableCell Cell() => new(
             new W.TableCellProperties(new W.TableCellBorders(new W.TopBorder { Val = W.BorderValues.Single, Size = 4 })),
             new W.Paragraph());
         var table = new W.Table(new W.TableProperties(), new W.TableGrid(Enumerable.Range(0, 40).Select(_ => new W.GridColumn { Width = "300" })));
-        for (var r = 0; r < 6000; r++) table.Append(new W.TableRow(Enumerable.Range(0, 40).Select(_ => Cell())));
+        for (var r = 0; r < rows; r++) table.Append(new W.TableRow(Enumerable.Range(0, 40).Select(_ => Cell())));
 
         var watch = Stopwatch.StartNew();
         var read = Docx(() => new W.Body(table)).Body.Blocks.OfType<TableBlock>().Single();
         watch.Stop();
 
-        Assert.Equal(6000, read.Rows.Count);
+        Assert.Equal(rows, read.Rows.Count);
         Assert.NotNull(read.Rows[^1].Cells[^1].Borders?.Top);
-        Assert.InRange(watch.Elapsed.TotalSeconds, 0, 20);
+        return watch.ElapsedMilliseconds;
     }
 }

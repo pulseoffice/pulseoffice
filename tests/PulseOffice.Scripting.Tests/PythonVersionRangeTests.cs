@@ -1,3 +1,4 @@
+using PulseOffice.Platform;
 using PulseOffice.Scripting.CPython;
 using Xunit;
 
@@ -33,9 +34,9 @@ public sealed class PythonVersionRangeTests
         File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var watch = System.Diagnostics.Stopwatch.StartNew();
 
-        var result = new PythonDiscovery().Inspect(script);
+        var result = new PythonDiscovery(new RuntimeHostSystem(), TimeSpan.FromMilliseconds(300)).Inspect(script);
 
         Assert.Null(result.Runtime);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(25), watch.Elapsed.ToString());
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(4), watch.Elapsed.ToString());
     }
 }

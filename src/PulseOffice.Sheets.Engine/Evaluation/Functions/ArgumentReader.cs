@@ -79,6 +79,8 @@ public sealed class ArgumentReader(IReadOnlyList<EvalValue> arguments, IEvaluati
 
     public IEnumerable<CellValue> Values(int index) => coercion.Enumerate(Raw(index), context);
 
+    public IEnumerable<CellValue> ContentValues(int index) => coercion.EnumerateContent(Raw(index), context);
+
     public bool TryNumbersOf(int index, out List<double> numbers, out CellError error) =>
         coercion.TryCollectNumbers([Raw(index)], context, out numbers, out error);
 

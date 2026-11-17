@@ -74,7 +74,11 @@ public sealed class AccentService : IAccentService
         _application = application ?? throw new ArgumentNullException(nameof(application));
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
         _shades = shades ?? throw new ArgumentNullException(nameof(shades));
-        _theme.ThemeChanged += (_, _) => SetActiveModule(ActiveModule);
+        _theme.ThemeChanged += (_, _) =>
+        {
+            _applied = null;
+            SetActiveModule(ActiveModule);
+        };
     }
 
     private void ApplySystemAccent(Avalonia.Media.Color accent)
@@ -103,9 +107,13 @@ public sealed class AccentService : IAccentService
 
     public event EventHandler? AccentChanged;
 
+    private (ModuleKind Module, bool Dark)? _applied;
+
     public void SetActiveModule(ModuleKind module)
     {
         ActiveModule = module;
+        if (_applied == (module, _theme.IsDark)) return;
+        _applied = (module, _theme.IsDark);
 
         var hex = module == ModuleKind.Shell
             ? DesignTokens.ShellAccent

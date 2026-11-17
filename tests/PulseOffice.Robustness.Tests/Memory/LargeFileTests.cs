@@ -76,12 +76,12 @@ public sealed class LargeFileTests : IDisposable
                 _readers.Read(seed.Family, "cycle" + Path.GetExtension(seed.Name), new MemoryStream(seed.Content, writable: false));
         }
 
-        for (var warm = 0; warm < 3; warm++) Cycle();
+        for (var warm = 0; warm < 2; warm++) Cycle();
         var before = Settled();
-        for (var round = 0; round < 25; round++) Cycle();
+        for (var round = 0; round < 6; round++) Cycle();
         var after = Settled();
 
-        Assert.True(after - before < 24L << 20, $"memory grew by {(after - before) >> 20} MB over 25 rounds of {seeds.Count} documents");
+        Assert.True(after - before < 12L << 20, $"memory grew by {(after - before) >> 20} MB over 6 rounds of {seeds.Count} documents");
     }
 
     private long Settled()

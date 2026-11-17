@@ -217,6 +217,10 @@ public abstract class CommandSweepTests : IDisposable
 
     private const int LargeParts = 12;
 
+    private const int RenderingNoise = 40;
+
+    private static readonly ClipboardContent SweepClipboard = new() { Text = "sweep" };
+
     private const int Shards = 6;
 
     private static readonly IReadOnlyDictionary<string, string> AlreadyInThatState = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -470,6 +474,8 @@ public abstract class CommandSweepTests : IDisposable
 
     protected Task Sweep(string module, string context, int part) => Session.Dispatch(async () =>
     {
+        var whole = System.Diagnostics.Stopwatch.StartNew();
+        var undoWatch = new System.Diagnostics.Stopwatch();
         var scenario = Scenarios.Single(candidate => candidate.Name == context);
         await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);
         var registry = new ShellComposition(provider).Compose();
@@ -488,11 +494,24 @@ public abstract class CommandSweepTests : IDisposable
             steps.Restart();
             while (host.IsDialogOpen) { host.Close(null); Dispatcher.UIThread.RunJobs(); }
             if (panel.IsOpen) panel.Toggle();
-            foreach (var open in workspace.Documents.ToList()) workspace.Close(open);
+            var previous = workspace.Documents.ToList();
             Dispatcher.UIThread.RunJobs();
             var closed = steps.ElapsedMilliseconds;
-            await executor.ExecuteAsync(registry.Find(new CommandId($"shell.file.new.{module}"))!, workspace.Context);
+            var create = registry.Find(new CommandId($"shell.file.new.{module}"))!;
+            await executor.ExecuteAsync(create, workspace.Context);
             Dispatcher.UIThread.RunJobs();
+            if (workspace.Active is null || previous.Contains(workspace.Active))
+            {
+                foreach (var open in workspace.Documents.ToList()) workspace.Close(open);
+                Dispatcher.UIThread.RunJobs();
+                await executor.ExecuteAsync(create, workspace.Context);
+                Dispatcher.UIThread.RunJobs();
+            }
+            else
+            {
+                foreach (var open in previous) workspace.Close(open);
+                Dispatcher.UIThread.RunJobs();
+            }
             ((PulseOffice.UI.Controls.Services.IDocumentFocusTarget)workspace.Active!.View).FocusDocument();
             Dispatcher.UIThread.RunJobs();
             var created = steps.ElapsedMilliseconds;
@@ -526,6 +545,9 @@ public abstract class CommandSweepTests : IDisposable
             return $"{content.Text}|{content.Html?.Length}|{content.Native?.Length}|{content.Png?.Length}";
         }
 
+        string? settledFrame = null;
+        byte[] framePixels = [];
+        byte[] preparedPixels = [];
         string Frame()
         {
             window.UpdateLayout();
@@ -534,10 +556,20 @@ public abstract class CommandSweepTests : IDisposable
             Dispatcher.UIThread.RunJobs();
             using var frame = window.CaptureRenderedFrame();
             if (frame is null) return string.Empty;
-            using var stream = new MemoryStream();
-            frame.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream.ToArray()));
+            using var pixels = frame.Lock();
+            var bytes = new byte[pixels.RowBytes * pixels.Size.Height];
+            System.Runtime.InteropServices.Marshal.Copy(pixels.Address, bytes, 0, bytes.Length);
+            if (frame.AlphaFormat == Avalonia.Platform.AlphaFormat.Opaque && pixels.Format.BitsPerPixel == 32)
+                for (var alpha = 3; alpha < bytes.Length; alpha += 4) bytes[alpha] = 0;
+            framePixels = bytes;
+            return $"{pixels.Size.Width}x{pixels.Size.Height}:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
         }
+
+        PulseOffice.Documents.UI.Editing.FolioEditor? FolioEditor() =>
+            provider.GetRequiredService<PulseOffice.Documents.UI.IActiveFolioContext>().Target?.Editor;
+
+        (PulseOffice.Documents.Editing.DocumentPosition Anchor, PulseOffice.Documents.Editing.DocumentPosition Caret)? FolioSelection() =>
+            FolioEditor() is { SelectedObjectId: null } editor ? (editor.Anchor, editor.Caret) : null;
 
         string Objects()
         {
@@ -552,6 +584,9 @@ public abstract class CommandSweepTests : IDisposable
                 deck?.IsTyping());
         }
 
+        List<PulseOffice.UI.Controls.Shapes.ShapeTextEditor> ShapeTextEditors() =>
+            Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<PulseOffice.UI.Controls.Shapes.ShapeTextEditor>().ToList();
+
         var phases = new System.Diagnostics.Stopwatch();
         var timings = new List<string>();
         long prepareMs = 0, beforeMs = 0;
@@ -561,7 +596,7 @@ public abstract class CommandSweepTests : IDisposable
         string Fingerprint()
         {
             var active = workspace.Active;
-            var frame = Frame();
+            var frame = settledFrame = Frame();
             var current = workspace.Context;
             var sheetContext = provider.GetRequiredService<PulseOffice.Sheets.UI.IActiveSheetContext>();
             return string.Join("\n",
@@ -572,12 +607,21 @@ public abstract class CommandSweepTests : IDisposable
                 panel.IsOpen,
                 window.FocusManager?.GetFocusedElement()?.GetType().FullName,
                 sheetContext.HasTarget ? sheetContext.Selection.ToString() : null,
+                FolioSelection() is { } folioSelection ? $"{folioSelection.Anchor}-{folioSelection.Caret}" : null,
                 Objects(),
+                string.Join(",", ShapeTextEditors().Select(editor => editor.HasPendingFormat)),
                 string.Join(",", registry.All.Where(command => command.Id != RepeatCommand).Select(command => (command.IsEnabled(current) ? "+" : "-") + (command.CheckedWhen?.Invoke(current) is true ? "!" : ""))),
                 frame);
         }
 
+        var contentWatch = new System.Diagnostics.Stopwatch();
         IReadOnlyDictionary<string, string> Content()
+        {
+            contentWatch.Start();
+            try { return ContentCore(); } finally { contentWatch.Stop(); }
+        }
+
+        IReadOnlyDictionary<string, string> ContentCore()
         {
             var model = workspace.Active?.Model;
             using var stream = new MemoryStream();
@@ -607,48 +651,107 @@ public abstract class CommandSweepTests : IDisposable
 
         OpenDocument? prepared = null;
         object? preparedPoint = null;
+        (PulseOffice.Documents.Editing.DocumentPosition Anchor, PulseOffice.Documents.Editing.DocumentPosition Caret)? preparedSelection = null;
         string? preparedPrint = null;
         IReadOnlyDictionary<string, string>? preparedContent = null;
         var undoChecked = 0;
         var undoUnreachable = 0;
         var undoFailures = new List<string>();
         var restores = 0;
+        var restoreMisses = new List<string>();
         var rebuilds = 0;
 
-        async Task Rebuild()
+        var notificationCenter = provider.GetRequiredService<PulseOffice.UI.Controls.Notifications.INotificationCenter>();
+        var notificationHistory = provider.GetRequiredService<PulseOffice.UI.Controls.Notifications.INotificationHistory>();
+        void ShowCurrentContext()
         {
-            await Prepare();
+            window.UpdateForContext(workspace.Context);
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        void DismissNotifications()
+        {
+            foreach (var entry in notificationCenter.Visible.ToList()) notificationCenter.Dismiss(entry.Id);
+            notificationHistory.Clear();
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        async Task Rebuild(bool arrangeOnly = false)
+        {
+            if (arrangeOnly) await scenario.ArrangeAsync(new SweepStage(provider, window, workspace), executor, registry);
+            else await Prepare();
+            DismissNotifications();
+            await clipboard.SetAsync(SweepClipboard);
+            ShowCurrentContext();
             rebuilds++;
             prepared = workspace.Active;
             preparedPoint = prepared?.History.StatePoint;
+            preparedSelection = FolioSelection();
             preparedPrint = Fingerprint();
+            preparedPixels = framePixels;
             preparedContent = null;
         }
 
-        bool Restore()
+        static bool WithinRenderingNoise(byte[] actual, byte[] expected)
+        {
+            if (actual.Length != expected.Length) return false;
+            for (var index = 0; index < actual.Length; index++)
+                if (Math.Abs(actual[index] - expected[index]) > RenderingNoise) return false;
+            return true;
+        }
+
+        bool OnlyFrameDiffers(string print) =>
+            preparedPrint is not null && print[..print.LastIndexOf('\n')] == preparedPrint[..preparedPrint.LastIndexOf('\n')];
+
+        async Task<bool> Restore()
         {
             while (host.IsDialogOpen) { host.Close(null); Dispatcher.UIThread.RunJobs(); }
             if (panel.IsOpen) panel.Toggle();
-            if (prepared is null || workspace.Documents.Count != 1 || !ReferenceEquals(workspace.Active, prepared)) return false;
+            if (prepared is null || workspace.Documents.Count != 1 || !ReferenceEquals(workspace.Active, prepared)) { restoreMisses.Add("document"); return false; }
             var history = prepared.History;
             for (var guard = 0; guard < 64 && !ReferenceEquals(history.StatePoint, preparedPoint) && history.CanUndo; guard++)
             {
                 history.Undo();
                 Dispatcher.UIThread.RunJobs();
             }
-            if (!ReferenceEquals(history.StatePoint, preparedPoint)) return false;
+            if (!ReferenceEquals(history.StatePoint, preparedPoint)) { restoreMisses.Add("history"); return false; }
             history.DiscardRedo();
+            if (preparedSelection is { } selection && FolioEditor() is { SelectedObjectId: null } folio && FolioSelection() != selection)
+            {
+                folio.Select(selection.Anchor, selection.Caret);
+                Dispatcher.UIThread.RunJobs();
+            }
+            DismissNotifications();
+            await clipboard.SetAsync(SweepClipboard);
             ((PulseOffice.UI.Controls.Services.IDocumentFocusTarget)prepared.View).FocusDocument();
             Dispatcher.UIThread.RunJobs();
-            if (Fingerprint() != preparedPrint) return false;
+            var now = Fingerprint();
+            for (var settle = 0; settle < 2 && now != preparedPrint && OnlyFrameDiffers(now); settle++)
+            {
+                if (WithinRenderingNoise(framePixels, preparedPixels)) now = preparedPrint!;
+                else
+                {
+                    AvaloniaHeadlessPlatform.ForceRenderTimerTick(8);
+                    now = Fingerprint();
+                }
+            }
+            if (now != preparedPrint)
+            {
+                var actual = now.Split('\n');
+                var expected = preparedPrint!.Split('\n');
+                restoreMisses.Add("fingerprint:" + string.Join(",", Enumerable.Range(0, actual.Length).Where(line => line >= expected.Length || actual[line] != expected[line])));
+                return false;
+            }
             restores++;
             return true;
         }
 
+        var composed = whole.ElapsedMilliseconds;
         await Prepare(arrange: false);
         var typical = registry.All.Where(command => command.IsEnabled(workspace.Context)).Select(command => command.Id).ToHashSet();
-        await Rebuild();
+        await Rebuild(arrangeOnly: true);
         var createCommand = executor.LastRepeatable?.Id;
+        var setUp = whole.ElapsedMilliseconds;
         var pristine = true;
         var restorable = false;
         var rows = new List<SweepRow>();
@@ -662,7 +765,8 @@ public abstract class CommandSweepTests : IDisposable
         {
             if (Unsafe.Contains(id.Value)) continue;
             phases.Restart();
-            if (id == RepeatCommand ? !pristine || executor.LastRepeatable?.Id != createCommand : !pristine && (!restorable || !Restore())) await Rebuild();
+            if (id != RepeatCommand && !pristine && !restorable) restoreMisses.Add("not restorable");
+            if (id == RepeatCommand ? !pristine || executor.LastRepeatable?.Id != createCommand : !pristine && (!restorable || !await Restore())) await Rebuild();
             pristine = true;
             prepareMs = phases.ElapsedMilliseconds;
             var command = registry.Find(id)!;
@@ -678,12 +782,18 @@ public abstract class CommandSweepTests : IDisposable
             void Notice(object? sender, PulseOffice.UI.Controls.Notifications.NotificationChange e) => notices++;
             var notifications = provider.GetRequiredService<PulseOffice.UI.Controls.Notifications.INotificationCenter>();
             notifications.Changed += Notice;
+            var pendings = 0;
+            void Pending(object? sender, EventArgs e) => pendings++;
+            var editors = ShapeTextEditors();
+            foreach (var editor in editors) editor.PendingChanged += Pending;
             var outsideHistory = 0;
             void Outside(object? sender, EventArgs e) => outsideHistory++;
             var pointBefore = document?.History.StatePoint;
             if (document is not null && preparedContent is null && ReferenceEquals(pointBefore, preparedPoint)) preparedContent = Content();
             if (document is not null) { document.History.Changed += Count; document.History.ChangedOutsideHistory += Outside; }
-            var before = Frame();
+            var before = settledFrame ?? Frame();
+            var beforePixels = framePixels;
+            settledFrame = null;
             var checkedBefore = command.CheckedWhen?.Invoke(context);
             var documents = workspace.Documents.Count;
             var asked = _fileDialogs.Asked;
@@ -692,7 +802,7 @@ public abstract class CommandSweepTests : IDisposable
             var sheet = provider.GetRequiredService<PulseOffice.Sheets.UI.IActiveSheetContext>();
             var selectionBefore = sheet.HasTarget ? sheet.Selection.ToString() : null;
             var objectsBefore = Objects();
-            await clipboard.SetAsync(new ClipboardContent { Text = "sweep" });
+            await clipboard.SetAsync(SweepClipboard);
             var clipped = await Clipboard();
             beforeMs = phases.ElapsedMilliseconds - prepareMs;
             var waited = new List<string>();
@@ -723,6 +833,7 @@ public abstract class CommandSweepTests : IDisposable
 
             if (document is not null) { document.History.Changed -= Count; document.History.ChangedOutsideHistory -= Outside; }
             notifications.Changed -= Notice;
+            foreach (var editor in editors) editor.PendingChanged -= Pending;
             while (host.IsDialogOpen) { waited.Add("dialog"); host.Close(null); Dispatcher.UIThread.RunJobs(); }
 
             Assert.True(window.PlatformImpl is not null, $"{id} closed the window");
@@ -734,12 +845,13 @@ public abstract class CommandSweepTests : IDisposable
             }
 
             var outcome = await running;
-            restorable = waited.Count == 0;
+            restorable = waited.All(step => step == "dialog");
             var effects = waited.Distinct().ToList();
             if (changes > 0) effects.Add("history");
             if (workspace.Documents.Count != documents || !ReferenceEquals(workspace.Active, document)) effects.Add("workspace");
             if (outcome.Notes.Count > 0) effects.Add("message");
             if (notices > 0) effects.Add("notification");
+            if (pendings > 0) effects.Add("pending format");
             if (_fileDialogs.Asked != asked) effects.Add("file");
             if (panel.IsOpen != panelBefore) effects.Add("panel");
             Dispatcher.UIThread.RunJobs();
@@ -748,13 +860,17 @@ public abstract class CommandSweepTests : IDisposable
             if (Objects() != objectsBefore) effects.Add("objects");
             if (await Clipboard() != clipped) effects.Add("clipboard");
             if (command.CheckedWhen?.Invoke(workspace.Context) != checkedBefore) effects.Add("checked");
-            if (effects.Count == 0 && Frame() != before) effects.Add("screen");
+            if (effects.Count == 0 && Frame() != before && !WithinRenderingNoise(framePixels, beforePixels)) effects.Add("screen");
             if (effects.Count == 0 && AlreadyInThatState.TryGetValue(id.Value, out var reason)) effects.Add(reason);
             rows.Add(new SweepRow(id.Value, outcome.Kind.ToString(), string.Join("+", effects), outcome.Reason ?? string.Empty));
             Trace(rows[^1], watch.Elapsed);
             if (document is not null && ReferenceEquals(workspace.Active, document) && workspace.Documents.Count == documents && !command.OutsideHistory && outsideHistory == 0
                 && preparedContent is not null && ReferenceEquals(pointBefore, preparedPoint) && !ReferenceEquals(document.History.StatePoint, pointBefore))
+            {
+                undoWatch.Start();
                 CheckUndo(id.Value, document);
+                undoWatch.Stop();
+            }
         }
 
         void CheckUndo(string command, OpenDocument document)
@@ -788,7 +904,7 @@ public abstract class CommandSweepTests : IDisposable
         {
             Directory.CreateDirectory(output);
             File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.tsv"), rows.Select(row => $"{row.Command}\t{row.Outcome}\t{row.Effect}\t{row.Detail.Replace('\t', ' ').Replace('\n', ' ')}"));
-            File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.timings.tsv"), timings.Append($"#\trestores\t{restores}\trebuilds\t{rebuilds}\tundoChecked\t{undoChecked}\tundoUnreachable\t{undoUnreachable}"));
+            File.WriteAllLines(Path.Combine(output, $"{module}-{context}-{part}.timings.tsv"), timings.Append($"#\trestores\t{restores}\trebuilds\t{rebuilds}\tundoChecked\t{undoChecked}\tundoUnreachable\t{undoUnreachable}").Append("#restore misses\t" + string.Join(" ", restoreMisses)).Append($"#time\tcomposed\t{composed}\tsetUp\t{setUp}\tundo\t{undoWatch.ElapsedMilliseconds}\twhole\t{whole.ElapsedMilliseconds}\tcontent\t{contentWatch.ElapsedMilliseconds}"));
         }
 
         Assert.True(rows.Count > 0 || scenario is not TypicalScenario, "the typical context runs no command");

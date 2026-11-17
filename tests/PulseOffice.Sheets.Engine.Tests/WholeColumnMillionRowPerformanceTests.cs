@@ -46,7 +46,7 @@ public sealed class WholeColumnMillionRowPerformanceTests(EngineFixture fixture,
 
 public sealed class MillionRowWorkbook
 {
-    public const int Rows = 1_000_000;
+    public const int Rows = 200_000;
 
     public const int Keys = 10;
 

@@ -7,6 +7,7 @@ public sealed class ValueCoercion
 
     private readonly ScalarReading _scalar = new();
     private readonly CellReading _cells = new();
+    private readonly ContentReading _content = new();
     private readonly NumberReading _numbers = new();
 
     public CellValue ToScalar(EvalValue value, IEvaluationContext context) => value.Accept(_scalar, context);
@@ -20,6 +21,8 @@ public sealed class ValueCoercion
     };
 
     public IEnumerable<CellValue> Enumerate(EvalValue value, IEvaluationContext context) => value.Accept(_cells, context);
+
+    public IEnumerable<CellValue> EnumerateContent(EvalValue value, IEvaluationContext context) => value.Accept(_content, context);
 
     public bool TryScalarNumber(EvalValue value, IEvaluationContext context, out double number, out CellError error)
     {
@@ -93,6 +96,24 @@ public sealed class ValueCoercion
 
         public override IEnumerable<CellValue> VisitRange(RangeValue value, IEvaluationContext context) =>
             context.GetRangeValues(value.SheetName, value.Range);
+
+        public override IEnumerable<CellValue> VisitArray(ArrayValue value, IEvaluationContext context) =>
+            value.Rows.SelectMany(row => row);
+
+        public override IEnumerable<CellValue> VisitReferenceList(ReferenceListValue value, IEvaluationContext context) =>
+            value.Areas.SelectMany(area => VisitRange(area, context));
+
+        protected override IEnumerable<CellValue> Otherwise(EvalValue value, IEvaluationContext context) => [];
+    }
+
+    private sealed class ContentReading : EvalValueVisitor<IEnumerable<CellValue>>
+    {
+        public override IEnumerable<CellValue> VisitScalar(ScalarValue value, IEvaluationContext context) => [value.Value];
+
+        public override IEnumerable<CellValue> VisitRange(RangeValue value, IEvaluationContext context) =>
+            context.ContentWithin(value.SheetName, value.Range) is { } content
+                ? context.GetRangeValues(value.SheetName, content)
+                : [];
 
         public override IEnumerable<CellValue> VisitArray(ArrayValue value, IEvaluationContext context) =>
             value.Rows.SelectMany(row => row);

@@ -82,31 +82,39 @@ public class DeepAuditSheetsEngineCoreTests(EngineFixture fixture) : IClassFixtu
     }
 
     [Fact]
-    public void UnaCatenaDiCentomilaCelleSiRicalcolaSenzaTraboccareLoStack()
+    public void UnaCatenaDiTrentamilaCelleSiRicalcolaSenzaTraboccareLoStack()
     {
         var (workbook, engine) = fixture.CreateWorkbook();
         var sheet = workbook.Sheets[0];
         sheet.SetValue(new CellAddress(0, 0), CellValue.Number(1));
-        for (var row = 1; row < 100_000; row++)
+        for (var row = 1; row < 30_000; row++)
             sheet.SetFormula(new CellAddress(row, 0), $"=A{row}+1");
         Exception? errore = null;
         var thread = new Thread(() =>
         {
             try { engine.RecalculateAll(); }
             catch (Exception e) { errore = e; }
-        }, 1024 * 1024);
+        }, 256 * 1024);
         thread.Start();
         thread.Join();
         Assert.Null(errore);
-        Assert.Equal(100_000, engine.GetValue(new SheetCell(0, new CellAddress(99_999, 0))).AsNumber());
+        Assert.Equal(30_000, engine.GetValue(new SheetCell(0, new CellAddress(29_999, 0))).AsNumber());
     }
 
     [Fact]
     public void MoltiIntervalliSiOrdinanoSenzaCostoQuadratico()
     {
+        Ranges(800);
+        var small = Ranges(800);
+        var large = Ranges(8_000);
+        Assert.True(large < 40 * Math.Max(small, 25), $"{large} ms against {small} ms for a tenth of the ranges");
+    }
+
+    private long Ranges(int rows)
+    {
         var (workbook, engine) = fixture.CreateWorkbook();
         var sheet = workbook.Sheets[0];
-        for (var row = 0; row < 20_000; row++)
+        for (var row = 0; row < rows; row++)
         {
             sheet.SetValue(new CellAddress(row, 0), CellValue.Number(1));
             sheet.SetFormula(new CellAddress(row, 2), $"=SUM(A{row + 1}:B{row + 1})");
@@ -114,8 +122,9 @@ public class DeepAuditSheetsEngineCoreTests(EngineFixture fixture) : IClassFixtu
         var watch = System.Diagnostics.Stopwatch.StartNew();
         engine.RecalculateAll();
         engine.SetValue(new SheetCell(0, new CellAddress(5, 0)), CellValue.Number(3));
-        Assert.True(watch.ElapsedMilliseconds < 3000, $"{watch.ElapsedMilliseconds} ms");
+        watch.Stop();
         Assert.Equal(3, engine.GetValue(new SheetCell(0, new CellAddress(5, 2))).AsNumber());
+        return watch.ElapsedMilliseconds;
     }
 
     [Fact]

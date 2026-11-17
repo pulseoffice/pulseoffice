@@ -31,7 +31,7 @@ public sealed class PythonDiscovery : IPythonDiscovery
 {
     private readonly PythonVersionRange _range = new();
     private readonly IReadOnlyList<PythonCandidateSource> _sources;
-    private readonly PythonInterpreterProbe _probe = new();
+    private readonly PythonInterpreterProbe _probe;
     private readonly PythonDescriptorReader _reader;
 
     public PythonDiscovery()
@@ -40,7 +40,13 @@ public sealed class PythonDiscovery : IPythonDiscovery
     }
 
     public PythonDiscovery(IHostSystem host)
+        : this(host, PythonInterpreterProbe.DefaultCeiling)
     {
+    }
+
+    public PythonDiscovery(IHostSystem host, TimeSpan probeCeiling)
+    {
+        _probe = new PythonInterpreterProbe(probeCeiling);
         var path = new ExecutableSearchPath(host);
         var names = new PythonExecutableNames();
         _sources = [new PathSource(path, names), new WindowsInstallSource(host), new MacInstallSource(names, host), new LinuxInstallSource(host)];
@@ -169,8 +175,10 @@ internal sealed class LinuxInstallSource(IHostSystem host) : PythonCandidateSour
 
 internal sealed record ProbeResult(string? Output, string Error);
 
-internal sealed class PythonInterpreterProbe
+internal sealed class PythonInterpreterProbe(TimeSpan ceiling)
 {
+    public static readonly TimeSpan DefaultCeiling = TimeSpan.FromSeconds(10);
+
     private const string Script = """
         import sys, sysconfig, platform, json
         print(json.dumps({
@@ -200,10 +208,10 @@ internal sealed class PythonInterpreterProbe
 
             var output = process.StandardOutput.ReadToEndAsync();
             var errors = process.StandardError.ReadToEndAsync();
-            if (!process.WaitForExit(10_000))
+            if (!process.WaitForExit(ceiling))
             {
                 process.Kill(entireProcessTree: true);
-                return new ProbeResult(null, "The interpreter did not answer within 10 seconds");
+                return new ProbeResult(null, string.Create(CultureInfo.InvariantCulture, $"The interpreter did not answer within {ceiling.TotalSeconds:0.#} seconds"));
             }
 
             Task.WaitAll([output, errors], TimeSpan.FromSeconds(2));

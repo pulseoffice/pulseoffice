@@ -43,9 +43,9 @@ public sealed class StatisticsFunctions(NumericText numbers) : IFunctionProvider
         .Raw("COUNT", 1, int.MaxValue, r =>
             CellValue.Number(Enumerable.Range(0, r.Count).Sum(i => r.Raw(i) is ScalarValue { Value: var direct }
                 ? CountsAsDirectNumber(direct) ? 1 : 0
-                : r.Values(i).Count(v => v.Kind == ValueKind.Number))))
+                : r.ContentValues(i).Count(v => v.Kind == ValueKind.Number))))
         .Raw("COUNTA", 1, int.MaxValue, r =>
-            CellValue.Number(Enumerable.Range(0, r.Count).Sum(i => r.Has(i) ? r.Values(i).Count(v => !v.IsEmpty) : 1)))
+            CellValue.Number(Enumerable.Range(0, r.Count).Sum(i => r.Has(i) ? r.ContentValues(i).Count(v => !v.IsEmpty) : 1)))
         .Raw("COUNTBLANK", 1, 1, r =>
             CellValue.Number(r.AllValues().Count(v => v.IsEmpty || v.Kind == ValueKind.Text && v.AsText().Length == 0)))
 

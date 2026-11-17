@@ -62,10 +62,15 @@ The rules below apply to every build and test run, by hand or by agents:
   no `dotnet test`, no vstest, no MSBuild per chunk; listing the classes takes 0.2 s instead of 2.4 s). Each project is
   split into chunks of test classes **balanced by the per-class durations recorded in `artifacts/test-runs/cache.json`**
   (aiming at `TESTS_CHUNK_SECONDS`, default 60, and at most `TESTS_CLASSES_PER_CHUNK`, default 40), so a serial headless
-  project such as `Desktop.Tests` is spread over several processes; up to `TESTS_JOBS` (default 3) chunks run at
-  once, longest first, each in its own `systemd-run --user --scope` with `MemoryMax` = `TESTS_MEMORY_TOTAL_GB`
-  (default 12) divided by the jobs, at most 6G (override with `TESTS_MEMORY_MAX`), and `MemorySwapMax=0`: a runaway
-  chunk is killed alone, never the session, and the running chunks together stay within the budget (on systems without
+  project such as `Desktop.Tests` is spread over several processes; up to `TESTS_JOBS` (default 5 since 2026-11-17,
+  was 3) chunks run at once, longest first, each in its own `systemd-run --user --scope` with `MemorySwapMax=0` and a
+  `MemoryMax` **sized from the project's recorded peak**: 1.5 times the highest `memory.peak` the cache holds for the
+  project, rounded up to 256 MB, between 1 and 6 GB (a project with no recorded peak gets the old
+  `TESTS_MEMORY_TOTAL_GB`/3, 4 GB; a killed chunk records its cap as its peak, so the next run gives it half as much again); a chunk
+  starts only when its cap fits beside the caps of the running chunks within `TESTS_MEMORY_TOTAL_GB` (default 12), so
+  the five small sweep or engine chunks (0.3–0.5 GB) run together while `Desktop.Tests` (3.4 GB peak) or
+  `Documents.UI.Tests` (2.7 GB) take two or three slots' worth of budget. `TESTS_MEMORY_MAX` fixes one cap for every
+  chunk. A runaway chunk is killed alone, never the session, and the running chunks together stay within the budget (on systems without
   `systemd-run`, macOS and Windows for now, chunks run uncapped with a warning; `MemoryCap` is the one place to add a
   cap there). **Result cache**: a project whose build output (size and time of every file in its `bin` folder) is
   unchanged since its last green run is skipped; projects that read the source tree (`Architecture`, `Localization`,
@@ -101,7 +106,7 @@ The rules below apply to every build and test run, by hand or by agents:
   `dotnet build-server shutdown` after the build.
 - **Test processes use the workstation GC and give memory back**: `DOTNET_gcServer=0`, `DOTNET_GCConserveMemory=7`,
   `DOTNET_TieredPGO=0`.
-- **At most two agents at a time**, never nested, and never two app builds or two full test runs in parallel; live
+- **At most two agents at a time**, never nested (except the audit cycle below, which uses six), and never two app builds or two full test runs in parallel; live
   tests with `tools/uiprobe-linux` use one virtual display per agent.
 
 ## Verified environment
@@ -221,10 +226,22 @@ Central package management in `Directory.Packages.props`: **versions are never w
     under the 60 s hang limit. A command starts from the prepared state reused while no command has run on it (disabled
     commands cost nothing) or restored by undoing back to the prepared history point and dropping the redo steps
     (`UndoStack.DiscardRedo`), accepted only if a fingerprint (documents, read-only, redo, dialog, panel, focus,
-    selection, objects, enabled and checked state of every command except Repeat, rendered frame) equals the
-    prepared one and the command opened no dialog or panel; otherwise the document is rebuilt. Repeat always starts
-    from a rebuild, since it depends on the last command run. `PULSEOFFICE_SWEEP_OUT=<folder>` writes per-slice
-    results and per-command timings (`*.timings.tsv`: prepare, before, execution, total, prepare steps).
+    Ledger selection, Folio selection, objects, pending shape-text formats, enabled and checked state of every command
+    except Repeat, rendered frame) equals the prepared one and the command left no panel open (a dialog it opened is
+    cancelled and the fingerprint decides); otherwise the document is rebuilt. Before the fingerprint, restore and
+    rebuild alike dismiss notifications and clear the history badge, put the sweep text on the clipboard, give Folio
+    back its prepared text selection, and the rebuild shows the current context on ribbon and menus (2026-11-17: without
+    these, the clipboard, a toast, a collapsed selection or a ribbon still showing the context before the scenario made
+    almost every restore fail). The frame is the SHA-256 of the raw pixels (alpha ignored when opaque); a restored
+    frame within rendering noise (no channel off by more than 40 of 255: subpixel glyph and icon differences after
+    ribbon relayout, measured at 1–32) is accepted, and the `screen` effect ignores the same noise, so it is no longer
+    triggered by a stale ribbon refreshing during the command. A pending shape-text format (a format command with a
+    collapsed caret in Ledger or Deck shape text, applied to the next typed text) is the `pending format` effect. The
+    rebuild opens the new document before closing the old one (no welcome page and accent switch in between).
+    Repeat always starts from a rebuild, since it depends on the last command run. `PULSEOFFICE_SWEEP_OUT=<folder>`
+    writes per-slice results and per-command timings (`*.timings.tsv`: prepare, before, execution, total, prepare
+    steps, then restore and rebuild counts, the reason of every restore miss and the set-up, undo-check and content
+    times of the slice).
     The sweep also checks **undo and redo** (2026-11-17): after a command that added a history step (the history's
     `StatePoint` moved away from the prepared point, no `ChangedOutsideHistory` was raised, the command is not
     `OutsideHistory`, and the workspace still shows the same document), it undoes back to the prepared point and compares
@@ -443,6 +460,11 @@ native macOS menu, modal service, settings schema.
    piece of work (these local commits need no request). Only when the user says so, the branch is squashed into a
    single commit and merged into `main`; pushing still follows rule 2 and needs `tools/run-tests.py --changed main` green first (the full suite only when the user asks).
 2-quater. **Releases are made only by the user** (2026-11-17): versions, tags and GitHub releases are created only by the user with `pulse-cmd.py`; agents never bump, tag or release.
+2-quinquies. **Audit cycle of six** (2026-11-17): audits run six at a time, one agent per area in its own worktree.
+   When all six have finished and applied their fixes, their branches are joined into `work`, the tests of the areas
+   touched by all six run once (`tools/run-tests.py --changed <commit before the merges>`), and `work` is squashed onto
+   `main`. The cycle repeats while any audit still reports medium or serious defects. During the cycle each agent runs
+   only its own targeted test classes; the `--changed` run is done once, at the join.
 2-bis. **Restructure instead of patching**: if a change requires redoing the
    structure, it is redone. A sequence of minimal patches on a structure that no longer holds
    produces unmaintainable code precisely while the project grows.

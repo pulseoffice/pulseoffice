@@ -118,23 +118,32 @@ public sealed class ExchangeMatrixTests : IDisposable
         return received;
     }
 
+    internal static IReadOnlyList<ExchangePackage> Alone(ExchangePackage package) =>
+        [.. package.Representations.Select(representation => new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Representations = [representation] })];
+
     internal static void PasteEveryFlavourAlone(ExchangeSuite suite, ExchangePackage package, string label)
     {
-        foreach (var representation in package.Representations)
+        var alones = Alone(package);
+        foreach (var to in Modules)
         {
-            var alone = new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Representations = [representation] };
-            foreach (var to in Modules)
+            suite.Activate(to);
+            PasteEveryFlavourAloneInto(suite, alones, label, to);
+        }
+    }
+
+    internal static void PasteEveryFlavourAloneInto(ExchangeSuite suite, IReadOnlyList<ExchangePackage> alones, string label, ModuleKind to)
+    {
+        foreach (var alone in alones)
+        {
+            var representation = alone.Representations[0];
+            var modes = suite.Exchange.Modes(to, alone);
+            if (representation.Flavor == ExchangeFlavor.Png) Assert.Contains(ExchangePasteMode.Image, modes);
+            if (representation.Flavor == ExchangeFlavor.Text && representation.Data.Length > 0) Assert.NotEmpty(modes);
+            foreach (var mode in modes)
             {
-                suite.Activate(to);
-                var modes = suite.Exchange.Modes(to, alone);
-                if (representation.Flavor == ExchangeFlavor.Png) Assert.Contains(ExchangePasteMode.Image, modes);
-                if (representation.Flavor == ExchangeFlavor.Text && representation.Data.Length > 0) Assert.NotEmpty(modes);
-                foreach (var mode in modes)
-                {
-                    var received = suite.Exchange.Receive(to, alone, mode);
-                    Dispatcher.UIThread.RunJobs();
-                    if (mode == ExchangePasteMode.Image) Assert.True(received, $"{label}: {representation.Flavor} as {mode} into {to}");
-                }
+                var received = suite.Exchange.Receive(to, alone, mode);
+                Dispatcher.UIThread.RunJobs();
+                if (mode == ExchangePasteMode.Image) Assert.True(received, $"{label}: {representation.Flavor} as {mode} into {to}");
             }
         }
     }
@@ -174,7 +183,7 @@ public sealed class ExchangeMatrixTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
-    public Task Il_testo_di_Folio_e_una_casella_di_Deck_passano_in_ogni_modulo_con_ogni_rappresentazione() => _session.Dispatch(async () =>
+    public Task Il_testo_di_Folio_passa_in_ogni_modulo_con_ogni_rappresentazione() => _session.Dispatch(async () =>
     {
         await using var suite = await new ExchangeSuiteFactory().Open();
         var editor = suite.Folio;
@@ -189,7 +198,12 @@ public sealed class ExchangeMatrixTests : IDisposable
             Assert.True(await suite.Paste(to), $"Folio text not pasted into {to}");
         }
         PasteEveryFlavourAlone(suite, folio, "Folio text");
+    }, CancellationToken.None);
 
+    [Fact]
+    public Task Una_casella_di_Deck_passa_in_ogni_modulo_con_ogni_rappresentazione() => _session.Dispatch(async () =>
+    {
+        await using var suite = await new ExchangeSuiteFactory().Open();
         var target = suite.Deck;
         var box = new PulseOffice.Presentations.TextElement
         {
@@ -268,28 +282,25 @@ public abstract class ExchangeCrossingTests : IDisposable
         Assert.IsType<ObjectsContent>(package.Content);
         var original = Assert.Single(((ObjectsContent)package.Content!).Objects).Object;
 
+        var native = new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Origin = from, Content = package.Content };
+        var serializer = suite.Service<IExchangeSerializer>();
+        var described = serializer.Read(serializer.Write(native));
+        Assert.NotNull(described);
+        var alones = ExchangeMatrixTests.Alone(package);
         foreach (var to in ExchangeMatrixTests.Modules)
         {
             var before = suite.Objects(to).Count;
             Assert.True(await suite.Paste(to), $"{kind} from {from} not pasted into {to}");
             var pasted = suite.Objects(to).Skip(before).ToList();
             Assert.Contains(pasted, item => item.GetType() == original.GetType());
-        }
 
-        var native = new ExchangePackage { Id = Guid.NewGuid().ToString("N"), Origin = from, Content = package.Content };
-        var serializer = suite.Service<IExchangeSerializer>();
-        var described = serializer.Read(serializer.Write(native));
-        Assert.NotNull(described);
-        foreach (var to in ExchangeMatrixTests.Modules)
-        {
-            var before = suite.Objects(to).Count;
-            suite.Activate(to);
+            before = suite.Objects(to).Count;
             Assert.True(suite.Exchange.Receive(to, described!, ExchangePasteMode.Objects) || to == from, $"{kind} described natively from {from} not pasted into {to}");
             Dispatcher.UIThread.RunJobs();
             Assert.True(suite.Objects(to).Count >= before);
-        }
 
-        ExchangeMatrixTests.PasteEveryFlavourAlone(suite, package, $"{kind} from {from}");
+            ExchangeMatrixTests.PasteEveryFlavourAloneInto(suite, alones, $"{kind} from {from}", to);
+        }
     }, CancellationToken.None);
 }
 

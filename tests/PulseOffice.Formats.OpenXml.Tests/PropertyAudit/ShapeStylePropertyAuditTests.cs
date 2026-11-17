@@ -82,18 +82,27 @@ public sealed class ShapeStylePropertyAuditTests
         return reader.Read(stream).Value!;
     }
 
-    [Fact]
-    public void Ogni_proprieta_dello_stile_di_forma_attraversa_ODP_e_PPTX_o_la_perdita_e_dichiarata()
+    private void AssertNoSilentLoss(string format, Func<Presentation, FidelityReport> fidelity, Func<Presentation, Presentation> roundTrip)
     {
-        var audit = new CodecPropertyAudit<Presentation>(_probe, Place, Recover, Prepare);
-        var odp = new OdpWriter();
-        var pptx = new PptxWriter();
-
-        var silent = audit.Silent(ShapeStyle.Default, "odp", odp.CheckFidelity, deck => Through(odp, new OdpReader(_themes, _masters), deck))
-            .Concat(audit.Silent(ShapeStyle.Default, "pptx", pptx.CheckFidelity, deck => Through(pptx, new PptxReader(_themes, _masters), deck)))
+        var silent = new CodecPropertyAudit<Presentation>(_probe, Place, Recover, Prepare)
+            .Silent(ShapeStyle.Default, format, fidelity, roundTrip)
             .Select(finding => $"{finding.Format} {finding.Path}: {finding.Expected} -> {finding.Actual}")
             .ToList();
 
         Assert.True(silent.Count == 0, string.Join(Environment.NewLine, silent));
+    }
+
+    [Fact]
+    public void Ogni_proprieta_dello_stile_di_forma_attraversa_ODP_o_la_perdita_e_dichiarata()
+    {
+        var odp = new OdpWriter();
+        AssertNoSilentLoss("odp", odp.CheckFidelity, deck => Through(odp, new OdpReader(_themes, _masters), deck));
+    }
+
+    [Fact]
+    public void Ogni_proprieta_dello_stile_di_forma_attraversa_PPTX_o_la_perdita_e_dichiarata()
+    {
+        var pptx = new PptxWriter();
+        AssertNoSilentLoss("pptx", pptx.CheckFidelity, deck => Through(pptx, new PptxReader(_themes, _masters), deck));
     }
 }

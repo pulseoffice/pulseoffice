@@ -82,11 +82,16 @@ public sealed class PptxMalformedInputTests
         using (var stream = (archive.GetEntry(entryName) ?? throw new InvalidOperationException(string.Join(",", archive.Entries.Select(e => e.FullName)))).Open())
             original = XDocument.Load(stream);
 
-        var count = original.Descendants().SelectMany(e => e.Attributes()).Count(a => !a.IsNamespaceDeclaration);
-        var failures = new List<string>();
-        var reader = new PptxReader(_themes, _masters);
+        var distinct = original.Descendants().SelectMany(e => e.Attributes()).Where(a => !a.IsNamespaceDeclaration)
+            .Select((attribute, index) => (Context: (attribute.Parent!.Parent?.Name, attribute.Parent.Name, attribute.Name), Index: index))
+            .DistinctBy(item => item.Context)
+            .Select(item => item.Index)
+            .ToList();
+        var failures = new System.Collections.Concurrent.ConcurrentBag<string>();
 
-        for (var index = 0; index < count; index++)
+        Parallel.ForEach(distinct, new ParallelOptions { MaxDegreeOfParallelism = 4 }, index =>
+        {
+            var reader = new PptxReader(_themes, _masters);
             foreach (var value in Garbage)
             {
                 var document = new XDocument(original);
@@ -101,8 +106,9 @@ public sealed class PptxMalformedInputTests
                 });
                 if (exception is not null) failures.Add($"{attribute.Name}={value}: {exception.GetType().Name} {exception.Message} {exception.StackTrace?.Split('\n').FirstOrDefault(l => l.Contains("PulseOffice"))}");
             }
+        });
 
-        Assert.True(failures.Count == 0, string.Join("\n", failures.Distinct()));
+        Assert.True(failures.IsEmpty, string.Join("\n", failures.Distinct()));
     }
     [Theory]
     [InlineData("ppt/slides/slide1.xml")]
@@ -120,11 +126,16 @@ public sealed class PptxMalformedInputTests
         using (var stream = archive.GetEntry(entryName)!.Open())
             original = XDocument.Load(stream);
 
-        var count = original.Descendants().Count();
+        var distinct = original.Descendants()
+            .Select((element, index) => (Context: (element.Parent?.Name, element.Name), Index: index))
+            .Skip(1)
+            .DistinctBy(item => item.Context)
+            .Select(item => item.Index)
+            .ToList();
         var failures = new List<string>();
         var reader = new PptxReader(_themes, _masters);
 
-        for (var index = 1; index < count; index++)
+        foreach (var index in distinct)
         {
             var document = new XDocument(original);
             var element = document.Descendants().ElementAt(index);
