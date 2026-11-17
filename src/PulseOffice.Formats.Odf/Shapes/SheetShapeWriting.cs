@@ -47,6 +47,7 @@ internal sealed class SheetShapeServices(
     public IOdfTextStyleSink TextStyles { get; } = new OdfTextStyleSink(() => $"ST{styles.Count + 1}", styles.Add);
     public IShapePathWriter Paths => paths;
     public OdfFontworkGeometry Fontwork { get; } = new();
+    public OdfFontworkText FontworkText { get; } = new(paragraphs);
     public OdfComputedGeometry Computed { get; } = new();
 
     public OdfDimensionLines Dimensions { get; } = new();
@@ -167,7 +168,7 @@ internal sealed class SheetShapeElementVisitor(SheetShapeServices services, stri
     public override XElement? VisitFontwork(PulseOffice.Drawing.Fontwork.FontworkObject fontwork)
     {
         var custom = Positioned(Namespaces.Draw + "custom-shape", services.FontworkStyle(fontwork.Style, slot.Height), withZ: true);
-        custom.Add(new XElement(Namespaces.Text + "p", fontwork.Text));
+        custom.Add(services.FontworkText.Paragraph(fontwork.Text));
         custom.Add(services.Fontwork.Geometry(fontwork.Warp));
         return custom;
     }

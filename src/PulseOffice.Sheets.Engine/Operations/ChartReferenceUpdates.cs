@@ -6,8 +6,11 @@ namespace PulseOffice.Sheets.Engine.Operations;
 internal abstract class ChartReferenceRewrite
 {
     private readonly ChartSourceReferences _references = new();
+    private readonly CellLinkTargets _links = new();
 
     protected IChartSourceReferences References => _references;
+
+    protected virtual bool KeepsUnqualifiedLinks => false;
 
     public ChartDefinition Rewrite(ChartDefinition chart)
     {
@@ -31,6 +34,33 @@ internal abstract class ChartReferenceRewrite
             : chart with { SourceSheet = sheet, SourceRange = range, SeriesSources = sources };
     }
 
+    public PlacedObject Rewrite(PlacedObject placed, string ownerSheet)
+    {
+        var content = placed.Content is ChartDefinition chart ? Rewrite(chart) : placed.Content;
+        var link = Link(placed.Hyperlink, ownerSheet);
+        return ReferenceEquals(content, placed.Content) && link == placed.Hyperlink
+            ? placed
+            : placed with { Content = content, Hyperlink = link };
+    }
+
+    public string? Link(string? link, string ownerSheet)
+    {
+        if (_links.Read(link, ownerSheet) is not { } target) return link;
+        if (target.SheetText is null && KeepsUnqualifiedLinks) return link;
+
+        var (sheet, range) = Compact(target.Sheet, target.Range);
+        if (sheet == target.Sheet && range == target.Range.ToString()) return link;
+
+        return _links.Write(target, sheet, CellRange.TryParseA1(range, out var parsed) ? parsed : null);
+    }
+
+    public IReadOnlyList<(CellAddress Address, Cell Before, Cell After)> LinkedCells(Worksheet owner) =>
+        [.. owner.NonEmptyCells()
+            .Where(pair => pair.Value.Hyperlink is ['#', _, ..])
+            .Select(pair => (pair.Key, pair.Value, Link: Link(pair.Value.Hyperlink, owner.Name)))
+            .Where(entry => entry.Link != entry.Value.Hyperlink)
+            .Select(entry => (entry.Key, entry.Value, entry.Value with { Hyperlink = entry.Link }))];
+
     private string? Reference(string? text)
     {
         if (References.Read(text) is not { } reference) return text;
@@ -43,8 +73,59 @@ internal abstract class ChartReferenceRewrite
     public void Rewrite(Worksheet owner)
     {
         for (var index = 0; index < owner.Objects.Count; index++)
-            if (owner.Objects[index] is { Content: ChartDefinition chart } placed && Rewrite(chart) is var rewritten && !ReferenceEquals(rewritten, chart))
-                owner.Objects[index] = placed with { Content = rewritten };
+            if (Rewrite(owner.Objects[index], owner.Name) is var rewritten && !ReferenceEquals(rewritten, owner.Objects[index]))
+                owner.Objects[index] = rewritten;
+
+        foreach (var (address, _, after) in LinkedCells(owner)) owner[address] = after;
+    }
+}
+
+internal sealed record CellLinkTarget(string Sheet, CellRange Range, string? SheetText, char Separator);
+
+internal sealed class CellLinkTargets
+{
+    private const string Broken = "#REF!";
+
+    public CellLinkTarget? Read(string? link, string ownerSheet)
+    {
+        if (link is not ['#', _, ..]) return null;
+        var body = link[1..];
+        var split = Separator(body);
+        var rangeText = split < 0 ? body : body[(split + 1)..];
+        if (!CellRange.TryParseA1(rangeText.Replace("$", string.Empty, StringComparison.Ordinal), out var range)) return null;
+        if (split < 0) return new CellLinkTarget(ownerSheet, range, null, '.');
+
+        var sheetText = body[..split];
+        var sheet = sheetText is ['\'', _, .., '\''] ? sheetText[1..^1].Replace("''", "'", StringComparison.Ordinal) : sheetText;
+        return sheet.Length == 0 ? null : new CellLinkTarget(sheet, range, sheetText, body[split]);
+    }
+
+    public string Write(CellLinkTarget target, string sheet, CellRange? range)
+    {
+        var rangeText = range?.ToString() ?? Broken;
+        var sameSheet = string.Equals(sheet, target.Sheet, StringComparison.CurrentCulture);
+        if (target.SheetText is null && sameSheet) return "#" + rangeText;
+        var sheetText = sameSheet && target.SheetText is { } original ? original : Quoted(sheet, target.SheetText);
+        return "#" + sheetText + target.Separator + rangeText;
+    }
+
+    private string Quoted(string sheet, string? original) =>
+        original is ['\'', ..] || sheet.Any(character => !char.IsLetterOrDigit(character) && character != '_')
+            ? "'" + sheet.Replace("'", "''", StringComparison.Ordinal) + "'"
+            : sheet;
+
+    private int Separator(string body)
+    {
+        var quoted = false;
+        var dot = -1;
+        for (var index = 0; index < body.Length; index++)
+        {
+            var character = body[index];
+            if (character == '\'') quoted = !quoted;
+            else if (!quoted && character == '!') return index;
+            else if (!quoted && character == '.') dot = index;
+        }
+        return dot;
     }
 }
 
@@ -68,6 +149,8 @@ internal sealed class ChartStructureRewrite(StructureChange change) : ChartRefer
 
 internal sealed class ChartSheetRewrite(string oldName, string? newName) : ChartReferenceRewrite
 {
+    protected override bool KeepsUnqualifiedLinks => true;
+
     protected override (string Sheet, string Range) Compact(string sheet, CellRange range) =>
         !string.Equals(sheet, oldName, StringComparison.CurrentCultureIgnoreCase) ? (sheet, range.ToString())
         : newName is null ? (sheet, ChartSourceReferences.Broken)
@@ -83,47 +166,68 @@ internal sealed class ChartLinksPart : StructurePart
     }
 }
 
-public sealed record ChartReferenceChange(Worksheet Owner, PlacedObject Before, PlacedObject After);
+public abstract record SheetReferenceChange(Worksheet Owner)
+{
+    internal abstract void Apply(bool forward);
+}
+
+public sealed record ObjectReferenceChange(Worksheet Owner, PlacedObject Before, PlacedObject After) : SheetReferenceChange(Owner)
+{
+    internal override void Apply(bool forward)
+    {
+        var index = Owner.Objects.IndexOf(forward ? Before : After);
+        if (index >= 0) Owner.Objects[index] = forward ? After : Before;
+    }
+}
+
+public sealed record CellLinkChange(Worksheet Owner, CellAddress Address, string Before, string After) : SheetReferenceChange(Owner)
+{
+    internal override void Apply(bool forward)
+    {
+        var cell = Owner[Address];
+        if (cell.Hyperlink == (forward ? Before : After)) Owner[Address] = cell with { Hyperlink = forward ? After : Before };
+    }
+}
 
 public interface IChartSheetReferences
 {
-    IReadOnlyList<ChartReferenceChange> Renamed(Workbook workbook, string oldName, string newName);
+    IReadOnlyList<SheetReferenceChange> Renamed(Workbook workbook, string oldName, string newName);
 
-    IReadOnlyList<ChartReferenceChange> Removed(Workbook workbook, Worksheet removed);
+    IReadOnlyList<SheetReferenceChange> Removed(Workbook workbook, Worksheet removed);
 
-    void Apply(IReadOnlyList<ChartReferenceChange> changes, bool forward);
+    void Apply(IReadOnlyList<SheetReferenceChange> changes, bool forward);
 }
 
 public sealed class ChartSheetReferences : IChartSheetReferences
 {
-    public IReadOnlyList<ChartReferenceChange> Renamed(Workbook workbook, string oldName, string newName) =>
+    public IReadOnlyList<SheetReferenceChange> Renamed(Workbook workbook, string oldName, string newName) =>
         Plan(workbook, new ChartSheetRewrite(oldName, newName), null);
 
-    public IReadOnlyList<ChartReferenceChange> Removed(Workbook workbook, Worksheet removed)
+    public IReadOnlyList<SheetReferenceChange> Removed(Workbook workbook, Worksheet removed)
     {
         ArgumentNullException.ThrowIfNull(removed);
         return Plan(workbook, new ChartSheetRewrite(removed.Name, null), removed);
     }
 
-    public void Apply(IReadOnlyList<ChartReferenceChange> changes, bool forward)
+    public void Apply(IReadOnlyList<SheetReferenceChange> changes, bool forward)
     {
         ArgumentNullException.ThrowIfNull(changes);
-        foreach (var (owner, before, after) in changes)
-        {
-            var from = forward ? before : after;
-            var index = owner.Objects.IndexOf(from);
-            if (index >= 0) owner.Objects[index] = forward ? after : before;
-        }
+        foreach (var change in changes) change.Apply(forward);
     }
 
-    private List<ChartReferenceChange> Plan(Workbook workbook, ChartSheetRewrite rewrite, Worksheet? skipped)
+    private List<SheetReferenceChange> Plan(Workbook workbook, ChartSheetRewrite rewrite, Worksheet? skipped)
     {
         ArgumentNullException.ThrowIfNull(workbook);
-        var changes = new List<ChartReferenceChange>();
+        var changes = new List<SheetReferenceChange>();
         foreach (var owner in workbook.Sheets.Where(sheet => !ReferenceEquals(sheet, skipped)))
+        {
             foreach (var placed in owner.Objects)
-                if (placed.Content is ChartDefinition chart && rewrite.Rewrite(chart) is var rewritten && !ReferenceEquals(rewritten, chart))
-                    changes.Add(new ChartReferenceChange(owner, placed, placed with { Content = rewritten }));
+                if (rewrite.Rewrite(placed, owner.Name) is var rewritten && !ReferenceEquals(rewritten, placed))
+                    changes.Add(new ObjectReferenceChange(owner, placed, rewritten));
+
+            foreach (var (address, before, after) in rewrite.LinkedCells(owner))
+                changes.Add(new CellLinkChange(owner, address, before.Hyperlink!, after.Hyperlink!));
+        }
         return changes;
     }
 }

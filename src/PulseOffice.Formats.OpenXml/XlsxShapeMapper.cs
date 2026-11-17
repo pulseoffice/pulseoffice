@@ -26,7 +26,7 @@ public sealed class XlsxShapeMapper
         var shapes = new SheetShapeElementReader();
         var freeforms = new SheetFreeformReader();
         var connectors = new SheetConnectorReader();
-        _readers = [new SheetFontworkReader(new OoxmlFontworkText(_styles)), shapes, freeforms, new SheetGroupReader([shapes, freeforms, connectors, new SheetGroupPictureReader()]), connectors];
+        _readers = [new SheetFontworkReader(new OoxmlFontworkText(_styles, new DrawingML.DrawingPlainText())), shapes, freeforms, new SheetGroupReader([shapes, freeforms, connectors, new SheetGroupPictureReader()]), connectors];
     }
 
     public IEnumerable<OpenXmlCompositeElement> BuildAnchors(Worksheet sheet) => BuildAnchors(sheet, null);

@@ -50,9 +50,10 @@ internal abstract class SheetShapeReader
         context.Units.Order(element) is var order and >= 0 ? placed with { ZOrder = order } : placed;
 }
 
-internal sealed class SheetFontworkReader : SheetShapeReader
+internal sealed class SheetFontworkReader(IOdfParagraphText paragraphs) : SheetShapeReader
 {
     private readonly OdfFontworkGeometry _geometry = new();
+    private readonly OdfFontworkText _text = new(paragraphs);
 
     public override bool Reads(XElement element) => element.Name == Namespaces.Draw + "custom-shape" && _geometry.IsFontwork(element);
 
@@ -63,7 +64,7 @@ internal sealed class SheetFontworkReader : SheetShapeReader
         var fontwork = new PulseOffice.Drawing.Fontwork.FontworkObject
         {
             Id = (string?)element.Attribute(Namespaces.Draw + "name") ?? $"fontwork{ordinal}",
-            Text = _geometry.TextOf(element),
+            Text = _text.Read(element),
             Warp = _geometry.WarpOf(element),
             Style = context.Style((string?)element.Attribute(Namespaces.Draw + "style-name")),
         };

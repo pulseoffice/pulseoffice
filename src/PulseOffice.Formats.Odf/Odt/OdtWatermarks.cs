@@ -5,7 +5,7 @@ using PulseOffice.Documents.Styles;
 
 namespace PulseOffice.Formats.Odf.Odt;
 
-internal sealed partial class OdtWatermarks(OdtMeasure measure) : OdtXml
+internal sealed partial class OdtWatermarks(OdtMeasure measure, OdfFontworkText text) : OdtXml
 {
     public const string ShapeName = "PowerPlusWaterMarkObject";
 
@@ -49,7 +49,7 @@ internal sealed partial class OdtWatermarks(OdtMeasure measure) : OdtXml
             new XAttribute(Svg + "width", measure.Points(width)),
             new XAttribute(Svg + "height", measure.Points(height)),
             new XAttribute(Draw + "transform", string.Create(CultureInfo.InvariantCulture, $"rotate ({radians:0.######}) translate ({tx:0.###}pt {ty:0.###}pt)")),
-            new XElement(Text + "p", watermark.Text),
+            text.Paragraph(watermark.Text),
             new XElement(Draw + "enhanced-geometry",
                 new XAttribute(Svg + "viewBox", "0 0 21600 21600"),
                 new XAttribute(Draw + "text-areas", "0 0 21600 21600"),
@@ -68,13 +68,13 @@ internal sealed partial class OdtWatermarks(OdtMeasure measure) : OdtXml
         var shape = region.Descendants(Draw + "custom-shape")
             .FirstOrDefault(element => ((string?)element.Attribute(Draw + "name"))?.StartsWith(ShapeName, StringComparison.Ordinal) == true);
         if (shape is null) return null;
-        var text = string.Concat(shape.Elements(Text + "p").Select(paragraph => paragraph.Value));
+        var content = text.Read(shape);
         var style = styles.Find("graphic", (string?)shape.Attribute(Draw + "style-name"));
         var graphic = style?.Element(Style + "graphic-properties");
         var font = (string?)style?.Element(Style + "text-properties")?.Attribute(Fo + "font-family")
             ?? (string?)style?.Element(Style + "text-properties")?.Attribute(Style + "font-name");
         var opacity = measure.Percent((string?)graphic?.Attribute(Draw + "opacity"));
-        var watermark = new PageWatermark(text)
+        var watermark = new PageWatermark(content)
         {
             Font = font?.Trim('\'', '"') is { Length: > 0 } family ? family : "Liberation Sans",
             Color = measure.Color((string?)graphic?.Attribute(Draw + "fill-color")) ?? 0xFFC0C0C0,

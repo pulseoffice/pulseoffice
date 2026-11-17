@@ -239,25 +239,26 @@ internal sealed class DeckFreeformReader(XlsxShapeStyleMapper styles) : DeckDraw
     }
 }
 
-internal sealed class DeckFormulaShapeCodec : DeckElementBuilder
+internal sealed class DeckFormulaShapeCodec(DrawingML.IDrawingPlainText plainText) : DeckElementBuilder
 {
     public override bool Builds(EmbeddedObject content) => content is FormulaObject;
 
     public override OpenXmlElement Build(ObjectElement element, uint id, SlidePart part)
     {
         var formula = (FormulaObject)element.Content;
+        var size = (int)Math.Round(Math.Clamp(double.IsFinite(formula.FontSize) ? formula.FontSize : 18, 1, 4000) * 100);
+        var body = new P.TextBody(new D.BodyProperties(), new D.ListStyle());
+        foreach (var line in formula.Expression.ReplaceLineEndings("\n").Split('\n'))
+            body.Append(new D.Paragraph(new D.Run(new D.RunProperties { FontSize = size }, new D.Text(line))));
         return new P.Shape(
             ShapeNames(id, "DeckFormula"),
             new P.ShapeProperties(Transform(element), new D.PresetGeometry { Preset = D.ShapeTypeValues.Rectangle }),
-            new P.TextBody(new D.BodyProperties(), new D.ListStyle(),
-                new D.Paragraph(new D.Run(
-                    new D.RunProperties { FontSize = (int)Math.Round(Math.Clamp(double.IsFinite(formula.FontSize) ? formula.FontSize : 18, 1, 4000) * 100) },
-                    new D.Text(formula.Expression)))));
+            body);
     }
 
     public ObjectElement? Read(P.Shape shape, string id)
     {
-        var expression = string.Concat(shape.TextBody?.Descendants<D.Text>().Select(t => t.Text) ?? []);
+        var expression = plainText.Body(shape.TextBody);
         return string.IsNullOrEmpty(expression)
             ? null
             : new ObjectElement { Id = id, Bounds = Bounds(shape.ShapeProperties?.Transform2D), Content = new FormulaObject { Id = id, Expression = expression } };
@@ -482,7 +483,7 @@ internal sealed class DeckOleObjectCodec : DeckDrawingCodec
 
 internal sealed class DeckFontworkCodec(XlsxShapeStyleMapper styles) : DeckElementBuilder
 {
-    private readonly OoxmlFontworkText _text = new(styles);
+    private readonly OoxmlFontworkText _text = new(styles, new DrawingML.DrawingPlainText());
 
     public override bool Builds(EmbeddedObject content) => content is PulseOffice.Drawing.Fontwork.FontworkObject;
 

@@ -21,7 +21,7 @@ internal sealed class XlsxDrawingRunLinks(DrawingsPart? part) : IDrawingRunLinks
 
 internal sealed class XlsxUnreadTextLinks
 {
-    private readonly OoxmlFontworkText _fontwork = new(new XlsxShapeStyleMapper());
+    private readonly OoxmlFontworkText _fontwork = new(new XlsxShapeStyleMapper(), new DrawingML.DrawingPlainText());
 
     public bool Present(DocumentFormat.OpenXml.Drawing.Spreadsheet.WorksheetDrawing? drawing) =>
         drawing?.Descendants<D.RunProperties>()

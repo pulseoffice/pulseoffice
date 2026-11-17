@@ -385,24 +385,20 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
     }
 }
 
-internal sealed class DeckFormulaCodec(PulseOffice.Formulas.IMathMlSyntax mathml) : DeckObjectCodec
+internal sealed class DeckFormulaCodec(PulseOffice.Formulas.IMathMlSyntax mathml, IOdfParagraphText paragraphs) : DeckObjectCodec
 {
-    public DeckFormulaCodec() : this(new PulseOffice.Formulas.MathMlSyntax())
-    {
-    }
-
     public XElement Build(ObjectElement element, FormulaObject formula, string href) =>
         Placed(Draw + "frame", element,
             Embedded(Draw + "object", href),
             new XElement(Draw + "image",
                 new XAttribute(Draw + "mime-type", "application/vnd.oasis.opendocument.formula"),
-                new XElement(Text + "p", formula.Expression)));
+                paragraphs.Paragraphs(formula.Expression)));
 
     public ObjectElement? Read(XElement frame, string id, Func<string, XDocument?> readXml)
     {
         if (frame.Element(Draw + "object") is not { } embedded) return null;
 
-        var expression = frame.Element(Draw + "image")?.Element(Text + "p")?.Value;
+        var expression = frame.Element(Draw + "image") is { } image ? paragraphs.Read(image) : null;
         if (string.IsNullOrEmpty(expression) && (string?)embedded.Attribute(Xlink + "href") is { Length: > 0 } href
             && readXml($"{href.TrimStart('.', '/')}/content.xml")?.Root is { Name.LocalName: "math" } math)
             expression = mathml.Read(math).Source;
@@ -729,13 +725,13 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
     }
 }
 
-internal sealed class DeckFontworkCodec(OdfShapeStyleReader styles) : DeckObjectCodec
+internal sealed class DeckFontworkCodec(OdfShapeStyleReader styles, OdfFontworkText text) : DeckObjectCodec
 {
     private readonly OdfFontworkGeometry _geometry = new();
 
     public XElement Build(ObjectElement element, PulseOffice.Drawing.Fontwork.FontworkObject fontwork, string styleName) =>
         Styled(Draw + "custom-shape", element, styleName,
-            new XElement(Text + "p", fontwork.Text),
+            text.Paragraph(fontwork.Text),
             _geometry.Geometry(fontwork.Warp));
 
     public bool Reads(XElement node) => _geometry.IsFontwork(node);
@@ -750,7 +746,7 @@ internal sealed class DeckFontworkCodec(OdfShapeStyleReader styles) : DeckObject
             Content = new PulseOffice.Drawing.Fontwork.FontworkObject
             {
                 Id = id,
-                Text = _geometry.TextOf(node),
+                Text = text.Read(node),
                 Warp = _geometry.WarpOf(node),
                 Style = styles.Read(styleName is not null && definitions.TryGetValue(styleName, out var found) ? found : null, definitions),
             },

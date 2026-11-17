@@ -5,7 +5,7 @@ using PulseOffice.Foundation.Units;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed class OdfDimensionLines(IDimensionLineGeometry geometry)
+internal sealed class OdfDimensionLines(IDimensionLineGeometry geometry, TextCodecs.IOdfParagraphText paragraphText)
 {
     private const int MaximumStyleDepth = 16;
     private static readonly XNamespace Draw = OdfPackage.Namespaces.Draw;
@@ -15,7 +15,7 @@ internal sealed class OdfDimensionLines(IDimensionLineGeometry geometry)
 
     private readonly OdfLength _length = new();
 
-    public OdfDimensionLines() : this(new DimensionLineGeometry())
+    public OdfDimensionLines() : this(new DimensionLineGeometry(), new TextCodecs.OdfParagraphText())
     {
     }
 
@@ -137,7 +137,7 @@ internal sealed class OdfDimensionLines(IDimensionLineGeometry geometry)
 
     private IEnumerable<XElement> Paragraphs(DimensionLine dimension, double measuredPoints)
     {
-        if (dimension.Label is { } label) return label.Split('\n').Select(line => new XElement(Text + "p", line)).ToList();
+        if (dimension.Label is { } label) return [.. paragraphText.Paragraphs(label)];
         var paragraph = new XElement(Text + "p",
             new XElement(Text + "measure", new XAttribute(Text + "kind", "value"),
                 geometry.Label(dimension with { ShowUnit = false }, measuredPoints, CultureInfo.InvariantCulture)));
@@ -154,7 +154,7 @@ internal sealed class OdfDimensionLines(IDimensionLineGeometry geometry)
         var free = string.Concat(paragraphs.SelectMany(paragraph => paragraph.DescendantNodes()).OfType<XText>()
             .Where(text => text.Ancestors(Text + "measure").FirstOrDefault() is null)
             .Select(text => text.Value));
-        return string.IsNullOrWhiteSpace(free) ? null : string.Join('\n', paragraphs.Select(paragraph => paragraph.Value));
+        return string.IsNullOrWhiteSpace(free) ? null : string.Join('\n', paragraphs.Select(paragraphText.Line));
     }
 
     private string? Lookup(XElement? style, Func<string, XElement?> styles, XName name, int depth)

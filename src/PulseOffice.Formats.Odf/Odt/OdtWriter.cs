@@ -59,12 +59,12 @@ public sealed class OdtWriter : ITextDocumentWriter
         var paragraphs = new OdtParagraphWriter(paragraphCodec, direct, resolver, names, inline);
         var blocks = new OdtBlockWriter(paragraphs, new OdtTableWriter(measure, names, vocabulary, borders, new TableAppearance(resolver), new OdtTableFormulas(new PulseOffice.Document.Tables.TableFormulaParser(), new PulseOffice.Document.Tables.WriterFormulaSyntax(), new PulseOffice.Document.Tables.CanonicalFormulaSyntax(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellNumbers(new PulseOffice.Documents.Editing.Tables.CellValueText(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellDirections()), new OdtSectionWriter(columns, new OdtIndexCodec(names, new PulseOffice.Documents.Indexes.IndexStyles())), resolver, names);
 
-        var changeWriter = new OdtChangeWriter();
+        var changeWriter = new OdtChangeWriter(new OdfParagraphText());
         _writer = new OdtDocumentWriter(
             blocks,
             marks,
             drawings,
-            new OdtStylesWriter(characters, paragraphCodec, frames, columns, measure, names, new OdtNumberFormats(), vocabulary, borders, new OdtWatermarks(measure), changeWriter, new OdfListPictures(measure, new OdfImageTypes())),
+            new OdtStylesWriter(characters, paragraphCodec, frames, columns, measure, names, new OdtNumberFormats(), vocabulary, borders, new OdtWatermarks(measure, new OdfFontworkText(new OdfParagraphText())), changeWriter, new OdfListPictures(measure, new OdfImageTypes())),
             changeWriter,
             new PulseOffice.Documents.Editing.StoryCatalog(new PulseOffice.Documents.Blocks.BlockTree()));
     }
@@ -348,7 +348,7 @@ internal sealed class OdtDocumentWriter(
     ];
 }
 
-internal sealed class OdtChangeWriter : OdtXml
+internal sealed class OdtChangeWriter(IOdfParagraphText paragraphs) : OdtXml
 {
     public XElement? Write(TextDocument document, OdtWriteSession session, IOdtBlockWriter blocks, IReadOnlySet<string> elsewhere)
     {
@@ -383,7 +383,7 @@ internal sealed class OdtChangeWriter : OdtXml
         var info = new XElement(Office + "change-info",
             new XElement(Dc + "creator", change.Author),
             new XElement(Dc + "date", change.Date.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", System.Globalization.CultureInfo.InvariantCulture)));
-        if (change.Comment is { } comment) info.Add(new XElement(Text + "p", comment));
+        if (change.Comment is { } comment) info.Add(paragraphs.Paragraphs(comment));
 
         XElement body = change switch
         {

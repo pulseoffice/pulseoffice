@@ -14,14 +14,20 @@ public sealed class OdfFormulaMapper
     private readonly IFormulaParser _parser;
     private readonly IMathMlSyntax _mathml;
 
-    public OdfFormulaMapper(IMathMlSyntax? mathml = null, IFormulaParser? parser = null)
+    public OdfFormulaMapper(IMathMlSyntax? mathml = null, IFormulaParser? parser = null) : this(mathml, parser, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText())
+    {
+    }
+
+    internal OdfFormulaMapper(IMathMlSyntax? mathml, IFormulaParser? parser, PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText paragraphs)
     {
         _mathml = mathml ?? new MathMlSyntax();
         _parser = parser ?? new FormulaParser();
+        _paragraphs = paragraphs;
     }
 
     private readonly OdfDrawUnits _units = new();
     private readonly AnchoredFrames _frames = new();
+    private readonly PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText _paragraphs;
 
     public IReadOnlyList<(string Path, XDocument Document)> Documents(Worksheet sheet, int startIndex)
     {
@@ -70,7 +76,7 @@ public sealed class OdfFormulaMapper
                 new XElement(
                     Namespaces.Draw + "image",
                     new XAttribute(Namespaces.Draw + "mime-type", "application/vnd.oasis.opendocument.formula"),
-                    new XElement(Namespaces.Text + "p", formula.Expression)));
+                    _paragraphs.Paragraphs(formula.Expression)));
 
             if (!frames.TryGetValue(placed.Anchor, out var list)) frames[placed.Anchor] = list = [];
 
@@ -93,7 +99,7 @@ public sealed class OdfFormulaMapper
             if (package.ReadXml($"{reference.TrimStart('.', '/')}/content.xml")?.Root is not { } root || root.Name.LocalName != "math") continue;
 
             var formula = _mathml.Read(root);
-            var source = formula.Source.Length > 0 ? formula.Source : frame.Descendants(Namespaces.Text + "p").FirstOrDefault()?.Value ?? string.Empty;
+            var source = formula.Source.Length > 0 ? formula.Source : frame.Element(Namespaces.Draw + "image") is { } image ? _paragraphs.Read(image) : string.Empty;
             var id = (string?)frame.Attribute(Namespaces.Draw + "name") ?? Guid.NewGuid().ToString("N");
 
             placed.Add(new PlacedObject

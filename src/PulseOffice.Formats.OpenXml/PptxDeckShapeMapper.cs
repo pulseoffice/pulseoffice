@@ -12,7 +12,7 @@ public sealed class PptxDeckShapeMapper
 {
     private readonly DeckPresetShapeCodec _shapes;
     private readonly DeckFreeformReader _freeforms;
-    private readonly DeckFormulaShapeCodec _formulas = new();
+    private readonly DeckFormulaShapeCodec _formulas = new(new DrawingML.DrawingPlainText());
     private readonly DeckPictureCodec _pictures = new(new OoxmlImageTypes(), new DrawingML.DrawingDuotone());
     private readonly DeckOleObjectCodec _ole = new();
     private readonly IReadOnlyList<DeckElementBuilder> _builders;

@@ -14,7 +14,7 @@ public sealed record SheetRenamePlan(
     string? PageStyleBefore,
     string? PageStyleAfter)
 {
-    public IReadOnlyList<ChartReferenceChange> Charts { get; init; } = [];
+    public IReadOnlyList<SheetReferenceChange> ObjectsAndLinks { get; init; } = [];
 
     public IReadOnlyList<SheetRuleRename> Rules { get; init; } = [];
 
@@ -71,7 +71,7 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
         return new SheetRenamePlan(sheet, oldName, newName, formulas, names,
             pageStyle ? sheet.PageStyleName : null, pageStyle ? newName : null)
         {
-            Charts = charts.Renamed(workbook, oldName, newName),
+            ObjectsAndLinks = charts.Renamed(workbook, oldName, newName),
             Rules = [.. workbook.Sheets
                 .Select(owner => RenamedRules(owner, oldName, newName))
                 .OfType<SheetRuleRename>()],
@@ -117,7 +117,7 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
             plan.Sheet.PageStyleName = target;
         }
 
-        charts.Apply(plan.Charts, forward);
+        charts.Apply(plan.ObjectsAndLinks, forward);
 
         foreach (var (before, after) in plan.Pivots)
         {

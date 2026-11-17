@@ -13814,3 +13814,17 @@ command, then redoes and compares with the one after it.
 
 Not verified: commands that change the document only outside the history while also adding a step (none known), and
 content the ODF writer does not serialize (it would be a format defect under rule 7 first).
+
+## Round 154
+
+Ledger references under structural edits (log: docs/deep-audit/round-154-ledger-references.md). Fixed: cell hyperlinks and
+named styles left behind by row/column insertion and deletion (serious); internal cell and object hyperlinks now follow
+structure edits, moves, renaming and sheet deletion, becoming #REF! when the target vanishes (medium). Charts, print
+ranges, names and validations checked without defects; four minor items open.
+## Round 155 (2026-11-17): plain-text follow-up
+
+Closed the items left open by round 152. Fontwork text (ODF and OOXML), equation sources (ODP, ODS, PPTX), the ODT
+watermark and tracked-change notes, inline chart table cells (ODF), ODS validation messages and ODF dimension labels now
+go through `IOdfParagraphText` / `IDrawingPlainText`. Defects: four medium, four minor, all fixed with
+`Round155PlainTextTests` (Odf, OpenXml). The `--changed main` run passed. Log:
+[docs/deep-audit/round-155-plain-text-followup.md](deep-audit/round-155-plain-text-followup.md).

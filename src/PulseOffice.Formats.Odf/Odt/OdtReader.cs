@@ -46,10 +46,10 @@ public sealed class OdtReader : ITextDocumentReader
             new OdtSectionReader(columns, new OdtIndexCodec(new OdtStyleNames(), new PulseOffice.Documents.Indexes.IndexStyles())),
             objects);
 
-        var changeReader = new OdtChangeReader(new OdtCommentReader());
+        var changeReader = new OdtChangeReader(new OdtCommentReader(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
         _reader = new OdtDocumentReader(
             blocks,
-            new OdtStylesReader(characters, paragraphCodec, frames, columns, measure, names, new OdtNumberFormats(), vocabulary, borders, new OdtWatermarks(measure), changeReader, new OdfListPictures(measure, new OdfImageTypes())),
+            new OdtStylesReader(characters, paragraphCodec, frames, columns, measure, names, new OdtNumberFormats(), vocabulary, borders, new OdtWatermarks(measure, new OdfFontworkText(new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText())), changeReader, new OdfListPictures(measure, new OdfImageTypes())),
             changeReader,
             new OdtFontFaceIndex(),
             names,
@@ -477,7 +477,7 @@ internal sealed class OdtDocumentReader(
     }
 }
 
-internal sealed class OdtChangeReader(OdtCommentReader comments) : OdtXml
+internal sealed class OdtChangeReader(OdtCommentReader comments, PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText paragraphs) : OdtXml
 {
     public void Read(XElement element, OdtReadContext context, OdtBlockReader blocks)
     {
@@ -500,7 +500,7 @@ internal sealed class OdtChangeReader(OdtCommentReader comments) : OdtXml
             var info = body.Element(Office + "change-info");
             var author = (string?)info?.Element(Dc + "creator") ?? string.Empty;
             var date = comments.Date((string?)info?.Element(Dc + "date"));
-            var note = info?.Elements(Text + "p").Select(p => p.Value).ToList() is { Count: > 0 } lines ? string.Join("\n", lines) : null;
+            var note = info?.Elements(Text + "p").Select(paragraphs.Line).ToList() is { Count: > 0 } lines ? string.Join("\n", lines) : null;
 
             TrackedChange? change = body.Name.LocalName switch
             {

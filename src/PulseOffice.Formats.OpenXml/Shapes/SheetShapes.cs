@@ -97,7 +97,7 @@ internal sealed class SheetDrawingVisitor(
 
     public override OpenXmlElement? VisitFontwork(PulseOffice.Drawing.Fontwork.FontworkObject fontwork)
     {
-        var text = new OoxmlFontworkText(styles);
+        var text = new OoxmlFontworkText(styles, new DrawingML.DrawingPlainText());
         return new Xdr.Shape(
             new Xdr.NonVisualShapeProperties(
                 new Xdr.NonVisualDrawingProperties { Id = id, Name = name },

@@ -39,7 +39,7 @@ public sealed class OdfShapeMapper
         _services = new SheetShapeServices(_styleMapper, _styles, new ShapePresets(), geometry, flattener, new ShapePathWriter(), _paragraphs, pictures);
 
         var shapes = new SheetCustomShapeReader(_paragraphs);
-        _readers = [new SheetFontworkReader(), new SheetCustomPathReader(), shapes, new SheetFramedShapeReader(shapes), new SheetTextFrameReader(_paragraphs), new SheetFreeformShapeReader(), new SheetConnectorShapeReader(), new SheetGroupShapeReader(() => _groupMembers ??= [.. _readers!, new SheetGroupImageReader()]), new SheetRectangleReader(_paragraphs), new SheetEllipseReader("ellipse", _paragraphs), new SheetEllipseReader("circle", _paragraphs), new SheetLineReader("line", _paragraphs), new SheetDimensionLineReader(_paragraphs)];
+        _readers = [new SheetFontworkReader(_paragraphs), new SheetCustomPathReader(), shapes, new SheetFramedShapeReader(shapes), new SheetTextFrameReader(_paragraphs), new SheetFreeformShapeReader(), new SheetConnectorShapeReader(), new SheetGroupShapeReader(() => _groupMembers ??= [.. _readers!, new SheetGroupImageReader()]), new SheetRectangleReader(_paragraphs), new SheetEllipseReader("ellipse", _paragraphs), new SheetEllipseReader("circle", _paragraphs), new SheetLineReader("line", _paragraphs), new SheetDimensionLineReader(_paragraphs)];
         _frames = new AnchoredFrames(
             Namespaces.Draw + "custom-shape", Namespaces.Draw + "frame", Namespaces.Draw + "path", Namespaces.Draw + "polygon",
             Namespaces.Draw + "polyline", Namespaces.Draw + "connector", Namespaces.Draw + "g",

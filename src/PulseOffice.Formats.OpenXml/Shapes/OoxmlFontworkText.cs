@@ -5,7 +5,7 @@ using D = DocumentFormat.OpenXml.Drawing;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed class OoxmlFontworkText(XlsxShapeStyleMapper styles)
+internal sealed class OoxmlFontworkText(XlsxShapeStyleMapper styles, DrawingML.IDrawingPlainText plainText)
 {
     private readonly FontworkWarps _warps = new();
 
@@ -40,7 +40,7 @@ internal sealed class OoxmlFontworkText(XlsxShapeStyleMapper styles)
         return new FontworkObject
         {
             Id = id,
-            Text = string.Join(" ", textBody.Descendants<D.Paragraph>().Select(paragraph => string.Concat(paragraph.Descendants<D.Text>().Select(text => text.Text)))),
+            Text = string.Join(" ", textBody.Elements<D.Paragraph>().Select(paragraph => plainText.Paragraph(paragraph).ReplaceLineEndings(" "))),
             Warp = _warps.FromOoxml(warp),
             Bold = run?.Bold?.Value ?? true,
             Italic = run?.Italic?.Value ?? false,

@@ -11,10 +11,10 @@ public sealed class OdfDeckShapeMapper
     private readonly DeckPathCodec _paths = new(new ShapePathWriter(), new OdfShapeStyleReader());
     private readonly DeckShapeCodec _shapes;
     private readonly DeckImageCodec _images = new(new OdfImageTypes());
-    private readonly DeckFormulaCodec _formulas = new();
+    private readonly DeckFormulaCodec _formulas;
     private readonly DeckOleCodec _ole = new();
     private readonly DeckTableCodec _tables;
-    private readonly DeckFontworkCodec _fontwork = new(new OdfShapeStyleReader());
+    private readonly DeckFontworkCodec _fontwork;
     private readonly DeckSceneCodec _scenes = new();
 
     public OdfDeckShapeMapper()
@@ -22,6 +22,8 @@ public sealed class OdfDeckShapeMapper
         var paragraphs = new OdfParagraphText();
         _shapes = new DeckShapeCodec(new ShapePresets(), new OdfShapeStyleReader(), paragraphs);
         _tables = new DeckTableCodec(paragraphs);
+        _formulas = new DeckFormulaCodec(new PulseOffice.Formulas.MathMlSyntax(), paragraphs);
+        _fontwork = new DeckFontworkCodec(new OdfShapeStyleReader(), new OdfFontworkText(paragraphs));
     }
 
     public XElement BuildFontwork(ObjectElement element, PulseOffice.Drawing.Fontwork.FontworkObject fontwork, string styleName) => _fontwork.Build(element, fontwork, styleName);

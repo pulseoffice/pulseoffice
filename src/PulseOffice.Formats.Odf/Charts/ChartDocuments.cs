@@ -40,6 +40,8 @@ internal abstract class OdfChartXml
 
 internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, OdfUnits units, IOdfParagraphText paragraphs) : OdfChartXml
 {
+    protected IOdfParagraphText Paragraphs => paragraphs;
+
     public XDocument Build(ChartDefinition definition, ChartData data, DocumentSize frame) =>
         Build(definition, data, frame, CultureInfo.InvariantCulture);
 
@@ -312,5 +314,5 @@ internal sealed class InlineChartDocumentBuilder(OdfChartVocabulary vocabulary, 
             new XElement(Text + "p", value.ToString(culture)));
 
     private XElement TextCell(string text) =>
-        new(Table + "table-cell", new XAttribute(Office + "value-type", "string"), new XElement(Text + "p", text));
+        new(Table + "table-cell", new XAttribute(Office + "value-type", "string"), Paragraphs.Paragraphs(text));
 }

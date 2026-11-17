@@ -10,6 +10,14 @@ namespace PulseOffice.Formats.Odf;
 public sealed class OdfSheetMetadataMapper
 {
     private readonly OdfValidationSyntax _syntax = new();
+    private readonly TextCodecs.IOdfParagraphText _paragraphs;
+
+    public OdfSheetMetadataMapper() : this(new TextCodecs.OdfParagraphText())
+    {
+    }
+
+    internal OdfSheetMetadataMapper(TextCodecs.IOdfParagraphText paragraphs) => _paragraphs = paragraphs;
+
     private readonly TableRows _rows = new();
     private readonly TableCells _cells = new();
     private readonly OdfQualifiedRanges _ranges = new();
@@ -53,15 +61,13 @@ public sealed class OdfSheetMetadataMapper
     {
         var message = new XElement(Namespaces.Table + name, new XAttribute(Namespaces.Table + "display", display ? "true" : "false"));
         if (title is { Length: > 0 }) message.Add(new XAttribute(Namespaces.Table + "title", title));
-        if (text is { Length: > 0 })
-            foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
-                message.Add(new XElement(Namespaces.Text + "p", line));
+        if (text is { Length: > 0 }) message.Add(_paragraphs.Paragraphs(text));
         return message;
     }
 
     private string? MessageText(XElement? message)
     {
-        var lines = message?.Elements(Namespaces.Text + "p").Select(paragraph => paragraph.Value).ToList();
+        var lines = message?.Elements(Namespaces.Text + "p").Select(_paragraphs.Line).ToList();
         return lines is null || lines.Count == 0 ? null : string.Join('\n', lines);
     }
 

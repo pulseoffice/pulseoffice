@@ -9,6 +9,8 @@ namespace PulseOffice.Formats.Odf;
 
 internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IOdfParagraphText paragraphs) : OdfChartXml
 {
+    protected IOdfParagraphText Paragraphs => paragraphs;
+
     public ChartDefinition? Read(XElement chart, string id)
     {
         if (chart.Element(Chart + "plot-area") is not { } plot) return null;
@@ -233,7 +235,7 @@ internal sealed class InlineChartDocumentReader(OdfChartVocabulary vocabulary, I
         if (table is null) return new ChartData([], []);
 
         var names = table.Element(Table + "table-header-rows")?.Element(Table + "table-row")
-            ?.Elements(Table + "table-cell").Skip(1).Select(cell => cell.Value).ToList() ?? [];
+            ?.Elements(Table + "table-cell").Skip(1).Select(Paragraphs.Read).ToList() ?? [];
         var categories = new List<string>();
         var values = new List<List<double>>();
 
@@ -243,7 +245,7 @@ internal sealed class InlineChartDocumentReader(OdfChartVocabulary vocabulary, I
             if (cells.Count == 0) continue;
             if ((long)(categories.Count + 1) * Math.Max(values.Count, cells.Count - 1) > MostValues) break;
 
-            categories.Add(cells[0].Value);
+            categories.Add(Paragraphs.Read(cells[0]));
             for (var index = 1; index < cells.Count; index++)
             {
                 while (values.Count < index) values.Add([.. Enumerable.Repeat(double.NaN, categories.Count - 1)]);

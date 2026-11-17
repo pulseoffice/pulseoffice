@@ -43,9 +43,6 @@ internal sealed class OdfFontworkGeometry
     public FontworkWarp WarpOf(XElement node) =>
         _warps.FromOdf((string?)node.Element(Namespaces.Draw + "enhanced-geometry")?.Attribute(Namespaces.Draw + "type"));
 
-    public string TextOf(XElement node) =>
-        string.Join(" ", node.Elements(Namespaces.Text + "p").Select(paragraph => paragraph.Value));
-
     private string Path(FontworkWarp warp)
     {
         var points = Enumerable.Range(0, 41).Select(step => _path.At(warp, step / 40.0))
