@@ -53,6 +53,11 @@ public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooter
             .ToList();
         _summary = new TextBlock { FontSize = metrics.FontSize, TextWrapping = Avalonia.Media.TextWrapping.Wrap }
             .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
+        Avalonia.Automation.AutomationProperties.SetLiveSetting(_summary, Avalonia.Automation.AutomationLiveSetting.Polite);
+        _summary.PropertyChanged += (_, change) =>
+        {
+            if (change.Property == TextBlock.TextProperty) Avalonia.Automation.AutomationProperties.SetName(_summary, _summary.Text ?? string.Empty);
+        };
 
         var options = new StackPanel { Spacing = metrics.SpacingSmall / 2 };
         foreach (var (_, box) in _options) options.Children.Add(box);
@@ -66,7 +71,7 @@ public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooter
 
         var footer = new DialogFooter(InterfaceDensity.Compact)
             .WithCancel(texts["find.close"], () => Completed?.Invoke(this, null));
-        if (target.SupportsFindNext) footer.WithAction(texts["find.next"], FindNext);
+        if (target.SupportsFindNext) footer.WithAction(texts["find.next"], FindNext, primary: true);
         footer.WithAction(texts["find.replaceAll"], ReplaceAll, out var replaceAll, primary: !target.SupportsFindNext);
         replaceAll.IsEnabled = !target.IsReadOnly;
         Footer = footer;
@@ -79,6 +84,8 @@ public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooter
     public event EventHandler<object?>? Completed;
 
     public Control? Footer { get; }
+
+    public string Summary => _summary.Text ?? string.Empty;
 
     private FindRequest Request() => new(
         _query.Text ?? string.Empty,

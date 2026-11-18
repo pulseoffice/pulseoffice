@@ -44,6 +44,21 @@ public sealed record SpillReferenceNode(string? SheetName, CellAddress Anchor) :
     public override TResult Accept<TResult>(IFormulaNodeVisitor<TResult> visitor) => visitor.VisitSpillReference(this);
 }
 
+[Flags]
+public enum TableArea
+{
+    Data = 1,
+    Headers = 2,
+    Totals = 4,
+    ThisRow = 8,
+    All = Headers | Data | Totals,
+}
+
+public sealed record TableReferenceNode(string Table, TableArea Area, string? FirstColumn, string? LastColumn) : FormulaNode
+{
+    public override TResult Accept<TResult>(IFormulaNodeVisitor<TResult> visitor) => visitor.VisitTableReference(this);
+}
+
 public sealed record NameNode(string Name) : FormulaNode
 {
     public override TResult Accept<TResult>(IFormulaNodeVisitor<TResult> visitor) => visitor.VisitName(this);
@@ -100,6 +115,8 @@ public interface IFormulaNodeVisitor<out TResult>
 
     TResult VisitName(NameNode node);
 
+    TResult VisitTableReference(TableReferenceNode node);
+
     TResult VisitUnary(UnaryNode node);
 
     TResult VisitBinary(BinaryNode node);
@@ -124,6 +141,8 @@ public abstract class FormulaNodeVisitor<TResult> : IFormulaNodeVisitor<TResult>
     public virtual TResult VisitSpillReference(SpillReferenceNode node) => Otherwise(node);
 
     public virtual TResult VisitName(NameNode node) => Otherwise(node);
+
+    public virtual TResult VisitTableReference(TableReferenceNode node) => Otherwise(node);
 
     public virtual TResult VisitUnary(UnaryNode node) => Otherwise(node);
 

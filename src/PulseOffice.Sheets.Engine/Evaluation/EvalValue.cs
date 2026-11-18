@@ -109,6 +109,8 @@ public interface IEvaluationContext
 
     string? ResolveName(string name);
 
+    Parsing.FormulaNode? ResolveTableReference(Parsing.TableReferenceNode node) => null;
+
     bool SheetExists(string sheetName);
 
     string CurrentSheetName { get; }

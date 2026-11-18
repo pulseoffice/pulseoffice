@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
@@ -14,7 +16,7 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.UI.Controls;
 
-public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion
+public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion, IKeyTipSource
 {
     private const int FullRows = 3;
     private const int CompactRows = 2;
@@ -23,6 +25,10 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion
     private readonly RibbonItemFactory _factory;
     private readonly RibbonTabStrip _tabStrip;
     private readonly Border _body;
+    private readonly KeyTipAssigner _assigner = new();
+    private TopLevel? _top;
+    private bool _altAlone;
+    private bool _swallowText;
 
     public event EventHandler<RibbonInvocation>? CommandInvoked;
 
@@ -56,7 +62,9 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion
         layout.Children.Add(_tabStrip);
         layout.Children.Add(_body);
 
-        Content = layout;
+        var tipLayer = new Canvas();
+        KeyTips = new RibbonKeyTips(tipLayer, this, _assigner, _metrics);
+        Content = new Panel { Children = { layout, tipLayer } };
 
         BorderThickness = new Thickness(0, 0, 0, 1);
 
@@ -95,6 +103,126 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion
 
     private int Rows => _compact ? CompactRows : FullRows;
 
+    public RibbonKeyTips KeyTips { get; }
+
+    public Func<bool> KeyTipsBlocked { get; set; } = () => false;
+
+    public IReadOnlyList<KeyTipTarget> Tabs()
+    {
+        var targets = new List<KeyTipTarget>();
+        var tabs = _tabStrip.Tabs;
+        for (var index = 0; index < tabs.Count; index++)
+        {
+            if (_tabStrip.BoundsOf(index) is not { } bounds) continue;
+            var chosen = index;
+            targets.Add(new KeyTipTarget(tabs[index].Title, _tabStrip, bounds, () => _tabStrip.Choose(chosen), OpensLevel: true));
+        }
+        return targets;
+    }
+
+    public IReadOnlyList<KeyTipTarget> Commands()
+    {
+        UpdateLayout();
+        return _groups is null ? [] : [.. _groups.Groups.SelectMany(group => group.KeyTipTargets())];
+    }
+
+    private bool TipsBlocked() => !IsEffectivelyVisible || !IsEffectivelyEnabled || KeyTipsBlocked();
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _top = TopLevel.GetTopLevel(this);
+        if (_top is null) return;
+        _top.AddHandler(KeyDownEvent, OnTopKeyDown, RoutingStrategies.Tunnel, true);
+        _top.AddHandler(KeyUpEvent, OnTopKeyUp, RoutingStrategies.Tunnel, true);
+        _top.AddHandler(TextInputEvent, OnTopTextInput, RoutingStrategies.Tunnel, true);
+        _top.AddHandler(PointerPressedEvent, OnTopPointerPressed, RoutingStrategies.Tunnel, true);
+        if (_top is WindowBase window) window.Deactivated += OnTopDeactivated;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        KeyTips.Close();
+        if (_top is null) return;
+        _top.RemoveHandler(KeyDownEvent, OnTopKeyDown);
+        _top.RemoveHandler(KeyUpEvent, OnTopKeyUp);
+        _top.RemoveHandler(TextInputEvent, OnTopTextInput);
+        _top.RemoveHandler(PointerPressedEvent, OnTopPointerPressed);
+        if (_top is WindowBase window) window.Deactivated -= OnTopDeactivated;
+        _top = null;
+    }
+
+    private void OnTopKeyDown(object? sender, KeyEventArgs e)
+    {
+        _swallowText = false;
+        if (TipsBlocked())
+        {
+            _altAlone = false;
+            KeyTips.Close();
+            return;
+        }
+        if (e.Key is Key.LeftAlt or Key.RightAlt)
+        {
+            _altAlone = (e.KeyModifiers & ~KeyModifiers.Alt) == KeyModifiers.None;
+            return;
+        }
+        _altAlone = false;
+        if (e.Key == Key.F10 && e.KeyModifiers == KeyModifiers.None)
+        {
+            KeyTips.Toggle();
+            e.Handled = true;
+            return;
+        }
+        if (KeyTips.Level == KeyTipLevel.Hidden
+            || e.Key is Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl or Key.LWin or Key.RWin) return;
+        if (e.Key == Key.Escape)
+        {
+            KeyTips.StepBack();
+            e.Handled = true;
+            return;
+        }
+        if (e.KeyModifiers is KeyModifiers.None or KeyModifiers.Shift && KeyTips.Type(Symbol(e)))
+        {
+            e.Handled = true;
+            _swallowText = true;
+            return;
+        }
+        KeyTips.Close();
+    }
+
+    private string? Symbol(KeyEventArgs e)
+    {
+        if (_assigner.Typed(e.KeySymbol) is not null) return e.KeySymbol;
+        return e.Key switch
+        {
+            >= Key.A and <= Key.Z => ((char)('A' + (e.Key - Key.A))).ToString(),
+            >= Key.D0 and <= Key.D9 => ((char)('0' + (e.Key - Key.D0))).ToString(),
+            >= Key.NumPad0 and <= Key.NumPad9 => ((char)('0' + (e.Key - Key.NumPad0))).ToString(),
+            _ => null,
+        };
+    }
+
+    private void OnTopKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.LeftAlt or Key.RightAlt) || !_altAlone) return;
+        _altAlone = false;
+        if (TipsBlocked()) return;
+        KeyTips.Toggle();
+        e.Handled = true;
+    }
+
+    private void OnTopTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (!_swallowText && KeyTips.Level == KeyTipLevel.Hidden) return;
+        _swallowText = false;
+        e.Handled = true;
+    }
+
+    private void OnTopPointerPressed(object? sender, PointerPressedEventArgs e) => KeyTips.Close();
+
+    private void OnTopDeactivated(object? sender, EventArgs e) => KeyTips.Close();
+
     public bool FocusTabs() => _tabStrip.FocusFromKeyboard();
 
     public bool Compact
@@ -132,6 +260,7 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion
 
         _signature = signature;
         _module = model.Module;
+        KeyTips.Close();
 
         IsVisible = !model.IsEmpty;
 

@@ -247,7 +247,7 @@ internal sealed class OdfDatabaseRangeMapper
         if (buttons)
         {
             sheet.AutoFilter.Activate(range, header);
-            sheet.AutoFilter.Remember(_sorts.Read(element.Element(Namespaces.Table + "sort"), range) is { LeftToRight: false } downward ? downward : null);
+            sheet.AutoFilter.Remember(_sorts.Read(element.Element(Namespaces.Table + "sort"), range));
         }
         else if (_sorts.Read(element.Element(Namespaces.Table + "sort"), range) is { } plain)
             sheet.RangeSort = new SheetRangeSort(range, header, plain);

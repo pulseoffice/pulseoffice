@@ -31,6 +31,7 @@ internal sealed class Parser
     private readonly IFunctionNameVocabulary? _vocabulary;
     private readonly string _language;
     private readonly FormulaPunctuation _punctuation;
+    private readonly TableReferenceSyntax _tableReferences = new();
     private int _index;
     private int _depth;
 
@@ -212,6 +213,10 @@ internal sealed class Parser
                     var (sheet, address, absoluteColumn, absoluteRow) = DecodeReference(token);
                     return new SpillReferenceNode(sheet, address) { AbsoluteColumn = absoluteColumn, AbsoluteRow = absoluteRow };
                 }
+
+            case TokenKind.TableReference:
+                Advance();
+                return _tableReferences.Parse(token.Text, token.Position);
 
             case TokenKind.Identifier:
                 Advance();

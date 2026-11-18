@@ -115,7 +115,7 @@ internal sealed class XlsxAutoFilterCodec
             else if (column.GetFirstChild<Top10>() is { } top)
                 filter = filter with { Top = new TopItemsCriterion(top.Top?.Value == false, top.Percent?.Value == true, top.Val?.Value is { } count && double.IsFinite(count) ? Math.Clamp(count, 0, 1048576) : 10) };
             else if (column.GetFirstChild<DynamicFilter>() is { } dynamic)
-                filter = _dynamic.Apply(filter, dynamic);
+                filter = _dynamic.Apply(filter, dynamic, sheet, range);
             else if (column.GetFirstChild<CustomFilters>() is { } customs)
             {
                 var conditions = new List<string>();

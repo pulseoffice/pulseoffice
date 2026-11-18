@@ -6,6 +6,8 @@ namespace PulseOffice.Documents.Editing;
 public interface IPageTextWidth
 {
     int At(TextDocument document, string paragraphId);
+
+    int PageAt(TextDocument document, string paragraphId);
 }
 
 public sealed class PageTextWidth : IPageTextWidth
@@ -14,13 +16,24 @@ public sealed class PageTextWidth : IPageTextWidth
 
     public int At(TextDocument document, string paragraphId)
     {
+        var cursor = Locate(document, paragraphId);
+        return Page(document, cursor) is { } page ? Column(Text(page), cursor.Columns ?? page.Columns) : DefaultTextWidth;
+    }
+
+    public int PageAt(TextDocument document, string paragraphId) =>
+        Page(document, Locate(document, paragraphId)) is { } page ? Text(page) : DefaultTextWidth;
+
+    private Cursor Locate(TextDocument document, string paragraphId)
+    {
         var cursor = new Cursor(document.InitialPageStyle);
         Walk(document.Body.Blocks, paragraphId, cursor, null);
-        var page = document.Styles.Page.Find(cursor.Style) ?? document.Styles.Page.Find(document.InitialPageStyle);
-        if (page is null) return DefaultTextWidth;
-        var text = Math.Max(0, page.Width.Value - page.BoundMargins.Left.Value - page.Margins.Right.Value);
-        return Column(text, cursor.Columns ?? page.Columns);
+        return cursor;
     }
+
+    private PageStyle? Page(TextDocument document, Cursor cursor) =>
+        document.Styles.Page.Find(cursor.Style) ?? document.Styles.Page.Find(document.InitialPageStyle);
+
+    private int Text(PageStyle page) => Math.Max(0, page.Width.Value - page.BoundMargins.Left.Value - page.Margins.Right.Value);
 
     private void Walk(IEnumerable<Block> blocks, string paragraphId, Cursor cursor, SectionColumns? columns)
     {

@@ -18,6 +18,9 @@ internal sealed class XlsxTablePlan(IReadOnlyDictionary<int, IReadOnlyList<Plann
     public IReadOnlyList<PlannedTable> For(int sheetIndex) => bySheet.TryGetValue(sheetIndex, out var tables) ? tables : [];
 
     public bool CarriesSheetFilter(int sheetIndex) => For(sheetIndex).Any(table => table.CarriesSheetFilter);
+
+    public bool Writes(string name) =>
+        bySheet.Values.Any(tables => tables.Any(table => string.Equals(table.Range.Name, name, StringComparison.OrdinalIgnoreCase)));
 }
 
 internal sealed partial class XlsxTablePlanner

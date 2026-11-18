@@ -15,6 +15,8 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
     private const char CanonicalArrayRow = '|';
     private const string ParameterPrefix = "_xlpm.";
 
+    private readonly Parsing.TableReferenceSyntax _tableReferences = new();
+
     public string ToLocal(string canonical, FormulaPunctuation local, Func<string, string> functionName, Func<string, string> bareName)
     {
         ArgumentNullException.ThrowIfNull(canonical);
@@ -76,6 +78,13 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
                 var end = index + 1;
                 while (end < text.Length && (IsNamePart(text[end]) || text[end] == '.')) end++;
                 var name = text[index..end];
+                if (end < text.Length && text[end] == '[')
+                {
+                    var close = _tableReferences.End(text, end);
+                    builder.Append(text, index, close - index);
+                    index = close;
+                    continue;
+                }
                 builder.Append(end < text.Length && text[end] == '(' ? functionName(name.ToUpperInvariant()) : otherName(name));
                 index = end;
                 continue;

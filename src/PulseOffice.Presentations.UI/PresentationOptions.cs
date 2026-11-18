@@ -18,6 +18,8 @@ public sealed record PresentationOptions(int StartIndex = 0, bool Loop = false, 
 
     public string EndOfShowText { get; init; } = string.Empty;
 
+    public PulseOffice.Localization.ITextCatalog? Texts { get; init; }
+
     public PulseOffice.Document.Forms.IFormControlInteraction? Forms { get; init; }
 
     public Action<Slide, SlideElement>? ControlChanged { get; init; }

@@ -10,7 +10,7 @@ namespace PulseOffice.Documents.UI.Commands;
 
 public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEditing sections, IFolioForms forms, ITextCatalog texts,
     PulseOffice.Documents.Protection.IProtectionKeys keys, PulseOffice.UI.Controls.Services.IStatusBarService status,
-    IColumnLayoutEditors columns, ITabbedForms tabbed, IFolioColumnLayouts layouts) : FolioCommandSet(context)
+    IColumnLayoutEditors columns, ITabbedForms tabbed, IFolioColumnLayouts layouts, IPageTextWidth pages) : FolioCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -23,14 +23,20 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         },
     ];
 
-    private IReadOnlyList<FormField> Fields(SectionSettings settings, string prefix = "")
+    private double TextWidth(TextDocument document, string paragraphId) =>
+        Math.Max(1, new Twip(pages.PageAt(document, paragraphId)).ToCentimeters());
+
+    private string Lead(SectionBlock section, string fallback) =>
+        section.Content.Blocks.FirstOrDefault(block => block is ParagraphBlock) is ParagraphBlock paragraph ? paragraph.Id : fallback;
+
+    private IReadOnlyList<FormField> Fields(SectionSettings settings, double textWidth, string prefix = "")
     {
         var columnsTitle = texts["folio.page.tab.columns"];
         var protection = texts["folio.section.group.protection"];
         return
         [
             new TextField(prefix + "name", texts["folio.section.name"], settings.Name),
-            new ColumnLayoutField(prefix + "columnLayout", columnsTitle, layouts.Layout(settings.Columns, 17), "cm", columns)
+            new ColumnLayoutField(prefix + "columnLayout", columnsTitle, layouts.Layout(settings.Columns, textWidth), "cm", columns)
             {
                 Section = columnsTitle,
             },
@@ -62,7 +68,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         if (Editor is not { } editor) return;
         var name = texts.Format("folio.section.default", sections.Sections(editor.Document).Count + 1);
         var initial = new SectionSettings(name, new SectionColumns(2, Twip.FromCentimeters(1.25)), false, false);
-        if (await forms.AskAsync("command.folio.insert.section.title", "folio.section.explanation", Fields(initial), ct).ConfigureAwait(true) is not { } values) return;
+        if (await forms.AskAsync("command.folio.insert.section.title", "folio.section.explanation", Fields(initial, TextWidth(editor.Document, editor.Caret.ParagraphId)), ct).ConfigureAwait(true) is not { } values) return;
         var settings = Read(values, name);
         editor.Change(() => sections.Wrap(editor.Document, editor.History, editor.ParagraphRange(), settings));
     }
@@ -80,7 +86,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
             var fields = new List<FormField>();
             if (section.ProtectionKey is not null)
                 fields.Add(new TextField(prefix + "unlock", texts["folio.section.unlockField"], string.Empty) { Secret = true, Section = texts["folio.section.group.unlock"] });
-            fields.AddRange(Fields(new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden), prefix));
+            fields.AddRange(Fields(new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden), TextWidth(editor.Document, Lead(section, editor.Caret.ParagraphId)), prefix));
             fields.Add(new CheckField(prefix + "remove", texts["folio.section.remove"], false) { Section = texts["folio.section.group.protection"] });
             return new FormTab(section.Name, texts["folio.section.explanation"], fields);
         }).ToList();

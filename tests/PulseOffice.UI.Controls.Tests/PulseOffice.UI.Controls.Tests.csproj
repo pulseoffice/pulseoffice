@@ -20,5 +20,6 @@
 
   <ItemGroup>
     <Compile Include="../Shared/UiThreadSession.cs" Link="Shared/UiThreadSession.cs" />
+    <Compile Include="../Shared/DialogKeyboardWalk.cs" Link="Shared/DialogKeyboardWalk.cs" />
   </ItemGroup>
 </Project>

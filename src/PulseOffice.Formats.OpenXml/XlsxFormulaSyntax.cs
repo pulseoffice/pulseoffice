@@ -10,6 +10,8 @@ public sealed class XlsxFormulaSyntax : FormulaDialect
 
     protected override FunctionNameTable? Functions => _functions;
 
+    protected override bool KeepsTableReferences => true;
+
     private const string Name = @"'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_]*";
     private const string Cell = @"\$?[A-Z]{1,3}\$?[0-9]{1,7}";
     private const string Whole = @"\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![0-9])|\$?[0-9]{1,7}:\$?[0-9]{1,7}";

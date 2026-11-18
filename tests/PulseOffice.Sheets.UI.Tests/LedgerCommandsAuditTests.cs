@@ -613,7 +613,7 @@ public class LedgerCommandsAuditTests
         var commands = new LedgerDataCommands(context, Fake<Engine.Operations.ISheetOutline>(), new Engine.Operations.DuplicateRemover(new PulseOffice.Sheets.Addressing.SelectionWorkArea()),
             new Engine.Operations.SheetCellShift(structure), Fake<PulseOffice.UI.Controls.Services.IStatusBarService>(),
             new Engine.Operations.WorkbookCheckpoints(snapshots),
-            new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English));
+            new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English), new Round206FixedDuplicatePrompt());
 
         await commands.GetCommands().Single(c => c.Id == "ledger.data.removeDuplicates").Execute(null!, CancellationToken.None);
 

@@ -140,6 +140,11 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
             if (_surfaces.FindCommand(commandId) is { } command) _surfaces.Execute(command, _context);
         };
         _ribbon = new RibbonView(ribbonServices);
+        _ribbon.KeyTipsBlocked = () => _interfaceLock.IsLocked || _dialogHost.IsDialogOpen;
+        _ribbon.KeyTips.Opened += (_, _) =>
+        {
+            foreach (var menu in _titleBar.MenuHost.Children.OfType<Menu>()) menu.Close();
+        };
         _ribbon.CommandInvoked += (_, invocation) =>
         {
             if (_workspace.Active is { } active) FocusShownDocument(active);

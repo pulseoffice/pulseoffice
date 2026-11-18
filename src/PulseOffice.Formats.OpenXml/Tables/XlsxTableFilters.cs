@@ -45,13 +45,13 @@ internal sealed class XlsxTableFilters(XlsxAutoFilterCodec codec)
 
     private void RememberSort(Sheet sheet, SortState? state)
     {
-        if (sheet.AutoFilter.Range is { } range && sheet.AutoFilter.Sort is null) sheet.AutoFilter.Remember(Downward(_sorts.Read(state, range)));
+        if (sheet.AutoFilter.Range is { } range && sheet.AutoFilter.Sort is null) sheet.AutoFilter.Remember(_sorts.Read(state, range));
     }
 
     private void ReadSheetSort(Sheet sheet, SortState? state)
     {
         if (state is null) return;
-        if (sheet.AutoFilter.Range is { } filtered && sheet.AutoFilter.Sort is null && state.ColumnSort?.Value != true
+        if (sheet.AutoFilter.Range is { } filtered && sheet.AutoFilter.Sort is null
             && _sorts.Area(state) is { } area && filtered.Contains(area.Start) && filtered.Contains(area.End))
         {
             RememberSort(sheet, state);

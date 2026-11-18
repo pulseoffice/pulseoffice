@@ -35,12 +35,26 @@ public sealed class DialogHost : ContentControl, IDialogService, PulseOffice.UI.
 
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && RunsDefaultFromChoice(e.Source))
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key != Key.Escape || _dialogs.Count == 0 || _collapsed is not null) return;
         if (!_dialogs[^1].Options.CanCancelWithEscape) return;
         if (HasOpenDropDown(e.Source)) return;
 
         Close(null);
         e.Handled = true;
+    }
+
+    private bool RunsDefaultFromChoice(object? source)
+    {
+        if (source is not (CheckBox or RadioButton) || _dialogs.Count == 0 || _collapsed is not null) return false;
+        if (_dialogs[^1].Frame is not { } frame) return false;
+        if (Reachable(frame).OfType<Button>().FirstOrDefault(button => button.IsDefault) is not { } primary) return false;
+        primary.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        return true;
     }
 
     public bool IsDialogOpen => _dialogs.Count > 0;

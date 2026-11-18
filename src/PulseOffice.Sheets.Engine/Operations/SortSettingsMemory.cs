@@ -73,8 +73,9 @@ public sealed class SortSettingsMemory : ISortSettingsMemory
         ? range.ColumnCount > 1 ? new CellRange(new CellAddress(range.Start.Row, range.Start.Column + 1), range.End) : null
         : range.RowCount > 1 ? new CellRange(new CellAddress(range.Start.Row + 1, range.Start.Column), range.End) : null;
 
-    private SortSettings? Within(SortSettings stored, CellRange owner, CellRange range) =>
-        stored.Moved(field => owner.Start.Column + field - range.Start.Column is var offset && offset >= 0 && offset < range.ColumnCount ? offset : null);
+    private SortSettings? Within(SortSettings stored, CellRange owner, CellRange range) => stored.LeftToRight
+        ? stored.Moved(field => owner.Start.Row + field - range.Start.Row is var offset && offset >= 0 && offset < range.RowCount ? offset : null)
+        : stored.Moved(field => owner.Start.Column + field - range.Start.Column is var offset && offset >= 0 && offset < range.ColumnCount ? offset : null);
 
     private bool SameBlock(CellRange owner, CellRange sorted) =>
         owner.Start.Column <= sorted.Start.Column && owner.End.Column >= sorted.End.Column

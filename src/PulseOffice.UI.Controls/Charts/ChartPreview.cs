@@ -24,6 +24,8 @@ public sealed class ChartPreview(ChartRenderer renderer, System.Globalization.Cu
 
     public IBrush Paper => _brushes.Find(this, Palette.Keys.Page, Brushes.White);
 
+    public ChartInk Ink => new(_brushes.Find(this, Palette.Keys.PageInk, Brushes.Black), Paper);
+
     public void Show(ChartDefinition definition, ChartData data)
     {
         _definition = definition ?? throw new ArgumentNullException(nameof(definition));
@@ -38,6 +40,6 @@ public sealed class ChartPreview(ChartRenderer renderer, System.Globalization.Cu
         var area = new Rect(Bounds.Size);
         context.FillRectangle(Paper, area);
         using (context.PushClip(area))
-            renderer.Render(context, _definition, _data, area, mode, culture);
+            renderer.Render(context, _definition, _data, area, mode, culture, Ink);
     }
 }

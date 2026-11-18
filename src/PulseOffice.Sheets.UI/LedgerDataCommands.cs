@@ -15,7 +15,8 @@ public sealed class LedgerDataCommands(
     ISheetCellShift shifts,
     IStatusBarService status,
     IWorkbookCheckpoints checkpoints,
-    ITextCatalog texts) : LedgerCommandSet(context)
+    ITextCatalog texts,
+    DataDialogs.IDuplicateRemovalPrompt duplicatePrompt) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -85,15 +86,11 @@ public sealed class LedgerDataCommands(
             ForbiddenState = DocumentState.ReadOnly,
             RequiredSelection = SelectionKind.CellRange,
             EnabledWhen = _ => Context.HasTarget,
-            Execute = (_, _) =>
-            {
-                RemoveDuplicates();
-                return Task.CompletedTask;
-            },
+            Execute = (_, ct) => RemoveDuplicatesAsync(ct),
         },
     ];
 
-    private void RemoveDuplicates()
+    private async Task RemoveDuplicatesAsync(CancellationToken ct)
     {
         if (Context.Workbook is not { } workbook) return;
         if (Context.Engine is not { } engine) return;
@@ -102,7 +99,7 @@ public sealed class LedgerDataCommands(
         var sheet = workbook.Sheets[sheetIndex];
         if (sheet.Protection.IsEnabled && !sheet.Protection.AllowDeleteRows)
         {
-            status.Report(texts["status.protection.format"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            status.Report(texts["status.protection.deleteRows"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
             return;
         }
         if (BoundedToUsed(sheet, Context.Selection) is not { } area)
@@ -111,7 +108,16 @@ public sealed class LedgerDataCommands(
             return;
         }
 
-        var plan = duplicates.Plan(sheet, new DuplicateRemovalRequest(area, HasHeader: false));
+        if (await duplicatePrompt.AskAsync(sheet, area, ct).ConfigureAwait(true) is not { } choice) return;
+        if (choice.KeyColumns.Count == 0)
+        {
+            status.Report(texts["status.duplicates.noColumns"], NotificationSeverity.Warning);
+            return;
+        }
+        if (!ReferenceEquals(Context.Workbook, workbook) || !ReferenceEquals(Context.Engine, engine) || Context.SheetIndex != sheetIndex)
+            return;
+
+        var plan = duplicates.Plan(sheet, new DuplicateRemovalRequest(area, choice.HasHeader) { KeyColumns = choice.KeyColumns });
 
         if (plan.RowsToRemove.Count == 0)
         {

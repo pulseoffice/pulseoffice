@@ -202,7 +202,7 @@ public sealed class DeckCommands(
 
         var renderer = new SlideRenderer(objectRenderer, texts);
         var window = new PresentationWindow(deck, scheduler, renderer,
-            new PresentationOptions(0) { Playlist = playlist, Rehearse = true });
+            new PresentationOptions(0) { Playlist = playlist, Rehearse = true, Texts = texts });
 
         IReadOnlyDictionary<string, int>? recorded = null;
         window.RehearsalFinished += (_, times) => recorded = times;
@@ -279,6 +279,7 @@ public sealed class DeckCommands(
                 PenColor = deck.Setup.PenColor,
                 MonitorIndex = _monitorIndex,
                 EndOfShowText = texts["deck.present.endOfShow"],
+                Texts = texts,
                 Forms = design.IsDesigning ? null : forms,
                 ControlChanged = (slide, element) =>
                 {

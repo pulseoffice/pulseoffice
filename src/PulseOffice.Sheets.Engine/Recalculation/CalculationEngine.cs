@@ -36,6 +36,16 @@ public sealed class CalculationEngine
 
     private readonly WholeColumnAggregates _aggregates;
 
+    private readonly TableReferenceResolution _tables = new();
+
+    private readonly FormulaDependencies _dependencies;
+
+    private readonly TableColumnFollower _columns;
+
+    public event EventHandler? Recalculated;
+
+    internal ITableReferenceResolution Tables => _tables;
+
     internal Evaluation.Functions.NumberToText NumberText => _evaluator.NumberText;
 
     internal Evaluation.Functions.NumericText TextNumbers => _evaluator.TextNumbers;
@@ -74,6 +84,10 @@ public sealed class CalculationEngine
         _functions = functions;
         _evaluator = evaluator;
         _aggregates = new WholeColumnAggregates(evaluator, ResolveSheet);
+        _dependencies = new FormulaDependencies(this, evaluator.Names, _tables);
+        _columns = new TableColumnFollower(_tables);
+        _columns.Reset(workbook);
+        _workbook.DatabaseRanges.Changed += OnTablesChanged;
         _workbook.CellContentChanged += OnExternalChange;
         _workbook.SheetCleared += _ => _aggregates.Clear();
         _workbook.NamesChanged += (_, _) => { if (_writing == 0 && _formulas.Count > 0) RecalculateAll(); };
@@ -88,6 +102,39 @@ public sealed class CalculationEngine
         if (_visibilitySensitive.Count == 0 && _volatile.Count == 0) return;
 
         RecalculateFrom([.. _visibilitySensitive]);
+    }
+
+    private void OnTablesChanged(object? sender, EventArgs e)
+    {
+        _columns.Reset(_workbook);
+        if (_writing > 0 || !AutomaticCalculation) return;
+        var readers = _tableReaders.Where(_formulas.ContainsKey).ToList();
+        if (readers.Count == 0) return;
+        foreach (var reader in readers) RegisterDependencies(reader, _formulas[reader]);
+        RecalculateFrom(readers);
+    }
+
+    private List<SheetCell> FollowColumnRenames(List<SheetCell> touched)
+    {
+        var renames = _columns.Follow(_workbook, touched);
+        if (renames.Count == 0) return touched;
+        foreach (var reader in _tableReaders.Where(_formulas.ContainsKey).ToList())
+        {
+            if (SheetAt(reader.SheetIndex) is not { } sheet || sheet[reader.Address].Formula is not { } formula) continue;
+            var renamer = new Operations.TableReferenceRenamer(renames);
+            if (renamer.Rewrite(formula) is not { } rewritten || !renamer.Changed) continue;
+            sheet[reader.Address] = sheet[reader.Address] with { Formula = rewritten };
+            var ast = _parser.Parse(rewritten);
+            _formulas[reader] = ast;
+            RegisterDependencies(reader, ast);
+            touched.Add(reader);
+        }
+        return touched;
+    }
+
+    private void Notify()
+    {
+        if (_writing == 0 && _batchDepth == 0) Recalculated?.Invoke(this, EventArgs.Empty);
     }
 
     private const int MaxSpillPasses = 8;
@@ -422,6 +469,7 @@ public sealed class CalculationEngine
         {
             _writing--;
         }
+        Notify();
     }
 
     private void SetFormulaCore(SheetCell cell, string formula)
@@ -460,6 +508,7 @@ public sealed class CalculationEngine
         {
             _writing--;
         }
+        Notify();
     }
 
     private void SetArrayFormulaCore(SheetCell anchor, CellRange area, string formula)
@@ -497,6 +546,7 @@ public sealed class CalculationEngine
         {
             _writing--;
         }
+        Notify();
     }
 
     private void SetValueCore(SheetCell cell, CellValue value)
@@ -549,6 +599,7 @@ public sealed class CalculationEngine
         {
             _writing--;
         }
+        Notify();
     }
 
     private void RecalculateAllCore()
@@ -567,6 +618,8 @@ public sealed class CalculationEngine
         _aggregates.Clear();
         _volatile.Clear();
         _visibilitySensitive.Clear();
+        _tableReaders.Clear();
+        _columns.Reset(_workbook);
         CollectLoadedSpills();
         _loadedSpills.UnionWith(previousSpills);
         for (var s = 0; s < _workbook.Sheets.Count; s++)
@@ -635,6 +688,7 @@ public sealed class CalculationEngine
         {
             _writing--;
         }
+        Notify();
     }
 
     private readonly List<SheetCell> _batched = [];
@@ -674,7 +728,8 @@ public sealed class CalculationEngine
             return;
         }
 
-        var touched = changed.ToList();
+        var touched = FollowColumnRenames(changed.ToList());
+
         _volatile.RemoveWhere(cell => !_formulas.ContainsKey(cell));
         var affected = _graph.TransitiveDependents([.. touched, .. _volatile]).ToHashSet();
         affected.UnionWith(_volatile);
@@ -928,108 +983,24 @@ public sealed class CalculationEngine
 
     private void RegisterDependencies(SheetCell cell, FormulaNode ast)
     {
-        var cells = new List<SheetCell>();
-        var ranges = new List<(int, CellRange)>();
-        Collect(ast, cell.SheetIndex, cells, ranges, cell);
-        _graph.SetPrecedents(cell, cells, ranges);
+        var collected = _dependencies.Collect(ast, cell);
+        Mark(_volatile, cell, collected.Volatile);
+        Mark(_visibilitySensitive, cell, collected.VisibilitySensitive);
+        Mark(_tableReaders, cell, collected.ReadsTables);
+        _graph.SetPrecedents(cell, collected.Cells, collected.Ranges);
     }
 
-    private static readonly HashSet<string> GeometryFunctions = new(StringComparer.OrdinalIgnoreCase)
+    private void Mark(HashSet<SheetCell> cells, SheetCell cell, bool member)
     {
-        "ROW", "COLUMN", "ROWS", "COLUMNS", "AREAS", "SHEET", "ISREF",
-    };
-
-    private static readonly HashSet<string> VolatileFunctions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "NOW", "TODAY", "RAND", "RANDBETWEEN", "INDIRECT", "OFFSET", "INFO", "CELL",
-    };
-
-    private static readonly HashSet<string> VisibilitySensitiveFunctions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "SUBTOTAL", "AGGREGATE",
-    };
+        if (member) cells.Add(cell);
+        else cells.Remove(cell);
+    }
 
     private readonly HashSet<SheetCell> _volatile = [];
 
     private readonly HashSet<SheetCell> _visibilitySensitive = [];
 
-    private void Collect(FormulaNode node, int defaultSheet, List<SheetCell> cells, List<(int, CellRange)> ranges, SheetCell owner)
-    {
-        var collector = new DependencyCollector(this, defaultSheet, cells, ranges, owner);
-        node.Accept(collector);
-        if (collector.Volatile) _volatile.Add(owner);
-        else _volatile.Remove(owner);
-        if (collector.VisibilitySensitive) _visibilitySensitive.Add(owner);
-        else _visibilitySensitive.Remove(owner);
-    }
-
-    private sealed class DependencyCollector(CalculationEngine engine, int defaultSheet, List<SheetCell> cells, List<(int, CellRange)> ranges, SheetCell owner)
-        : FormulaNodeVisitor<bool>
-    {
-        public override bool VisitReference(ReferenceNode node) => Cell(node.SheetName, node.Address);
-
-        public override bool VisitSpillReference(SpillReferenceNode node) => Cell(node.SheetName, node.Anchor);
-
-        public override bool VisitRange(RangeNode node)
-        {
-            if (node.SpansSheets)
-            {
-                foreach (var name in engine.SheetsBetween(node.SheetName!, node.LastSheetName!))
-                    ranges.Add((engine.ResolveSheet(name, defaultSheet), node.Range));
-                return true;
-            }
-            var sheet = engine.ResolveSheet(node.SheetName, defaultSheet);
-            if (sheet >= 0) ranges.Add((sheet, node.Range));
-            return true;
-        }
-
-        public override bool VisitUnary(UnaryNode node) => node.Operand.Accept(this);
-
-        public override bool VisitBinary(BinaryNode node) => node.Left.Accept(this) & node.Right.Accept(this);
-
-        public bool Volatile { get; private set; }
-
-        public bool VisibilitySensitive { get; private set; }
-
-        public override bool VisitFunction(FunctionNode node)
-        {
-            if (VolatileFunctions.Contains(node.Name)) Volatile = true;
-            if (VisibilitySensitiveFunctions.Contains(node.Name)) VisibilitySensitive = true;
-            if (GeometryFunctions.Contains(node.Name))
-                return All(node.Arguments.Where(argument => argument is not (ReferenceNode or RangeNode or SpillReferenceNode)));
-            return All(node.Arguments);
-        }
-
-        public override bool VisitArray(ArrayNode node) => All(node.Rows.SelectMany(row => row));
-
-        public override bool VisitInvocation(InvocationNode node) => node.Callee.Accept(this) & All(node.Arguments);
-
-        private readonly HashSet<string> _expanding = new(StringComparer.OrdinalIgnoreCase);
-
-        public override bool VisitName(NameNode node)
-        {
-            if (engine._workbook.ResolveName(node.Name, engine.SheetAt(defaultSheet)?.Name)?.Expression is not { } expression) return true;
-            if (!_expanding.Add(node.Name)) return true;
-            try { return engine._evaluator.Names.Expand(expression, owner.Address).Accept(this); }
-            catch (FormulaSyntaxException) { return true; }
-            finally { _expanding.Remove(node.Name); }
-        }
-
-        protected override bool Otherwise(FormulaNode node) => true;
-
-        private bool Cell(string? sheetName, CellAddress address)
-        {
-            var sheet = engine.ResolveSheet(sheetName, defaultSheet);
-            if (sheet >= 0) cells.Add(new SheetCell(sheet, address));
-            return true;
-        }
-
-        private bool All(IEnumerable<FormulaNode> nodes)
-        {
-            foreach (var node in nodes) node.Accept(this);
-            return true;
-        }
-    }
+    private readonly HashSet<SheetCell> _tableReaders = [];
 
     internal IReadOnlyList<string> SheetsBetween(string firstSheet, string lastSheet)
     {
@@ -1039,7 +1010,7 @@ public sealed class CalculationEngine
         return [.. Enumerable.Range(Math.Min(first, last), Math.Abs(last - first) + 1).Select(index => _workbook.Sheets[index].Name)];
     }
 
-    private int ResolveSheet(string? name, int current)
+    internal int ResolveSheet(string? name, int current)
     {
         if (name is null) return current;
         var sheet = _workbook.FindSheet(name);
@@ -1138,6 +1109,8 @@ internal sealed class WorkbookEvaluationContext(CalculationEngine engine, SheetC
         var range = database.Range;
         return $"'{sheet.Name.Replace("'", "''", StringComparison.Ordinal)}'.{range.Start.ToA1(true, true)}:{range.End.ToA1(true, true)}";
     }
+
+    public FormulaNode? ResolveTableReference(TableReferenceNode node) => engine.Tables.Reference(engine.Workbook, node, current);
 
     public bool SheetExists(string sheetName) => engine.Workbook.FindSheet(sheetName) is not null;
 

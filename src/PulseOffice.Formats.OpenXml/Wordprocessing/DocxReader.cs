@@ -280,7 +280,9 @@ public sealed class DocxReader : ITextDocumentReader
             }
 
             var name = index == 0 ? DefaultStyleNames.Standard : "Converted" + (++converted).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var numbering = document.LineNumbering;
             var style = _sections.Read(name, resolved, main, context, out var restart);
+            if (index > 0 && numbering is not null) document.LineNumbering = numbering;
             style.Background ??= background;
             var previous = current;
             current = style;
@@ -303,6 +305,8 @@ public sealed class DocxReader : ITextDocumentReader
                 continue;
             }
             var first = start;
+            if (index > 0 && _sections.LineNumberRestart(resolved) is { } sectionStart && document.LineNumbering is { } lines && !(lines.RestartEachSection && lines.Start == sectionStart))
+                RestartLines(document, first, end, sectionStart);
             if (first < document.Body.Count && document.Body[first] is TableBlock table && index > 0) table.PageStyleName = name;
             if (first >= document.Body.Count || document.Body[first] is not ParagraphBlock paragraph) continue;
             if (index == 0 && restart is null) continue;

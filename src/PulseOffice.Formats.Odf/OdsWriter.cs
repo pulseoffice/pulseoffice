@@ -583,7 +583,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 var merge = _currentSheet?.Merges.At(address);
 
                 var element = sheet.TryGetCell(address, out var cell)
-                    ? Cells.Write(cell with { StyleId = sheet.StyleIdAt(address) }, workbook)
+                    ? Cells.Write(cell with { StyleId = sheet.StyleIdAt(address) }, workbook, new SheetCell(workbook.IndexOf(sheet), address))
                     : new XElement(Namespaces.Table + "table-cell");
 
                 if (InheritsColumnStyle(sheet, address) && cell?.Hyperlink is not { Length: > 0 })

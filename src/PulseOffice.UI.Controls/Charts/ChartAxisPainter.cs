@@ -8,7 +8,7 @@ public sealed class ChartAxisPainter(ChartText text)
 {
     private const double LabelSize = 9;
     private const double MinorTickLength = 3;
-    private readonly IBrush _labels = Brushes.Gray;
+    private readonly IBrush _labels = text.Ink.Muted;
 
     public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid) =>
         Values(context, scale, plot, horizontal, grid, null);
@@ -171,10 +171,10 @@ public sealed class ChartAxisPainter(ChartText text)
         var beside = horizontal ? category : value;
 
         if (below is { Length: > 0 })
-            text.Centred(context, text.Layout(below, Brushes.Black, 10, bold: true), new Point(plot.Center.X, plot.Bottom + 28 + (horizontal ? 0 : groupLevels * GroupRowHeight)));
+            text.Centred(context, text.Layout(below, text.Ink.Text, 10, bold: true), new Point(plot.Center.X, plot.Bottom + 28 + (horizontal ? 0 : groupLevels * GroupRowHeight)));
 
         if (beside is not { Length: > 0 }) return;
-        var label = text.Layout(beside, Brushes.Black, 10, bold: true);
+        var label = text.Layout(beside, text.Ink.Text, 10, bold: true);
         var centre = new Point(plot.X - 44 - (horizontal ? groupLevels * GroupColumnWidth : 0), plot.Center.Y);
         using (context.PushTransform(Matrix.CreateTranslation(-centre.X, -centre.Y) * Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(centre.X, centre.Y)))
             text.Centred(context, label, centre);

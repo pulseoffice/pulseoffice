@@ -51,7 +51,7 @@ public sealed class Round204DocxFolioMinorQueueTests
     public void A_restart_word_cannot_express_is_declared()
     {
         var document = Document();
-        document.LineNumbering = new LineNumbering(1);
+        document.LineNumbering = new LineNumbering(1) { RestartEachPage = true };
         document.Body.Add(new ParagraphBlock(document.NextId("p"), new TextParagraph("due") { LineNumberRestart = 4 }));
 
         Assert.Contains(_composer.Writer(DocxFlavour.Document).CheckFidelity(document).Losses, loss => loss.Code == "DOCX248");

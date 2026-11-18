@@ -18,7 +18,7 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
         return styles.NameFor(styleId, style, null, code);
     }
 
-    public XElement Write(Cell cell, Workbook workbook)
+    public XElement Write(Cell cell, Workbook workbook, SheetCell at)
     {
         var element = new XElement(Namespaces.Table + "table-cell");
 
@@ -34,7 +34,11 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
         if (styles.NameFor(cell.StyleId, cellStyle, parent, code, styleLink, inferred, parentStyle) is { } styleName)
             element.Add(new XAttribute(Namespaces.Table + "style-name", styleName));
 
-        if (cell.HasFormula) element.Add(new XAttribute(Namespaces.Table + "formula", new OdfFormulaSyntax().ToOdf(cell.Formula!)));
+        if (cell.HasFormula)
+        {
+            var (formula, structured) = _tableFormulas.Write(cell.Formula!, workbook, at);
+            element.Add(new XAttribute(Namespaces.Table + "formula", new OdfFormulaSyntax().ToOdf(formula)), structured);
+        }
         if (cell.IsArrayAnchor && cell.ArrayFormulaRange is { } array)
             element.Add(
                 new XAttribute(Namespaces.Table + "number-matrix-columns-spanned", array.ColumnCount.ToString(CultureInfo.InvariantCulture)),
@@ -86,6 +90,7 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
 
     private readonly OdfLinkSyntax _links = new();
     private readonly OdfDynamicArrays _dynamicArrays = new();
+    private readonly OdfTableFormulas _tableFormulas = new();
     private readonly OdsNumberValueWriter _numbers = new();
 
     private XAttribute Type(string type) => new(Namespaces.Office + "value-type", type);

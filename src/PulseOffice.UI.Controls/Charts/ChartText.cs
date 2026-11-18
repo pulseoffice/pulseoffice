@@ -4,9 +4,20 @@ using Avalonia.Media;
 
 namespace PulseOffice.UI.Controls.Charts;
 
-public sealed class ChartText(CultureInfo culture)
+public sealed record ChartInk(IBrush Text, IBrush Paper)
+{
+    public static readonly ChartInk Print = new(Brushes.Black, Brushes.White);
+
+    public IBrush Muted => Text is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.5 * solid.Opacity) : Brushes.Gray;
+
+    public IBrush Backdrop => Paper is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.7 * solid.Opacity) : new SolidColorBrush(Colors.White, 0.7);
+}
+
+public sealed class ChartText(CultureInfo culture, ChartInk? ink = null)
 {
     public CultureInfo Culture => culture;
+
+    public ChartInk Ink { get; } = ink ?? ChartInk.Print;
 
     public FormattedText Layout(string text, IBrush brush, double size, bool bold = false) =>
         new(text, culture, FlowDirection.LeftToRight,

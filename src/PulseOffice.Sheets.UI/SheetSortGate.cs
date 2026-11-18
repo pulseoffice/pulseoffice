@@ -7,27 +7,41 @@ namespace PulseOffice.Sheets.UI;
 
 public interface ISheetSortGate
 {
-    bool Refuses(Workbook workbook, Worksheet sheet, CellRange range);
+    bool RefusesBeforeChoice(Workbook workbook, Worksheet sheet, CellRange range);
+
+    bool Refuses(Workbook workbook, Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom);
 }
 
 public sealed class SheetSortGate(ISheetEditGuard guard, IStatusBarService status, ITextCatalog texts, Engine.Operations.ISheetSort sorter) : ISheetSortGate
 {
-    public bool Refuses(Workbook workbook, Worksheet sheet, CellRange range)
+    public bool RefusesBeforeChoice(Workbook workbook, Worksheet sheet, CellRange range)
     {
         ArgumentNullException.ThrowIfNull(workbook);
         ArgumentNullException.ThrowIfNull(sheet);
-        if (sorter.Splits(sheet, range, hasHeader: false))
+        return RefusesProtected(workbook, sheet, range);
+    }
+
+    public bool Refuses(Workbook workbook, Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+        ArgumentNullException.ThrowIfNull(sheet);
+        if (sorter.Splits(sheet, range, hasHeader, orientation))
         {
             status.Report(texts["status.sort.arrays"], NotificationSeverity.Error);
             return true;
         }
 
-        if (sorter.BreaksMerges(sheet, range, hasHeader: true))
+        if (sorter.BreaksMerges(sheet, range, hasHeader, orientation))
         {
             status.Report(texts["status.sort.merged"], NotificationSeverity.Error);
             return true;
         }
 
+        return RefusesProtected(workbook, sheet, range);
+    }
+
+    private bool RefusesProtected(Workbook workbook, Worksheet sheet, CellRange range)
+    {
         if (!sheet.Protection.IsEnabled) return false;
 
         if (!sheet.Protection.AllowSort)

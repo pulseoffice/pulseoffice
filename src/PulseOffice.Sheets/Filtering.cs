@@ -49,7 +49,7 @@ public sealed class AutoFilterState
 
     public SortSettings? Sort { get; private set; }
 
-    public void Remember(SortSettings? sort) => Sort = Range is { } range && sort is not null && sort.FitsWithin(range.ColumnCount) ? sort : null;
+    public void Remember(SortSettings? sort) => Sort = Range is { } range && sort is not null && sort.FitsWithin(range) ? sort : null;
 
     public void Activate(CellRange range, bool hasHeader = true)
     {

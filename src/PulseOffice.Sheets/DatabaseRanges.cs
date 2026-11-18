@@ -41,19 +41,28 @@ public sealed class DatabaseRangeCollection
 
     public int Count => _ranges.Count;
 
+    public event EventHandler? Changed;
+
     public void Define(DatabaseRange range)
     {
         ArgumentNullException.ThrowIfNull(range);
 
         _ranges[range.Name] = range;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool Remove(string name) => _ranges.Remove(name);
+    public bool Remove(string name)
+    {
+        if (!_ranges.Remove(name)) return false;
+        Changed?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
 
     public void ReplaceAll(IEnumerable<DatabaseRange> ranges)
     {
         _ranges.Clear();
         foreach (var range in ranges) _ranges[range.Name] = range;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public IReadOnlyList<DatabaseRange> Reindex(Func<int, int> map)
@@ -69,6 +78,7 @@ public sealed class DatabaseRangeCollection
             }
             else _ranges[range.Name] = range with { SheetIndex = index, RangeFilter = range.RangeFilter?.Reindexed(map) };
         }
+        Changed?.Invoke(this, EventArgs.Empty);
         return detached;
     }
 

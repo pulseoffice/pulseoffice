@@ -151,6 +151,10 @@ internal sealed class XlsxWriteContext(Book workbook, XlsxStyleMapper styles, Xl
     public bool UsesDynamicArrays { get; set; }
     public XlsxTablePlan Tables => _tables ??= new XlsxTablePlanner().Plan(workbook);
     private XlsxTablePlan? _tables;
+    private readonly PulseOffice.Sheets.Engine.Operations.TableReferenceFlattening _tableReferences = new();
+
+    public string Formula(string formula, int sheetIndex, CellAddress address) =>
+        _tableReferences.Flatten(formula, workbook, new SheetCell(sheetIndex, address), Tables.Writes);
     private readonly XlsxLeapYearSerials _leapYear = new();
     private readonly XlsxCalendarCells _calendar = new(workbook);
 
@@ -304,6 +308,7 @@ internal sealed class SheetDataSection(XlsxDataTableWriter dataTables) : Workshe
     {
         var cells = new CellRowIndex(sheet.CellAddresses);
         var tables = dataTables.Plan(sheet);
+        var sheetIndex = context.Workbook.IndexOf(sheet);
         var rows = cells.Rows
             .Concat(sheet.Layout.RowHeights.Keys)
             .Concat(sheet.Layout.AutomaticRowHeights.Keys)
@@ -363,7 +368,7 @@ internal sealed class SheetDataSection(XlsxDataTableWriter dataTables) : Workshe
             {
                 var address = new CellAddress(index, column);
                 if (sheet.TryGetCell(address, out var cell))
-                    row.AppendChild(Cell(address, cell with { StyleId = sheet.StyleIdAt(address) }, context, tables));
+                    row.AppendChild(Cell(address, sheetIndex, cell with { StyleId = sheet.StyleIdAt(address) }, context, tables));
                 else
                     row.AppendChild(new XlsxCell { CellReference = address.ToA1(), StyleIndex = context.Styles.StyleIndexOf(sheet.StyleIdAt(address), context.Workbook) });
             }
@@ -381,7 +386,7 @@ internal sealed class SheetDataSection(XlsxDataTableWriter dataTables) : Workshe
         return stored.Concat(crossings.SelectMany(run => Enumerable.Range(run.First, run.Last - run.First + 1))).Distinct().Order();
     }
 
-    private XlsxCell Cell(CellAddress address, ModelCell source, XlsxWriteContext context, XlsxDataTablePlan tables)
+    private XlsxCell Cell(CellAddress address, int sheetIndex, ModelCell source, XlsxWriteContext context, XlsxDataTablePlan tables)
     {
         var workbook = context.Workbook;
         var style = workbook.Styles.Get(source.StyleId);
@@ -398,7 +403,7 @@ internal sealed class SheetDataSection(XlsxDataTableWriter dataTables) : Workshe
         }
         else if (source.HasFormula)
         {
-            cell.CellFormula = new CellFormula(new XlsxFormulaSyntax().ToOpenXml(source.Formula!));
+            cell.CellFormula = new CellFormula(new XlsxFormulaSyntax().ToOpenXml(context.Formula(source.Formula!, sheetIndex, address)));
             if (source.IsArrayAnchor && source.ArrayFormulaRange is { } array)
             {
                 cell.CellFormula.FormulaType = CellFormulaValues.Array;
@@ -485,8 +490,6 @@ internal sealed class XlsxReadContext(Book workbook, IReadOnlyList<string> strin
     public XlsxColumnMetrics Columns { get; } = new XlsxColumnMetricsFactory().For(stylesheet);
     public ConstantFormulas Constants { get; } = new();
     public XlsxTableCatalog Tables { get; } = new();
-    public StructuredReferenceResolver References => _references ??= new StructuredReferenceResolver(Tables);
-    private StructuredReferenceResolver? _references;
     public IReadOnlySet<uint> DynamicArrays { get; init; } = new HashSet<uint>();
 }
 
@@ -685,7 +688,7 @@ internal sealed class SheetDataReader(OoxmlAttributeSanitizer sanitizer) : IXlsx
             var styleIndex = (int)(cell.StyleIndex?.Value ?? 0);
             var value = context.Cells.ReadValue(cell, context.Strings);
             if (Crossing(row, cell, value, styleIndex, address, target, context)) continue;
-            var own = cell.CellFormula?.Text is { Length: > 0 } text ? new XlsxFormulaSyntax().ToInternal(context.References.Resolve(text, address, target.Name)) : null;
+            var own = cell.CellFormula?.Text is { Length: > 0 } text ? new XlsxFormulaSyntax().ToInternal(text) : null;
             var formula = state.Shared.Resolve(cell.CellFormula, address, own);
             state.DataTables.Collect(cell.CellFormula, address);
             target[address] = new ModelCell

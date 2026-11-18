@@ -137,6 +137,7 @@ internal static class LedgerToolsComposition
                 provider.GetRequiredService<PulseOffice.Localization.IDiagnosticTexts>()));
         services.AddSingleton<LedgerCommentCommands>();
         services.AddSingleton<LedgerAnalysisCommands>();
+        services.AddSingleton<PulseOffice.Sheets.UI.ICellOverwritePrompt, PulseOffice.Sheets.UI.CellOverwritePrompt>();
         services.AddSingleton<LedgerToolCommands>();
         services.AddSingleton<LedgerStyleCommands>();
         services.AddSingleton<ISheetSnapshots, SheetSnapshots>();

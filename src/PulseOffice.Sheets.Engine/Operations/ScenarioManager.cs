@@ -28,7 +28,7 @@ public sealed class ScenarioManager : IScenarioManager
         var values = new Dictionary<CellAddress, CellValue>();
         var formulas = new Dictionary<CellAddress, string>();
 
-        foreach (var address in range.Cells())
+        foreach (var address in Occupied(sheet, range)?.Cells() ?? [])
         {
             var cell = sheet[address];
             values[address] = cell.Value;
@@ -43,6 +43,13 @@ public sealed class ScenarioManager : IScenarioManager
             Values = values,
             Formulas = formulas,
         };
+    }
+
+    private CellRange? Occupied(Worksheet sheet, CellRange range)
+    {
+        var bottom = Math.Min(range.End.Row, sheet.LastUsedRow);
+        var right = Math.Min(range.End.Column, sheet.LastUsedColumn);
+        return bottom < range.Start.Row || right < range.Start.Column ? null : new CellRange(range.Start, new CellAddress(bottom, right));
     }
 
     public IReadOnlyDictionary<CellAddress, ScenarioCell> Apply(

@@ -58,10 +58,14 @@ public sealed class ChartRenderer
     public void Render(DrawingContext context, ChartDefinition definition, ChartData data, Rect bounds, System.Globalization.CultureInfo culture) =>
         Render(context, definition, data, bounds, ChartRenderMode.Full, culture);
 
-    public void Render(DrawingContext context, ChartDefinition definition, ChartData data, Rect bounds, ChartRenderMode mode, System.Globalization.CultureInfo culture)
+    public void Render(DrawingContext context, ChartDefinition definition, ChartData data, Rect bounds, ChartRenderMode mode, System.Globalization.CultureInfo culture) =>
+        Render(context, definition, data, bounds, mode, culture, ChartInk.Print);
+
+    public void Render(DrawingContext context, ChartDefinition definition, ChartData data, Rect bounds, ChartRenderMode mode, System.Globalization.CultureInfo culture, ChartInk ink)
     {
         ArgumentNullException.ThrowIfNull(culture);
-        var scene = new ChartScene(new ChartText(culture));
+        ArgumentNullException.ThrowIfNull(ink);
+        var scene = new ChartScene(new ChartText(culture, ink));
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(definition);
         definition = _inlineErrorValues.Refresh(definition);
@@ -91,7 +95,7 @@ public sealed class ChartRenderer
 
         if (data.IsEmpty)
         {
-            DrawEmpty(scene.Text, context, Brushes.Black, bounds);
+            DrawEmpty(scene.Text, context, scene.Text.Ink.Text, bounds);
             return;
         }
 
@@ -107,7 +111,7 @@ public sealed class ChartRenderer
         DrawTitle(scene.Text, context, definition, bounds);
         scene.Legend.Paint(context, definition.Legend, items, area, plot, bounds);
 
-        var frame = new Plots.ChartFrame(context, definition, data, plot, bounds, scene.Text.Culture);
+        var frame = new Plots.ChartFrame(context, definition, data, plot, bounds, scene.Text.Culture, scene.Text.Ink.Muted);
         var horizontal = painter.HorizontalAxis(definition.Type);
         double? categoryLine = null;
 
@@ -186,9 +190,9 @@ public sealed class ChartRenderer
         {
             var caption = LabelText(text, definition, data, label);
             if (caption.Length == 0) continue;
-            var layout = text.Layout(caption, Brushes.Black, 9);
+            var layout = text.Layout(caption, text.Ink.Text, 9);
             var origin = new Point(label.Anchor.X - layout.Width / 2, label.Anchor.Y - layout.Height - 2);
-            context.FillRectangle(new SolidColorBrush(Colors.White, 0.7), new Rect(origin, new Size(layout.Width, layout.Height)));
+            context.FillRectangle(text.Ink.Backdrop, new Rect(origin, new Size(layout.Width, layout.Height)));
             context.DrawText(layout, origin);
         }
     }
@@ -253,7 +257,7 @@ public sealed class ChartRenderer
     {
         if (definition.ChartTitle is not { Length: > 0 } title) return;
 
-        var text = chartText.Layout(title, Brushes.Black, 14, bold: true);
+        var text = chartText.Layout(title, chartText.Ink.Text, 14, bold: true);
         text.MaxTextWidth = Math.Max(bounds.Width - Padding * 2, 1);
         text.MaxLineCount = 1;
         text.Trimming = TextTrimming.CharacterEllipsis;

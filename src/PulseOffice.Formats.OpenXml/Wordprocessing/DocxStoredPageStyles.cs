@@ -39,7 +39,7 @@ public sealed class DocxStoredPageStyles(DocxSectionCodec sections, IDefaultStyl
         var root = new XElement(_ps + "pageStyles", new XAttribute(XNamespace.Xmlns + "ps", _ps));
         foreach (var style in stored)
         {
-            var section = sections.Write(style, null, false, true, main, context);
+            var section = sections.Write(style, null, false, true, null, main, context);
             var entry = new XElement(_ps + "pageStyle", new XAttribute("name", style.Name), XElement.Parse(section.OuterXml));
             if (style.Usage != PageUsage.All) entry.Add(new XAttribute("usage", style.Usage.ToString()));
             if (style.NextStyleName is { } next) entry.Add(new XAttribute("next", next));

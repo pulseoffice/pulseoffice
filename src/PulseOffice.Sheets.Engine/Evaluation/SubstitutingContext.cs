@@ -99,6 +99,8 @@ public sealed class SubstitutingContext : IEvaluationContext
 
     public string? ResolveName(string name) => _inner.ResolveName(name);
 
+    public Parsing.FormulaNode? ResolveTableReference(Parsing.TableReferenceNode node) => _inner.ResolveTableReference(node);
+
     public bool SheetExists(string sheetName) => _inner.SheetExists(sheetName);
 
     public string CurrentSheetName => _inner.CurrentSheetName;

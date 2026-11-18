@@ -57,6 +57,22 @@ public abstract class RibbonSlot : ContentControl
         }
     }
 
+    public KeyTipTarget KeyTip() => new(Item.Title, this, new Avalonia.Rect(Bounds.Size), ActivateFromKeyTip);
+
+    private void ActivateFromKeyTip()
+    {
+        if (Content is not Control root) return;
+        var controls = root.GetSelfAndLogicalDescendants().OfType<Control>().Where(control => control.IsEffectivelyEnabled).ToList();
+        if (controls.FirstOrDefault(control => control is TextBox or ComboBox or NumericUpDown) is { } field)
+        {
+            field.Focus(Avalonia.Input.NavigationMethod.Tab);
+            if (field is ComboBox combo) combo.IsDropDownOpen = true;
+            return;
+        }
+        if (controls.OfType<Button>().FirstOrDefault() is { } button)
+            button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+    }
+
     private bool Speaks(Control control) => control is Button or ToggleButton or ComboBox or TextBox or NumericUpDown;
 
     protected abstract Control Build();

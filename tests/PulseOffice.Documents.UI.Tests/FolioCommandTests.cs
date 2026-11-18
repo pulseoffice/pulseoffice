@@ -49,7 +49,7 @@ public sealed class FolioCommandTests
             .. new FolioObjectCommands(active, services.GetRequiredService<IFolioObjectEditing>(), services.GetRequiredService<IFolioObjectMover>(), null!, services.GetRequiredService<PulseOffice.Documents.Editing.ICaptions>(), services.GetRequiredService<PulseOffice.Documents.Objects.IFrameChains>(), services.GetRequiredService<IFolioObjectCycle>()).GetCommands(),
             .. new FolioListCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.IListEditing>(), null!, null!, null!).GetCommands(),
             .. new FolioStyleCommands(active, null!, null!, null!, null!, null!, null!, null!, null!).GetCommands(),
-            .. new FolioSectionCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.ISectionEditing>(), null!, null!, null!, null!, null!, null!, null!).GetCommands(),
+            .. new FolioSectionCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.ISectionEditing>(), null!, null!, null!, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioViewCommands(active, services.GetRequiredService<FolioViewCommandServices>()).GetCommands(),
             .. new FolioToolCommands(active, services.GetRequiredService<FolioToolServices>()).GetCommands(),
             .. new FolioClipboardCommands(active, services.GetRequiredService<PulseOffice.Exchange.IObjectExchange>(), services.GetRequiredService<PulseOffice.Documents.Editing.Tables.ITablePasting>(), null!).GetCommands(),

@@ -91,6 +91,12 @@ public abstract class FormulaPrinter : FormulaNodeVisitor<bool>
         return true;
     }
 
+    public override bool VisitTableReference(TableReferenceNode node)
+    {
+        Builder.Append(_tableReferences.Print(node));
+        return true;
+    }
+
     public override bool VisitUnary(UnaryNode node)
     {
         if (node.Operator == UnaryOperator.Percent)
@@ -150,6 +156,8 @@ public abstract class FormulaPrinter : FormulaNodeVisitor<bool>
     protected void Print(FormulaNode node) => node.Accept(this);
 
     private readonly SheetNameQuoting _quoting = new();
+
+    private readonly TableReferenceSyntax _tableReferences = new();
 
     protected void Sheet(string? sheet)
     {

@@ -46,7 +46,7 @@ public interface ISheetSort
         bool hasHeader = false, UndoStack? history = null, string historyLabel = "Sort",
         SortOrientation orientation = SortOrientation.TopToBottom);
 
-    bool Splits(Worksheet sheet, CellRange range, bool hasHeader);
+    bool Splits(Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom);
 
     bool BreaksMerges(Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom);
 }
@@ -154,7 +154,8 @@ public sealed class SheetSorter : ISheetSort
         }
     }
 
-    public bool Splits(Worksheet sheet, CellRange range, bool hasHeader) => Splits(sheet, range, hasHeader, new SortAxis(false));
+    public bool Splits(Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom) =>
+        Splits(sheet, range, hasHeader, new SortAxis(orientation == SortOrientation.LeftToRight));
 
     private bool Splits(Worksheet sheet, CellRange range, bool hasHeader, SortAxis axis)
     {

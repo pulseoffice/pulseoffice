@@ -28,6 +28,10 @@ public sealed class RibbonTabStrip : TabStrip<RibbonTab>
 
     protected override TabGeometry Geometry => new(SidePadding / 2, SidePadding, Gap, Metrics.FontSize + 1);
 
+    public IReadOnlyList<RibbonTab> Tabs => Items;
+
+    public void Choose(int index) => SelectAt(index);
+
     public void Replace(IReadOnlyList<RibbonTab> tabs) => Swap(tabs);
 
     public void Show(IReadOnlyList<RibbonTab> tabs, string? keepTitle)

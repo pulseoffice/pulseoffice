@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
@@ -60,6 +61,29 @@ public sealed class RibbonGroupView : ContentControl
             if (items.TryGetValue(slot.CommandId, out var item))
                 slot.Refresh(item);
     }
+
+    public IEnumerable<KeyTipTarget> KeyTipTargets()
+    {
+        if (Content is not Control view) yield break;
+        if (view is Button collapsed)
+        {
+            yield return Opener(collapsed);
+            yield break;
+        }
+        foreach (var visual in view.GetVisualDescendants())
+        {
+            if (visual is RibbonSlot slot)
+            {
+                if (slot.IsEffectivelyVisible && slot.IsEffectivelyEnabled) yield return slot.KeyTip();
+            }
+            else if (visual is Button more && more.IsEffectivelyVisible && more.FindAncestorOfType<RibbonSlot>() is null)
+                yield return Opener(more);
+        }
+    }
+
+    private KeyTipTarget Opener(Button button) =>
+        new(_group.Title, button, new Rect(button.Bounds.Size),
+            () => button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)));
 
     private void Show()
     {

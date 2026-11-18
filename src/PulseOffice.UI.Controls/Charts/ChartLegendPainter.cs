@@ -68,14 +68,14 @@ public sealed class ChartLegendPainter(ChartText text)
     private void PaintItem(DrawingContext context, ChartLegendItem item, Point origin, double maxWidth)
     {
         context.FillRectangle(new SolidColorBrush(item.Colour), new Rect(origin.X, origin.Y + 3, Swatch, Swatch));
-        var label = text.Layout(item.Name, Brushes.Black, FontSize);
+        var label = text.Layout(item.Name, text.Ink.Text, FontSize);
         label.MaxTextWidth = Math.Max(maxWidth, 1);
         label.MaxLineCount = 1;
         label.Trimming = TextTrimming.CharacterEllipsis;
         context.DrawText(label, new Point(origin.X + Swatch + Gap, origin.Y));
     }
 
-    private double Width(ChartLegendItem item) => Swatch + Gap + text.Layout(item.Name, Brushes.Black, FontSize).Width;
+    private double Width(ChartLegendItem item) => Swatch + Gap + text.Layout(item.Name, text.Ink.Text, FontSize).Width;
 
     private List<List<MeasuredItem>> Lines(IReadOnlyList<ChartLegendItem> items, double width)
     {

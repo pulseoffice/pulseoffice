@@ -10,6 +10,8 @@ public abstract class FormulaDialect
 
     protected virtual FunctionNameTable? Functions => null;
 
+    protected virtual bool KeepsTableReferences => false;
+
     private readonly LambdaParameterQualifier _parameters = new();
 
     public string FromInternal(string internalFormula)
@@ -44,8 +46,19 @@ public abstract class FormulaDialect
         var segment = new StringBuilder();
         var inQuotes = false;
 
-        foreach (var c in text)
+        for (var index = 0; index < text.Length; index++)
         {
+            var c = text[index];
+            if (!inQuotes && c == '[' && KeepsTableReferences && index > 0 && IsTableNamePart(text[index - 1]))
+            {
+                var end = TableReferenceEnd(text, index);
+                result.Append(transform(segment.ToString()));
+                segment.Clear();
+                result.Append(text, index, end - index);
+                index = end - 1;
+                continue;
+            }
+
             if (c == '"')
             {
                 if (!inQuotes)
@@ -64,5 +77,19 @@ public abstract class FormulaDialect
 
         if (segment.Length > 0) result.Append(transform(segment.ToString()));
         return result.ToString();
+    }
+
+    private bool IsTableNamePart(char c) => char.IsLetterOrDigit(c) || c is '_' or '.' or '\\';
+
+    private int TableReferenceEnd(string text, int open)
+    {
+        var depth = 0;
+        for (var index = open; index < text.Length; index++)
+        {
+            if (text[index] == '\'') { index++; continue; }
+            if (text[index] == '[') depth++;
+            else if (text[index] == ']' && --depth == 0) return index + 1;
+        }
+        return text.Length;
     }
 }

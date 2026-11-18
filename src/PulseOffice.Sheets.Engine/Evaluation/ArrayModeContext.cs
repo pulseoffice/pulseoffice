@@ -27,6 +27,8 @@ public sealed class ArrayModeContext(IEvaluationContext inner) : IEvaluationCont
 
     public string? ResolveName(string name) => inner.ResolveName(name);
 
+    public Parsing.FormulaNode? ResolveTableReference(Parsing.TableReferenceNode node) => inner.ResolveTableReference(node);
+
     public bool SheetExists(string sheetName) => inner.SheetExists(sheetName);
 
     public string CurrentSheetName => inner.CurrentSheetName;

@@ -154,7 +154,7 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
             .SelectMany(sort => sort?.Fields ?? [])
             .Count(field => field.CustomOrder?.Any(item => item.Contains(',', StringComparison.Ordinal)) == true);
         if (commaOrders > 0)
-            losses.Add(Diagnostic.Info("XLSX236", $"{commaOrders} remembered sort keys use a custom order with an item that contains a comma: Excel stores a custom order as one comma-separated list, so XLSX splits that item. The sorted cells are not affected. ODS keeps the order.").With(commaOrders));
+            losses.Add(Diagnostic.Info("XLSX236", $"{commaOrders} remembered sort keys use a custom order with an item that contains a comma: Excel stores a custom order as one comma-separated list, so other applications split that item. The sorted cells are not affected. PulseOffice reads the order back from an extension; ODS keeps it natively.").With(commaOrders));
 
         if (workbook.Consolidation is { Sources.Count: > 0 } consolidation && consolidation.Target != Sheets.Addressing.CellAddress.First)
             losses.Add(Diagnostic.Info("XLSX237", "The remembered consolidation settings name a destination cell: XLSX keeps the settings on the destination sheet but not the cell, so the dialog proposes the top-left cell when the file is opened again. ODS keeps it."));

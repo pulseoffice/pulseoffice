@@ -82,7 +82,7 @@ internal sealed class FiltersPart : StructurePart
         }
 
         var fields = Fields(edit, before, after);
-        state.Restore(new AutoFilterMemento(after, state.HasHeader, Columns(state.Filters, fields)) { Sort = state.Sort?.Moved(fields) });
+        state.Restore(new AutoFilterMemento(after, state.HasHeader, Columns(state.Filters, fields)) { Sort = state.Sort is { } sort ? sort.Moved(Fields(edit, before, after, sort.Orientation)) : null });
     }
 
     private IReadOnlyList<ColumnFilter> Columns(IReadOnlyList<ColumnFilter> filters, Func<int, int?> fields) =>

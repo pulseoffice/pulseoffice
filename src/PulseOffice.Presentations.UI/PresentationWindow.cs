@@ -81,6 +81,9 @@ public sealed class PresentationWindow : Window
     private readonly Action<Slide, SlideElement>? _controlChanged;
 
     private readonly ShowMediaStage _media;
+    private readonly ShowAnnouncer _announcer;
+
+    public string Announcement => _announcer.Message;
 
     public PresentationWindow(Presentation deck, IAnimationScheduler scheduler, ISlideRenderer renderer, PresentationOptions options)
     {
@@ -97,6 +100,7 @@ public sealed class PresentationWindow : Window
         _laser.Fill = _penBrush;
         _endMessage.Text = options.EndOfShowText;
         _curtain.Child = _endMessage;
+        _announcer = new ShowAnnouncer(options.Texts, options.EndOfShowText);
         _controller = new PresentationController([.. options.Playlist is { Count: > 0 } list ? list : deck.Slides], scheduler, options.StartIndex, ignoreSteps: _withoutAnimation);
 
         _front = NewCanvas();
@@ -108,7 +112,7 @@ public sealed class PresentationWindow : Window
         _stage = new Panel
         {
             Background = Brushes.Black,
-            Children = { _back, _front, _media.Layer, _curtain, _ink, new Canvas { IsHitTestVisible = false, ZIndex = 10, Children = { _laser } } },
+            Children = { _back, _front, _media.Layer, _curtain, _ink, _announcer.Region, new Canvas { IsHitTestVisible = false, ZIndex = 10, Children = { _laser } } },
         };
         _front.ZIndex = 1;
         _ink.ZIndex = 10;
@@ -189,6 +193,7 @@ public sealed class PresentationWindow : Window
             _media.Clear();
             _inkSlideIndex = _controller.SlideIndex;
             _media.StartAutomatic(_controller.Current);
+            _announcer.Slide(SlideNumber, SlideTotal);
         }
 
         if (_withoutAnimation)
@@ -225,6 +230,7 @@ public sealed class PresentationWindow : Window
         _curtain.IsVisible = _keypad.Screen != ShowCurtain.Slide;
         _curtain.Background = _keypad.Screen == ShowCurtain.White ? Brushes.White : Brushes.Black;
         _endMessage.IsVisible = _keypad.Screen == ShowCurtain.End && _endMessage.Text is { Length: > 0 };
+        _announcer.Screen(_keypad.Screen, SlideNumber, SlideTotal);
     }
 
     private void Resume()
@@ -245,6 +251,7 @@ public sealed class PresentationWindow : Window
         if (Digit(key) is { } digit)
         {
             _keypad.Type(digit);
+            _announcer.Typed(_keypad.Typed);
             return true;
         }
 

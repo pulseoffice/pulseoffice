@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Compile Include="../Shared/UiThreadSession.cs" Link="Shared/UiThreadSession.cs" />
+    <Compile Include="../Shared/DialogKeyboardWalk.cs" Link="Shared/DialogKeyboardWalk.cs" />
     <Compile Include="../Shared/DialogAdmissionHarness.cs" Link="Shared/DialogAdmissionHarness.cs" />
   </ItemGroup>
 

@@ -40,6 +40,7 @@ public interface ISolver
 public sealed class Solver : ISolver
 {
     private const double Penalty = 1e6;
+    private const double TargetTolerance = 1e-6;
 
     public SolverOutcome Solve(CalculationEngine engine, SolverRequest request)
     {
@@ -145,14 +146,19 @@ public sealed class Solver : ISolver
 
         var objective = engine.GetValue(request.Objective);
         var feasible = Violation(engine, request) <= 1e-6;
+        var reached = objective.TryCoerceToNumber(out var number) && Reaches(request, number);
 
         return new SolverOutcome(
-            feasible && objective.IsNumeric,
-            objective.TryCoerceToNumber(out var number) ? number : double.NaN,
+            feasible && objective.IsNumeric && reached,
+            objective.IsNumeric ? number : double.NaN,
             rounded,
             iterations,
-            feasible ? null : "constraints");
+            !feasible ? "constraints" : reached ? null : "target");
     }
+
+    private bool Reaches(SolverRequest request, double objective) =>
+        request.Goal != SolverGoal.Value
+        || Math.Abs(objective - request.TargetValue) <= TargetTolerance * Math.Max(1, Math.Abs(request.TargetValue));
 
     private double[] Round(SolverRequest request, double[] point)
     {

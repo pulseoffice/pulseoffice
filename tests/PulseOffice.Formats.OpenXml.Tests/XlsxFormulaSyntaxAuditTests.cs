@@ -45,10 +45,10 @@ public sealed class XlsxFormulaSyntaxAuditTests
     }
 
     [Theory]
-    [InlineData("TableStyleTest.xlsx", "B10", "=COUNTIF($B$2:$B$9;\">5\")")]
-    [InlineData("TableStyleTest.xlsx", "C10", "=SUBTOTAL(101;$C$2:$C$9)")]
-    [InlineData("Book1_custom.xlsx", "D11", "=SUBTOTAL(109;$D$2:$D$10)")]
-    public void IRiferimentiStrutturatiDelleTabelleDiventanoIntervalli(string file, string cell, string formula)
+    [InlineData("TableStyleTest.xlsx", "B10", "=COUNTIF(Table2[B];\">5\")")]
+    [InlineData("TableStyleTest.xlsx", "C10", "=SUBTOTAL(101;Table2[C])")]
+    [InlineData("Book1_custom.xlsx", "D11", "=SUBTOTAL(109;Table1[Age])")]
+    public void IRiferimentiStrutturatiDelleTabelleRestanoStrutturati(string file, string cell, string formula)
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Excel", file));
         var result = new XlsxSpreadsheetReader().Read(stream);

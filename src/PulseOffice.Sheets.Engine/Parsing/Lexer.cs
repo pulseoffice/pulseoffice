@@ -14,6 +14,7 @@ public enum TokenKind
     Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual,
     OpenParen, CloseParen, OpenBrace, CloseBrace,
     Comma, Semicolon, Colon, Space, ArrayRowSeparator, Tilde, At,
+    TableReference,
 }
 
 public readonly record struct Token(TokenKind Kind, string Text, int Position)
@@ -206,6 +207,8 @@ public sealed class Lexer(string input, char decimalSeparator = '.')
 
         var isCall = _pos < _text.Length && _text[_pos] == '(';
 
+        if (_pos < _text.Length && _text[_pos] == '[') return ReadTableReference(start);
+
         if (!isCall && (string.Equals(text, "TRUE", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(text, "FALSE", StringComparison.OrdinalIgnoreCase)))
             return new Token(TokenKind.Boolean, text, start);
@@ -221,6 +224,19 @@ public sealed class Lexer(string input, char decimalSeparator = '.')
         }
 
         return new Token(TokenKind.Identifier, text, start);
+    }
+
+    private Token ReadTableReference(int start)
+    {
+        var depth = 0;
+        while (_pos < _text.Length)
+        {
+            var c = _text[_pos++];
+            if (c == '\'' && _pos < _text.Length) _pos++;
+            else if (c == '[') depth++;
+            else if (c == ']' && --depth == 0) return new Token(TokenKind.TableReference, _text[start.._pos], start);
+        }
+        throw new FormulaSyntaxException("Unterminated table reference", start);
     }
 
     private static bool LooksLikeReference(ReadOnlySpan<char> text)

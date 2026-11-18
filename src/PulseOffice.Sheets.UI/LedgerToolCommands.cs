@@ -29,7 +29,8 @@ public sealed class LedgerToolCommands(
     DataDialogs.LedgerSortServices sorting,
     DataDialogs.LedgerDialogKit kit,
     DataDialogs.ILedgerDialogProbes probes,
-    ISheetRangeFilters rangeFilters) : LedgerCommandSet(context)
+    ISheetRangeFilters rangeFilters,
+    ICellOverwritePrompt overwrite) : LedgerCommandSet(context)
 {
     private static readonly SubtotalFunction[] Functions =
     [
@@ -75,7 +76,7 @@ public sealed class LedgerToolCommands(
             return;
         }
 
-        if (sortGate.Refuses(workbook, sheet, bounded)) return;
+        if (sortGate.RefusesBeforeChoice(workbook, sheet, bounded)) return;
 
         var remembered = sorting.Memory.Recall(workbook, Context.SheetIndex, bounded);
         var orders = sorting.Orders.Including(remembered?.Fields.Select(field => field.CustomOrder).OfType<IReadOnlyList<string>>() ?? []);
@@ -107,6 +108,9 @@ public sealed class LedgerToolCommands(
         }, ct).ConfigureAwait(true);
 
         if (choice is null) return;
+        if (!ReferenceEquals(Context.Workbook, workbook) || !ReferenceEquals(workbook.Sheets.ElementAtOrDefault(Context.SheetIndex), sheet)) return;
+        var chosenOrientation = choice.LeftToRight ? SortOrientation.LeftToRight : SortOrientation.TopToBottom;
+        if (sortGate.Refuses(workbook, sheet, bounded, choice.HasHeader, chosenOrientation)) return;
 
         var keys = choice.Levels
             .Select(level => new Engine.Operations.SortKey(level.Column, !level.Descending)
@@ -118,9 +122,8 @@ public sealed class LedgerToolCommands(
 
         using (Context.History?.BeginTransaction(texts["history.ledger.sort"]))
         {
-            var orientation = choice.LeftToRight ? SortOrientation.LeftToRight : SortOrientation.TopToBottom;
-            sorting.Sorter.Sort(sheet, bounded, keys, choice.HasHeader, Context.History, texts["history.ledger.sort"], orientation);
-            sorting.Memory.Remember(workbook, Context.SheetIndex, bounded, keys, Context.History, texts["history.ledger.sort"], choice.HasHeader, orientation);
+            sorting.Sorter.Sort(sheet, bounded, keys, choice.HasHeader, Context.History, texts["history.ledger.sort"], chosenOrientation);
+            sorting.Memory.Remember(workbook, Context.SheetIndex, bounded, keys, Context.History, texts["history.ledger.sort"], choice.HasHeader, chosenOrientation);
         }
         if (sheet.AutoFilter.Range is { } filtered && filtered.Contains(bounded.Start)) rangeFilters.Refresh(Context, sheet);
         Context.RequestRefresh();
@@ -259,6 +262,14 @@ public sealed class LedgerToolCommands(
         {
             status.Report(texts["status.protection.locked"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
             return;
+        }
+
+        var occupied = plan.Values.Keys.Count(address => address.Column > range.End.Column && !sheet.GetValue(address).IsEmpty);
+        if (occupied > 0)
+        {
+            if (!await overwrite.ConfirmAsync(occupied, ct).ConfigureAwait(true)) return;
+            if (!ReferenceEquals(Context.Workbook, workbook) || !ReferenceEquals(Context.Engine, engine)
+                || !ReferenceEquals(workbook.Sheets.ElementAtOrDefault(Context.SheetIndex), sheet)) return;
         }
 
         var before = snapshots.Capture(sheet);

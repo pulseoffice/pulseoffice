@@ -359,6 +359,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
 {
     private readonly ConstantFormulas _constants = new();
     private readonly OdfDynamicArrays _dynamicArrays = new();
+    private readonly OdfTableFormulas _tableFormulas = new();
 
     public int StyleIdOf(string styleName, OdsReadContext context)
     {
@@ -401,7 +402,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
         var value = IsErrorResult(element, formula)
             ? Error(paragraphs.Read(element))
             : Value(element, valueType, context.Diagnostics);
-        var internalFormula = formula is null ? null : new OdfFormulaSyntax().ToInternal(formula);
+        var internalFormula = formula is null ? null : _tableFormulas.Read(element) ?? new OdfFormulaSyntax().ToInternal(formula);
 
         return new Cell
         {

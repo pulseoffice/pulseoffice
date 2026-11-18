@@ -187,6 +187,19 @@ public abstract class TabStrip<TItem> : ThemedSurface
         Chosen(index, _items[index]);
     }
 
+    protected void SelectAt(int index)
+    {
+        if (index < 0 || index >= _items.Count) return;
+        if (index != _selected)
+        {
+            _selected = index;
+            Announce();
+            InvalidateMeasure();
+            InvalidateVisual();
+        }
+        Chosen(index, _items[index]);
+    }
+
     private int At(Point point)
     {
         foreach (var (index, bounds, _) in _tabs)

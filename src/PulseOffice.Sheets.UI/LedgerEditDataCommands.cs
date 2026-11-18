@@ -91,7 +91,7 @@ public sealed class LedgerEditDataCommands(
         if (sorting.QuickSort.Plan(workbook, Context.SheetIndex, Context.Selection) is not { } plan) return;
 
         var sheet = workbook.Sheets[Context.SheetIndex];
-        if (sortGate.Refuses(workbook, sheet, plan.Range)) return;
+        if (sortGate.Refuses(workbook, sheet, plan.Range, plan.HasHeader)) return;
 
         SortKey[] keys = [new SortKey(plan.Column, ascending)];
         var label = texts["history.ledger.sort"];

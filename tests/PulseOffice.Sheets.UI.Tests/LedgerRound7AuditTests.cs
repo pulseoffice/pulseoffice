@@ -153,7 +153,7 @@ public class LedgerRound7AuditTests
 
         scene.Selection = new CellRange(A("A1"), A("A3"));
         var commands = new LedgerDataCommands(scene.Context, Fake<Engine.Operations.ISheetOutline>(), new Engine.Operations.DuplicateRemover(new PulseOffice.Sheets.Addressing.SelectionWorkArea()),
-            new Engine.Operations.SheetCellShift(new Engine.Operations.SheetStructure()), new RecordingStatus(), Checkpoints(), Texts);
+            new Engine.Operations.SheetCellShift(new Engine.Operations.SheetStructure()), new RecordingStatus(), Checkpoints(), Texts, new Round206FixedDuplicatePrompt());
 
         await Run(commands.GetCommands(), "ledger.data.removeDuplicates");
 
@@ -169,7 +169,7 @@ public class LedgerRound7AuditTests
         sheet.Protection = new SheetProtection { IsEnabled = true };
         var status = new RecordingStatus();
 
-        Assert.True(new SheetSortGate(new SheetEditGuard(), status, Texts, new Engine.Operations.SheetSorter()).Refuses(workbook, sheet, new CellRange(A("A1"), A("A3"))));
+        Assert.True(new SheetSortGate(new SheetEditGuard(), status, Texts, new Engine.Operations.SheetSorter()).Refuses(workbook, sheet, new CellRange(A("A1"), A("A3")), hasHeader: true));
         Assert.Equal([Texts["status.protection.sort"]], status.Messages);
     }
 
@@ -188,7 +188,7 @@ public class LedgerRound7AuditTests
         var commands = new LedgerToolCommands(scene.Context, new Engine.Operations.SheetSnapshots(),
             Fake<Engine.Operations.ISheetSubtotals>(), split, new AnsweringDialogs(new Dictionary<string, object> { ["options"] = choice }), status,
             new SheetEditGuard(), Fake<ISheetSortGate>(), Fake<Dialogs.IValidationRules>(), new Engine.Operations.ValidationPlacement(), Fake<Dialogs.ISheetReferenceSources>(),
-            Fake<Dialogs.ISheetReferenceReader>(), Texts, null!, null!, Fake<DataDialogs.ILedgerDialogProbes>(), Fake<ISheetRangeFilters>());
+            Fake<Dialogs.ISheetReferenceReader>(), Texts, null!, null!, Fake<DataDialogs.ILedgerDialogProbes>(), Fake<ISheetRangeFilters>(), new Round206FixedOverwritePrompt(true));
 
         await Run(commands.GetCommands(), "ledger.data.textToColumns");
 

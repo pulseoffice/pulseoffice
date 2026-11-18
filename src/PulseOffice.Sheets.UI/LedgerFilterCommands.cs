@@ -106,7 +106,7 @@ public sealed class LedgerFilterCommands(
 
         if (choice.SortDescending is { } descending)
         {
-            if (sortGate.Refuses(workbook, sheet, range)) return;
+            if (sortGate.Refuses(workbook, sheet, range, sheet.AutoFilter.HasHeader)) return;
 
             sorter.Sort(sheet, range, [new SortKey(columnOffset, !descending)], sheet.AutoFilter.HasHeader, Context.History, texts["history.ledger.sort"]);
             if (sheet.AutoFilter.IsActive) ApplyFilters(sheet);

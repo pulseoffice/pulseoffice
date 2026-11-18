@@ -79,6 +79,7 @@ internal static class LedgerDataComposition
         services.AddSingleton<ITextToColumns, TextToColumns>();
         services.AddSingleton<ISheetSubtotals, SheetSubtotals>();
         services.AddSingleton<ISheetConsolidation, SheetConsolidation>();
+        services.AddSingleton<PulseOffice.Sheets.UI.DataDialogs.IDuplicateRemovalPrompt, PulseOffice.Sheets.UI.DataDialogs.DuplicateRemovalPrompt>();
         services.AddSingleton<LedgerDataCommands>();
         services.AddSingleton<LedgerExternalDataCommands>();
         services.AddSingleton<ISheetMerge, SheetMerge>();
