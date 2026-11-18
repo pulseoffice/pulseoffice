@@ -14,7 +14,7 @@ public sealed class TableStyleGalleryViewTests
 
     private sealed class PresetNames : ITableStyleGallery
     {
-        public Task<TableStyleChoice?> AskAsync(string titleKey, string? current, bool headerRow, bool bandedRows, CancellationToken ct) =>
+        public Task<TableStyleChoice?> AskAsync(string titleKey, string? current, bool headerRow, TableBanding banding, CancellationToken ct) =>
             Task.FromResult<TableStyleChoice?>(null);
 
         public string Name(TableLook look) => look.Name;
@@ -24,7 +24,7 @@ public sealed class TableStyleGalleryViewTests
     public Task LaGalleriaUsaLeTessereCondiviseEParteDalloStileCorrente() => MacroEventsViewTests.Session.Dispatch(() =>
     {
         var looks = new TableStylePresets().All;
-        var view = new TableStyleGalleryView(looks, Texts, new PresetNames(), "elegant", headerRow: true, bandedRows: false, new GalleryNavigator());
+        var view = new TableStyleGalleryView(looks, Texts, new PresetNames(), "elegant", headerRow: true, TableBanding.None, new GalleryNavigator());
         var window = new Window { Content = view, Width = 700, Height = 600 };
         window.Show();
 

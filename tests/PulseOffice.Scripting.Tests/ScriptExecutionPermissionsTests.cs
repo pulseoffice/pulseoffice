@@ -87,9 +87,9 @@ public sealed class ScriptExecutionPermissionsTests
     [Fact]
     public void Gli_ambiti_annidati_ripristinano_il_precedente()
     {
-        using (_permissions.Enter(ScriptPermissions.Trusted))
+        using (_permissions.Enter(ScriptPermissions.Trusted, TestContext.Current.CancellationToken))
         {
-            using (_permissions.Enter(ScriptPermissions.Sandboxed))
+            using (_permissions.Enter(ScriptPermissions.Sandboxed, TestContext.Current.CancellationToken))
                 Assert.False(_permissions.Current.FileSystemWrite);
             Assert.True(_permissions.Current.FileSystemWrite);
         }

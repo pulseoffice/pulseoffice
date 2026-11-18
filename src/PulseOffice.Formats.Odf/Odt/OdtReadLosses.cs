@@ -26,7 +26,7 @@ internal sealed class OdtReadLosses
         [UnreadObjects] = Diagnostic.Warning(UnreadObjects, "Embedded objects that are neither charts nor formulas and have no picture to show, and OLE objects whose data is missing, are not imported, and neither are their frames."),
         [ApproximatedShapes] = Diagnostic.Warning(ApproximatedShapes, "Shapes whose geometry formulas cannot be evaluated, because their equations or path are malformed, are imported as rectangles."),
         [UnnamedBody] = Diagnostic.Warning(UnnamedBody, "The body of the document is not marked as text: it is read as text, as other ODF applications do. Check that nothing is missing."),
-        [ListNumberFormats] = Diagnostic.Warning(ListNumberFormats, "List numbers in formats PulseOffice does not have, such as zero-padded or non-Latin numbering, are imported as Arabic numbers."),
+        [ListNumberFormats] = Diagnostic.Warning(ListNumberFormats, "List numbers in formats PulseOffice does not have, such as Arabic-Indic digits or Korean numbering, are imported as Arabic numbers."),
         [PictureBullets] = Diagnostic.Info(PictureBullets, "Picture bullets of lists whose picture is missing from the file are imported as character bullets."),
     };
 

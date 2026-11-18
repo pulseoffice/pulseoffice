@@ -11,19 +11,72 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed class DocxRevisionWriter(IDirectFormatting formatting, DocxCharacterCodec characters, DocxParagraphCodec paragraphs)
 {
-    public W.InsertedRun Inserted(TrackedChange change, DocxWriteContext context) => new()
+    public W.InsertedRun Inserted(TrackedChange change, DocxWriteContext context) => Moving(change, new W.InsertedRun
     {
         Id = Next(context),
         Author = change.Author,
         Date = change.Date.UtcDateTime,
-    };
+    }, context);
 
-    public W.DeletedRun DeletedRange(TrackedChange change, DocxWriteContext context) => new()
+    public W.DeletedRun DeletedRange(TrackedChange change, DocxWriteContext context) => Moving(change, new W.DeletedRun
     {
         Id = Next(context),
         Author = change.Author,
         Date = change.Date.UtcDateTime,
-    };
+    }, context);
+
+    private T Moving<T>(TrackedChange change, T element, DocxWriteContext context) where T : OpenXmlCompositeElement
+    {
+        var move = change switch
+        {
+            Insertion insertion => insertion.MoveId,
+            Deletion deletion => deletion.MoveId,
+            _ => null,
+        };
+        if (move is not null) context.Moves.Add((element, move));
+        return element;
+    }
+
+    public void WriteMoves(DocxWriteContext context)
+    {
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (element, move) in context.Moves)
+        {
+            if (element.Parent is null) continue;
+            if (!names.TryGetValue(move, out var name))
+            {
+                name = "move" + (names.Count + 1).ToString(CultureInfo.InvariantCulture);
+                names[move] = name;
+            }
+            var range = Next(context);
+            OpenXmlCompositeElement moved;
+            OpenXmlElement start;
+            OpenXmlElement end;
+            if (element is W.DeletedRun deleted)
+            {
+                moved = new W.MoveFromRun { Id = deleted.Id?.Value, Author = deleted.Author?.Value, Date = deleted.Date!.Value };
+                start = new W.MoveFromRangeStart { Id = range, Name = name, Author = deleted.Author?.Value, Date = deleted.Date!.Value };
+                end = new W.MoveFromRangeEnd { Id = range };
+            }
+            else if (element is W.InsertedRun inserted)
+            {
+                moved = new W.MoveToRun { Id = inserted.Id?.Value, Author = inserted.Author?.Value, Date = inserted.Date!.Value };
+                start = new W.MoveToRangeStart { Id = range, Name = name, Author = inserted.Author?.Value, Date = inserted.Date!.Value };
+                end = new W.MoveToRangeEnd { Id = range };
+            }
+            else continue;
+            foreach (var child in element.ChildElements.ToList())
+            {
+                child.Remove();
+                moved.Append(child);
+            }
+            element.InsertBeforeSelf(start);
+            element.InsertAfterSelf(end);
+            element.InsertAfterSelf(moved);
+            element.Remove();
+        }
+        context.Moves.Clear();
+    }
 
     public W.Inserted InsertedMark(TrackedChange change, DocxWriteContext context) => new()
     {
@@ -94,7 +147,7 @@ public sealed class DocxRevisionWriter(IDirectFormatting formatting, DocxCharact
         do
         {
             var target = index < children.Count ? children[index].Hyperlink : null;
-            var deleted = new W.DeletedRun { Id = Next(context), Author = deletion.Author, Date = deletion.Date.UtcDateTime };
+            var deleted = Moving(deletion, new W.DeletedRun { Id = Next(context), Author = deletion.Author, Date = deletion.Date.UtcDateTime }, context);
             while (index < children.Count && children[index].Hyperlink == target) deleted.Append(children[index++].Element);
             groups.Add((deleted, target));
         }

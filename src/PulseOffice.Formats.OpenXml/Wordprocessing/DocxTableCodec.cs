@@ -41,8 +41,14 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             if (table.HeaderBackground is { } fill) header.Append(new W.TableStyleConditionalFormattingTableCellProperties(Shading(fill)));
             element.Append(header);
         }
+        if (table.HeaderBold == true)
+            foreach (var emphasis in new[] { W.TableStyleOverrideValues.LastRow, W.TableStyleOverrideValues.FirstColumn, W.TableStyleOverrideValues.LastColumn })
+                element.Append(new W.TableStyleProperties(new W.RunPropertiesBaseStyle(new W.Bold())) { Type = emphasis });
         if (table.BandBackground is { } band)
+        {
+            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Vertical });
             element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Horizontal });
+        }
     }
 
     public W.TableCellMarginDefault? Margins(TableProperties table)

@@ -64,6 +64,7 @@ public sealed class ChartRenderer
         var scene = new ChartScene(new ChartText(culture));
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(definition);
+        definition = _inlineErrorValues.Refresh(definition);
         data = definition.Coloured(data);
 
         var scale = Math.Min(1, Math.Min(bounds.Width / ReferenceWidth, bounds.Height / ReferenceHeight));
@@ -147,6 +148,8 @@ public sealed class ChartRenderer
     }
 
     private readonly ChartAxisScaling _axisScaling = new();
+
+    private readonly ChartInlineErrorValues _inlineErrorValues = new();
 
     private readonly ChartAxisMarks _marks = new();
 

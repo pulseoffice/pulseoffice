@@ -32,6 +32,7 @@ public sealed class DeckExchange(
 {
     private const int PasteOffset = 200;
     private const double FreeFontSize = 18;
+    private const string PasteLabel = "deck.action.paste";
 
     public ModuleKind Module => ModuleKind.Presentations;
 
@@ -110,13 +111,13 @@ public sealed class DeckExchange(
                 var sheet = sheets.Create(target.Deck.NextId(), grid, ods);
                 return Place(target, slide, Elements(target.Deck, slide, [new ExchangedObject(sheet, sheet.NaturalSize)]), 0, []);
             case ExchangePasteMode.FormattedText when Paragraphs(package) is { } paragraphs:
-                insertion.Insert(target, paragraphs, FreeFontSize);
+                insertion.Insert(target, paragraphs, FreeFontSize, PasteLabel);
                 return true;
             case ExchangePasteMode.UnformattedText when package.TextOf(ExchangeFlavor.Text) is { Length: > 0 } text:
                 var lines = text.ReplaceLineEndings("\n").Split('\n');
                 if (target.IsTyping() && target.TypeAtCaret(string.Join("\n", lines))) return true;
-                if (lines.Length == 1) insertion.Insert(target, new TextRun(lines[0]), FreeFontSize);
-                else insertion.Insert(target, [.. lines.Select(line => new TextParagraph(line))], FreeFontSize);
+                if (lines.Length == 1) insertion.Insert(target, new TextRun(lines[0]), FreeFontSize, PasteLabel);
+                else insertion.Insert(target, [.. lines.Select(line => new TextParagraph(line))], FreeFontSize, PasteLabel);
                 return true;
             case ExchangePasteMode.Image when package.BytesOf(ExchangeFlavor.Png) is { } png:
                 return target.InsertImageBytes(png, "image.png");

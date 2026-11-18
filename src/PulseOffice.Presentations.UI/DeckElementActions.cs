@@ -72,12 +72,12 @@ public sealed class DeckElementActions(Presentation deck, ITextCatalog texts, De
             () => { slide.Replace(before); deck.Raise(); });
     }
 
-    public void InsertElement(Slide slide, SlideElement element)
+    public void InsertElement(Slide slide, SlideElement element, string labelKey = "deck.action.insertObject")
     {
         var top = Top(slide);
         if (element.ZOrder < top) element = element with { ZOrder = top };
         element = Fitted(slide, element);
-        Do(texts["deck.action.insertObject"],
+        Do(texts[labelKey],
             () => { slide.Add(element); deck.Raise(); },
             () => { slide.Remove(element.Id); deck.Raise(); });
     }

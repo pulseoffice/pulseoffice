@@ -24,6 +24,7 @@ public sealed class ModuleAgentScripts(
             Globals = scope.Globals.ToDictionary(pair => pair.Key, pair => pair.Value),
             Permissions = PermissionsFor(access),
         }, ct).ConfigureAwait(true);
+        await result.Stopped.ConfigureAwait(true);
 
         return new AgentScriptOutcome(result.Succeeded, result.Value,
             result.Succeeded ? null : string.Join("; ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));

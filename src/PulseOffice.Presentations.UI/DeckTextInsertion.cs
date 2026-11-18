@@ -8,16 +8,16 @@ public interface IDeckTextInsertion
 {
     bool CanInsert(DeckTarget target);
 
-    void Insert(DeckTarget target, TextRun run, double freeFontSize);
+    void Insert(DeckTarget target, TextRun run, double freeFontSize, string? labelKey = null);
 
-    void Insert(DeckTarget target, IReadOnlyList<TextParagraph> paragraphs, double freeFontSize);
+    void Insert(DeckTarget target, IReadOnlyList<TextParagraph> paragraphs, double freeFontSize, string? labelKey = null);
 }
 
 public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsertion
 {
     public bool CanInsert(DeckTarget target) => target.CurrentSlide() is not null;
 
-    public void Insert(DeckTarget target, TextRun run, double freeFontSize)
+    public void Insert(DeckTarget target, TextRun run, double freeFontSize, string? labelKey = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(run);
@@ -27,14 +27,14 @@ public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsert
 
         if (target.Selected() is TextElement selected)
         {
-            target.Actions.AppendRun(slide, selected.Id, run);
+            target.Actions.AppendRun(slide, selected.Id, run, labelKey ?? "deck.action.insertSymbol");
             return;
         }
 
         var width = Twip.FromCentimeters(6);
         var height = Twip.FromCentimeters(1.6);
 
-        target.Actions.InsertElement(slide, new TextElement
+        target.Actions.InsertElement(slide, labelKey: labelKey ?? "deck.action.insertObject", element: new TextElement
         {
             Id = Guid.NewGuid().ToString("N"),
             Bounds = new DocumentRect(
@@ -47,7 +47,7 @@ public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsert
         });
     }
 
-    public void Insert(DeckTarget target, IReadOnlyList<TextParagraph> paragraphs, double freeFontSize)
+    public void Insert(DeckTarget target, IReadOnlyList<TextParagraph> paragraphs, double freeFontSize, string? labelKey = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(paragraphs);
@@ -57,14 +57,14 @@ public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsert
 
         if (target.Selected() is TextElement selected)
         {
-            target.Actions.EditText(slide, selected.Id, rich.Insert(selected.Text, null, paragraphs));
+            target.Actions.EditText(slide, selected.Id, rich.Insert(selected.Text, null, paragraphs), labelKey ?? "deck.action.editText");
             return;
         }
 
         var width = Twip.FromCentimeters(12);
         var height = Twip.FromCentimeters(Math.Min(14, 1.0 + 0.8 * paragraphs.Count));
 
-        target.Actions.InsertElement(slide, new TextElement
+        target.Actions.InsertElement(slide, labelKey: labelKey ?? "deck.action.insertObject", element: new TextElement
         {
             Id = Guid.NewGuid().ToString("N"),
             Bounds = new DocumentRect(

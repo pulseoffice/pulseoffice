@@ -110,7 +110,7 @@ public sealed class ChangeMarking(IStoryCatalog stories, IParagraphText text, IC
         if (!document.Changes.All.OfType<Deletion>().Any(deletion => deletion.WithinInsertion == insertionId)) return;
         var log = Log(document, recorder);
         log.Replace(log.All.Select(change => change is Deletion deletion && deletion.WithinInsertion == insertionId
-            ? new Deletion(deletion.Id, deletion.Author, deletion.Date, deletion.Removed) { Comment = deletion.Comment }
+            ? new Deletion(deletion.Id, deletion.Author, deletion.Date, deletion.Removed) { Comment = deletion.Comment, MoveId = deletion.MoveId }
             : change));
     }
 

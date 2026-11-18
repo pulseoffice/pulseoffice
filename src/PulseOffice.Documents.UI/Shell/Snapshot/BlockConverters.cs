@@ -31,6 +31,7 @@ public sealed class BlockConverter : SnapshotConverter<Block>
                 StyleName = node.Get<string>("style"),
                 HeaderRows = node.Get("headerRows", 0),
                 RepeatHeaderRows = node.Get("repeatHeaderRows", true),
+                Banding = node.Get("banding", PulseOffice.Document.Tables.TableBanding.Standard),
                 Alignment = node.Get("alignment", TableAlignment.Left),
                 Indent = node.Get("indent", Twip.Zero),
                 Direct = node.Get("direct", PulseOffice.Documents.Styles.TableProperties.None),
@@ -60,7 +61,7 @@ public sealed class BlockConverter : SnapshotConverter<Block>
 
         public SnapshotWriter VisitTable(TableBlock table) =>
             node.Put("block", Table).Put("rows", table.Rows).Put("columns", table.Columns).Put("name", table.Name)
-                .Put("style", table.StyleName).Put("headerRows", table.HeaderRows).Put("repeatHeaderRows", table.RepeatHeaderRows)
+                .Put("style", table.StyleName).Put("headerRows", table.HeaderRows).Put("repeatHeaderRows", table.RepeatHeaderRows).Put("banding", table.Banding)
                 .Put("alignment", table.Alignment).Put("indent", table.Indent).Put("direct", table.Direct).Put("pageStyle", table.PageStyleName)
                 .Put("pageBreakBefore", table.PageBreakBefore);
 

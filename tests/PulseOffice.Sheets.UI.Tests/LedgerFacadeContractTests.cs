@@ -30,7 +30,7 @@ public sealed class LedgerFacadeContractTests
         public T Write<T>(Func<T> write) => write();
     }
 
-    private sealed class Output : IScriptOutput
+    internal sealed class Output : IScriptOutput
     {
         public List<string> Lines { get; } = [];
 
@@ -90,7 +90,7 @@ public sealed class LedgerFacadeContractTests
         public string Initials => "T";
     }
 
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         private readonly ServiceProvider _provider;
         private readonly ActiveSheetContext _context = new();

@@ -56,7 +56,7 @@ public sealed class DeckVideoFrameSourceTests
     {
         public int Calls { get; private set; }
 
-        public Task<RasterSlide> RenderAsync(Slide slide, CancellationToken ct)
+        public Task<RasterSlide> RenderAsync(SlideFrameRequest request, CancellationToken ct)
         {
             Calls++;
             if (Calls >= failFrom) throw new InvalidOperationException("out of memory");

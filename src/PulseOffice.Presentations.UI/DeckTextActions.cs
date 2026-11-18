@@ -8,13 +8,13 @@ namespace PulseOffice.Presentations.UI;
 
 public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckActionRecorder recorder, ITextEditSplice _splice)
 {
-    public void EditText(Slide slide, string elementId, RichText updated)
+    public void EditText(Slide slide, string elementId, RichText updated, string labelKey = "deck.action.editText")
     {
         if (slide.Find(elementId) is not TextElement current) return;
 
         var after = Fitted(slide, current with { Text = updated });
 
-        Do(texts["deck.action.editText"],
+        Do(texts[labelKey],
             () => { slide.Replace(after); deck.Raise(); },
             () => { slide.Replace(current); deck.Raise(); });
     }
@@ -54,7 +54,7 @@ public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckA
 
     public void AppendToText(Slide slide, string elementId, string text) => AppendRun(slide, elementId, new TextRun(text));
 
-    public void AppendRun(Slide slide, string elementId, TextRun run)
+    public void AppendRun(Slide slide, string elementId, TextRun run, string labelKey = "deck.action.insertSymbol")
     {
         ArgumentNullException.ThrowIfNull(run);
         if (slide.Find(elementId) is not TextElement te) return;
@@ -73,7 +73,7 @@ public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckA
         var before = te;
         var after = Fitted(slide, te with { Text = te.Text with { Paragraphs = paragraphs } });
 
-        Do(texts["deck.action.insertSymbol"],
+        Do(texts[labelKey],
             () => { slide.Replace(after); deck.Raise(); },
             () => { slide.Replace(before); deck.Raise(); });
     }

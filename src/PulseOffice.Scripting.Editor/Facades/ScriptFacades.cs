@@ -78,6 +78,71 @@ public sealed class ReadOnlyGuardedDispatcher(IScriptDispatcher inner, Func<bool
     }
 }
 
+public sealed class CancellableScriptDispatcher(IScriptDispatcher inner, IScriptExecutionPermissions run) : IScriptDispatcher
+{
+    public T Read<T>(Func<T> read)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        var token = Observed();
+        return inner.Read(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            return read();
+        });
+    }
+
+    public void Change(Action change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var token = Observed();
+        inner.Change(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            change();
+        });
+    }
+
+    public void Show(Action show)
+    {
+        ArgumentNullException.ThrowIfNull(show);
+        var token = Observed();
+        inner.Show(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            show();
+        });
+    }
+
+    public T Write<T>(Func<T> write)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        var token = Observed();
+        return inner.Write(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            return write();
+        });
+    }
+
+    public void Complete(Func<Task> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var token = Observed();
+        inner.Complete(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            return change();
+        });
+    }
+
+    private CancellationToken Observed()
+    {
+        var token = run.Cancellation;
+        token.ThrowIfCancellationRequested();
+        return token;
+    }
+}
+
 public abstract class ScriptFacade(IScriptDispatcher dispatcher)
 {
     protected T Read<T>(Func<T> read) => dispatcher.Read(read);

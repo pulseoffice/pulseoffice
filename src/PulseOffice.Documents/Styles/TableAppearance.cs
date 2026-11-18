@@ -13,7 +13,7 @@ public interface ITableAppearance
 
     BoxBorders StyleBorders(TableBlock table, TableProperties style, int row, int column);
 
-    uint? StyleBackground(TableBlock table, TableProperties style, int row);
+    uint? StyleBackground(TableBlock table, TableProperties style, int row, int column);
 }
 
 public sealed class TableAppearance(IStyleResolver resolver) : ITableAppearance
@@ -26,9 +26,9 @@ public sealed class TableAppearance(IStyleResolver resolver) : ITableAppearance
         var header = row < table.HeaderRows;
         return new CellAppearance(
             cell.Borders ?? StyleBorders(table, style, row, column),
-            cell.Background ?? StyleBackground(table, style, row),
+            cell.Background ?? StyleBackground(table, style, row, column),
             header ? style.HeaderColor : null,
-            header && style.HeaderBold == true,
+            header ? style.HeaderBold == true : style.HeaderBold == true && Emphasized(table, row, column),
             cell.Borders is not null,
             cell.Background is not null);
     }
@@ -41,18 +41,22 @@ public sealed class TableAppearance(IStyleResolver resolver) : ITableAppearance
         var cell = table.Cell(row, column);
         var last = row + Math.Max(1, cell.RowSpan) - 1;
         var headerEnd = Math.Max(0, table.HeaderRows) - 1;
+        var total = table.Banding.LastRow && row == table.Rows.Count - 1 && row >= table.HeaderRows;
         return new BoxBorders
         {
-            Top = row == 0 ? line : null,
+            Top = row == 0 || total ? line : null,
             Bottom = last == table.Rows.Count - 1 || last == headerEnd ? line : null,
         };
     }
 
-    public uint? StyleBackground(TableBlock table, TableProperties style, int row)
+    public uint? StyleBackground(TableBlock table, TableProperties style, int row, int column)
     {
         if (row < table.HeaderRows && style.HeaderBackground is { } header) return header;
         var body = row - Math.Max(0, table.HeaderRows);
-        if (body >= 0 && body % 2 == 1 && style.BandBackground is { } band) return band;
+        if (style.BandBackground is { } band && (table.Banding.BandsRow(body) || body >= 0 && table.Banding.BandsColumn(column))) return band;
         return style.Background;
     }
+
+    private bool Emphasized(TableBlock table, int row, int column) =>
+        row >= table.HeaderRows && table.Banding.Emphasizes(row, column, table.Rows.Count, table.ColumnCount);
 }

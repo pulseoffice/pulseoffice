@@ -56,7 +56,8 @@ public sealed record LedgerExchangeServices(
     ISheetRangeMove Moves,
     IWorkbookCheckpoints Checkpoints,
     IExchangeGridSnapshots Grids,
-    ICellGridConversions Conversions);
+    ICellGridConversions Conversions,
+    IChartErrorValueRefresh ErrorValues);
 
 public sealed class LedgerExchange(LedgerExchangeServices services) : ILedgerExchange
 {
@@ -155,8 +156,29 @@ public sealed class LedgerExchange(LedgerExchangeServices services) : ILedgerExc
             ? [new ExchangeRepresentation(ExchangeFlavor.Png, png)]
             : [];
 
-    private Document.Embedding.EmbeddedObject Portable(Workbook workbook, Document.Embedding.EmbeddedObject content) =>
-        content is ChartDefinition { InlineData: null } chart ? chart with { InlineData = services.ChartData.Extract(workbook, chart) } : content;
+    private Document.Embedding.EmbeddedObject Portable(Workbook workbook, Document.Embedding.EmbeddedObject content) => content switch
+    {
+        ChartDefinition { InlineData: null } chart => services.ErrorValues.Refresh(workbook, chart) with
+        {
+            InlineData = services.ChartData.Extract(workbook, chart),
+            PivotSource = null,
+        },
+        ChartDefinition chart => chart with { PivotSource = null },
+        _ => content,
+    };
+
+    private Document.Embedding.EmbeddedObject Linked(Workbook workbook, Document.Embedding.EmbeddedObject content, ref int nextFormat)
+    {
+        if (content is not ChartDefinition { PivotSource: { } link } chart) return content;
+        if (!workbook.Pivots.Any(pivot => string.Equals(pivot.Name, link.PivotName, StringComparison.Ordinal)))
+            return chart with { PivotSource = null };
+        return chart with { PivotSource = link with { FormatId = nextFormat++ } };
+    }
+
+    private int NextPivotFormat(Workbook workbook) =>
+        workbook.Sheets.SelectMany(sheet => sheet.Objects)
+            .Select(item => item.Content is ChartDefinition { PivotSource: { } link } ? link.FormatId + 1 : 0)
+            .DefaultIfEmpty(0).Max();
 
     private bool PasteCells(Workbook workbook, Worksheet sheet, ExchangePackage package, PasteRequest request)
     {
@@ -287,13 +309,15 @@ public sealed class LedgerExchange(LedgerExchangeServices services) : ILedgerExc
         }
         var anchor = services.Context.Selection.Start;
         var top = sheet.Objects.Count == 0 ? 0 : sheet.Objects.Max(item => item.ZOrder);
+        var nextFormat = NextPivotFormat(workbook);
+        var linked = objects.Select(item => Linked(workbook, item.Object, ref nextFormat)).ToList();
         var placed = objects.Select((item, index) =>
         {
             var id = Guid.NewGuid().ToString("N");
             return new PlacedObject
             {
                 Id = id,
-                Content = item.Object with { Id = id },
+                Content = linked[index] with { Id = id },
                 Anchor = anchor,
                 OffsetX = Twip.FromPoints(12 * index),
                 OffsetY = Twip.FromPoints(12 * index),

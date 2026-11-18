@@ -166,7 +166,7 @@ public sealed class JavaScriptEngine : IScriptEngine
         if (await Task.WhenAny(running, Task.Delay(limit, CancellationToken.None)).ConfigureAwait(false) == running)
             return await running.ConfigureAwait(false);
 
-        return Failure(ScriptMessages.Timeout(context.Permissions.Timeout), "JS0002", limit);
+        return Failure(ScriptMessages.Timeout(context.Permissions.Timeout), "JS0002", limit) with { Stopped = running };
 
         static ScriptResult Failure(ScriptMessage message, string code, TimeSpan elapsed) =>
             new(false, null, [message.Diagnostic(code)], elapsed);

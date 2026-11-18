@@ -103,7 +103,7 @@ internal sealed class OdtStylesReader(
             var levels = sheet.Outline.Levels.ToArray();
             foreach (var level in outline.Elements(Text + "outline-level-style"))
                 if (measure.Integer((string?)level.Attribute(Text + "level")) is { } number && number >= 1 && number <= levels.Length)
-                    levels[number - 1] = Level(level, context) with { Format = numbers.Value((string?)level.Attribute(Style + "num-format") ?? string.Empty) };
+                    levels[number - 1] = Level(level, context) with { Format = numbers.Value((string?)level.Attribute(Style + "num-format") ?? string.Empty, (string?)level.Attribute(Pt + "num-format")) };
             sheet.Outline = new ListStyle(sheet.Outline.Name, levels);
         }
 
@@ -319,10 +319,10 @@ internal sealed class OdtStylesReader(
         var image = element.Name.LocalName == "list-level-style-image";
         var picture = image ? pictures.Read(element, context.ReadBytes) : null;
         if (image && picture is null) context.Losses.Add(OdtReadLosses.PictureBullets);
-        if (!bullet && !image && !numbers.Knows((string?)element.Attribute(Style + "num-format"))) context.Losses.Add(OdtReadLosses.ListNumberFormats);
+        if (!bullet && !image && !numbers.Knows((string?)element.Attribute(Style + "num-format"), (string?)element.Attribute(Pt + "num-format"))) context.Losses.Add(OdtReadLosses.ListNumberFormats);
         var format = bullet ? NumberFormat.Bullet
             : element.Name.LocalName == "list-level-style-image" ? NumberFormat.Bullet
-            : numbers.Value((string?)element.Attribute(Style + "num-format") ?? string.Empty);
+            : numbers.Value((string?)element.Attribute(Style + "num-format") ?? string.Empty, (string?)element.Attribute(Pt + "num-format"));
         var (indent, hanging) = Geometry(element.Element(Style + "list-level-properties"));
         var startText = bullet || image ? (string?)element.Attribute(Pt + "start-value") : (string?)element.Attribute(Text + "start-value");
         var displayText = bullet || image ? (string?)element.Attribute(Pt + "display-levels") : (string?)element.Attribute(Text + "display-levels");
@@ -337,11 +337,18 @@ internal sealed class OdtStylesReader(
             DisplayLevels = Math.Clamp(measure.Integer(displayText) ?? 1, 1, PulseOffice.Documents.Styles.ListStyle.LevelCount),
             Legal = !bullet && !image && (string?)element.Attribute(Pt + "legal") == "true",
             Separator = (string?)element.Attribute(Pt + "level-separator") ?? ".",
+            Separators = Gaps(element),
             Indent = indent,
             Hanging = hanging,
             CharacterStyleName = characterStyle is { Length: > 0 } character ? context.StyleNames.Resolve(character) : null,
             Picture = picture,
         };
+    }
+
+    private IReadOnlyList<string> Gaps(XElement element)
+    {
+        var gaps = element.Elements(Pt + "level-gap").Select(gap => (string?)gap.Attribute(Pt + "separator") ?? ".").ToArray();
+        return gaps.Length == 0 ? [] : gaps;
     }
 
     private (double Indent, double Hanging) Geometry(XElement? properties)

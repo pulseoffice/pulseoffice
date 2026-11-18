@@ -11,6 +11,8 @@ public interface IPivotCoordinator
     OperationResult<int> RefreshAll(Workbook workbook, PivotLabels labels);
 
     void Remove(Workbook workbook, string id);
+
+    int FollowCharts(Workbook workbook);
 }
 
 public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer renderer, IPivotSources? sources = null, IPivotChartLinks? charts = null) : IPivotCoordinator
@@ -95,6 +97,25 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
             ? OperationResult<int>.Ok(refreshed)
             : OperationResult<int>.Fail([.. problems]);
     }
+
+    public int FollowCharts(Workbook workbook)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+
+        var followed = 0;
+        foreach (var definition in workbook.Pivots.ToList())
+        {
+            if (!definition.IsValid || !Linked(workbook, definition.Name)) continue;
+            if (definition.ExternalSource is { Cache.HasRecords: false }) continue;
+            if (_sources.Open(workbook, definition) is not { } source) continue;
+            followed += _charts.Follow(workbook, definition.Name, definition, engine.Build(definition, source));
+        }
+        return followed;
+    }
+
+    private static bool Linked(Workbook workbook, string name) =>
+        workbook.Sheets.SelectMany(sheet => sheet.Objects).Any(placed =>
+            placed.Content is PulseOffice.Charts.ChartDefinition { PivotSource: { } link } && string.Equals(link.PivotName, name, StringComparison.OrdinalIgnoreCase));
 
     private OperationResult<CellRange> KeepLastResult(Workbook workbook, PivotDefinition definition)
     {

@@ -138,10 +138,12 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         [typeof(W.BookmarkEnd)] = (element, collector) => ReadBookmarkEnd((W.BookmarkEnd)element, collector),
         [typeof(W.CommentRangeStart)] = (element, collector) => ReadCommentStart((W.CommentRangeStart)element, collector),
         [typeof(W.CommentRangeEnd)] = (element, collector) => ReadCommentEnd((W.CommentRangeEnd)element, collector),
-        [typeof(W.InsertedRun)] = (element, collector) => Inserted(((W.InsertedRun)element).Author?.Value, ((W.InsertedRun)element).Date?.Value, element.ChildElements, collector),
-        [typeof(W.MoveToRun)] = (element, collector) => Inserted(((W.MoveToRun)element).Author?.Value, ((W.MoveToRun)element).Date?.Value, element.ChildElements, collector),
-        [typeof(W.DeletedRun)] = (element, collector) => Deleted(((W.DeletedRun)element).Author?.Value, ((W.DeletedRun)element).Date?.Value, element.ChildElements, collector),
-        [typeof(W.MoveFromRun)] = (element, collector) => Deleted(((W.MoveFromRun)element).Author?.Value, ((W.MoveFromRun)element).Date?.Value, element.ChildElements, collector),
+        [typeof(W.InsertedRun)] = (element, collector) => Inserted(((W.InsertedRun)element).Author?.Value, ((W.InsertedRun)element).Date?.Value, element.ChildElements, collector, null),
+        [typeof(W.MoveToRun)] = (element, collector) => Inserted(((W.MoveToRun)element).Author?.Value, ((W.MoveToRun)element).Date?.Value, element.ChildElements, collector,
+            MoveId(RangeName<W.MoveToRangeStart>(element, start => start.Name?.Value), ((W.MoveToRun)element).Author?.Value, ((W.MoveToRun)element).Date?.Value)),
+        [typeof(W.DeletedRun)] = (element, collector) => Deleted(((W.DeletedRun)element).Author?.Value, ((W.DeletedRun)element).Date?.Value, element.ChildElements, collector, null),
+        [typeof(W.MoveFromRun)] = (element, collector) => Deleted(((W.MoveFromRun)element).Author?.Value, ((W.MoveFromRun)element).Date?.Value, element.ChildElements, collector,
+            MoveId(RangeName<W.MoveFromRangeStart>(element, start => start.Name?.Value), ((W.MoveFromRun)element).Author?.Value, ((W.MoveFromRun)element).Date?.Value)),
         [typeof(DocumentFormat.OpenXml.Math.OfficeMath)] = (element, collector) => Object(objects.Formulas.Read((DocumentFormat.OpenXml.Math.OfficeMath)element, collector.Context, collector.ParagraphId), collector),
         [typeof(DocumentFormat.OpenXml.Math.Paragraph)] = (element, collector) => ReadMathParagraph((DocumentFormat.OpenXml.Math.Paragraph)element, collector),
         [typeof(W.SdtRun)] = (element, collector) => ReadSdtRun((W.SdtRun)element, collector),
@@ -258,18 +260,34 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
     private DateTimeOffset Date(DateTime? value) =>
         value is { } date ? new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Utc)) : DateTimeOffset.MinValue;
 
-    private void Inserted(string? author, DateTime? date, IEnumerable<OpenXmlElement> children, Collector collector)
+    private string MoveId(string? name, string? author, DateTime? date) =>
+        "move-" + (name is { Length: > 0 } ? name : (author ?? string.Empty) + "|" + Date(date).ToString("O", CultureInfo.InvariantCulture));
+
+    private string? RangeName<TStart>(OpenXmlElement element, Func<TStart, string?> name) where TStart : OpenXmlElement
+    {
+        for (var node = element; node.Parent is not null; node = node.Parent)
+        {
+            foreach (var sibling in node.ElementsBefore().Reverse())
+            {
+                if (sibling is TStart start) return name(start);
+                if (sibling.Descendants<TStart>().LastOrDefault() is { } inner) return name(inner);
+            }
+        }
+        return null;
+    }
+
+    private void Inserted(string? author, DateTime? date, IEnumerable<OpenXmlElement> children, Collector collector, string? moveId)
     {
         var when = Date(date);
         var change = collector.LastInsertion;
         var closing = change is null ? -1 : collector.Marks.FindLastIndex(mark => mark is ChangeMark { Edge: MarkEdge.End } end && end.ChangeId == change.Id && end.Offset == collector.Length);
-        if (change is not null && closing >= 0 && change.Author == (author ?? string.Empty) && change.Date == when)
+        if (change is not null && closing >= 0 && change.Author == (author ?? string.Empty) && change.Date == when && change.MoveId == moveId)
         {
             collector.Marks.RemoveAt(closing);
         }
         else
         {
-            change = new Insertion(collector.Context.Document.NextId("change"), author ?? string.Empty, when);
+            change = new Insertion(collector.Context.Document.NextId("change"), author ?? string.Empty, when) { MoveId = moveId };
             collector.Context.Document.Changes.Add(change);
             collector.Marks.Add(new ChangeMark(collector.Length, change.Id, MarkEdge.Start));
         }
@@ -299,7 +317,7 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         return created;
     }
 
-    private void Deleted(string? author, DateTime? date, IEnumerable<OpenXmlElement> children, Collector collector)
+    private void Deleted(string? author, DateTime? date, IEnumerable<OpenXmlElement> children, Collector collector, string? moveId)
     {
         var runs = new List<TextRun>();
         var marks = new List<InlineMark>();
@@ -364,7 +382,7 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         if (runs.Count == 0 && marks.Count == 0 && !holdsObjects) return;
         var paragraph = new TextParagraph(string.Empty) { StyleName = DefaultStyleNames.Standard }.WithRuns(Merge(runs));
         var removed = new BlockContainer([new ParagraphBlock(removedId, paragraph) { Marks = marks }]);
-        var change = new Deletion(collector.Context.Document.NextId("change"), author ?? string.Empty, Date(date), removed) { WithinInsertion = collector.Within?.Id };
+        var change = new Deletion(collector.Context.Document.NextId("change"), author ?? string.Empty, Date(date), removed) { WithinInsertion = collector.Within?.Id, MoveId = moveId };
         collector.Context.Document.Changes.Add(change);
         collector.Marks.Add(new ChangeMark(collector.Length, change.Id, MarkEdge.Point));
     }

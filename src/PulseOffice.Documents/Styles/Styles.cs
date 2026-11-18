@@ -103,6 +103,21 @@ public enum NumberFormat
     UpperLetter,
     LowerRoman,
     UpperRoman,
+    DecimalZero,
+    Ordinal,
+    OrdinalText,
+    CardinalText,
+    Hebrew,
+    ArabicAbjad,
+    ArabicAlpha,
+    Hiragana,
+    Katakana,
+    KatakanaIroha,
+    IdeographDigital,
+    ChineseCounting,
+    ThaiLetters,
+    RussianLower,
+    RussianUpper,
 }
 
 public sealed record ListLevel(NumberFormat Format)
@@ -119,6 +134,8 @@ public sealed record ListLevel(NumberFormat Format)
 
     public string Separator { get; init; } = ".";
 
+    public IReadOnlyList<string> Separators { get; init; } = [];
+
     public bool Legal { get; init; }
 
     public double Indent { get; init; }
@@ -128,6 +145,10 @@ public sealed record ListLevel(NumberFormat Format)
     public string? CharacterStyleName { get; init; }
 
     public ListBulletPicture? Picture { get; init; }
+
+    public string SeparatorAt(int gap) => gap >= 0 && gap < Separators.Count ? Separators[gap] : Separator;
+
+    public bool HasGapSeparators => Separators.Count > 0;
 }
 
 public sealed class ListStyle(string name, IReadOnlyList<ListLevel> levels) : DocumentStyle(name)

@@ -121,9 +121,9 @@ public sealed class DeckTableCommands(
             Execute = async (_, ct) =>
             {
                 if (Context.Target is not { } t || t.Selected() is not ObjectElement { Content: DataTableObject current }) return;
-                if (await gallery.AskAsync("command.deck.table.style.title", null, current.Style.HeaderRow, current.Style.BandedRows, ct).ConfigureAwait(true) is not { } choice) return;
+                if (await gallery.AskAsync("command.deck.table.style.title", null, current.Style.HeaderRow, current.Style.ToBanding(), ct).ConfigureAwait(true) is not { } choice) return;
                 if (t.CurrentSlide() is not { } slide || t.Selected() is not ObjectElement { Content: DataTableObject } element) return;
-                t.Actions.EditTable(slide, element.Id, table => looks.Apply(table, choice.Look, choice.HeaderRow, choice.BandedRows));
+                t.Actions.EditTable(slide, element.Id, table => looks.Apply(table, choice.Look, choice.HeaderRow, choice.Banding));
             },
         };
 

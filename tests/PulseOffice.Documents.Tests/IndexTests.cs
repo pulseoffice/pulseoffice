@@ -62,7 +62,7 @@ public sealed class IndexTests
         Assert.True(Index.Protected);
         var entry = (ParagraphBlock)Index.Content[2];
         Assert.Equal(DefaultStyleNames.ContentsLevel(2), entry.StyleName);
-        Assert.Equal("#Dettagli|outline", entry.Content.Runs[0].Hyperlink);
+        Assert.Equal("#__RefHeading__p103", entry.Content.Runs[0].Hyperlink);
         _f.History.Undo();
         Assert.Empty(_f.IndexEditing.Indexes(_f.Document));
     }

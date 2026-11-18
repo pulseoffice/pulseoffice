@@ -24,8 +24,37 @@ internal sealed class SeriesSourceAddresses
 
     public string? Model(string? address)
     {
-        if (string.IsNullOrWhiteSpace(address) || _ranges.Read(address) is not { } found || found.Sheet.Length == 0) return null;
-        return _references.Write(found.Sheet, found.Range);
+        if (string.IsNullOrWhiteSpace(address)) return null;
+        var areas = new List<ChartSourceReference>();
+        foreach (var part in Parts(address))
+        {
+            if (_ranges.Read(part) is not { } found || found.Sheet.Length == 0) return null;
+            areas.Add(new ChartSourceReference(found.Sheet, found.Range));
+        }
+        return areas.Count switch
+        {
+            0 => null,
+            1 => _references.Write(areas[0].Sheet, areas[0].Range),
+            _ => _references.Write(areas),
+        };
+    }
+
+    private List<string> Parts(string address)
+    {
+        var parts = new List<string>();
+        var quoted = false;
+        var start = 0;
+        for (var index = 0; index < address.Length; index++)
+        {
+            if (address[index] == '\'') quoted = !quoted;
+            else if (address[index] == ' ' && !quoted)
+            {
+                if (index > start) parts.Add(address[start..index]);
+                start = index + 1;
+            }
+        }
+        if (address.Length > start) parts.Add(address[start..]);
+        return parts;
     }
 
     private ChartSeriesSource? Source(ChartDefinition definition, int series) =>
@@ -33,7 +62,9 @@ internal sealed class SeriesSourceAddresses
 
     public string? Address(string? text)
     {
-        if (_references.Read(text) is not { } reference) return null;
-        return reference.Range.IsSingleCell ? _ranges.WriteAddress(reference.Sheet, reference.Range.Start) : _ranges.Write(reference.Sheet, reference.Range);
+        var areas = _references.Areas(text);
+        if (areas.Count == 0) return null;
+        return string.Join(' ', areas.Select(reference =>
+            reference.Range.IsSingleCell ? _ranges.WriteAddress(reference.Sheet, reference.Range.Start) : _ranges.Write(reference.Sheet, reference.Range)));
     }
 }

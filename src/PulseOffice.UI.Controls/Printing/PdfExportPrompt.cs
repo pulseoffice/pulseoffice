@@ -4,7 +4,7 @@ using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.UI.Controls.Printing;
 
-public sealed record PdfPreviewLayout(string Label, Func<IPrintableDocument> Build);
+public sealed record PdfPreviewLayout(string Label, Func<bool, IPrintableDocument> Build);
 
 public sealed record PdfExportDefaults(string Title, string Author, string Subject, string Keywords, int PageCount)
 {
@@ -19,9 +19,14 @@ public sealed record PdfExportDefaults(string Title, string Author, string Subje
     public string LayoutLabel { get; init; } = string.Empty;
 
     public IReadOnlyList<PdfPreviewLayout> Layouts { get; init; } = [];
+
+    public string? IncludeHiddenLabel { get; init; }
 }
 
-public sealed record PdfExportChoice(PulseOffice.Formats.Pdf.PdfExportOptions Options, int? Layout);
+public sealed record PdfExportChoice(PulseOffice.Formats.Pdf.PdfExportOptions Options, int? Layout)
+{
+    public bool IncludeHidden { get; init; }
+}
 
 public interface IPdfExportPrompt
 {

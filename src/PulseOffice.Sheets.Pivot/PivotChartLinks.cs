@@ -36,18 +36,21 @@ public sealed class PivotChartLinks(IChartSourceReferences references, IChartDat
         if (leafRows.Count == 0 || leafColumns.Count == 0) return chart;
 
         var categoryColumn = pivot.Layout == PivotLayout.Tabular ? origin.Column + rowHeaderColumns - 1 : origin.Column;
-        var firstRow = origin.Row + headerRows + leafRows[0];
         var lastRow = origin.Row + headerRows + leafRows[^1];
         var nameRow = origin.Row + headerRows - 1;
         var sheet = pivot.DestinationSheet;
+        var runs = Runs(leafRows);
 
-        var categories = references.Write(sheet, new CellRange(new CellAddress(firstRow, categoryColumn), new CellAddress(lastRow, categoryColumn)));
+        var categories = Lane(sheet, runs, origin.Row + headerRows, categoryColumn);
         var sources = leafColumns.Select(index =>
         {
             var column = origin.Column + rowHeaderColumns + index;
+            var names = Enumerable.Range(origin.Row, headerRows)
+                .Select(row => new ChartSourceReference(sheet, new CellRange(new CellAddress(row, column), new CellAddress(row, column))))
+                .ToList();
             return new ChartSeriesSource(
-                references.Write(sheet, new CellRange(new CellAddress(nameRow, column), new CellAddress(nameRow, column))),
-                references.Write(sheet, new CellRange(new CellAddress(firstRow, column), new CellAddress(lastRow, column))),
+                names.Count == 1 ? references.Write(sheet, names[0].Range) : references.Write(names),
+                Lane(sheet, runs, origin.Row + headerRows, column),
                 categories);
         }).ToList();
 
@@ -101,6 +104,25 @@ public sealed class PivotChartLinks(IChartSourceReferences references, IChartDat
             }
         }
         return count;
+    }
+
+    private string Lane(string sheet, IReadOnlyList<(int First, int Last)> runs, int top, int column)
+    {
+        var areas = runs
+            .Select(run => new ChartSourceReference(sheet, new CellRange(new CellAddress(top + run.First, column), new CellAddress(top + run.Last, column))))
+            .ToList();
+        return areas.Count == 1 ? references.Write(sheet, areas[0].Range) : references.Write(areas);
+    }
+
+    private static List<(int First, int Last)> Runs(IReadOnlyList<int> rows)
+    {
+        var runs = new List<(int First, int Last)>();
+        foreach (var row in rows)
+        {
+            if (runs.Count > 0 && runs[^1].Last == row - 1) runs[^1] = (runs[^1].First, row);
+            else runs.Add((row, row));
+        }
+        return runs;
     }
 
     private static List<int> Leaves(IReadOnlyList<PivotNode> nodes, int fieldCount)

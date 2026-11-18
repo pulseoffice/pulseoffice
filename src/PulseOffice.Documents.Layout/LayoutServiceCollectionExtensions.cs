@@ -25,6 +25,9 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<INumberFormatter>(new LetterNumbers(true));
         services.AddSingleton<INumberFormatter>(new RomanNumbers(false));
         services.AddSingleton<INumberFormatter>(new RomanNumbers(true));
+        var systems = new NumberSystems();
+        foreach (var system in Enum.GetValues<NumberSystem>())
+            services.AddSingleton<INumberFormatter>(new SystemNumbers(Enum.Parse<PulseOffice.Documents.Styles.NumberFormat>(system.ToString()), system, systems));
         services.AddSingleton<IListLabeling, ListLabeling>();
         services.AddSingleton<IRunFonts, RunFonts>();
         services.TryAddSingleton<ILineSpacingRules, LineSpacingRules>();

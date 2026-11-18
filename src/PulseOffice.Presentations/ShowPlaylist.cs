@@ -16,4 +16,16 @@ public sealed class ShowPlaylist
             .Select(entry => entry.slide)
             .ToList();
     }
+
+    public int DetourPosition(Presentation deck, IReadOnlyList<Slide> playlist, Slide detour)
+    {
+        ArgumentNullException.ThrowIfNull(deck);
+        ArgumentNullException.ThrowIfNull(playlist);
+        ArgumentNullException.ThrowIfNull(detour);
+        var order = deck.IndexOf(detour);
+        var position = 0;
+        for (var index = 0; index < playlist.Count; index++)
+            if (deck.IndexOf(playlist[index]) is var placed && placed >= 0 && placed < order) position = index + 1;
+        return position;
+    }
 }

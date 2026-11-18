@@ -128,7 +128,7 @@ public sealed class FolioInsertCommands(
         {
             editor.Insert((documents, at) => documents.InsertTable(editor.Document, editor.History, at, choice.Rows, choice.Columns), "insert-table");
             if (container.Blocks.OfType<PulseOffice.Documents.Blocks.TableBlock>().FirstOrDefault(table => !existing.Contains(table.Id)) is not { } created) return;
-            looks.Apply(editor, created, choice.Look, choice.HeaderRow, choice.BandedRows);
+            looks.Apply(editor, created, choice.Look, choice.HeaderRow, new PulseOffice.Document.Tables.TableBanding { BandedRows = choice.BandedRows });
             if (created.Cell(0, 0).Content.Blocks.OfType<PulseOffice.Documents.Blocks.ParagraphBlock>().FirstOrDefault() is { } first)
                 editor.Select(new PulseOffice.Documents.Editing.DocumentPosition(first.Id, 0), new PulseOffice.Documents.Editing.DocumentPosition(first.Id, 0));
         }

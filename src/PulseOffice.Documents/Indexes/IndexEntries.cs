@@ -14,6 +14,8 @@ public sealed record IndexEntry(string Text, int Level, IReadOnlyList<string> Pa
     public string? Link { get; init; }
 
     public string? Prefix { get; init; }
+
+    public string? HeadingId { get; init; }
 }
 
 public interface IIndexEntrySource
@@ -34,6 +36,9 @@ public sealed class IndexScope(IDocumentReadingOrder order, IBlockTree tree) : I
     {
         var generated = tree.Blocks(document.Body).OfType<SectionBlock>().Where(section => section.IsIndex)
             .SelectMany(section => tree.Paragraphs(section.Content)).Select(paragraph => paragraph.Id).ToHashSet(StringComparer.Ordinal);
+        generated.UnionWith(tree.Blocks(document.Body).OfType<TableBlock>().SelectMany(table => table.Rows)
+            .Where(row => row.ChangeId is { } change && document.Changes.Find(change) is Annotations.Deletion)
+            .SelectMany(row => row.Cells).SelectMany(cell => tree.Paragraphs(cell.Content)).Select(paragraph => paragraph.Id));
         return order.BodyWithFrames(document).Where(paragraph => !generated.Contains(paragraph.Id));
     }
 }
@@ -48,7 +53,7 @@ public sealed class ContentsEntrySource(IIndexScope scope, IDocumentOutline outl
         foreach (var paragraph in scope.Paragraphs(document))
         {
             if (definition.FromOutline && outline.LevelOf(document, paragraph) is { } level && level <= definition.Levels && paragraph.Text.Trim() is { Length: > 0 } text)
-                entries.Add(new IndexEntry(text, level, [paragraph.Id]) { Link = "#" + text + "|outline" });
+                entries.Add(new IndexEntry(text, level, [paragraph.Id]) { HeadingId = paragraph.Id });
             if (!definition.FromMarks) continue;
             foreach (var mark in paragraph.Marks.OfType<IndexEntryMark>().Where(mark => mark.Index is "toc" && mark.Edge != MarkEdge.End && (mark.Level ?? 1) <= definition.Levels))
                 entries.Add(new IndexEntry(mark.Entry, mark.Level ?? 1, [paragraph.Id]));

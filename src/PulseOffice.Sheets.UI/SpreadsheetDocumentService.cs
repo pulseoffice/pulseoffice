@@ -17,7 +17,7 @@ public interface ISpreadsheetDocumentService
     Task SaveAsAsync(OpenDocument document, CancellationToken ct = default);
 }
 
-public sealed class SpreadsheetModuleFormats(ISpreadsheetFormatRegistry formats) : IModuleFormats<Workbook>
+public sealed class SpreadsheetModuleFormats(ISpreadsheetFormatRegistry formats, PulseOffice.Sheets.Pivot.IPivotCoordinator pivots) : IModuleFormats<Workbook>
 {
     public IReadOnlyList<FileFilter> ReadableFilters => Filters(formats.ReadableFormats);
 
@@ -43,6 +43,7 @@ public sealed class SpreadsheetModuleFormats(ISpreadsheetFormatRegistry formats)
 
     private OperationResult<Workbook> Named(string path, OperationResult<Workbook> result)
     {
+        if (result.Value is { Pivots.Count: > 0 } linked) pivots.FollowCharts(linked);
         if (result.Value is { Sheets.Count: 1 } workbook && DelimitedReaderFor(path) is not null
             && _names.FromFile(path) is { Length: > 0 } name)
             workbook.Sheets[0].Name = name;

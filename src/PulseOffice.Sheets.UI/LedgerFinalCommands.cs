@@ -266,8 +266,8 @@ public sealed class LedgerFinalCommands(
     private async Task TableStylesAsync(CancellationToken ct)
     {
         if (Context.Workbook is null) return;
-        if (await gallery.AskAsync("command.ledger.format.tableStyles.title", null, true, true, ct).ConfigureAwait(true) is not { } choice) return;
-        looks.ApplyToSelection(texts["history.format.tableStyle"], choice.Look, choice.HeaderRow, choice.BandedRows);
+        if (await gallery.AskAsync("command.ledger.format.tableStyles.title", null, true, PulseOffice.Document.Tables.TableBanding.Standard, ct).ConfigureAwait(true) is not { } choice) return;
+        looks.ApplyToSelection(texts["history.format.tableStyle"], choice.Look, choice.HeaderRow, choice.Banding);
     }
 
     private async Task ThemeAsync(CancellationToken ct)

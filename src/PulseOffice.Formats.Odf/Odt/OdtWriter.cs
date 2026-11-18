@@ -387,7 +387,7 @@ internal sealed class OdtChangeWriter(IOdfParagraphText paragraphs) : OdtXml
 
         XElement body = change switch
         {
-            Insertion => new XElement(Text + "insertion", info),
+            Insertion insertion => new XElement(Text + "insertion", info, insertion.MoveId is { } move ? new XAttribute(Pt + "move-id", move) : null),
             Deletion deletion => Deletion(deletion, info, styles, session, blocks),
             ParagraphFormatChange layout => Previous(new XElement(Text + "format-change", new XAttribute(Pt + "kind", "paragraph"), info),
                 change.Id, layout.PreviousKnown ? layout.Previous : null, styles, session, blocks),
@@ -411,6 +411,7 @@ internal sealed class OdtChangeWriter(IOdfParagraphText paragraphs) : OdtXml
     {
         var element = new XElement(Text + "deletion", info);
         if (deletion.WithinInsertion is { } within) element.Add(new XAttribute(Pt + "within-insertion", within));
+        if (deletion.MoveId is { } move) element.Add(new XAttribute(Pt + "move-id", move));
         blocks.Write(element, deletion.Removed.Blocks, styles, session);
         return element;
     }

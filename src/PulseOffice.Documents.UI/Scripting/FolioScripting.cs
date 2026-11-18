@@ -169,20 +169,20 @@ public sealed class FolioFacade(IScriptDispatcher dispatcher, IActiveFolioContex
         return true;
     }
 
-    public int Find(string text)
+    public int Find(string text, bool matchCase = false)
     {
         if (string.IsNullOrEmpty(text)) throw new ArgumentException("The text to find is empty.", nameof(text));
-        return Read(() => services.Search.FindAll(Paragraphs(), new SearchQuery(text)).Count);
+        return Read(() => services.Search.FindAll(Paragraphs(), new SearchQuery(text, MatchCase: matchCase)).Count);
     }
 
-    public int Replace(string text, string replacement)
+    public int Replace(string text, string replacement, bool matchCase = false)
     {
         if (string.IsNullOrEmpty(text)) throw new ArgumentException("The text to replace is empty.", nameof(text));
         var count = 0;
         Change(() =>
         {
             var editor = Writable();
-            var found = services.Search.FindAll(Paragraphs(), new SearchQuery(text, MatchCase: true))
+            var found = services.Search.FindAll(Paragraphs(), new SearchQuery(text, MatchCase: matchCase))
                 .Where(range => Verdict(editor, range.Start.ParagraphId) == EditVerdict.Allowed)
                 .ToList();
             var value = replacement ?? string.Empty;
@@ -463,8 +463,8 @@ public sealed class FolioScriptApi : IScriptApiSection
             new("Italic", "boolean", "Italic(paragraph, on)", ["paragraph:paragraphNumber", "on:flag"]),
             new("SelectParagraph", "boolean", "SelectParagraph(paragraph)", ["paragraph:paragraphNumber"]),
             new("Select", "boolean", "Select(paragraph, start, end)", ["paragraph:paragraphNumber", "start:offset", "end:offset"]),
-            new("Find", "number", "Find(text)", ["text:text"]),
-            new("Replace", "number", "Replace(text, replacement)", ["text:text", "replacement:replacement"]),
+            new("Find", "number", "Find(text, matchCase)", ["text:text", "matchCase:matchCase"]),
+            new("Replace", "number", "Replace(text, replacement, matchCase)", ["text:text", "replacement:replacement", "matchCase:matchCase"]),
             new("InsertTable", "boolean", "InsertTable(rows, columns)", ["rows:count", "columns:count"]),
             new("Cell", "string", "Cell(table, row, column)", ["table:tableNumber", "row:rowNumber", "column:columnNumber"]),
             new("SetCell", "boolean", "SetCell(table, row, column, text)", ["table:tableNumber", "row:rowNumber", "column:columnNumber", "text:cellText"]),

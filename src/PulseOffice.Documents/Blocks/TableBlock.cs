@@ -121,6 +121,8 @@ public sealed class TableBlock(string id, IEnumerable<TableRow> rows, IEnumerabl
 
     public bool RepeatHeaderRows { get; set; } = true;
 
+    public PulseOffice.Document.Tables.TableBanding Banding { get; set; } = PulseOffice.Document.Tables.TableBanding.Standard;
+
     public Styles.TableProperties Direct { get; set; } = Styles.TableProperties.None;
 
     public string? PageStyleName { get; set; }
@@ -143,6 +145,7 @@ public sealed class TableBlock(string id, IEnumerable<TableRow> rows, IEnumerabl
         StyleName = StyleName,
         HeaderRows = HeaderRows,
         RepeatHeaderRows = RepeatHeaderRows,
+        Banding = Banding,
         Direct = Direct,
         PageStyleName = PageStyleName,
         PageBreakBefore = PageBreakBefore,

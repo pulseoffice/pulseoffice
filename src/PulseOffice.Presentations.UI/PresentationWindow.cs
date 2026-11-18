@@ -12,7 +12,7 @@ namespace PulseOffice.Presentations.UI;
 public sealed class PresentationWindow : Window
 {
     private readonly Presentation _deck;
-    private readonly IReadOnlyList<Slide> _playlist;
+    private readonly ShowPlaylist _playlists = new();
     private readonly PresentationController _controller;
     private readonly ISlideRenderer _renderer;
     private readonly bool _loop;
@@ -28,6 +28,17 @@ public sealed class PresentationWindow : Window
     private readonly ShowPointerGestures _gestures = new();
 
     private readonly Canvas _ink = new() { IsHitTestVisible = false };
+    private readonly ShowKeypad _keypad = new();
+    private readonly TextBlock _endMessage = new()
+    {
+        Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+        FontSize = 20,
+        Margin = new Thickness(24),
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Top,
+        IsVisible = false,
+    };
+    private readonly Border _curtain = new() { IsVisible = false, IsHitTestVisible = false, ZIndex = 5 };
     private readonly Ellipse _laser = new()
     {
         Width = 18,
@@ -43,12 +54,7 @@ public sealed class PresentationWindow : Window
     private int _inkSlideIndex = -1;
 
     private readonly bool _rehearse;
-    private readonly RehearsalTimeline _timeline = new();
-    private readonly System.Diagnostics.Stopwatch _slideClock = new();
-    private readonly System.Diagnostics.Stopwatch _totalClock = new();
-    private string? _rehearsalId;
-    private TextBlock? _timerLabel;
-    private DispatcherTimer? _timerTick;
+    private readonly ShowRehearsalClock _rehearsal = new();
 
     private DispatcherTimer? _animator;
     private Action? _finishAnimation;
@@ -59,25 +65,26 @@ public sealed class PresentationWindow : Window
 
     public event EventHandler<IReadOnlyDictionary<string, int>>? RehearsalFinished;
 
+    private IReadOnlyList<Slide> Playlist => _controller.Slides;
+
     public Slide? CurrentSlide => _controller.Current;
 
-    public Slide? NextSlide => _controller.SlideIndex + 1 < _playlist.Count
-        ? _playlist[_controller.SlideIndex + 1]
+    public Slide? NextSlide => _controller.SlideIndex + 1 < Playlist.Count
+        ? Playlist[_controller.SlideIndex + 1]
         : null;
 
     public int SlideNumber => _controller.SlideIndex + 1;
 
-    public int SlideTotal => _playlist.Count;
+    public int SlideTotal => Playlist.Count;
 
     private readonly PulseOffice.Document.Forms.IFormControlInteraction? _forms;
     private readonly Action<Slide, SlideElement>? _controlChanged;
 
-    private readonly Func<MediaElement, Task>? _playMedia;
+    private readonly ShowMediaStage _media;
 
     public PresentationWindow(Presentation deck, IAnimationScheduler scheduler, ISlideRenderer renderer, PresentationOptions options)
     {
         _deck = deck;
-        _playlist = [.. options.Playlist is { Count: > 0 } list ? list : deck.Slides];
         _renderer = renderer;
         _loop = options.Loop;
         _rehearse = options.Rehearse;
@@ -86,29 +93,27 @@ public sealed class PresentationWindow : Window
         _monitorIndex = options.MonitorIndex;
         _forms = options.Forms;
         _controlChanged = options.ControlChanged;
-        _playMedia = options.PlayMedia;
         _penBrush = new SolidColorBrush(ParseColor(options.PenColor));
         _laser.Fill = _penBrush;
-        _controller = new PresentationController(_playlist, scheduler, options.StartIndex, ignoreSteps: _withoutAnimation);
+        _endMessage.Text = options.EndOfShowText;
+        _curtain.Child = _endMessage;
+        _controller = new PresentationController([.. options.Playlist is { Count: > 0 } list ? list : deck.Slides], scheduler, options.StartIndex, ignoreSteps: _withoutAnimation);
 
         _front = NewCanvas();
         _back = NewCanvas();
         _back.IsVisible = false;
+        _media = new ShowMediaStage(options.Media, _front.BoundsOf);
+        _front.SizeChanged += (_, _) => _media.Relayout();
 
         _stage = new Panel
         {
             Background = Brushes.Black,
-            Children = { _back, _front, _ink, new Canvas { IsHitTestVisible = false, ZIndex = 10, Children = { _laser } } },
+            Children = { _back, _front, _media.Layer, _curtain, _ink, new Canvas { IsHitTestVisible = false, ZIndex = 10, Children = { _laser } } },
         };
         _front.ZIndex = 1;
         _ink.ZIndex = 10;
 
-        if (_rehearse)
-        {
-            var overlay = BuildRehearsalOverlay();
-            overlay.ZIndex = 20;
-            _stage.Children.Add(overlay);
-        }
+        if (_rehearse) _stage.Children.Add(_rehearsal.Overlay);
 
         Title = "PulseOffice — Deck";
         Background = Brushes.Black;
@@ -118,7 +123,7 @@ public sealed class PresentationWindow : Window
         ShowSlide(_front, _controller.SlideIndex);
         PlayEntry();
 
-        if (_rehearse) StartRehearsal();
+        if (_rehearse) _rehearsal.Start(_controller.Current?.Id);
 
         Focusable = true;
         KeyDown += OnKeyDown;
@@ -146,55 +151,6 @@ public sealed class PresentationWindow : Window
     private static Color ParseColor(string? hex) =>
         !string.IsNullOrWhiteSpace(hex) && Color.TryParse(hex, out var color) ? color : Color.FromRgb(225, 29, 46);
 
-    private Control BuildRehearsalOverlay()
-    {
-        _timerLabel = new TextBlock
-        {
-            FontSize = 22,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(236, 238, 244)),
-        };
-
-        return new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(180, 20, 20, 26)),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(14, 8),
-            Margin = new Thickness(20),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            Child = _timerLabel,
-        };
-    }
-
-    private void StartRehearsal()
-    {
-        _totalClock.Restart();
-        MarkSlide();
-        _timerTick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        _timerTick.Tick += (_, _) => UpdateTimerLabel();
-        _timerTick.Start();
-        UpdateTimerLabel();
-    }
-
-    private void MarkSlide()
-    {
-        var id = _controller.Current?.Id;
-        if (id == _rehearsalId) return;
-
-        if (_rehearsalId is { } previous) _timeline.Record(previous, (int)_slideClock.ElapsedMilliseconds);
-        _rehearsalId = id;
-        _slideClock.Restart();
-    }
-
-    private void UpdateTimerLabel()
-    {
-        if (_timerLabel is null) return;
-        _timerLabel.Text = $"{Clock(_slideClock.Elapsed)}   /   {Clock(_totalClock.Elapsed)}";
-    }
-
-    private static string Clock(TimeSpan span) => $"{(int)span.TotalMinutes:00}:{span.Seconds:00}";
-
     private readonly ShowSlideSetup _setup = new();
 
     private SlideView NewCanvas()
@@ -221,7 +177,7 @@ public sealed class PresentationWindow : Window
 
     private void ShowSlide(SlideView canvas, int index)
     {
-        var slide = index >= 0 && index < _playlist.Count ? _playlist[index] : null;
+        var slide = index >= 0 && index < Playlist.Count ? Playlist[index] : null;
         _setup.Show(canvas, _deck, slide);
     }
 
@@ -230,6 +186,7 @@ public sealed class PresentationWindow : Window
         if (_inkSlideIndex != _controller.SlideIndex)
         {
             _ink.Children.Clear();
+            _media.Clear();
             _inkSlideIndex = _controller.SlideIndex;
         }
 
@@ -247,14 +204,86 @@ public sealed class PresentationWindow : Window
             _front.InvalidateVisual();
         }
 
-        if (_rehearse) MarkSlide();
+        if (_rehearse) _rehearsal.Mark(_controller.Current?.Id);
         RestartAutoAdvance();
         SlideChanged?.Invoke(this, EventArgs.Empty);
     }
 
 
+    public ShowCurtain Screen => _keypad.Screen;
+
+    private static int? Digit(Key key) => key switch
+    {
+        >= Key.D0 and <= Key.D9 => key - Key.D0,
+        >= Key.NumPad0 and <= Key.NumPad9 => key - Key.NumPad0,
+        _ => null,
+    };
+
+    private void RefreshScreen()
+    {
+        _curtain.IsVisible = _keypad.Screen != ShowCurtain.Slide;
+        _curtain.Background = _keypad.Screen == ShowCurtain.White ? Brushes.White : Brushes.Black;
+        _endMessage.IsVisible = _keypad.Screen == ShowCurtain.End && _endMessage.Text is { Length: > 0 };
+    }
+
+    private void Resume()
+    {
+        _keypad.Resume();
+        RefreshScreen();
+    }
+
+    private bool HandleScreenKey(Key key)
+    {
+        if (_keypad.Screen == ShowCurtain.End)
+        {
+            if (key is Key.Left or Key.Up or Key.PageUp or Key.Back) Resume();
+            else Close();
+            return true;
+        }
+
+        if (Digit(key) is { } digit)
+        {
+            _keypad.Type(digit);
+            return true;
+        }
+
+        if (key == Key.Enter && _keypad.TakeNumber() is { } number)
+        {
+            Resume();
+            if (number >= 1 && number <= _deck.Slides.Count)
+            {
+                var wanted = _deck.Slides[number - 1];
+                GoToSlide(slide => ReferenceEquals(slide, wanted));
+            }
+            return true;
+        }
+
+        _keypad.ClearTyped();
+        switch (key)
+        {
+            case Key.B or Key.OemPeriod:
+                _keypad.Toggle(ShowCurtain.Black);
+                RefreshScreen();
+                return true;
+            case Key.W or Key.OemComma:
+                _keypad.Toggle(ShowCurtain.White);
+                RefreshScreen();
+                return true;
+        }
+
+        if (!_keypad.IsBlanked) return false;
+        Resume();
+        return true;
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (HandleScreenKey(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Escape:
@@ -282,7 +311,7 @@ public sealed class PresentationWindow : Window
                 Jump();
                 break;
             case Key.End:
-                _controller.GoTo(_playlist.Count - 1);
+                _controller.GoTo(Playlist.Count - 1);
                 Jump();
                 break;
         }
@@ -306,7 +335,7 @@ public sealed class PresentationWindow : Window
 
     public int SlidePosition => _controller.SlideIndex;
 
-    public int SlideCount => _playlist.Count;
+    public int SlideCount => Playlist.Count;
 
     public void FirstExternal()
     {
@@ -317,12 +346,24 @@ public sealed class PresentationWindow : Window
 
     public void LastExternal()
     {
-        _controller.GoTo(_playlist.Count - 1);
+        _controller.GoTo(Playlist.Count - 1);
         Jump();
     }
 
     private void Advance()
     {
+        if (_keypad.Screen == ShowCurtain.End)
+        {
+            Close();
+            return;
+        }
+
+        if (_keypad.IsBlanked)
+        {
+            Resume();
+            return;
+        }
+
         if (_busy)
         {
             _finishAnimation?.Invoke();
@@ -341,7 +382,7 @@ public sealed class PresentationWindow : Window
                 PlayTransition(slideBefore, _controller.SlideIndex);
                 break;
             case AdvanceResult.Finished:
-                if (_loop && _playlist.Count > 0)
+                if (_loop && Playlist.Count > 0)
                 {
                     var last = _controller.SlideIndex;
                     _controller.GoTo(0);
@@ -349,13 +390,24 @@ public sealed class PresentationWindow : Window
                     if (last == 0) Jump();
                     else PlayTransition(last, 0);
                 }
-                else Close();
+                else if (_rehearse) Close();
+                else
+                {
+                    _keypad.End();
+                    RefreshScreen();
+                }
                 break;
         }
     }
 
     private void Back()
     {
+        if (_keypad.Screen != ShowCurtain.Slide)
+        {
+            Resume();
+            return;
+        }
+
         if (_busy)
         {
             _finishAnimation?.Invoke();
@@ -381,6 +433,13 @@ public sealed class PresentationWindow : Window
     private void OnPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         var move = _gestures.ForPress(e.GetCurrentPoint(this).Properties.PointerUpdateKind);
+        if (_keypad.Screen != ShowCurtain.Slide)
+        {
+            Move(move);
+            e.Handled = true;
+            return;
+        }
+
         if (move != ShowMove.Forward)
         {
             if (_tool == PointerTool.None) Move(move);
@@ -422,9 +481,9 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        if (element is MediaElement media && _playMedia is { } play)
+        if (element is MediaElement media && _media.Handles(media))
         {
-            _ = play(media);
+            _ = _media.ActivateAsync(media);
             e.Handled = true;
             return;
         }
@@ -471,7 +530,7 @@ public sealed class PresentationWindow : Window
             return new InteractiveAction { TargetId = image.Id, Kind = InteractionKind.Hyperlink, Reference = area.Target };
 
         var name = area.Target[1..];
-        var slide = _playlist.FirstOrDefault(candidate => candidate.Id == name || candidate.Name == name);
+        var slide = _deck.Slides.FirstOrDefault(candidate => candidate.Id == name || candidate.Name == name);
         return slide is null ? null : new InteractiveAction { TargetId = image.Id, Kind = InteractionKind.GoToSlide, Reference = slide.Id };
     }
 
@@ -483,10 +542,9 @@ public sealed class PresentationWindow : Window
             case InteractionKind.NextSlide: return GoToSlideIndex(current + 1);
             case InteractionKind.PreviousSlide: return GoToSlideIndex(current - 1);
             case InteractionKind.FirstSlide: return GoToSlideIndex(0);
-            case InteractionKind.LastSlide: return GoToSlideIndex(_playlist.Count - 1);
+            case InteractionKind.LastSlide: return GoToSlideIndex(Playlist.Count - 1);
             case InteractionKind.GoToSlide:
-                var index = _playlist.ToList().FindIndex(sl => sl.Id == action.Reference);
-                return index >= 0 && GoToSlideIndex(index);
+                return GoToSlide(slide => slide.Id == action.Reference);
             case InteractionKind.StopShow:
                 Close();
                 return true;
@@ -494,8 +552,7 @@ public sealed class PresentationWindow : Window
                 if (action.Reference is { Length: > 1 } local && local[0] == '#')
                 {
                     var name = local[1..];
-                    var found = _playlist.ToList().FindIndex(sl => sl.Id == name || sl.Name == name);
-                    return found >= 0 && GoToSlideIndex(found);
+                    return GoToSlide(slide => slide.Id == name || slide.Name == name);
                 }
                 if (action.Reference is { Length: > 0 } url && Uri.TryCreate(url, UriKind.Absolute, out var uri)
                     && uri.Scheme is "http" or "https" or "mailto")
@@ -506,9 +563,16 @@ public sealed class PresentationWindow : Window
         }
     }
 
+    private bool GoToSlide(Func<Slide, bool> wanted)
+    {
+        if ((Playlist.FirstOrDefault(wanted) ?? _deck.Slides.FirstOrDefault(wanted)) is not { } slide) return false;
+        var index = _controller.Admit(slide, _playlists.DetourPosition(_deck, Playlist, slide));
+        return GoToSlideIndex(index);
+    }
+
     private bool GoToSlideIndex(int target)
     {
-        if (target < 0 || target >= _playlist.Count) return false;
+        if (target < 0 || target >= Playlist.Count) return false;
         if (target == _controller.SlideIndex) return true;
 
         var before = _controller.SlideIndex;
@@ -519,6 +583,8 @@ public sealed class PresentationWindow : Window
 
     private void Jump()
     {
+        _keypad.Resume();
+        RefreshScreen();
         StopAnimator();
         ResetBack();
         ShowSlide(_front, _controller.SlideIndex);
@@ -562,7 +628,7 @@ public sealed class PresentationWindow : Window
 
     private void PlayTransition(int fromIndex, int toIndex)
     {
-        var transition = _playlist[toIndex].Transition;
+        var transition = Playlist[toIndex].Transition;
         if (transition.IsNone)
         {
             ShowSlide(_front, toIndex);
@@ -625,7 +691,7 @@ public sealed class PresentationWindow : Window
 
     private Func<string, ElementVisual>? InitialVisualFor(int index)
     {
-        var plan = _controller.PlanOf(_playlist[index]);
+        var plan = _controller.PlanOf(Playlist[index]);
         return plan.NeedsVisuals ? id => plan.VisualAt(id, -1, _ => -1) : null;
     }
 
@@ -689,14 +755,10 @@ public sealed class PresentationWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         StopAnimator();
+        _media.Clear();
         _autoAdvance?.Stop();
 
-        if (_rehearse)
-        {
-            _timerTick?.Stop();
-            if (_rehearsalId is { } id) _timeline.Record(id, (int)_slideClock.ElapsedMilliseconds);
-            RehearsalFinished?.Invoke(this, _timeline.Times);
-        }
+        if (_rehearse) RehearsalFinished?.Invoke(this, _rehearsal.Finish());
 
         base.OnClosed(e);
     }

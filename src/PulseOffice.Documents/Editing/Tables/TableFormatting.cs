@@ -35,6 +35,8 @@ public interface ITableFormatting
 
     DocumentEdit SetHeaderRows(TextDocument document, UndoStack history, TableBlock table, int count, bool repeat);
 
+    DocumentEdit SetBanding(TextDocument document, UndoStack history, TableBlock table, TableBanding banding);
+
     DocumentEdit SetPlacement(TextDocument document, UndoStack history, TableBlock table, TableAlignment alignment, Twip indent);
 
     DocumentEdit SetRowBreak(TextDocument document, UndoStack history, TableSelection selection, bool allow);
@@ -110,6 +112,14 @@ public sealed class TableFormatting(ITableGrid grid, IStyleEditing styles, IBloc
         var recorder = new EditRecorder(document, "set-table-header").Touch(table);
         table.HeaderRows = Math.Clamp(count, 0, table.Rows.Count);
         table.RepeatHeaderRows = repeat;
+        return recorder.Commit(history);
+    }
+
+    public DocumentEdit SetBanding(TextDocument document, UndoStack history, TableBlock table, TableBanding banding)
+    {
+        ArgumentNullException.ThrowIfNull(banding);
+        var recorder = new EditRecorder(document, "set-table-banding").Touch(table);
+        table.Banding = banding;
         return recorder.Commit(history);
     }
 

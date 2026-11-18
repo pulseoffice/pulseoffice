@@ -618,7 +618,12 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
             table.Name is null ? new XAttribute(Pt + "unnamed", "true") : null,
             new XAttribute(Table + "style-name", tableStyle),
             new XAttribute(Xml + "id", table.Id),
-            table.RepeatHeaderRows ? null : new XAttribute(Pt + "repeat-header", "false"));
+            table.RepeatHeaderRows ? null : new XAttribute(Pt + "repeat-header", "false"),
+            table.Banding.BandedRows ? null : new XAttribute(Table + "use-banding-rows-styles", "false"),
+            table.Banding.BandedColumns ? new XAttribute(Table + "use-banding-columns-styles", "true") : null,
+            table.Banding.FirstColumn ? new XAttribute(Table + "use-first-column-styles", "true") : null,
+            table.Banding.LastColumn ? new XAttribute(Table + "use-last-column-styles", "true") : null,
+            table.Banding.LastRow ? new XAttribute(Table + "use-last-row-styles", "true") : null);
 
         foreach (var column in table.Columns)
         {

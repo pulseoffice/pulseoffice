@@ -20,22 +20,30 @@ public interface IScriptExecutionPermissions
 {
     ScriptPermissions Current { get; }
 
+    CancellationToken Cancellation { get; }
+
     IDisposable Enter(ScriptPermissions permissions);
+
+    IDisposable Enter(ScriptPermissions permissions, CancellationToken cancellation);
 
     void Demand(ScriptCapability capability);
 }
 
 public sealed class ScriptExecutionPermissions : IScriptExecutionPermissions
 {
-    private readonly AsyncLocal<ScriptPermissions?> _current = new();
+    private readonly AsyncLocal<RunScope?> _current = new();
 
-    public ScriptPermissions Current => _current.Value ?? ScriptPermissions.Sandboxed;
+    public ScriptPermissions Current => _current.Value?.Permissions ?? ScriptPermissions.Sandboxed;
 
-    public IDisposable Enter(ScriptPermissions permissions)
+    public CancellationToken Cancellation => _current.Value?.Cancellation ?? CancellationToken.None;
+
+    public IDisposable Enter(ScriptPermissions permissions) => Enter(permissions, Cancellation);
+
+    public IDisposable Enter(ScriptPermissions permissions, CancellationToken cancellation)
     {
         ArgumentNullException.ThrowIfNull(permissions);
         var previous = _current.Value;
-        _current.Value = permissions;
+        _current.Value = new RunScope(permissions, cancellation);
         return new Scope(this, previous);
     }
 
@@ -55,7 +63,9 @@ public sealed class ScriptExecutionPermissions : IScriptExecutionPermissions
         if (!allowed) throw new ScriptPermissionException(capability);
     }
 
-    private sealed class Scope(ScriptExecutionPermissions owner, ScriptPermissions? previous) : IDisposable
+    private sealed record RunScope(ScriptPermissions Permissions, CancellationToken Cancellation);
+
+    private sealed class Scope(ScriptExecutionPermissions owner, RunScope? previous) : IDisposable
     {
         private bool _disposed;
 

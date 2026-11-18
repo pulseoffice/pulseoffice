@@ -7,15 +7,17 @@ namespace PulseOffice.Presentations.UI;
 
 public interface IDeckTableLooks
 {
-    DataTableObject Apply(DataTableObject table, TableLook look, bool headerRow, bool bandedRows);
+    DataTableObject Apply(DataTableObject table, TableLook look, bool headerRow, TableBanding banding);
 }
 
 public sealed class DeckTableLooks : IDeckTableLooks
 {
-    public DataTableObject Apply(DataTableObject table, TableLook look, bool headerRow, bool bandedRows)
+    public DataTableObject Apply(DataTableObject table, TableLook look, bool headerRow, TableBanding banding)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(look);
+        ArgumentNullException.ThrowIfNull(banding);
+        var style = table.Style.WithBanding(banding);
         var rows = table.Snapshot.Rows.Count;
         var columns = table.Snapshot.Columns.Count;
         var line = new TableBorderLine(Hex(look.BorderColor), look.BorderWidth);
@@ -26,8 +28,8 @@ public sealed class DeckTableLooks : IDeckTableLooks
             {
                 var header = row < 0;
                 var fill = header ? look.HeaderFill
-                    : bandedRows && row % 2 == 1 ? look.BandFill
-                    : table.Style.BandedColumns && column % 2 == 1 ? look.BandFill ?? look.BodyFill
+                    : banding.BandsRow(row) ? look.BandFill
+                    : banding.BandsColumn(column) ? look.BandFill ?? look.BodyFill
                     : look.BodyFill;
                 var opening = row == first;
                 var closing = header || row == rows - 1;
@@ -38,7 +40,7 @@ public sealed class DeckTableLooks : IDeckTableLooks
                     {
                         FillHex = fill is { } colour ? Hex(colour) : null,
                         TextHex = header && look.HeaderInk is { } ink ? Hex(ink) : null,
-                        Bold = header ? look.HeaderBold : Emphasized(table.Style, row, column, rows, columns),
+                        Bold = header ? look.HeaderBold : banding.Emphasizes(row, column, rows, columns),
                         Top = look.InnerLines || opening ? line : null,
                         Bottom = look.InnerLines || closing ? line : null,
                         Left = look.InnerLines ? line : null,
@@ -50,19 +52,16 @@ public sealed class DeckTableLooks : IDeckTableLooks
         return table with
         {
             CellFormats = formats,
-            Style = table.Style with
+            Style = style with
             {
                 HeaderRow = headerRow,
-                BandedRows = bandedRows && look.BandFill is not null,
+                BandedRows = banding.BandedRows && look.BandFill is not null,
                 Grid = look.InnerLines,
                 AccentHex = Hex(look.HeaderFill ?? look.BorderColor),
                 OwnLook = true,
             },
         };
     }
-
-    private bool Emphasized(DataTableStyle style, int row, int column, int rows, int columns) =>
-        (style.FirstColumn && column == 0) || (style.LastColumn && column == columns - 1) || (style.LastRow && row == rows - 1);
 
     private string Hex(uint argb) => new ArgbColor(argb).ToHashedHex();
 }

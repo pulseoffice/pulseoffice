@@ -55,9 +55,12 @@ internal static class DocumentFormatsComposition
         services.AddSingleton<PulseOffice.Drawing.Assets.IVectorRasterizer, PulseOffice.Formats.Rasterizing.SkiaVectorRasterizer>();
         services.AddSingleton(provider => new PulseOffice.Formats.SignatureLineImage(provider.GetRequiredService<PulseOffice.Drawing.Assets.IVectorRasterizer>()));
         services.AddSingleton(provider => new PulseOffice.Formats.VectorFallback(provider.GetRequiredService<PulseOffice.Drawing.Assets.IVectorRasterizer>()));
-        services.AddSingleton<ISpreadsheetWriter>(provider => new OdsSpreadsheetWriter(false, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>()));
-        services.AddSingleton<ISpreadsheetWriter>(provider => new OdsSpreadsheetWriter(true, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>()));
-        services.AddSingleton<ISpreadsheetWriter>(provider => new FlatOdsSpreadsheetWriter(new OdsSpreadsheetWriter(false, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>())));
+        services.TryAddSingleton<PulseOffice.Platform.IPrivateSpool, PulseOffice.Platform.PrivateFileSpool>();
+        services.AddSingleton<IContentSpool>(provider => new OverflowContentSpool(
+            () => provider.GetRequiredService<PulseOffice.Platform.IPrivateSpool>().Create(), OverflowContentSpool.DefaultThreshold));
+        services.AddSingleton<ISpreadsheetWriter>(provider => new OdsSpreadsheetWriter(false, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>(), provider.GetRequiredService<IContentSpool>()));
+        services.AddSingleton<ISpreadsheetWriter>(provider => new OdsSpreadsheetWriter(true, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>(), provider.GetRequiredService<IContentSpool>()));
+        services.AddSingleton<ISpreadsheetWriter>(provider => new FlatOdsSpreadsheetWriter(new OdsSpreadsheetWriter(false, provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>(), provider.GetRequiredService<IContentSpool>())));
         services.AddSingleton<ISpreadsheetReader, XlsxSpreadsheetReader>();
         services.AddSingleton<ISpreadsheetReader>(_ => new XlsxSpreadsheetReader(XlsxFormat.Template));
         services.AddSingleton<ISpreadsheetWriter>(provider => new XlsxSpreadsheetWriter(provider.GetRequiredService<PulseOffice.Formats.SignatureLineImage>(), provider.GetRequiredService<PulseOffice.Formats.VectorFallback>(), false));

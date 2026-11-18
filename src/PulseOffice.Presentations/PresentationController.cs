@@ -10,9 +10,9 @@ public enum AdvanceResult
 
 public sealed class PresentationController
 {
-    private readonly IReadOnlyList<Slide> _slides;
+    private readonly List<Slide> _slides;
     private readonly IAnimationScheduler _scheduler;
-    private readonly int[] _stepCounts;
+    private readonly List<int> _stepCounts;
     private readonly bool _ignoreSteps;
     private readonly Dictionary<string, int> _triggerSteps = new(StringComparer.Ordinal);
     private SlideAnimationPlan? _plan;
@@ -28,7 +28,7 @@ public sealed class PresentationController
         ArgumentNullException.ThrowIfNull(slides);
         ArgumentNullException.ThrowIfNull(scheduler);
 
-        _slides = slides;
+        _slides = [.. slides];
         _scheduler = scheduler;
         _ignoreSteps = ignoreSteps;
         _stepCounts = ignoreSteps ? [.. slides.Select(_ => 0)] : [.. slides.Select(StepsOf)];
@@ -48,6 +48,21 @@ public sealed class PresentationController
     }
 
     public int StepIndex { get; private set; }
+
+    public IReadOnlyList<Slide> Slides => _slides;
+
+    public int Admit(Slide slide, int position)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        var existing = _slides.IndexOf(slide);
+        if (existing >= 0) return existing;
+
+        var at = Math.Clamp(position, 0, _slides.Count);
+        _slides.Insert(at, slide);
+        _stepCounts.Insert(at, _ignoreSteps ? 0 : StepsOf(slide));
+        if (_slides.Count > 1 && at <= _slideIndex) _slideIndex++;
+        return at;
+    }
 
     public Slide? Current => _slides.Count > 0 ? _slides[SlideIndex] : null;
 

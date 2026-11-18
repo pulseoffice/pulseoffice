@@ -22,6 +22,8 @@ public sealed class StatisticalPlot : ChartPlotBase
 
     public override bool KeepsGaps => true;
 
+    public override bool DrawsReversedCategories => true;
+
     public override PlotScale? ValueAxis(ChartFrame frame)
     {
         var values = Values(frame);
@@ -112,7 +114,7 @@ public sealed class StatisticalPlot : ChartPlotBase
 
         var maximum = ordered.Max(bin => bin.Count);
         var scale = PlotScale.Nice(0, maximum, frame.Plot.Bottom, frame.Plot.Y);
-        var categories = new CategoryScale(ordered.Count, frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, ordered.Count);
 
         for (var index = 0; index < ordered.Count; index++)
         {
@@ -146,8 +148,7 @@ public sealed class StatisticalPlot : ChartPlotBase
 
     private void DrawBoxes(ChartFrame frame)
     {
-        var categories = new CategoryScale(
-            Math.Max(1, frame.Data.Series.Count), frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, Math.Max(1, frame.Data.Series.Count));
 
         var everything = Values(frame);
         if (everything.Count == 0) return;
@@ -279,8 +280,7 @@ public sealed class StatisticalPlot : ChartPlotBase
 
     private void DrawPoints(ChartFrame frame, bool spread)
     {
-        var categories = new CategoryScale(
-            Math.Max(1, frame.Data.Series.Count), frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, Math.Max(1, frame.Data.Series.Count));
 
         var everything = Values(frame);
         if (everything.Count == 0) return;
@@ -328,7 +328,7 @@ public sealed class StatisticalPlot : ChartPlotBase
         var highest = Math.Max(0, totals.Max(step => Math.Max(step.From, step.To)));
 
         var scale = PlotScale.Nice(lowest, highest, frame.Plot.Bottom, frame.Plot.Y);
-        var categories = new CategoryScale(totals.Count, frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, totals.Count);
         var rising = new SolidColorBrush(Color.FromRgb(0x16, 0xA3, 0x4A));
         var falling = new SolidColorBrush(Color.FromRgb(0xDC, 0x26, 0x26));
 

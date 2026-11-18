@@ -424,6 +424,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
             StyleName = context.Styles.NameOf(tableProperties?.TableStyle?.Val?.Value ?? tableParagraphs.DefaultTableStyle(context)),
             Name = tableProperties?.TableCaption?.Val?.Value,
             HeaderRows = headerRows,
+            Banding = _looks.Read(tableProperties?.GetFirstChild<W.TableLook>()),
             Direct = tableStyles.Padding(tableProperties?.TableCellMarginDefault),
             Alignment = Alignment(tableProperties?.TableJustification?.Val?.Value),
         };
@@ -455,12 +456,9 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
 
     public const string TruncatedTable = "DOCX222";
 
-    private bool LooksHeaded(W.TableLook? look)
-    {
-        if (look is null) return false;
-        if (look.FirstRow?.Value is { } first) return first;
-        return int.TryParse(look.Val?.Value, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var flags) && (flags & 0x0020) != 0;
-    }
+    private readonly DocxTableLooks _looks = new();
+
+    private bool LooksHeaded(W.TableLook? look) => _looks.Headed(look);
 
     private TableAlignment Alignment(W.TableRowAlignmentValues? value) =>
         value == W.TableRowAlignmentValues.Center ? TableAlignment.Center

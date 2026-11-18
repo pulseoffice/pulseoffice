@@ -124,7 +124,7 @@ public sealed class IronPythonScriptEngine : IScriptEngine
         if (await Task.WhenAny(running, Task.Delay(limit, CancellationToken.None)).ConfigureAwait(false) == running)
             return await running.ConfigureAwait(false);
 
-        return Failure(ScriptMessages.Timeout(context.Permissions.Timeout), "PY0002", stopwatch.Elapsed);
+        return Failure(ScriptMessages.Timeout(context.Permissions.Timeout), "PY0002", stopwatch.Elapsed) with { Stopped = running };
 
         static ScriptPosition FailurePosition(Microsoft.Scripting.Hosting.ScriptEngine engine, Exception failure)
         {

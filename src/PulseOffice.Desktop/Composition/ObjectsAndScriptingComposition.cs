@@ -87,9 +87,11 @@ internal static class ObjectsAndScriptingComposition
         services.AddSingleton<PulseOffice.Scripting.Editor.IScriptApiProvider, PulseOffice.Scripting.Editor.ScriptApiProvider>();
         services.AddSingleton<PulseOffice.Scripting.Editor.Facades.IScriptClipboardOperations, PulseOffice.Scripting.Editor.Facades.ScriptClipboardOperations>();
         services.AddSingleton<PulseOffice.Scripting.Editor.Facades.IScriptDispatcher>(provider =>
-            new PulseOffice.Scripting.Editor.Facades.ReadOnlyGuardedDispatcher(
-                new PulseOffice.Scripting.Editor.Facades.UiThreadScriptDispatcher(),
-                () => provider.GetRequiredService<IDocumentWorkspace>().Active?.IsReadOnly == true));
+            new PulseOffice.Scripting.Editor.Facades.CancellableScriptDispatcher(
+                new PulseOffice.Scripting.Editor.Facades.ReadOnlyGuardedDispatcher(
+                    new PulseOffice.Scripting.Editor.Facades.UiThreadScriptDispatcher(),
+                    () => provider.GetRequiredService<IDocumentWorkspace>().Active?.IsReadOnly == true),
+                provider.GetRequiredService<PulseOffice.Scripting.IScriptExecutionPermissions>()));
         services.AddSingleton<Sheets.UI.Scripting.LedgerScriptHost>();
         services.TryAddSingleton<PulseOffice.Scripting.IScriptExecutionPermissions, PulseOffice.Scripting.ScriptExecutionPermissions>();
         services.AddSingleton<PulseOffice.Scripting.IMacroFingerprints, PulseOffice.Scripting.Sha256MacroFingerprints>();

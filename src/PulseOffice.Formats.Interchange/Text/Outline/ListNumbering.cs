@@ -4,6 +4,8 @@ namespace PulseOffice.Formats.Interchange.Text.Outline;
 
 public sealed class ListNumbering
 {
+    private readonly PulseOffice.Text.Rich.NumberSystems _systems = new();
+
     public string Label(ListPlacement placement, int value) => placement.Kind switch
     {
         ListKind.None => string.Empty,
@@ -17,6 +19,7 @@ public sealed class ListNumbering
         NumberFormat.UpperLetter => Letters(value),
         NumberFormat.LowerRoman => Roman(value).ToLowerInvariant(),
         NumberFormat.UpperRoman => Roman(value),
+        _ when Enum.TryParse<PulseOffice.Text.Rich.NumberSystem>(format.ToString(), out var system) => _systems.Render(system, value),
         _ => value.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 

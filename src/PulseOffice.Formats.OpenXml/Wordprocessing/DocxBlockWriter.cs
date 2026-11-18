@@ -9,6 +9,8 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphCodec paragraphs, DocxInlineWriter inlines, DocxRevisionWriter revisions, DocxValues values, DocxDropCaps drops, DocxBorders borders, DocxCellFormulas formulas, DocxIndexCodec indexes,
     DocxContentControls controls, DocxTableStyleCodec tableStyles, DocxFloatingTables floatingTables, DocxListHeaderIndent listHeaders, DocxTabPositions tabs, DocxParagraphMarkSplits splits, DocxRowChanges rowChanges, DocxCellGeometry geometry)
 {
+    private readonly DocxTableLooks _looks = new();
+
     private sealed class Visitor(DocxBlockWriter owner, DocxWriteContext context) : IBlockVisitor<IEnumerable<OpenXmlElement>>
     {
         public IEnumerable<OpenXmlElement> VisitParagraph(ParagraphBlock paragraph) => owner.Paragraphs(paragraph, context);
@@ -20,6 +22,8 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
                 ? owner.Index(section, index, [.. section.Content.Blocks.SelectMany(block => block.Accept(this))])
                 : owner.Sequence(section.Content.Blocks, context, this);
     }
+
+    public void SettleMoves(DocxWriteContext context) => revisions.WriteMoves(context);
 
     public IEnumerable<OpenXmlElement> Write(BlockContainer container, DocxWriteContext context)
     {
@@ -168,16 +172,7 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
         if (table.Alignment == TableAlignment.Left && table.Indent.Value != 0)
             properties.Append(new W.TableIndentation { Width = table.Indent.Value, Type = W.TableWidthUnitValues.Dxa });
         if (tableStyles.Margins(table.Direct) is { } margins) properties.Append(margins);
-        properties.Append(new W.TableLook
-        {
-            Val = table.HeaderRows > 0 ? "04A0" : "0400",
-            FirstRow = table.HeaderRows > 0,
-            LastRow = false,
-            FirstColumn = false,
-            LastColumn = false,
-            NoHorizontalBand = false,
-            NoVerticalBand = true,
-        });
+        properties.Append(_looks.Write(table.HeaderRows > 0, table.Banding));
         if (table.Name is not null) properties.Append(new W.TableCaption { Val = table.Name });
         element.Append(properties);
         element.Append(new W.TableGrid(table.Columns.Select(width => new W.GridColumn { Width = values.Text(width.Value) })));

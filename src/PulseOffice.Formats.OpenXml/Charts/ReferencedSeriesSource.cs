@@ -23,7 +23,7 @@ internal sealed class ReferencedSeriesSource(ChartDefinition definition, IChartS
 
     public OpenXmlElement Categories(IReadOnlyList<string> categories)
     {
-        if (Formula(_sources.Select(source => source.Categories).FirstOrDefault(text => references.Read(text) is not null)) is not { } formula)
+        if (Formula(_sources.Select(source => source.Categories).FirstOrDefault(text => references.Areas(text).Count > 0)) is not { } formula)
             return _literals.Categories(categories);
 
         var cache = new C.StringCache(new C.PointCount { Val = (uint)categories.Count });

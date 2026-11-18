@@ -239,9 +239,11 @@ public sealed class FolioTableCommands(
 
     private async Task StyleAsync(FolioEditor editor, TableSelection at, CancellationToken ct)
     {
-        var current = presets.Named(at.Table.StyleName)?.Key;
-        if (await gallery.AskAsync("command.folio.table.style.title", current, at.Table.HeaderRows > 0, true, ct).ConfigureAwait(true) is not { } choice) return;
-        looks.Apply(editor, at.Table, choice.Look, choice.HeaderRow, choice.BandedRows);
+        var named = presets.Named(at.Table.StyleName);
+        var current = named?.Key;
+        var banding = named is not null && at.Table.StyleName == presets.Unbanded(named) ? at.Table.Banding with { BandedRows = false } : at.Table.Banding;
+        if (await gallery.AskAsync("command.folio.table.style.title", current, at.Table.HeaderRows > 0, banding, ct).ConfigureAwait(true) is not { } choice) return;
+        looks.Apply(editor, at.Table, choice.Look, choice.HeaderRow, choice.Banding);
     }
 
     private async Task SortAsync(FolioEditor editor, TableSelection at, CancellationToken ct)

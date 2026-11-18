@@ -54,6 +54,7 @@ public sealed class ListLevelsEditor : UserControl
     private readonly TextBox _bullet = new() { Width = 56, MaxLength = 2, HorizontalContentAlignment = HorizontalAlignment.Center };
     private readonly TextBox _prefix = new() { Width = 72 };
     private readonly TextBox _suffix = new() { Width = 72 };
+    private readonly TextBox _separator = new() { Width = 72 };
     private readonly NumberBox _start;
     private readonly NumberBox _display;
     private readonly MeasureField _indent;
@@ -118,6 +119,7 @@ public sealed class ListLevelsEditor : UserControl
         _bullet.TextChanged += (_, _) => Edit(level => level with { Bullet = _bullet.Text is { Length: > 0 } bullet ? bullet : level.Bullet });
         _prefix.TextChanged += (_, _) => Edit(level => level with { Prefix = _prefix.Text ?? string.Empty });
         _suffix.TextChanged += (_, _) => Edit(level => level with { Suffix = _suffix.Text ?? string.Empty });
+        _separator.TextChanged += (_, _) => Edit(level => level with { Separator = _separator.Text ?? string.Empty });
         _start = new NumberBox(new NumberEntry(new NumericBounds(0, 9999), true, culture), 1, metrics, boxWidth: 72);
         _start.ValueCommitted += (_, value) => Edit(level => level with { Start = (int)Math.Round(value) });
         _display = new NumberBox(new NumberEntry(new NumericBounds(1, Math.Max(1, request.Levels.Count)), true, culture), 1, metrics, boxWidth: 72);
@@ -138,6 +140,11 @@ public sealed class ListLevelsEditor : UserControl
         }
         if (request.Offers(ListFeatures.Start)) _numberRows.Add(details.Add(texts["textFormat.list.start"], _start, editorWidth: 120));
         if (request.Offers(ListFeatures.DisplayLevels)) _numberRows.Add(details.Add(texts["textFormat.list.display"], _display, editorWidth: 120));
+        if (request.Offers(ListFeatures.Separator))
+        {
+            AutomationProperties.SetName(_separator, texts["textFormat.list.separator"]);
+            _numberRows.Add(details.Add(texts["textFormat.list.separator"], _separator, editorWidth: 120));
+        }
         if (request.Offers(ListFeatures.Indents))
         {
             details.Add(texts["textFormat.list.indent"], _indent, editorWidth: 160);
@@ -268,6 +275,7 @@ public sealed class ListLevelsEditor : UserControl
         _bullet.Text = level.Bullet;
         _prefix.Text = level.Prefix;
         _suffix.Text = level.Suffix;
+        _separator.Text = level.Separator;
         _start.Value = level.Start;
         _display.Value = level.DisplayLevels;
         _indent.Value = level.Indent;

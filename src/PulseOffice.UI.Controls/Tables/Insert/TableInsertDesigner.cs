@@ -55,6 +55,8 @@ public sealed class TableInsertDesigner : ITableLookBanding
 
     public TableLook Look => Looks[_look];
 
+    public PulseOffice.Document.Tables.TableBanding Banding => PulseOffice.Document.Tables.TableBanding.Standard with { BandedRows = BandedRows };
+
     public bool HeaderRow
     {
         get => _headerRow;

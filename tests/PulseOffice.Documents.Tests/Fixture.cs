@@ -36,7 +36,7 @@ public sealed class Fixture
             new Indexes.CaptionEntrySource(scope), new Indexes.BibliographyEntrySource(scope), new Indexes.ObjectEntrySource(scope, new Indexes.IndexObjectClassifier()),
         ];
         var styles = new Indexes.IndexStyles();
-        IndexEditing = new Indexes.IndexEditing(Stories, Tree, new Indexes.IndexComposer(entries, styles), styles);
+        IndexEditing = new Indexes.IndexEditing(Stories, Tree, new Indexes.IndexComposer(entries, styles, new Fields.ReferenceTargets(Bookmarks, Outline, new Fields.DocumentReadingOrder(Tree, Stories), Stories, new Fields.FieldRunRewriter())), styles);
         Editor = new DocumentEditor(Stories, Text, new DirectFormatting(), Trails, Deletion, Tree, Anchoring, Sequences, new TableEditing(Stories, Deletion),
             new Clipboard.FragmentPaster(Stories, Text, new Clipboard.FragmentAdoption(new Clipboard.FragmentRemapper(Stories, Tree), new Clipboard.StyleMerger()), Anchoring, Sequences));
         Factory = new TextDocumentFactory(new DefaultStyleSheetFactory());

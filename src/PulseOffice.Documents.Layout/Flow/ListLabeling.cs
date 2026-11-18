@@ -69,6 +69,13 @@ public sealed class RomanNumbers(bool upper) : INumberFormatter
     }
 }
 
+public sealed class SystemNumbers(NumberFormat format, NumberSystem system, INumberSystems systems) : INumberFormatter
+{
+    public NumberFormat Format => format;
+
+    public string Render(int value) => systems.Render(system, value);
+}
+
 public interface IListLabeling
 {
     IReadOnlyList<ListPlacement?> Place(StyleSheet sheet, IReadOnlyList<TextParagraph> paragraphs);
@@ -150,6 +157,12 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
             var value = counts[l] ?? style.Level(l).StartAt;
             parts.Add(_formatters.TryGetValue(format, out var formatter) ? formatter.Render(value) : value.ToString(CultureInfo.InvariantCulture));
         }
-        return string.Join(definition.Separator, parts);
+        var label = new StringBuilder();
+        for (var part = 0; part < parts.Count; part++)
+        {
+            if (part > 0) label.Append(definition.SeparatorAt(part - 1));
+            label.Append(parts[part]);
+        }
+        return label.ToString();
     }
 }

@@ -111,8 +111,8 @@ public sealed class DeckActions
     public void RemoveAnimation(Slide slide, AnimationEffect effect) =>
         _show.RemoveAnimation(slide, effect);
 
-    public void EditText(Slide slide, string elementId, RichText updated) =>
-        _text.EditText(slide, elementId, updated);
+    public void EditText(Slide slide, string elementId, RichText updated, string labelKey = "deck.action.editText") =>
+        _text.EditText(slide, elementId, updated, labelKey);
 
     public int RewriteTexts(string labelKey, Func<RichText, RichText> text, Func<string, string>? notes = null) =>
         _text.RewriteTexts(labelKey, text, notes);
@@ -146,11 +146,11 @@ public sealed class DeckActions
     public void AppendToText(Slide slide, string elementId, string text) =>
         _text.AppendToText(slide, elementId, text);
 
-    public void AppendRun(Slide slide, string elementId, TextRun run) =>
-        _text.AppendRun(slide, elementId, run);
+    public void AppendRun(Slide slide, string elementId, TextRun run, string labelKey = "deck.action.insertSymbol") =>
+        _text.AppendRun(slide, elementId, run, labelKey);
 
-    public void InsertElement(Slide slide, SlideElement element) =>
-        _elements.InsertElement(slide, element);
+    public void InsertElement(Slide slide, SlideElement element, string labelKey = "deck.action.insertObject") =>
+        _elements.InsertElement(slide, element, labelKey);
 
     public void DeleteObject(Slide slide, SlideElement element) =>
         _elements.DeleteObject(slide, element);

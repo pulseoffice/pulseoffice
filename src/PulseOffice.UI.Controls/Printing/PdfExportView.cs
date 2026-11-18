@@ -25,6 +25,7 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
     private readonly TextBlock _rangeMessage;
     private readonly CheckBox _bookmarks = new();
     private readonly CheckBox _notes = new();
+    private readonly CheckBox _hidden = new();
     private readonly CheckBox _links = new();
     private readonly CheckBox _archive = new();
     private readonly TextBox _title = new();
@@ -93,6 +94,12 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
             };
             _layout.SelectionChanged += (_, _) => Rebuild();
             general.Add(defaults.LayoutLabel, _layout);
+        }
+
+        if (defaults.IncludeHiddenLabel is { } hiddenLabel)
+        {
+            _hidden.IsCheckedChanged += (_, _) => Rebuild();
+            general.Add(null, Check(_hidden, hiddenLabel), DialogRowKind.Indented);
         }
 
         var rangeStack = new StackPanel { Spacing = 2 };
@@ -217,6 +224,12 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
         }
     }
 
+    public bool IncludeHidden
+    {
+        get => _defaults.IncludeHiddenLabel is not null && _hidden.IsChecked == true;
+        set => _hidden.IsChecked = value;
+    }
+
     public int? LayoutIndex
     {
         get => _layout?.SelectedIndex;
@@ -298,7 +311,7 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
             Security = ArchiveChecked ? null : Security,
         };
 
-        Completed?.Invoke(this, new PdfExportChoice(options, _layout?.SelectedIndex));
+        Completed?.Invoke(this, new PdfExportChoice(options, _layout?.SelectedIndex) { IncludeHidden = IncludeHidden });
     }
 
     private int PageCount => _document?.PageCount ?? _defaults.PageCount;
@@ -311,7 +324,7 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
     private void Rebuild()
     {
         _document = _layout is { SelectedIndex: >= 0 } chosen && chosen.SelectedIndex < _defaults.Layouts.Count
-            ? _defaults.Layouts[chosen.SelectedIndex].Build()
+            ? _defaults.Layouts[chosen.SelectedIndex].Build(IncludeHidden)
             : _defaults.Preview?.Invoke();
         _pages.Document = _document;
         Refilter();

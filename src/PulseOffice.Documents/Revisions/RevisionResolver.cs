@@ -41,7 +41,8 @@ public sealed class RevisionResolver(
 
     public int Resolve(TextDocument document, UndoStack history, IEnumerable<string> changeIds, RevisionVerdict verdict)
     {
-        var wanted = changeIds.Distinct(StringComparer.Ordinal).Where(id => document.Changes.Find(id) is not null).ToList();
+        var wanted = changeIds.Select(id => document.Changes.Find(id)).OfType<TrackedChange>()
+            .SelectMany(document.Changes.MovedWith).Select(change => change.Id).Distinct(StringComparer.Ordinal).ToList();
         if (wanted.Count == 0) return 0;
         var total = wanted.Count;
         var recording = document.Changes.IsRecording;

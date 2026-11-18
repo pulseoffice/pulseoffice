@@ -53,6 +53,7 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Shell.IDocumentStateWitness, PulseOffice.Presentations.UI.DeckStateWitness>();
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckMediaFiles, PulseOffice.Presentations.UI.DeckMediaFiles>();
         services.AddSingleton<PulseOffice.Presentations.UI.IShowMediaPlayer, PulseOffice.Presentations.UI.ShowMediaPlayer>();
+        services.AddSingleton<PulseOffice.Presentations.UI.IShowMediaSessions, PulseOffice.Presentations.UI.ShowMediaSessions>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckCommands>();
         services.AddSingleton<PulseOffice.Text.Rich.IRichTextFormatter, PulseOffice.Text.Rich.RichTextFormatter>();
         services.AddSingleton<PulseOffice.Text.Rich.IRichTextInsertion, PulseOffice.Text.Rich.RichTextInsertion>();
@@ -162,6 +163,7 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Presentations.UI.DeckObjectCommands>();
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckVideoFrameSourceFactory, PulseOffice.Presentations.UI.DeckVideoFrameSourceFactory>();
         services.AddSingleton<PulseOffice.Presentations.UI.IVideoSlideDuration, PulseOffice.Presentations.UI.VideoSlideDuration>();
+        services.AddSingleton<PulseOffice.Presentations.UI.ISlideVideoTimeline, PulseOffice.Presentations.UI.SlideVideoTimeline>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckExportCommands>();
         services.AddSingleton<PulseOffice.Document.Embedding.ITableSizing, PulseOffice.Document.Embedding.OptimalRowSizing>();
         services.AddSingleton<PulseOffice.Document.Embedding.ITableSizing, PulseOffice.Document.Embedding.MinimalRowSizing>();

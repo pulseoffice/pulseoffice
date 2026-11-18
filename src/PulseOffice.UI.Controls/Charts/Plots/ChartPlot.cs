@@ -135,6 +135,9 @@ public abstract class ChartPlotBase : IChartPlot
             : new CategoryScale(Math.Max(count, 1), plot.X, plot.Right, Reversed: reversed);
     }
 
+    protected CategoryScale Across(ChartFrame frame, int count) =>
+        new(Math.Max(1, count), frame.Plot.X, frame.Plot.Right, Reversed: frame.Definition.CategoryAxis.Reversed);
+
     protected void Label(ChartFrame frame, string text, Point origin, double size = 9)
     {
         var formatted = new FormattedText(

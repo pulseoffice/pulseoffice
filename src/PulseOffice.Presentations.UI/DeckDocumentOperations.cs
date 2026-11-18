@@ -33,7 +33,7 @@ public sealed class DeckDocumentOperations(
         if (document.Model is not Presentation { Slides.Count: > 0 } deck)
             return new(HasHeadings: true, LayoutLabel: string.Empty, Layouts: []);
 
-        PdfExportLayout Layout(string label, DeckExportLayout layout) => new(label, () => publisher.BuildExportable(deck, layout));
+        PdfExportLayout Layout(string label, DeckExportLayout layout) => new(label, includeHidden => publisher.BuildExportable(deck, layout, includeHidden));
 
         return new(HasHeadings: true, LayoutLabel: texts["deck.export.layout"], Layouts:
         [
@@ -45,7 +45,10 @@ public sealed class DeckDocumentOperations(
             Layout(texts["deck.export.layout.handout4"], DeckExportLayout.Handout4),
             Layout(texts["deck.export.layout.handout6"], DeckExportLayout.Handout6),
             Layout(texts["deck.export.layout.handout9"], DeckExportLayout.Handout9),
-        ]);
+        ])
+        {
+            IncludeHiddenLabel = deck.Slides.Any(slide => slide.Hidden) ? texts["deck.export.includeHidden"] : null,
+        };
     }
 
     public bool InsertImage(OpenDocument document, byte[] data, string name) =>

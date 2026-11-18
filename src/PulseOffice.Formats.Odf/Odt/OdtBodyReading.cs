@@ -797,6 +797,14 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
             StyleName = styleName,
             HeaderRows = header.Count,
             RepeatHeaderRows = (string?)element.Attribute(Pt + "repeat-header") != "false",
+            Banding = new PulseOffice.Document.Tables.TableBanding
+            {
+                BandedRows = (string?)element.Attribute(Table + "use-banding-rows-styles") != "false",
+                BandedColumns = (string?)element.Attribute(Table + "use-banding-columns-styles") == "true",
+                FirstColumn = (string?)element.Attribute(Table + "use-first-column-styles") == "true",
+                LastColumn = (string?)element.Attribute(Table + "use-last-column-styles") == "true",
+                LastRow = (string?)element.Attribute(Table + "use-last-row-styles") == "true",
+            },
             Direct = Padding(element, context),
             PageStyleName = (string?)tableStyle?.Attribute(Style + "master-page-name") is { Length: > 0 } master ? context.PageNames.Resolve(master) : null,
             PageBreakBefore = (string?)tableStyle?.Element(Style + "table-properties")?.Attribute(Fo + "break-before") == "page",

@@ -360,6 +360,14 @@ Central package management in `Directory.Packages.props`: **versions are never w
     Help › Show in Applications Menu adds or removes the integration; the command exists only when running from an
     AppImage.
 
+31. **In-app media player for the slide show** (round 193, 2026-11-18): `IMediaPlayback` in `PulseOffice.Platform.Media`
+    (open, play, pause, seek, live volume, position events, BGRA frames, platform audio). Trim, loop, mute and fades are
+    core logic (`MediaVolumeCurve`, `MediaSession`) over any backend; one `DecodedMediaPlayback` combines an
+    `IMediaDecoder` (ffmpeg pipes on Linux, Media Foundation source readers on Windows, AVFoundation asset readers on
+    macOS) with an `IAudioOutputFactory` (paplay/pw-cat/aplay/ffplay, winmm waveOut, AudioQueue), chosen by
+    `MediaPlaybackProvider`. The shared `MediaView` draws it; Deck's show falls back to the system player when no
+    backend can open the medium. Log: docs/deep-audit/round-193-media-player.md.
+
 16. **Folio content controls**: a pair of inline markers with the properties on the start marker,
     not anchored objects. In DOCX form controls are distinguished by the `pulseoffice.form:` prefix in `w:tag`.
 
@@ -447,6 +455,9 @@ native macOS menu, modal service, settings schema.
   IronPython), the memory cap does not apply, the time cap does not interrupt code stuck in a
   native call, the runtime starts once per process (changing it requires a restart). Virtual environments and
   package installation (pip/uv) are not there yet.
+- **Slide show media player on Windows and macOS** (round 193): the Media Foundation/waveOut and AVFoundation/AudioQueue
+  backends are written but not verified on a real Windows or Mac; media start on click only (no auto-start setting in
+  the model yet).
 - **Avalonia 12 developer tools**: `AvaloniaUI.DiagnosticsSupport` hooked into Debug builds (F12);
   the tools window is an external program (`avdt`, AvaloniaUI Developer Tools) that requires an Avalonia
   account: not installed here, so F12 has not been tried live.

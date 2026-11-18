@@ -16,7 +16,10 @@ public enum ReferenceTargetKind
     Endnotes,
 }
 
-public sealed record ReferenceTarget(ReferenceTargetKind Kind, string Key, string Title);
+public sealed record ReferenceTarget(ReferenceTargetKind Kind, string Key, string Title)
+{
+    public string? Sequence { get; init; }
+}
 
 public interface IReferenceTargets
 {
@@ -48,7 +51,7 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
             new ReferenceTarget(kind, heading.Paragraph.Id, new string(' ', (heading.Level - 1) * 2) + heading.Text))],
         ReferenceTargetKind.Captions => [.. order.Paragraphs(document)
             .Where(paragraph => paragraph.Content.Runs.Any(run => run.Field == TextFieldKind.Sequence && string.Equals(run.FieldArgument, sequence, StringComparison.Ordinal)))
-            .Select(paragraph => new ReferenceTarget(kind, paragraph.Id, paragraph.Text))],
+            .Select(paragraph => new ReferenceTarget(kind, paragraph.Id, paragraph.Text) { Sequence = sequence })],
         ReferenceTargetKind.Footnotes => Notes(document, NoteKind.Footnote, kind),
         _ => Notes(document, NoteKind.Endnote, kind),
     };
@@ -60,12 +63,24 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
     public string? Touches(TextDocument document, ReferenceTarget target) => target.Kind switch
     {
         ReferenceTargetKind.Headings => HeadingBookmark(stories.Find(document, target.Key).Paragraph) is null ? target.Key : null,
-        ReferenceTargetKind.Captions => stories.Find(document, target.Key).Paragraph.Content.Runs.FirstOrDefault(run => run.Field == TextFieldKind.Sequence)?.FieldDetail?.Format is { Length: > 0 } ? null : target.Key,
+        ReferenceTargetKind.Captions => CaptionNamed(stories.Find(document, target.Key).Paragraph.Content.Runs, target.Sequence) ? null : target.Key,
         _ => null,
     };
 
     public string? HeadingOf(TextDocument document, string bookmarkName) =>
         bookmarkName.StartsWith(HeadingPrefix, StringComparison.Ordinal) && bookmarks.Find(document, bookmarkName) is { } bookmark ? bookmark.ParagraphId : null;
+
+    private bool CaptionNamed(IReadOnlyList<TextRun> runs, string? sequence) =>
+        SequenceIndex(runs, sequence) is var index && index >= 0 && runs[index].FieldDetail?.Format is { Length: > 0 };
+
+    private int SequenceIndex(IReadOnlyList<TextRun> runs, string? sequence)
+    {
+        for (var index = 0; index < runs.Count; index++)
+            if (runs[index].Field == TextFieldKind.Sequence && string.Equals(runs[index].FieldArgument, sequence, StringComparison.Ordinal)) return index;
+        for (var index = 0; index < runs.Count; index++)
+            if (runs[index].Field == TextFieldKind.Sequence) return index;
+        return -1;
+    }
 
     private string? HeadingBookmark(ParagraphBlock heading) =>
         heading.Marks.OfType<BookmarkMark>().FirstOrDefault(mark => mark.Edge == MarkEdge.Start && mark.Offset == 0 && mark.Name.StartsWith(HeadingPrefix, StringComparison.Ordinal))?.Name;
@@ -90,7 +105,8 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
             case ReferenceTargetKind.Captions:
                 var caption = stories.Find(document, target.Key).Paragraph;
                 var runs = caption.Content.Runs.ToList();
-                var index = runs.FindIndex(run => run.Field == TextFieldKind.Sequence);
+                var index = SequenceIndex(runs, target.Sequence);
+                if (index < 0) return target.Key;
                 if (runs[index].FieldDetail?.Format is { Length: > 0 } captionName) return captionName;
                 var taken = bookmarks.SequenceTargets(document).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
                 var number = 0;

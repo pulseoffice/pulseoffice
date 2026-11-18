@@ -217,7 +217,7 @@ public sealed class MacroWritePermissionTests : IDisposable
     [Fact]
     public void Un_collegamento_messo_dopo_il_controllo_non_porta_la_scrittura_fuori()
     {
-        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true });
+        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true }, TestContext.Current.CancellationToken);
         Directory.CreateDirectory(_folder.Root);
         var outside = Path.Combine(_scratch, "fuori");
         Directory.CreateDirectory(outside);
@@ -248,7 +248,7 @@ public sealed class MacroWritePermissionTests : IDisposable
     [Fact]
     public void Appending_to_a_file_that_is_a_hard_link_never_changes_the_other_name()
     {
-        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true });
+        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true }, TestContext.Current.CancellationToken);
         Directory.CreateDirectory(_folder.Root);
         var outside = Path.Combine(_scratch, "fuori");
         Directory.CreateDirectory(outside);
@@ -266,7 +266,7 @@ public sealed class MacroWritePermissionTests : IDisposable
     [Fact]
     public void Appending_keeps_what_the_file_already_held()
     {
-        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true });
+        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true }, TestContext.Current.CancellationToken);
         var files = new ScriptFilesFacade(_permissions, _folder, new ConfinedFileWriter(new FileSystemLinks()));
 
         files.AppendText("registro.log", "uno\n");

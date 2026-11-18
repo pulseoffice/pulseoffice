@@ -145,6 +145,7 @@ public sealed class FolioFacadeContractTests
         {
             f.Doc.AppendParagraph("Gatto e gatto");
             Assert.Equal(2, f.Doc.Find("gatto"));
+            Assert.Equal(1, f.Doc.Find("gatto", matchCase: true));
             Assert.Equal(0, f.Doc.Find("cane"));
             Assert.Throws<ArgumentException>(() => f.Doc.Find(string.Empty));
         },
@@ -154,6 +155,8 @@ public sealed class FolioFacadeContractTests
             Assert.Equal(2, f.Doc.Replace("gatto", "topo"));
             Assert.Equal("topo e topo", f.First.Text);
             Assert.Equal(0, f.Doc.Replace("cane", "lupo"));
+            Assert.Equal(0, f.Doc.Replace("TOPO", "ratto", matchCase: true));
+            Assert.Equal(2, f.Doc.Replace("TOPO", "topo"));
             Assert.Throws<ArgumentException>(() => f.Doc.Replace(string.Empty, "x"));
             f.ReadOnly(() => f.Doc.Replace("topo", "ratto"));
             Assert.Equal("topo e topo", f.First.Text);

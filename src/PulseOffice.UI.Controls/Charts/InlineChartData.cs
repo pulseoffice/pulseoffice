@@ -16,8 +16,10 @@ public sealed class InlineChartData(IChartSampleData samples, IChartFamilyCatalo
     public ChartData For(ChartDefinition chart) =>
         chart.InlineData ?? samples.For(families.FamilyOf(chart.Type));
 
+    private readonly ChartInlineErrorValues _errorValues = new();
+
     public ChartDefinition Settle(ChartDefinition chart) =>
-        chart.InlineData is null ? chart with { InlineData = For(chart) } : chart;
+        _errorValues.Refresh(chart.InlineData is null ? chart with { InlineData = For(chart) } : chart);
 
     public ChartEditSource Source(System.Globalization.CultureInfo culture) => new() { Data = For, Culture = culture, DataLayoutEditable = false };
 }

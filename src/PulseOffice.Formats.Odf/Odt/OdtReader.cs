@@ -504,7 +504,7 @@ internal sealed class OdtChangeReader(OdtCommentReader comments, PulseOffice.For
 
             TrackedChange? change = body.Name.LocalName switch
             {
-                "insertion" => new Insertion(id, author, date),
+                "insertion" => new Insertion(id, author, date) { MoveId = (string?)body.Attribute(Pt + "move-id") },
                 "deletion" => new Deletion(id, author, date, new BlockContainer(body.Elements().Where(child => child.Name != Office + "change-info")
                     .SelectMany(child =>
                     {
@@ -512,7 +512,7 @@ internal sealed class OdtChangeReader(OdtCommentReader comments, PulseOffice.For
                         blocks.Read(child, context, null, list);
                         return list;
                     })))
-                { WithinInsertion = (string?)body.Attribute(Pt + "within-insertion") },
+                { WithinInsertion = (string?)body.Attribute(Pt + "within-insertion"), MoveId = (string?)body.Attribute(Pt + "move-id") },
                 "format-change" when (string?)body.Attribute(Pt + "kind") == "paragraph" => Previous(body, context, blocks) is { } layout
                     ? new ParagraphFormatChange(id, author, date, layout)
                     : new ParagraphFormatChange(id, author, date, new PulseOffice.Text.Rich.TextParagraph(string.Empty)) { PreviousKnown = false },

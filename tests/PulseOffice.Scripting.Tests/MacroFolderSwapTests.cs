@@ -29,7 +29,7 @@ public sealed class MacroFolderSwapTests : IDisposable
     [InlineData(SwapMoment.JustBeforeTheMove)]
     public void A_subfolder_swapped_for_a_link_never_leaves_the_file_outside(SwapMoment moment)
     {
-        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true });
+        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true }, TestContext.Current.CancellationToken);
         var subfolder = Path.Combine(_folder.Root, "report");
         var links = new SwappingLinks(new FileSystemLinks(), subfolder, _outside, Path.Combine(subfolder, "totali.csv"), moment);
         var files = new ScriptFilesFacade(_permissions, _folder, new ConfinedFileWriter(links));
@@ -43,7 +43,7 @@ public sealed class MacroFolderSwapTests : IDisposable
     [Fact]
     public void Without_a_swap_the_file_is_written_inside_its_subfolder()
     {
-        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true });
+        using var scope = _permissions.Enter(ScriptPermissions.Sandboxed with { MacroFolderWrite = true }, TestContext.Current.CancellationToken);
         var files = new ScriptFilesFacade(_permissions, _folder, new ConfinedFileWriter(new FileSystemLinks()));
 
         var path = files.WriteText("report/nuovo/totali.csv", "a;b");

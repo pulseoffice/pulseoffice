@@ -22,6 +22,7 @@ public sealed class DeckCommands(
     PulseOffice.Document.Forms.IFormControlInteraction forms,
     PulseOffice.Presentations.Remote.IRemoteSession remote,
     IShowMediaPlayer media,
+    IShowMediaSessions mediaSessions,
     Design.ShowSetupServices showSetup,
     ICustomShowEditing customShows)
 {
@@ -277,13 +278,17 @@ public sealed class DeckCommands(
                 ManualAdvance = deck.Setup.Advance == ShowAdvanceMode.Manual,
                 PenColor = deck.Setup.PenColor,
                 MonitorIndex = _monitorIndex,
+                EndOfShowText = texts["deck.present.endOfShow"],
                 Forms = design.IsDesigning ? null : forms,
                 ControlChanged = (slide, element) =>
                 {
                     if (element is ObjectElement control && owner is not null && owner.Deck.IndexOf(slide) >= 0)
                         owner.Actions.ChangeControl(slide, control);
                 },
-                PlayMedia = element => media.PlayAsync(element, documentPath),
+                Media = new ShowMediaOptions(
+                    element => mediaSessions.OpenAsync(element, documentPath),
+                    element => media.PlayAsync(element, documentPath),
+                    texts),
             });
 
         if (withPresenter)

@@ -97,6 +97,28 @@ public sealed record DataTableStyle
     public string? AccentHex { get; init; }
 
     public bool OwnLook { get; init; }
+
+    public PulseOffice.Document.Tables.TableBanding ToBanding() => new()
+    {
+        BandedRows = BandedRows,
+        BandedColumns = BandedColumns,
+        FirstColumn = FirstColumn,
+        LastColumn = LastColumn,
+        LastRow = LastRow,
+    };
+
+    public DataTableStyle WithBanding(PulseOffice.Document.Tables.TableBanding banding)
+    {
+        ArgumentNullException.ThrowIfNull(banding);
+        return this with
+        {
+            BandedRows = banding.BandedRows,
+            BandedColumns = banding.BandedColumns,
+            FirstColumn = banding.FirstColumn,
+            LastColumn = banding.LastColumn,
+            LastRow = banding.LastRow,
+        };
+    }
 }
 
 public sealed record TableLayout

@@ -12,6 +12,8 @@ public sealed class FinancialPlot : ChartPlotBase
     public override bool Handles(ChartType type) => type is
         ChartType.StockHighLowClose or ChartType.StockOpenHighLowClose or ChartType.Candlestick;
 
+    public override bool DrawsReversedCategories => true;
+
     public override PlotScale? ValueAxis(ChartFrame frame)
     {
         var withOpen = frame.Definition.Type is not ChartType.StockHighLowClose;
@@ -43,7 +45,7 @@ public sealed class FinancialPlot : ChartPlotBase
         if (ValueAxis(frame) is not { } scale) return;
 
         var count = new[] { high.Count, low.Count, close.Count }.Min();
-        var categories = new CategoryScale(Math.Max(1, count), frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, count);
 
         for (var index = 0; index < count; index++)
         {

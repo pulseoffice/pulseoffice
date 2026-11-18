@@ -16,9 +16,11 @@ public sealed record PresentationOptions(int StartIndex = 0, bool Loop = false, 
 
     public int MonitorIndex { get; init; } = -1;
 
+    public string EndOfShowText { get; init; } = string.Empty;
+
     public PulseOffice.Document.Forms.IFormControlInteraction? Forms { get; init; }
 
     public Action<Slide, SlideElement>? ControlChanged { get; init; }
 
-    public Func<MediaElement, Task>? PlayMedia { get; init; }
+    public ShowMediaOptions? Media { get; init; }
 }

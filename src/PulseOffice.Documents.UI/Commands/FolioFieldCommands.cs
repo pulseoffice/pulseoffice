@@ -177,7 +177,7 @@ public sealed class FolioFieldCommands(
             {
                 Editing = hit,
                 ReferenceKind = new FolioReferenceKind(kind, sequence, string.Empty, string.Empty),
-                Target = new ReferenceTarget(kind, key, string.Empty),
+                Target = new ReferenceTarget(kind, key, string.Empty) { Sequence = sequence },
                 Format = run.FieldDetail?.Format ?? ReferenceFormats.Text,
             }, ct);
         }

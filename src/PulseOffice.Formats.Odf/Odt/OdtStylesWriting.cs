@@ -267,10 +267,12 @@ internal sealed class OdtStylesWriter(
         else
         {
             element.Add(new XAttribute(Style + "num-format", numbers.Token(level.Format)));
+            if (numbers.Extension(level.Format) is { } extension) element.Add(new XAttribute(Pt + "num-format", extension));
             element.Add(new XAttribute(Text + "start-value", level.StartAt));
             if (level.DisplayLevels > 1) element.Add(new XAttribute(Text + "display-levels", level.DisplayLevels));
             if (level.Legal) element.Add(new XAttribute(Pt + "legal", "true"));
             if (level.Separator != ".") element.Add(new XAttribute(Pt + "level-separator", level.Separator));
+            foreach (var gap in level.Separators) element.Add(new XElement(Pt + "level-gap", new XAttribute(Pt + "separator", gap)));
         }
         if (bullet && level.Bullet.Length == 0) element.Add(new XAttribute(Pt + "bullet-empty", "true"));
         if (bullet) element.Add(new XAttribute(Pt + "start-value", level.StartAt), new XAttribute(Pt + "display-levels", level.DisplayLevels));

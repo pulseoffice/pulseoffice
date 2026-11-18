@@ -148,11 +148,12 @@ public sealed class ShellPrintCommands(
                 Preview = () => exportable,
                 LayoutLabel = profile.LayoutLabel,
                 Layouts = [.. profile.Layouts.Select(layout => new PulseOffice.UI.Controls.Printing.PdfPreviewLayout(layout.Label, layout.Build))],
+                IncludeHiddenLabel = profile.IncludeHiddenLabel,
             }, ct).ConfigureAwait(true);
             if (choice is null) return;
             options = choice.Options;
             if (profile.Layouts.Count > 0 && choice.Layout is int index)
-                printable = profile.Layouts[Math.Clamp(index, 0, profile.Layouts.Count - 1)].Build();
+                printable = profile.Layouts[Math.Clamp(index, 0, profile.Layouts.Count - 1)].Build(choice.IncludeHidden);
         }
 
         var chosen = await files.SaveFileAsync(texts["dialog.exportPdf.title"], name + ".pdf", [new FileFilter("PDF", ["pdf"])], ct).ConfigureAwait(true);

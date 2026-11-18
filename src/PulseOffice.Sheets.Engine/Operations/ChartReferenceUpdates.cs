@@ -84,9 +84,16 @@ internal abstract class ChartReferenceRewrite
 
     private string? Reference(string? text)
     {
-        if (References.Read(text) is not { } reference) return text;
-        var (sheet, range) = Compact(reference.Sheet, reference.Range);
-        return CellRange.TryParseA1(range, out var parsed) ? References.Write(sheet, parsed) : ChartSourceReferences.Broken;
+        var areas = References.Areas(text);
+        if (areas.Count == 0) return text;
+        var moved = new List<ChartSourceReference>();
+        foreach (var reference in areas)
+        {
+            var (sheet, range) = Compact(reference.Sheet, reference.Range);
+            if (CellRange.TryParseA1(range, out var parsed)) moved.Add(new ChartSourceReference(sheet, parsed));
+        }
+        if (moved.Count == 0) return ChartSourceReferences.Broken;
+        return moved.Count == 1 ? References.Write(moved[0].Sheet, moved[0].Range) : References.Write(moved);
     }
 
     protected abstract (string Sheet, string Range) Compact(string sheet, CellRange range);

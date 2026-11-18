@@ -84,6 +84,25 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         [NumberFormat.UpperLetter] = W.NumberFormatValues.UpperLetter,
         [NumberFormat.LowerRoman] = W.NumberFormatValues.LowerRoman,
         [NumberFormat.UpperRoman] = W.NumberFormatValues.UpperRoman,
+        [NumberFormat.DecimalZero] = W.NumberFormatValues.DecimalZero,
+        [NumberFormat.Ordinal] = W.NumberFormatValues.Ordinal,
+        [NumberFormat.OrdinalText] = W.NumberFormatValues.OrdinalText,
+        [NumberFormat.CardinalText] = W.NumberFormatValues.CardinalText,
+        [NumberFormat.Hebrew] = W.NumberFormatValues.Hebrew1,
+        [NumberFormat.ArabicAbjad] = W.NumberFormatValues.ArabicAbjad,
+        [NumberFormat.ArabicAlpha] = W.NumberFormatValues.ArabicAlpha,
+        [NumberFormat.Katakana] = W.NumberFormatValues.AiueoFullWidth,
+        [NumberFormat.KatakanaIroha] = W.NumberFormatValues.IrohaFullWidth,
+        [NumberFormat.IdeographDigital] = W.NumberFormatValues.IdeographDigital,
+        [NumberFormat.ChineseCounting] = W.NumberFormatValues.ChineseCounting,
+        [NumberFormat.ThaiLetters] = W.NumberFormatValues.ThaiLetters,
+        [NumberFormat.RussianLower] = W.NumberFormatValues.RussianLower,
+        [NumberFormat.RussianUpper] = W.NumberFormatValues.RussianUpper,
+    };
+
+    private readonly IReadOnlyDictionary<NumberFormat, string> _customs = new Dictionary<NumberFormat, string>
+    {
+        [NumberFormat.Hiragana] = "あ, い, う, ...",
     };
 
     public W.Numbering Write(NumberingDefinitionsPart part, IReadOnlyList<ListStyle> lists, ListStyle outline, DocxListMap map, Func<int, string?> outlineStyle)
@@ -174,10 +193,10 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
     {
         var text = level.Format == NumberFormat.Bullet
             ? level.Bullet
-            : level.Prefix + string.Join(level.Separator, Enumerable.Range(index + 2 - Math.Clamp(level.DisplayLevels, 1, index + 1), Math.Clamp(level.DisplayLevels, 1, index + 1)).Select(n => "%" + values.Text(n))) + level.Suffix;
+            : level.Prefix + Placeholders(level, index) + level.Suffix;
         var element = new W.Level(
             new W.StartNumberingValue { Val = level.StartAt },
-            new W.NumberingFormat { Val = _formats[level.Format] },
+            Numbering(level.Format),
             new W.LevelText { Val = text },
             new W.LevelJustification { Val = W.LevelJustificationValues.Left },
             new W.PreviousParagraphProperties(new W.Indentation
@@ -190,8 +209,55 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         return element;
     }
 
+    private string Placeholders(ListLevel level, int index)
+    {
+        var shown = Math.Clamp(level.DisplayLevels, 1, index + 1);
+        var first = index + 2 - shown;
+        var text = new System.Text.StringBuilder();
+        for (var gap = 0; gap < shown; gap++)
+        {
+            if (gap > 0) text.Append(level.SeparatorAt(gap - 1));
+            text.Append('%').Append(values.Text(first + gap));
+        }
+        return text.ToString();
+    }
+
+    private IReadOnlyList<string> Gaps(string text)
+    {
+        var gaps = new List<string>();
+        var previous = -1;
+        for (var position = 0; position < text.Length - 1; position++)
+        {
+            if (text[position] != '%' || !char.IsAsciiDigit(text[position + 1])) continue;
+            if (previous >= 0) gaps.Add(text[(previous + 2)..position]);
+            previous = position;
+            position++;
+        }
+        return gaps;
+    }
+
     public bool LosesFormats(W.Numbering? numbering) =>
-        numbering is not null && numbering.Descendants<W.NumberingFormat>().Any(format => format.Val?.Value is { } value && !_formats.Values.Contains(value));
+        numbering is not null && numbering.Descendants<W.NumberingFormat>().Any(format => format.Val?.Value is not null && FormatOf(format) is null);
+
+    private W.NumberingFormat Numbering(NumberFormat format) =>
+        _customs.TryGetValue(format, out var custom)
+            ? new W.NumberingFormat { Val = W.NumberFormatValues.Custom, Format = custom }
+            : new W.NumberingFormat { Val = _formats.TryGetValue(format, out var known) ? known : W.NumberFormatValues.Decimal };
+
+    private NumberFormat? FormatOf(W.NumberingFormat? element)
+    {
+        if (element?.Val?.Value is not { } value) return NumberFormat.Arabic;
+        if (value == W.NumberFormatValues.Custom)
+        {
+            var pattern = element.Format?.Value ?? string.Empty;
+            foreach (var (format, custom) in _customs)
+                if (pattern.Length > 0 && custom.StartsWith(pattern[..1], StringComparison.Ordinal)) return format;
+            return null;
+        }
+        foreach (var (format, known) in _formats)
+            if (known == value) return format;
+        return null;
+    }
 
     public bool LosesPictures(W.Numbering? numbering) =>
         numbering is not null && numbering.Descendants<W.LevelPictureBulletId>().Any(id => id.Val?.Value is not { } value || pictures.Read(numbering, value) is null);
@@ -203,8 +269,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
 
     private ListLevel Read(W.Level level)
     {
-        var format = level.NumberingFormat?.Val?.Value;
-        var kind = format is null ? NumberFormat.Arabic : _formats.FirstOrDefault(pair => pair.Value == format.Value, new(NumberFormat.Arabic, W.NumberFormatValues.Decimal)).Key;
+        var kind = FormatOf(level.NumberingFormat) ?? NumberFormat.Arabic;
         var text = level.LevelText?.Val?.Value ?? string.Empty;
         var indentation = level.PreviousParagraphProperties?.GetFirstChild<W.Indentation>();
         var hanging = values.Points(indentation?.Hanging?.Value) ?? 0;
@@ -215,12 +280,14 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         var first = text.IndexOf('%');
         var last = text.LastIndexOf('%');
         var placeholders = text.Count(character => character == '%');
+        var gaps = Gaps(text);
         return new ListLevel(kind)
         {
             Prefix = first > 0 ? text[..first] : string.Empty,
             Suffix = last >= 0 && last + 2 <= text.Length ? text[(last + 2)..] : string.Empty,
             DisplayLevels = Math.Max(1, placeholders),
-            Separator = placeholders > 1 && text.IndexOf('%', first + 1) is var second && second >= first + 2 ? text[(first + 2)..second] : ".",
+            Separator = gaps.Count > 0 ? gaps[0] : ".",
+            Separators = gaps.Distinct(StringComparer.Ordinal).Skip(1).Any() ? gaps : [],
             Legal = level.IsLegalNumberingStyle is { } legal && (legal.Val?.Value ?? true),
             StartAt = start,
             Indent = left - hanging,

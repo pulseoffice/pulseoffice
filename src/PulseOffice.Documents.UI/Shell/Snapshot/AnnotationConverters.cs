@@ -41,8 +41,12 @@ public sealed class TrackedChangeConverter : SnapshotConverter<TrackedChange>
         var date = node.Get<DateTimeOffset>("date");
         TrackedChange change = node.Require<ChangeKind>("change") switch
         {
-            ChangeKind.Insertion => new Insertion(id, author, date),
-            ChangeKind.Deletion => new Deletion(id, author, date, node.Get("removed", new BlockContainer())),
+            ChangeKind.Insertion => new Insertion(id, author, date) { MoveId = node.Get<string>("moveId") },
+            ChangeKind.Deletion => new Deletion(id, author, date, node.Get("removed", new BlockContainer()))
+            {
+                WithinInsertion = node.Get<string>("withinInsertion"),
+                MoveId = node.Get<string>("moveId"),
+            },
             ChangeKind.Format => new FormatChange(id, author, date, node.Get<List<TextRun>>("previousRuns", [])),
             ChangeKind.ParagraphFormat => new ParagraphFormatChange(id, author, date, node.Require<TextParagraph>("previous")) { PreviousKnown = node.Get("previousKnown", true) },
             var other => throw new JsonException($"Unknown change kind '{other}'."),
@@ -56,8 +60,11 @@ public sealed class TrackedChangeConverter : SnapshotConverter<TrackedChange>
         node.Put("change", value.Kind).Put("id", value.Id).Put("author", value.Author).Put("date", value.Date).Put("comment", value.Comment);
         switch (value)
         {
+            case Insertion insertion:
+                node.Put("moveId", insertion.MoveId);
+                break;
             case Deletion deletion:
-                node.Put("removed", deletion.Removed);
+                node.Put("removed", deletion.Removed).Put("withinInsertion", deletion.WithinInsertion).Put("moveId", deletion.MoveId);
                 break;
             case FormatChange format:
                 node.Put("previousRuns", format.PreviousRuns);

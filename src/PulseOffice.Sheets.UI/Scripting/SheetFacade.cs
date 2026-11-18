@@ -370,7 +370,7 @@ public sealed class SheetFacade(
                 ? [.. filter.DistinctValues(sheet, range, Within(range, column) - 1, hasHeader)]
                 : []);
 
-    public string[] Find(string text, bool inFormulas = false) => Read<string[]>(() =>
+    public string[] Find(string text, bool inFormulas = false, bool matchCase = false) => Read<string[]>(() =>
     {
         if (Sheet() is not { } sheet || string.IsNullOrEmpty(text)) return [];
 
@@ -380,14 +380,14 @@ public sealed class SheetFacade(
         {
             var haystack = inFormulas && cell.HasFormula ? cell.Formula! : cell.Value.ToString();
 
-            if (haystack?.Contains(text, StringComparison.CurrentCultureIgnoreCase) == true)
+            if (haystack?.Contains(text, Comparison(matchCase)) == true)
                 found.Add(address.ToA1());
         }
 
         return [.. found];
     });
 
-    public int Replace(string text, string replacement) => Write(() =>
+    public int Replace(string text, string replacement, bool matchCase = false) => Write(() =>
     {
         if (context.Engine is not { } engine || Sheet() is not { } sheet) return 0;
         if (string.IsNullOrEmpty(text)) return 0;
@@ -401,9 +401,9 @@ public sealed class SheetFacade(
 
             var current = cell.Value.AsText();
 
-            if (!current.Contains(text, StringComparison.CurrentCulture)) continue;
+            if (!current.Contains(text, Comparison(matchCase))) continue;
 
-            replaced.Add((address, Fitting(current.Replace(text, replacement, StringComparison.CurrentCulture))));
+            replaced.Add((address, Fitting(current.Replace(text, replacement, Comparison(matchCase)))));
         }
 
         if (replaced.Count == 0) return 0;
@@ -417,6 +417,9 @@ public sealed class SheetFacade(
 
         return replaced.Count;
     });
+
+    private static StringComparison Comparison(bool matchCase) =>
+        matchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase;
 
     public void Comment(string reference, string text) => Edit("Comment", () =>
     {

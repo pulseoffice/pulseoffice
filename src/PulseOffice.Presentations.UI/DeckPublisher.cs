@@ -20,7 +20,7 @@ public interface IDeckPublisher
 
     IPrintableDocument BuildEverySlide(Presentation deck);
 
-    IPrintableDocument BuildExportable(Presentation deck, DeckExportLayout layout);
+    IPrintableDocument BuildExportable(Presentation deck, DeckExportLayout layout, bool includeHidden = false);
 
     string BuildHtml(Presentation deck);
 
@@ -48,6 +48,9 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
     public IPrintableDocument BuildPrintable(Presentation deck, DeckExportLayout layout) =>
         Build(deck, layout, Paper(layout), slide => !slide.Hidden);
 
+    private static Func<Slide, bool> Included(bool includeHidden) =>
+        includeHidden ? _ => true : slide => !slide.Hidden;
+
     public IPrintableDocument BuildEverySlide(Presentation deck) =>
         Build(deck, DeckExportLayout.Slides, Paper(DeckExportLayout.Slides), _ => true);
 
@@ -59,7 +62,7 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
         FooterHeight = new Twip(0),
     };
 
-    public IPrintableDocument BuildExportable(Presentation deck, DeckExportLayout layout) =>
+    public IPrintableDocument BuildExportable(Presentation deck, DeckExportLayout layout, bool includeHidden = false) =>
         layout == DeckExportLayout.Slides
             ? Build(deck, layout, new PageSetup
             {
@@ -67,8 +70,8 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
                 Margins = new Margins(new Twip(0), new Twip(0), new Twip(0), new Twip(0)),
                 HeaderHeight = new Twip(0),
                 FooterHeight = new Twip(0),
-            }, slide => !slide.Hidden)
-            : BuildPrintable(deck, layout);
+            }, Included(includeHidden))
+            : Build(deck, layout, Paper(layout), Included(includeHidden));
 
     private DeckPrintable Build(Presentation deck, DeckExportLayout layout, PageSetup setup, Func<Slide, bool> included)
     {

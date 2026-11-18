@@ -13,7 +13,7 @@ public sealed class Round162DocxMoveTests
     private readonly DocxComposer _composer = new(new DirectFormatting(), new DefaultStyleSheetFactory());
 
     [Fact]
-    public void Moved_text_is_read_as_deletion_and_insertion_and_the_loss_is_declared()
+    public void Moved_text_is_read_as_a_linked_deletion_and_insertion()
     {
         var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
@@ -28,9 +28,11 @@ public sealed class Round162DocxMoveTests
         var read = _composer.Reader(DocxFlavour.Document).Read(stream);
 
         Assert.True(read.Succeeded);
-        Assert.Contains(read.Diagnostics, diagnostic => diagnostic.Code == "DOCX224");
-        Assert.Contains(read.Value!.Changes.All, change => change is Deletion);
-        Assert.Contains(read.Value.Changes.All, change => change is Insertion);
+        Assert.DoesNotContain(read.Diagnostics, diagnostic => diagnostic.Code == "DOCX224");
+        var deletion = Assert.Single(read.Value!.Changes.All.OfType<Deletion>());
+        var insertion = Assert.Single(read.Value.Changes.All.OfType<Insertion>());
+        Assert.NotNull(deletion.MoveId);
+        Assert.Equal(deletion.MoveId, insertion.MoveId);
     }
 
     [Fact]

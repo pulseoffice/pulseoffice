@@ -134,6 +134,7 @@ public sealed class FragmentRemapper(IStoryCatalog stories, IBlockTree tree) : I
                 StyleName = table.StyleName,
                 HeaderRows = table.HeaderRows,
                 RepeatHeaderRows = table.RepeatHeaderRows,
+                Banding = table.Banding,
                 Direct = table.Direct,
                 PageStyleName = table.PageStyleName,
                 PageBreakBefore = table.PageBreakBefore,

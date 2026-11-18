@@ -45,8 +45,9 @@ public sealed class Round179FolioListTests
     }
 
     [Theory]
-    [InlineData("decimalZero", true)]
-    [InlineData("ordinal", true)]
+    [InlineData("hex", true)]
+    [InlineData("koreanCounting", true)]
+    [InlineData("decimalZero", false)]
     [InlineData("lowerRoman", false)]
     public void Word_number_formats_without_a_model_format_are_declared(string format, bool declared)
     {

@@ -304,6 +304,7 @@ public sealed class DocxWriter : ITextDocumentWriter
                     : new W.Document(body);
                 _annotations.WriteNotes(main, context);
                 _numbering.WriteRestarts(numbering.Numbering, context.Lists);
+                _blocks.SettleMoves(context);
                 main.AddNewPart<DocumentSettingsPart>().Settings = Settings(document);
                 _fonts.Write(main, document.Fonts);
                 _bibliography.Write(main, document);

@@ -120,7 +120,8 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
         _destination = new TextBox { Text = suggestedSheet, MinWidth = 160 };
         AutomationProperties.SetName(_destination, kit["pivot.destination"]);
         _previewNote = kit.Note();
-        _previewFrame = new Border { Background = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Child = _preview, BorderBrush = new SolidColorBrush(Color.FromRgb(0xD1, 0xD5, 0xDB)), BorderThickness = new Thickness(1), IsVisible = false };
+        _previewFrame = new Border { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Child = _preview, BorderThickness = new Thickness(1), IsVisible = false }
+            .Themed(Border.BackgroundProperty, Palette.Keys.Surface).Themed(Border.BorderBrushProperty, Palette.Keys.BorderStrong);
 
         var zoneGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnSpacing = metrics.SpacingSmall, RowSpacing = metrics.SpacingSmall };
         foreach (var (area, index) in Model.Areas.Select((area, index) => (area, index)))
@@ -280,15 +281,16 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
         for (var r = 0; r < grid.Count; r++)
             for (var c = 0; c < grid[r].Count; c++)
             {
+                var text = new TextBlock { Text = grid[r][c], FontSize = _kit.Metrics.FontSizeSmall, FontWeight = r == 0 || c == 0 ? FontWeight.SemiBold : FontWeight.Normal, MaxWidth = 90, TextTrimming = TextTrimming.CharacterEllipsis }
+                    .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary);
                 var cell = new Border
                 {
                     MinWidth = 54,
                     Padding = new Thickness(4, 1),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(0xE5, 0xE7, 0xEB)),
                     BorderThickness = new Thickness(0, 0, 1, 1),
-                    Background = r == 0 ? new SolidColorBrush(Color.FromRgb(0xDC, 0xFC, 0xE7)) : Brushes.White,
-                    Child = new TextBlock { Text = grid[r][c], FontSize = _kit.Metrics.FontSizeSmall, Foreground = Brushes.Black, FontWeight = r == 0 || c == 0 ? FontWeight.SemiBold : FontWeight.Normal, MaxWidth = 90, TextTrimming = TextTrimming.CharacterEllipsis },
-                };
+                    Child = text,
+                }.Themed(Border.BorderBrushProperty, Palette.Keys.Border)
+                 .Themed(Border.BackgroundProperty, r == 0 ? "PulseAccentSubtle" : Palette.Keys.Surface);
                 Grid.SetRow(cell, r);
                 Grid.SetColumn(cell, c);
                 _preview.Children.Add(cell);

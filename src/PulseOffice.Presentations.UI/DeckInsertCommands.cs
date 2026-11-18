@@ -344,7 +344,7 @@ public sealed class DeckInsertCommands(
                 Rows = [.. Enumerable.Range(0, body).Select(_ => (IReadOnlyList<object?>)[.. Enumerable.Repeat<object?>(string.Empty, choice.Columns)])],
             },
         };
-        InsertContent(t, slide, tableLooks.Apply(table, choice.Look, choice.HeaderRow, choice.BandedRows), 16, 0);
+        InsertContent(t, slide, tableLooks.Apply(table, choice.Look, choice.HeaderRow, table.Style.ToBanding() with { BandedRows = choice.BandedRows }), 16, 0);
     }
 
     private CommandDefinition Insert(string id, Func<DeckTarget, EmbeddedObject> build, double widthCm, double heightCm) =>

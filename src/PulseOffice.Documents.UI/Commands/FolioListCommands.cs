@@ -22,7 +22,7 @@ public interface IFolioListForms
 
 public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) : IFolioListForms
 {
-    private readonly ListNumbering[] _all = [ListNumbering.None, ListNumbering.Bullet, ListNumbering.Arabic, ListNumbering.LowerLetter, ListNumbering.UpperLetter, ListNumbering.LowerRoman, ListNumbering.UpperRoman];
+    private readonly ListNumbering[] _all = Enum.GetValues<ListNumbering>();
 
     public IReadOnlyList<FormTab> ListTabs(StyleSheet sheet, string listStyle, int level) =>
         [shared.Tab(ListRequest(sheet, listStyle, level), [new CheckField("apply", texts["folio.list.apply"], true)])];
@@ -47,7 +47,7 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
 
     private ListFormatRequest OutlineRequest(ListStyle outline) =>
         new([.. outline.Levels.Select(Format)], 0, [.. _all.Where(numbering => numbering != ListNumbering.Bullet)],
-            ListFeatures.Affixes | ListFeatures.Start | ListFeatures.DisplayLevels | ListFeatures.Indents, ListSampleMode.Headings);
+            ListFeatures.Affixes | ListFeatures.Start | ListFeatures.DisplayLevels | ListFeatures.Separator | ListFeatures.Indents, ListSampleMode.Headings);
 
     private ListLevelFormat Format(ListLevel level) => new((ListNumbering)(int)level.Format)
     {
@@ -56,6 +56,7 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
         Suffix = level.Suffix,
         Start = level.StartAt,
         DisplayLevels = level.DisplayLevels,
+        Separator = level.Separator,
         Indent = level.Indent,
         Hanging = level.Hanging,
         Picture = level.Picture,
@@ -70,6 +71,8 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
             Suffix = edited[index].Suffix,
             StartAt = edited[index].Start,
             DisplayLevels = edited[index].DisplayLevels,
+            Separator = edited[index].Separator,
+            Separators = edited[index].Separator == level.Separator ? level.Separators : [],
             Indent = edited[index].Indent,
             Hanging = edited[index].Hanging,
             Picture = edited[index].Picture,

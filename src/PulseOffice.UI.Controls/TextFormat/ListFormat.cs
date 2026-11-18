@@ -11,6 +11,21 @@ public enum ListNumbering
     UpperLetter,
     LowerRoman,
     UpperRoman,
+    DecimalZero,
+    Ordinal,
+    OrdinalText,
+    CardinalText,
+    Hebrew,
+    ArabicAbjad,
+    ArabicAlpha,
+    Hiragana,
+    Katakana,
+    KatakanaIroha,
+    IdeographDigital,
+    ChineseCounting,
+    ThaiLetters,
+    RussianLower,
+    RussianUpper,
 }
 
 [Flags]
@@ -23,7 +38,8 @@ public enum ListFeatures
     Indents = 1 << 3,
     Symbol = 1 << 4,
     Picture = 1 << 5,
-    All = (1 << 6) - 1,
+    Separator = 1 << 6,
+    All = (1 << 7) - 1,
 }
 
 public enum ListSampleMode
@@ -43,6 +59,8 @@ public sealed record ListLevelFormat(ListNumbering Numbering)
     public int Start { get; init; } = 1;
 
     public int DisplayLevels { get; init; } = 1;
+
+    public string Separator { get; init; } = ".";
 
     public double Indent { get; init; }
 
@@ -72,9 +90,9 @@ public interface IListLabeler
     string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters);
 }
 
-public sealed class ListLabeler(IListNumberFormats numbers) : IListLabeler
+public sealed class ListLabeler(IListNumberFormats numbers, INumberSystems systems) : IListLabeler
 {
-    public ListLabeler() : this(new ListNumberFormats())
+    public ListLabeler() : this(new ListNumberFormats(), new NumberSystems())
     {
     }
 
@@ -85,7 +103,8 @@ public sealed class ListLabeler(IListNumberFormats numbers) : IListLabeler
         ListNumbering.UpperLetter => numbers.Number(ListNumberStyle.UpperLetter, value),
         ListNumbering.LowerRoman => numbers.Number(ListNumberStyle.LowerRoman, value),
         ListNumbering.UpperRoman => numbers.Number(ListNumberStyle.UpperRoman, value),
-        _ => string.Empty,
+        ListNumbering.None or ListNumbering.Bullet => string.Empty,
+        _ => systems.Render(Enum.Parse<NumberSystem>(numbering.ToString()), value),
     };
 
     public string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters)
@@ -99,6 +118,6 @@ public sealed class ListLabeler(IListNumberFormats numbers) : IListLabeler
         var parts = Enumerable.Range(first, level - first + 1)
             .Where(index => levels[index].Numbering is not (ListNumbering.None or ListNumbering.Bullet))
             .Select(index => Number(levels[index].Numbering, counters[index]));
-        return format.Prefix + string.Join('.', parts) + format.Suffix;
+        return format.Prefix + string.Join(format.Separator, parts) + format.Suffix;
     }
 }

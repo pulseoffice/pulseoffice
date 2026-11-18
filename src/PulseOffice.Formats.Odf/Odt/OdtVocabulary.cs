@@ -273,13 +273,32 @@ internal sealed class OdtNumberFormats
 {
     private readonly TokenMap<NumberFormat> _formats = new(NumberFormat.Arabic, "1",
         (NumberFormat.Arabic, "1"), (NumberFormat.LowerLetter, "a"), (NumberFormat.UpperLetter, "A"),
-        (NumberFormat.LowerRoman, "i"), (NumberFormat.UpperRoman, "I"), (NumberFormat.None, ""));
+        (NumberFormat.LowerRoman, "i"), (NumberFormat.UpperRoman, "I"), (NumberFormat.None, ""),
+        (NumberFormat.DecimalZero, "01, 02, 03, ..."), (NumberFormat.Ordinal, "1st"), (NumberFormat.OrdinalText, "First"),
+        (NumberFormat.CardinalText, "One"), (NumberFormat.Hebrew, "א, ב, ג, ..."), (NumberFormat.ArabicAbjad, "أ, ب, ج, ..."),
+        (NumberFormat.ArabicAlpha, "أ, ب, ت, ..."), (NumberFormat.Hiragana, "あ, い, う, ..."), (NumberFormat.Katakana, "ア, イ, ウ, ..."),
+        (NumberFormat.KatakanaIroha, "イ, ロ, ハ, ..."), (NumberFormat.ChineseCounting, "一, 二, 三, ..."),
+        (NumberFormat.ThaiLetters, "ก, ข, ฃ, ..."), (NumberFormat.RussianLower, "а, б, в, ..."), (NumberFormat.RussianUpper, "А, Б, В, ..."));
+
+    private readonly TokenMap<NumberFormat> _extensions = new(NumberFormat.Arabic, "arabic",
+        (NumberFormat.DecimalZero, "decimal-zero"), (NumberFormat.Ordinal, "ordinal"), (NumberFormat.OrdinalText, "ordinal-text"),
+        (NumberFormat.CardinalText, "cardinal-text"), (NumberFormat.Hebrew, "hebrew"), (NumberFormat.ArabicAbjad, "arabic-abjad"),
+        (NumberFormat.ArabicAlpha, "arabic-alpha"), (NumberFormat.Hiragana, "hiragana"), (NumberFormat.Katakana, "katakana"),
+        (NumberFormat.KatakanaIroha, "katakana-iroha"), (NumberFormat.IdeographDigital, "ideograph-digital"),
+        (NumberFormat.ChineseCounting, "chinese-counting"), (NumberFormat.ThaiLetters, "thai-letters"),
+        (NumberFormat.RussianLower, "russian-lower"), (NumberFormat.RussianUpper, "russian-upper"));
 
     public string Token(NumberFormat format) => _formats.Token(format);
 
+    public string? Extension(NumberFormat format) => _extensions.Find(_extensions.Token(format)) == format ? _extensions.Token(format) : null;
+
     public NumberFormat Value(string? token) => token is null ? NumberFormat.Arabic : _formats.Value(token);
 
+    public NumberFormat Value(string? token, string? extension) => _extensions.Find(extension) ?? Value(token);
+
     public bool Knows(string? token) => token is null || _formats.Find(token) is not null;
+
+    public bool Knows(string? token, string? extension) => _extensions.Find(extension) is not null || Knows(token);
 }
 
 internal sealed class OdtVocabulary

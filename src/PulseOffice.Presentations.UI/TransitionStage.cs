@@ -37,7 +37,7 @@ public sealed class TransitionStage(ITransitionEffectFactory effects, SmilTransi
         layer.Clip = null;
     }
 
-    private Geometry Clip(IReadOnlyList<TransitionShape> shapes, Size size)
+    public Geometry Clip(IReadOnlyList<TransitionShape> shapes, Size size)
     {
         var group = new GeometryGroup { FillRule = FillRule.NonZero };
         foreach (var shape in shapes)

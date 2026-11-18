@@ -375,6 +375,8 @@ public class LedgerCommandsRound6Tests
         public PulseOffice.Foundation.Diagnostics.OperationResult<int> RefreshAll(Workbook workbook, Pivot.PivotLabels labels) => inner.RefreshAll(workbook, labels);
 
         public void Remove(Workbook workbook, string id) => inner.Remove(workbook, id);
+
+        public int FollowCharts(Workbook workbook) => inner.FollowCharts(workbook);
     }
 
     private static (Scene Scene, Pivot.PivotCoordinator Real) PivotScene()

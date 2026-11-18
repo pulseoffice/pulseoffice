@@ -21,6 +21,8 @@ public sealed class ShowMediaPlayer(
     IStatusBarService status,
     ITextCatalog texts) : IShowMediaPlayer
 {
+    private readonly MediaFileExtensions _extensions = new();
+
     public async Task PlayAsync(MediaElement media, string? documentPath)
     {
         ArgumentNullException.ThrowIfNull(media);
@@ -46,7 +48,7 @@ public sealed class ShowMediaPlayer(
 
     private async Task PlayEmbeddedAsync(MediaElement media)
     {
-        var name = string.IsNullOrWhiteSpace(media.FileName) ? $"media{Extension(media.MimeType)}" : media.FileName;
+        var name = string.IsNullOrWhiteSpace(media.FileName) ? $"media{_extensions.For(media)}" : media.FileName;
         try
         {
             ReportUnopened(await launcher.OpenAsync(media.Data, name).ConfigureAwait(true), Path.GetFileName(name));
@@ -64,16 +66,4 @@ public sealed class ShowMediaPlayer(
 
     private void Warn(string key, string argument) =>
         status.Report(string.Format(CultureInfo.CurrentCulture, texts[key], argument), NotificationSeverity.Warning);
-
-    private static string Extension(string? mimeType) => mimeType switch
-    {
-        "video/mp4" => ".mp4",
-        "video/quicktime" => ".mov",
-        "video/webm" => ".webm",
-        "audio/mpeg" => ".mp3",
-        "audio/wav" or "audio/x-wav" => ".wav",
-        "audio/ogg" => ".ogg",
-        "audio/mp4" => ".m4a",
-        _ => ".bin",
-    };
 }

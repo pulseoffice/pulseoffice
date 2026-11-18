@@ -63,24 +63,29 @@ public sealed class IndexStyles : IIndexStyles
 
 public interface IIndexComposer
 {
-    IReadOnlyList<Block> Compose(TextDocument document, IndexDefinition definition, IFieldLayoutFacts facts);
+    IReadOnlyList<Block> Compose(TextDocument document, IndexDefinition definition, IFieldLayoutFacts facts, EditRecorder recorder);
 }
 
-public sealed class IndexComposer(IEnumerable<IIndexEntrySource> sources, IIndexStyles styles) : IIndexComposer
+public sealed class IndexComposer(IEnumerable<IIndexEntrySource> sources, IIndexStyles styles, Fields.IReferenceTargets targets) : IIndexComposer
 {
     private readonly IReadOnlyDictionary<IndexKind, IIndexEntrySource> _sources =
         sources.SelectMany(source => source.Kinds.Select(kind => (kind, source))).ToDictionary(pair => pair.kind, pair => pair.source);
 
-    public IReadOnlyList<Block> Compose(TextDocument document, IndexDefinition definition, IFieldLayoutFacts facts)
+    public IReadOnlyList<Block> Compose(TextDocument document, IndexDefinition definition, IFieldLayoutFacts facts, EditRecorder recorder)
     {
         var blocks = new List<Block>();
         if (definition.Title.Length > 0)
             blocks.Add(new ParagraphBlock(document.NextId("p"), definition.Title, styles.Heading(definition)));
         foreach (var entry in _sources[definition.Kind].Collect(document, definition))
-            blocks.Add(Paragraph(document, definition, entry, facts));
+            blocks.Add(Paragraph(document, definition, Linked(document, definition, entry, recorder), facts));
         if (blocks.Count == 0) blocks.Add(new ParagraphBlock(document.NextId("p"), string.Empty, styles.Entry(definition, 1)));
         return blocks;
     }
+
+    private IndexEntry Linked(TextDocument document, IndexDefinition definition, IndexEntry entry, EditRecorder recorder) =>
+        definition.Hyperlinks && entry.HeadingId is { } heading
+            ? entry with { Link = "#" + targets.Prepare(document, recorder, new Fields.ReferenceTarget(Fields.ReferenceTargetKind.Headings, heading, entry.Text)) }
+            : entry;
 
     private ParagraphBlock Paragraph(TextDocument document, IndexDefinition definition, IndexEntry entry, IFieldLayoutFacts facts)
     {
@@ -140,7 +145,7 @@ public sealed class IndexEditing(IStoryCatalog stories, IBlockTree tree, IIndexC
         var recorder = new EditRecorder(document, "insert-index").Touch(container);
         var count = Indexes(document).Count(section => section.Index!.Kind == definition.Kind) + 1;
         var section = new SectionBlock(document.NextId("s"), styles.SectionName(definition.Kind) + count.ToString(CultureInfo.InvariantCulture),
-            new BlockContainer(composer.Compose(document, definition, facts)))
+            new BlockContainer(composer.Compose(document, definition, facts, recorder)))
         {
             Index = definition,
             Protected = true,
@@ -161,7 +166,7 @@ public sealed class IndexEditing(IStoryCatalog stories, IBlockTree tree, IIndexC
     {
         foreach (var section in Indexes(document).Where(section => sectionId is null || section.Id == sectionId))
         {
-            var fresh = composer.Compose(document, section.Index!, facts);
+            var fresh = composer.Compose(document, section.Index!, facts, recorder);
             if (Same(section.Content.Blocks, fresh)) continue;
             recorder.Touch(section.Content);
             section.Content.Replace(fresh);
@@ -174,7 +179,7 @@ public sealed class IndexEditing(IStoryCatalog stories, IBlockTree tree, IIndexC
         if (Locate(document, sectionId) is not { } location) return recorder.Commit(history);
         var old = (SectionBlock)location.Container[location.Index];
         recorder.Touch(location.Container);
-        var section = old.WithContent(new BlockContainer(composer.Compose(document, definition, facts)), definition);
+        var section = old.WithContent(new BlockContainer(composer.Compose(document, definition, facts, recorder)), definition);
         location.Container.RemoveAt(location.Index);
         location.Container.Insert(location.Index, section);
         return recorder.Commit(history);

@@ -21,6 +21,8 @@ public sealed class XlsxChartMapper
     private readonly SheetReferenceUnion _union = new();
     private readonly PivotChartExtent _pivotExtent = new();
     private readonly ChartSourceReferences _references = new();
+
+    private readonly OoxmlRangeFormulas _rangeFormulas = new();
     private readonly ChartSourceLayout _layout = new();
     private readonly ModelSeriesSlots _slots = new();
     private readonly ChartDataExtractor _data = new(new CanonicalSeriesNames(), new DocumentLanguageChartCellText());
@@ -79,6 +81,7 @@ public sealed class XlsxChartMapper
             var formulas = content.Series
                 .SelectMany(s => s.Descendants<C.Formula>())
                 .Select(f => pivot ? _pivotExtent.Drawn(f) : f.Text)
+                .SelectMany(text => _rangeFormulas.Parts(text))
                 .Where(t => t.Contains('!'))
                 .ToList();
 
@@ -133,7 +136,7 @@ public sealed class XlsxChartMapper
     {
         if (container?.Descendants<C.Formula>().FirstOrDefault() is not { } formula) return null;
         var text = pivot ? _pivotExtent.Drawn(formula) : formula.Text;
-        return text.Contains('!') && _references.Read(text) is { } reference ? _references.Write(reference.Sheet, reference.Range) : null;
+        return _rangeFormulas.Model(text);
     }
 
     private string SheetOf(string formula)
@@ -201,7 +204,7 @@ internal sealed class XlsxPivotChartLink
     {
         if (pivot is null) return;
 
-        var name = string.IsNullOrEmpty(sheet) ? pivot.PivotName : $"{_quoting.Quoted(sheet)}!{pivot.PivotName}";
+        var name = string.IsNullOrEmpty(sheet) ? $"[]{pivot.PivotName}" : $"[]{_quoting.Quoted(sheet)}!{pivot.PivotName}";
         var source = new C.PivotSource(
             new C.PivotTableName(name),
             new C.FormatId { Val = (uint)Math.Max(0, pivot.FormatId) });
@@ -236,6 +239,7 @@ internal sealed class XlsxPivotChartLink
         if (space.GetFirstChild<C.PivotSource>() is not { } source) return null;
         var text = source.ChildElements.FirstOrDefault(child => child.LocalName == "name")?.InnerText?.Trim();
         if (string.IsNullOrEmpty(text)) return null;
+        if (text[0] == '[' && text.IndexOf(']', StringComparison.Ordinal) is var close and > 0) text = text[(close + 1)..];
         var separator = text.LastIndexOf('!');
         var name = separator >= 0 ? text[(separator + 1)..] : text;
         if (name.Length == 0) return null;

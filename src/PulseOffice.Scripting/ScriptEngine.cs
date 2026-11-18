@@ -23,7 +23,10 @@ public sealed record ScriptResult(
     object? Value,
     IReadOnlyList<ScriptDiagnostic> Diagnostics,
     TimeSpan Elapsed,
-    string? StackTrace = null);
+    string? StackTrace = null)
+{
+    public Task Stopped { get; init; } = Task.CompletedTask;
+}
 
 public sealed record ScriptPermissions
 {

@@ -29,6 +29,7 @@ public sealed class RadarPlot : ChartPlotBase
         if (count < 3) return;
 
         var centre = frame.Plot.Center;
+        var spokes = new RadarSpokes(centre, count, frame.Definition.CategoryAxis.Reversed);
         var radius = Math.Min(frame.Plot.Width, frame.Plot.Height) / 2 * 0.85;
 
         var values = frame.Data.Series.SelectMany(series => series.Values).Where(double.IsFinite).ToList();
@@ -40,12 +41,12 @@ public sealed class RadarPlot : ChartPlotBase
 
         for (var ring = 1; ring <= 4; ring++)
         {
-            var geometry = Polygon(centre, radius * ring / 4, count);
+            var geometry = Polygon(spokes, radius * ring / 4);
             frame.Context.DrawGeometry(null, web, geometry);
         }
 
         for (var index = 0; index < count; index++)
-            frame.Context.DrawLine(web, centre, Corner(centre, radius, index, count));
+            frame.Context.DrawLine(web, centre, spokes.Corner(radius, index));
 
         foreach (var (series, order) in frame.Data.Series.Select((series, order) => (series, order)))
         {
@@ -55,7 +56,7 @@ public sealed class RadarPlot : ChartPlotBase
             {
                 for (var index = 0; index < count; index++)
                 {
-                    var point = Corner(centre, scale.Position(Value(series, index)), index, count);
+                    var point = spokes.Corner(scale.Position(Value(series, index)), index);
 
                     if (index == 0) sink.BeginFigure(point, frame.Definition.Type is ChartType.FilledRadar);
                     else sink.LineTo(point);
@@ -71,7 +72,7 @@ public sealed class RadarPlot : ChartPlotBase
                 geometry);
             if (frame.Definition.Type is ChartType.FilledRadar || format.Marker is MarkerSymbol.Automatic or MarkerSymbol.None) continue;
             for (var index = 0; index < count; index++)
-                _strokes.Marker(frame.Context, Brush(frame.Data, order), format, Corner(centre, scale.Position(Value(series, index)), index, count), 2.5);
+                _strokes.Marker(frame.Context, Brush(frame.Data, order), format, spokes.Corner(scale.Position(Value(series, index)), index), 2.5);
         }
     }
 
@@ -81,7 +82,7 @@ public sealed class RadarPlot : ChartPlotBase
         if (axes < 2) return;
 
         var points = frame.Data.Series.Max(series => series.Values.Count);
-        var categories = new CategoryScale(axes, frame.Plot.X, frame.Plot.Right);
+        var categories = Across(frame, axes);
 
         var scales = frame.Data.Series
             .Select(series => PlotScale.Nice(
@@ -118,24 +119,28 @@ public sealed class RadarPlot : ChartPlotBase
         }
     }
 
-    private StreamGeometry Polygon(Point centre, double radius, int count)
+    private StreamGeometry Polygon(RadarSpokes spokes, double radius)
     {
         var geometry = new StreamGeometry();
 
         using var sink = geometry.Open();
 
-        sink.BeginFigure(Corner(centre, radius, 0, count), false);
+        sink.BeginFigure(spokes.Corner(radius, 0), false);
 
-        for (var index = 1; index < count; index++) sink.LineTo(Corner(centre, radius, index, count));
+        for (var index = 1; index < spokes.Count; index++) sink.LineTo(spokes.Corner(radius, index));
 
         sink.EndFigure(true);
         return geometry;
     }
+}
 
-    private Point Corner(Point centre, double radius, int index, int count)
+public sealed record RadarSpokes(Point Centre, int Count, bool Reversed)
+{
+    public Point Corner(double radius, int index)
     {
-        var angle = -Math.PI / 2 + 2 * Math.PI * index / count;
+        var turn = 2 * Math.PI * index / Count;
+        var angle = -Math.PI / 2 + (Reversed ? -turn : turn);
 
-        return new Point(centre.X + radius * Math.Cos(angle), centre.Y + radius * Math.Sin(angle));
+        return new Point(Centre.X + radius * Math.Cos(angle), Centre.Y + radius * Math.Sin(angle));
     }
 }

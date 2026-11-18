@@ -19,7 +19,9 @@ public sealed class PermissionScopedScriptEngine(IScriptEngine inner, IScriptExe
     public async Task<ScriptResult> ExecuteAsync(string source, ScriptContext context, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        using var scope = permissions.Enter(context.Permissions);
+        using var timeCap = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeCap.CancelAfter(context.Permissions.Timeout);
+        using var scope = permissions.Enter(context.Permissions, timeCap.Token);
         return await inner.ExecuteAsync(source, context, ct).ConfigureAwait(true);
     }
 

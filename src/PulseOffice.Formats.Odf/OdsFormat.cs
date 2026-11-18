@@ -82,9 +82,14 @@ public sealed class OdsSpreadsheetReader : ISpreadsheetReader
     public OperationResult<Workbook> Read(Stream stream) => _reader.Read(stream);
 }
 
-public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors) : ISpreadsheetWriter
+public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors, IContentSpool spool) : ISpreadsheetWriter
 {
-    private readonly OdsWriter _writer = new(template, signatureImages, vectors);
+    private readonly OdsWriter _writer = new(template, signatureImages, vectors, spool);
+
+    public OdsSpreadsheetWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors)
+        : this(template, signatureImages, vectors, new MemoryContentSpool())
+    {
+    }
 
     public OdsSpreadsheetWriter(bool template, SignatureLineImage signatureImages)
         : this(template, signatureImages, new VectorFallback())

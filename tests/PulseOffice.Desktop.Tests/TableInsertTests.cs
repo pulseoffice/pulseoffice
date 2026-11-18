@@ -191,7 +191,7 @@ public sealed class TableInsertTests(HeadlessDesktopSession headless)
             },
         };
 
-        var styled = new DeckTableLooks().Apply(table, look, true, true);
+        var styled = new DeckTableLooks().Apply(table, look, true, PulseOffice.Document.Tables.TableBanding.Standard);
         Assert.True(styled.Style.OwnLook);
         Assert.True(styled.Style.HeaderRow);
         Assert.Equal(8, styled.CellFormats.Count);
@@ -202,7 +202,7 @@ public sealed class TableInsertTests(HeadlessDesktopSession headless)
         Assert.Null(styled.CellFormats.Single(format => format.Row == 0 && format.Column == 0).Look!.FillHex);
         Assert.Equal("#DBEAFE", styled.CellFormats.Single(format => format.Row == 1 && format.Column == 1).Look!.FillHex);
 
-        var plain = new DeckTableLooks().Apply(table, look, false, false);
+        var plain = new DeckTableLooks().Apply(table, look, false, PulseOffice.Document.Tables.TableBanding.None);
         Assert.Equal(6, plain.CellFormats.Count);
         Assert.All(plain.CellFormats, format => Assert.Null(format.Look!.FillHex));
     }

@@ -30,9 +30,11 @@ public abstract class TrackedChange(string id, string author, DateTimeOffset dat
 
 public sealed class Insertion(string id, string author, DateTimeOffset date) : TrackedChange(id, author, date)
 {
+    public string? MoveId { get; init; }
+
     public override ChangeKind Kind => ChangeKind.Insertion;
 
-    public override TrackedChange Clone() => new Insertion(Id, Author, Date) { Comment = Comment };
+    public override TrackedChange Clone() => new Insertion(Id, Author, Date) { Comment = Comment, MoveId = MoveId };
 
     public override TrackedChange CopyAs(string id, IReadOnlyDictionary<string, string> renamed, Func<BlockContainer, BlockContainer> content) => new Insertion(id, Author, Date) { Comment = Comment };
 }
@@ -44,9 +46,11 @@ public sealed class Deletion(string id, string author, DateTimeOffset date, Bloc
 
     public string? WithinInsertion { get; init; }
 
+    public string? MoveId { get; init; }
+
     public override ChangeKind Kind => ChangeKind.Deletion;
 
-    public override TrackedChange Clone() => new Deletion(Id, Author, Date, Removed.Clone()) { Comment = Comment, WithinInsertion = WithinInsertion };
+    public override TrackedChange Clone() => new Deletion(Id, Author, Date, Removed.Clone()) { Comment = Comment, WithinInsertion = WithinInsertion, MoveId = MoveId };
 
     public override TrackedChange CopyAs(string id, IReadOnlyDictionary<string, string> renamed, Func<BlockContainer, BlockContainer> content) =>
         new Deletion(id, Author, Date, content(Removed))
@@ -111,6 +115,16 @@ public sealed class TrackedChangeLog
     public bool Remove(string id) => _changes.RemoveAll(change => change.Id == id) > 0;
 
     public IEnumerable<TrackedChange> By(string author) => _changes.Where(change => change.Author == author);
+
+    public IEnumerable<TrackedChange> MovedWith(TrackedChange change) =>
+        MoveOf(change) is { } move ? _changes.Where(other => MoveOf(other) == move) : [change];
+
+    private string? MoveOf(TrackedChange change) => change switch
+    {
+        Insertion insertion => insertion.MoveId,
+        Deletion deletion => deletion.MoveId,
+        _ => null,
+    };
 
     public void CopyFrom(TrackedChangeLog other)
     {

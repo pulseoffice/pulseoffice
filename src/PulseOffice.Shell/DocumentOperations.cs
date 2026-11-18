@@ -54,9 +54,12 @@ public interface IDocumentOperations
 
 }
 
-public sealed record PdfExportLayout(string Label, Func<IPrintableDocument> Build);
+public sealed record PdfExportLayout(string Label, Func<bool, IPrintableDocument> Build);
 
-public sealed record PdfExportProfile(bool HasHeadings, string LayoutLabel, IReadOnlyList<PdfExportLayout> Layouts);
+public sealed record PdfExportProfile(bool HasHeadings, string LayoutLabel, IReadOnlyList<PdfExportLayout> Layouts)
+{
+    public string? IncludeHiddenLabel { get; init; }
+}
 
 public interface IDocumentOperationsCatalog
 {

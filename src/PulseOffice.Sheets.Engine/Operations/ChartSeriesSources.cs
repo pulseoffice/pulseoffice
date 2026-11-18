@@ -11,6 +11,10 @@ public interface IChartSourceReferences
 
     string Write(string sheet, CellRange range);
 
+    IReadOnlyList<ChartSourceReference> Areas(string? text);
+
+    string Write(IReadOnlyList<ChartSourceReference> areas);
+
     bool Same(string? first, string? second);
 }
 
@@ -48,6 +52,42 @@ public sealed class ChartSourceReferences : IChartSourceReferences
     }
 
     public string Write(string sheet, CellRange range) => _text.Join(sheet, range.ToString());
+
+    public IReadOnlyList<ChartSourceReference> Areas(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return [];
+        var areas = new List<ChartSourceReference>();
+        foreach (var part in Split(text))
+        {
+            if (Read(part) is not { } area) return [];
+            areas.Add(area);
+        }
+        return areas;
+    }
+
+    public string Write(IReadOnlyList<ChartSourceReference> areas)
+    {
+        ArgumentNullException.ThrowIfNull(areas);
+        return string.Join(',', areas.Select(area => Write(area.Sheet, area.Range)));
+    }
+
+    private List<string> Split(string text)
+    {
+        var parts = new List<string>();
+        var quoted = false;
+        var start = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\'') quoted = !quoted;
+            else if (text[index] == ',' && !quoted)
+            {
+                parts.Add(text[start..index]);
+                start = index + 1;
+            }
+        }
+        parts.Add(text[start..]);
+        return parts;
+    }
 
     public bool Same(string? first, string? second)
     {
@@ -142,7 +182,7 @@ internal sealed class SeriesSourceReader(IChartSourceReferences references, ICha
     public ChartData Read(Workbook workbook, ChartDefinition definition, bool visibleOnly)
     {
         var sources = definition.SeriesSources!;
-        var categorySource = sources.Select(source => source.Categories).FirstOrDefault(text => references.Read(text) is not null);
+        var categorySource = sources.Select(source => source.Categories).FirstOrDefault(text => references.Areas(text).Count > 0);
         var categories = categorySource is null ? null : Cells(workbook, categorySource, visibleOnly).Select(cell => cell.Text).ToList();
 
         var series = new List<ChartSeries>();
@@ -163,22 +203,30 @@ internal sealed class SeriesSourceReader(IChartSourceReferences references, ICha
 
     private string? Name(Workbook workbook, string? text)
     {
-        if (references.Read(text) is not { } reference || workbook.FindSheet(reference.Sheet) is not { } sheet) return null;
-        return cells.Text(workbook, sheet[reference.Range.Start]);
+        var areas = references.Areas(text);
+        if (areas.Count == 0 || workbook.FindSheet(areas[0].Sheet) is null) return null;
+        var names = areas
+            .Where(area => workbook.FindSheet(area.Sheet) is not null)
+            .Select(area => cells.Text(workbook, workbook.FindSheet(area.Sheet)![area.Range.Start]))
+            .Where(name => !string.IsNullOrWhiteSpace(name));
+        return string.Join(' ', names);
     }
 
     private IEnumerable<(string Text, double Number)> Cells(Workbook workbook, string text, bool visibleOnly)
     {
-        if (references.Read(text) is not { } reference || workbook.FindSheet(reference.Sheet) is not { } sheet) yield break;
-        if ((workArea.Bound(reference.Range, null) ?? workArea.Bound(reference.Range, sheet.UsedRange())) is not { } range) yield break;
-
         var count = 0;
-        foreach (var address in range.Cells())
+        foreach (var reference in references.Areas(text))
         {
-            if (visibleOnly && (sheet.Layout.IsRowHidden(address.Row) || sheet.Layout.IsColumnHidden(address.Column))) continue;
-            if (++count > MaximumPoints) yield break;
-            var cell = sheet[address];
-            yield return (cells.Text(workbook, cell), cell.Value.Kind == Values.ValueKind.Number ? cell.Value.AsNumber() : double.NaN);
+            if (workbook.FindSheet(reference.Sheet) is not { } sheet) continue;
+            if ((workArea.Bound(reference.Range, null) ?? workArea.Bound(reference.Range, sheet.UsedRange())) is not { } range) continue;
+
+            foreach (var address in range.Cells())
+            {
+                if (visibleOnly && (sheet.Layout.IsRowHidden(address.Row) || sheet.Layout.IsColumnHidden(address.Column))) continue;
+                if (++count > MaximumPoints) yield break;
+                var cell = sheet[address];
+                yield return (cells.Text(workbook, cell), cell.Value.Kind == Values.ValueKind.Number ? cell.Value.AsNumber() : double.NaN);
+            }
         }
     }
 }
