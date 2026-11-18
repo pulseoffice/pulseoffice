@@ -109,9 +109,9 @@ internal sealed class LedgerCellOperations(
             return;
         }
 
-        if (sheet.Protection.IsEnabled)
+        if (sheet.Protection.BlocksObjects)
         {
-            status.Report(texts["status.protection.format"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            status.Report(texts["status.protection.objects"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
             grid.Refresh();
             return;
         }

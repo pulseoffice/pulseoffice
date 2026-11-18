@@ -562,7 +562,7 @@ internal sealed class OdtNoteReader(OdtVocabulary vocabulary) : OdtXml
 
 internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingReader drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
-    private readonly OdtImageClip _clip = new(measure);
+    private readonly OdfImageClip _clip = new(measure);
 
     public bool Handles(XElement element) => element.Name == Draw + "frame" || element.Name == Draw + "a" || drawings.Handles(element);
 
@@ -656,7 +656,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             Placement = placement with
             {
                 Horizontal = frames.Horizontal((string?)graphic?.Attribute(Style + "horizontal-rel")),
-                Vertical = frames.Vertical((string?)graphic?.Attribute(Style + "vertical-rel")),
+                Vertical = frames.ReadVertical(graphic) ?? VerticalRelation.Paragraph,
                 HorizontalAlign = frames.HorizontalPosition((string?)graphic?.Attribute(Style + "horizontal-pos")),
                 VerticalAlign = frames.VerticalPosition((string?)graphic?.Attribute(Style + "vertical-pos")),
             },

@@ -253,7 +253,7 @@ internal sealed class LedgerObjectEditing(
     public bool CanEditObjects(Worksheet sheet)
     {
         if (!writer.CanEdit()) return false;
-        if (!sheet.Protection.IsEnabled) return true;
+        if (!sheet.Protection.BlocksObjects) return true;
 
         status.Report(texts["status.protection.objects"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
         grid.Refresh();

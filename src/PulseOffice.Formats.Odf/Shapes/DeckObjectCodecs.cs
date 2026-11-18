@@ -265,9 +265,9 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
     }
 }
 
-internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors) : DeckObjectCodec
+internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors, OdfImageClip clip) : DeckObjectCodec
 {
-    public DeckImageCodec(OdfImageTypes types) : this(types, new VectorFallback())
+    public DeckImageCodec(OdfImageTypes types) : this(types, new VectorFallback(), new OdfImageClip(new PulseOffice.Formats.Odf.Odt.OdtMeasure()))
     {
     }
 
@@ -321,16 +321,18 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
 
         var bounds = Bounds(frame);
         var filter = ImageFilter.None;
-        (double, double, double, double) crop = default;
+        string? clipped = null;
 
         var styleName = (string?)frame.Attribute(Draw + "style-name");
         if (styleName is not null && definitions is not null && definitions.TryGetValue(styleName, out var style)
             && style.Element(Style + "graphic-properties") is { } graphic)
         {
             if ((string?)graphic.Attribute(Draw + "color-mode") == "greyscale") filter = ImageFilter.Grayscale;
-            if ((string?)graphic.Attribute(OdfPackage.Namespaces.Fo + "clip") is { } clip) crop = Clip(clip, bounds);
+            clipped = (string?)graphic.Attribute(OdfPackage.Namespaces.Fo + "clip");
         }
 
+        var frameSize = new DocumentSize(bounds.Width, bounds.Height);
+        var unclipped = new RasterImageObject { Id = id, Data = data, MediaType = mediaType };
         return new ObjectElement
         {
             Id = id,
@@ -343,7 +345,7 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
                 LinkPath = linkPath,
                 NaturalSize = new DocumentSize(bounds.Width, bounds.Height),
                 Filter = filter,
-                Crop = crop,
+                Crop = clip.Read(clipped, unclipped, frameSize),
                 Map = new OdfImageMapCodec().Read(frame, new DocumentSize(bounds.Width, bounds.Height)),
             },
         };
@@ -370,21 +372,6 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
     }
 
     private readonly ImageHeader _header = new();
-
-    private (double Left, double Top, double Right, double Bottom) Clip(string clip, DocumentRect bounds)
-    {
-        var open = clip.IndexOf('(');
-        var close = clip.IndexOf(')');
-        if (open < 0 || close < 0) return default;
-
-        var parts = clip[(open + 1)..close].Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 4) return default;
-
-        double Twips(string part) => Centimeters(part) * PulseOffice.Foundation.Units.Twip.PerCentimeter;
-        double width = bounds.Width.Value, height = bounds.Height.Value;
-        return (width > 0 ? Twips(parts[3]) / width : 0, height > 0 ? Twips(parts[0]) / height : 0,
-            width > 0 ? Twips(parts[1]) / width : 0, height > 0 ? Twips(parts[2]) / height : 0);
-    }
 }
 
 internal sealed class DeckFormulaCodec(PulseOffice.Formulas.IMathMlSyntax mathml, IOdfParagraphText paragraphs) : DeckObjectCodec

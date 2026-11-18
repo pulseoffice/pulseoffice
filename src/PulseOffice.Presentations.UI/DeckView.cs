@@ -111,7 +111,8 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         PulseOffice.UI.Controls.Services.IContextMenuKey? menuKey = null,
         PulseOffice.UI.Controls.Rulers.IParagraphRuler? paragraphRuler = null,
         PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys? nudges = null,
-        PulseOffice.Drawing.Assets.IImageExtents? extents = null)
+        PulseOffice.Drawing.Assets.IImageExtents? extents = null,
+        IDeckLinkTips? linkTips = null)
     {
         _masters = masters;
         _connectors = connectors;
@@ -128,13 +129,19 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         _deckContext = deckContext;
         _canvas = new SlideView(renderer) { Size = deck.Size, Editable = true, Grid = deck.Grid, Deck = deck, Focusable = true, FocusAdorner = null };
         _state = new DeckViewState(deck, actions, texts, _canvas, _options);
+        if (linkTips is not null)
+        {
+            _canvas.PointerMoved += (_, e) => linkTips.Show(_canvas, linkTips.At(_canvas, e.GetPosition(_canvas)));
+            _canvas.PointerExited += (_, _) => linkTips.Show(_canvas, null);
+        }
 
         _correction = new DeckTextCorrection(_state, autoCorrect, autoCorrectSettings, spelling);
         _player = new DeckAnimationPlayer(_state, scheduler);
         _colorBar = new DeckColorBar(_state);
         _proofing = new DeckProofing(_state, spelling, autoSpell, userWords);
         var stillImages = new PulseOffice.UI.Controls.Objects.StillImageProbe();
-        _filmstrip = new DeckFilmstrip(_state, this, renderer, keyNavigation, contextMenus, stillImages);
+        var stripLayout = new SlideStripLayout();
+        _filmstrip = new DeckFilmstrip(_state, this, renderer, keyNavigation, contextMenus, stillImages, new DeckSectionHeaders(actions, texts, _state.Metrics), stripLayout);
         _shapes = new DeckShapeTextEditing(_state, this, _filmstrip,
             new PulseOffice.UI.Controls.Shapes.ShapeTextEditor(shapeTextEditing ?? new PulseOffice.Drawing.Shapes.ShapeTextEditing(), new PulseOffice.Drawing.Shapes.ShapeTextInk(), new PulseOffice.UI.Controls.Shapes.ShapeBrushes(), focus, word),
             shapeRichText ?? new PulseOffice.Drawing.Shapes.ShapeRichText());
@@ -154,7 +161,8 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         _inspector = new DeckInspector(_state, this, _player, new PulseOffice.Presentations.UI.Motion.DeckElementNames(_state.Texts));
         _modes = new DeckModeViews(_state, this, renderer,
             new DeckMasterViews(_state, this, renderer, handoutLayout ?? new HandoutLayout(), masterSlides ?? new SlideFactory(), new DeckChoiceNames(_state.Texts),
-                new Design.LayoutChoices(new DeckChoiceNames(_state.Texts), actions.Layouts.Catalog)), _correction, stillImages, new DeckOutlineText(), new OutlineSlideMatching(), new OutlineBlockMove(new DeckOutlineText()));
+                new Design.LayoutChoices(new DeckChoiceNames(_state.Texts), actions.Layouts.Catalog)), _correction, stillImages, new DeckOutlineText(), new OutlineSlideMatching(), new OutlineBlockMove(new DeckOutlineText()),
+            new DeckSectionHeaders(actions, texts, _state.Metrics), stripLayout);
         _insertion = new DeckObjectInsertion(_state, this, images, extents ?? new PulseOffice.Drawing.Assets.ImageExtents(), _modeHost);
 
         AddHandler(KeyDownEvent, _menus.OnMenuKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);

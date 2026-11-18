@@ -109,6 +109,22 @@ public sealed class DocxWriteContext(TextDocument document, OpenXmlPart part)
         _ => throw new InvalidOperationException("Images cannot be stored in " + Part.Uri),
     };
 
+    private readonly Dictionary<string, ImagePart> _sharedImages = new(StringComparer.Ordinal);
+
+    public string SharedImage(PartTypeInfo type, ReadOnlySpan<byte> data)
+    {
+        var key = $"{type.ContentType}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(data))}";
+        if (_sharedImages.TryGetValue(key, out var existing))
+        {
+            return Part.Parts.Where(pair => pair.OpenXmlPart == existing).Select(pair => pair.RelationshipId).FirstOrDefault()
+                ?? Part.CreateRelationshipToPart(existing);
+        }
+        var part = AddImage(type);
+        using (var stream = part.GetStream(FileMode.Create)) stream.Write(data);
+        _sharedImages[key] = part;
+        return Part.GetIdOfPart(part);
+    }
+
     private readonly Dictionary<(OpenXmlPart, string), string> _links = [];
 
     public string Link(string target)

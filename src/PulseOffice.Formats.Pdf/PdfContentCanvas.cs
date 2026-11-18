@@ -194,7 +194,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
     {
         if (!double.IsFinite(opacity)) opacity = 1;
         var value = Math.Clamp(opacity, 0, 1);
-        var name = $"GS{(int)Math.Round(value * 100)}";
+        var name = $"GS{(int)Math.Round(value * 1000)}";
 
         _alphas[name] = value;
 

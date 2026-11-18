@@ -8,6 +8,7 @@ public sealed class OdfProtectionMapper
 {
     private const string Sha256 = "http://www.w3.org/2000/09/xmldsig#sha256";
     private const string Unreadable = "unreadable";
+    private readonly XName _editObjects = XNamespace.Get("urn:pulseoffice:spreadsheet") + "edit-objects";
 
     public void Write(Worksheet sheet, XElement table)
     {
@@ -15,6 +16,7 @@ public sealed class OdfProtectionMapper
 
         table.Add(new XAttribute(Namespaces.Table + "protected", "true"));
         Key(table, sheet.Protection.PasswordHash);
+        if (sheet.Protection.AllowEditObjects) table.Add(new XAttribute(_editObjects, "true"));
 
         var options = new XElement(Namespaces.Loext + "table-protection");
         foreach (var option in Options)
@@ -47,7 +49,12 @@ public sealed class OdfProtectionMapper
     {
         if ((string?)table.Attribute(Namespaces.Table + "protected") != "true") return;
 
-        var protection = sheet.Protection with { IsEnabled = true, PasswordHash = HashOf(table) };
+        var protection = sheet.Protection with
+        {
+            IsEnabled = true,
+            PasswordHash = HashOf(table),
+            AllowEditObjects = (string?)table.Attribute(_editObjects) == "true",
+        };
         var options = table.Element(Namespaces.Loext + "table-protection")
             ?? table.Element(Namespaces.Table + "table-protection");
         if (options is not null)

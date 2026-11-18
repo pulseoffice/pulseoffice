@@ -12,6 +12,8 @@ public interface IFolioObjectLinks
 {
     FolioObjectLinkTarget? Point(FolioEditor editor, ObjectBox box, double x, double y);
 
+    FolioObjectLinkTarget? Locate(FolioEditor editor, ObjectBox box, double x, double y);
+
     FolioObjectLinkTarget? Target(FolioEditor editor);
 
     string? Link(FolioEditor editor, FolioObjectLinkTarget target);
@@ -31,6 +33,13 @@ public sealed class FolioObjectLinks(IGroupChildLinks children, IFolioObjectEdit
 
     public FolioObjectLinkTarget? Point(FolioEditor editor, ObjectBox box, double x, double y)
     {
+        var target = Locate(editor, box, x, y);
+        if (target is not null) _pointed = (editor, target);
+        return target;
+    }
+
+    public FolioObjectLinkTarget? Locate(FolioEditor editor, ObjectBox box, double x, double y)
+    {
         ArgumentNullException.ThrowIfNull(editor);
         ArgumentNullException.ThrowIfNull(box);
         if (editor.Document.Objects.Find(box.ObjectId) is not { } item) return null;
@@ -44,9 +53,7 @@ public sealed class FolioObjectLinks(IGroupChildLinks children, IFolioObjectEdit
             if (item.FlipVertical) fractionY = 1 - fractionY;
             member = children.MemberAt(group, fractionX, fractionY);
         }
-        var target = new FolioObjectLinkTarget(item.Id, member);
-        _pointed = (editor, target);
-        return target;
+        return new FolioObjectLinkTarget(item.Id, member);
     }
 
     public FolioObjectLinkTarget? Target(FolioEditor editor)

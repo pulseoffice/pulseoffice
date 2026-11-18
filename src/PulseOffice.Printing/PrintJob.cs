@@ -241,6 +241,12 @@ public sealed class ImposedDocument : IPrintableDocument
 
     public int PageCount => _sheets.Count;
 
+    public DocumentSize PageSize(int index) =>
+        index >= 0 && index < _sheets.Count && _sheets[index] is [{ Page: >= 0, Scale: 1 } single] && single.Page < _source.PageCount
+            && single.Offset.X == Twip.Zero && single.Offset.Y == Twip.Zero
+            ? _source.PageSize(single.Page)
+            : new DocumentSize(Setup.PageWidth, Setup.PageHeight);
+
     public IReadOnlyList<IReadOnlyList<SheetSlot>> Sheets => _sheets;
 
     public void PaintPage(int index, IPageCanvas canvas)
@@ -255,7 +261,8 @@ public sealed class ImposedDocument : IPrintableDocument
                 else
                 {
                     var scaled = new ScaledPageCanvas(canvas, slot.Scale, new DocumentPoint(Twip.Zero, Twip.Zero), slot.Offset);
-                    _source.PaintPage(slot.Page, new ClippedPageCanvas(scaled, new DocumentRect(Twip.Zero, Twip.Zero, _source.Setup.PageWidth, _source.Setup.PageHeight)));
+                    var size = _source.PageSize(slot.Page);
+                    _source.PaintPage(slot.Page, new ClippedPageCanvas(scaled, new DocumentRect(Twip.Zero, Twip.Zero, size.Width, size.Height)));
                 }
             }
             if (_borders) Frame(canvas, slot.Area);
@@ -278,6 +285,8 @@ public sealed class FilteredPrintDocument(IPrintableDocument source, bool graphi
     public PageSetup Setup => source.Setup;
 
     public int PageCount => source.PageCount;
+
+    public DocumentSize PageSize(int index) => source.PageSize(index);
 
     public void PaintPage(int index, IPageCanvas canvas) => source.PaintPage(index, new FilteredPageCanvas(canvas, graphics, blackText));
 }

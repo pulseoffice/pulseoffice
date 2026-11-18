@@ -33,7 +33,8 @@ public sealed class DeckActions
             groupEditing ?? new SlideGroupEditing(), flipping ?? new PulseOffice.Drawing.Shapes.ContentFlipping(),
             refit ?? new FreeformRefit(), optionGroups ?? new PulseOffice.Document.Forms.OptionGroups(),
             behaviourCloning ?? new ElementBehaviourCloning());
-        _text = new DeckTextActions(deck, texts, _recorder, splice ?? new TextEditSplice());
+        var textSplice = splice ?? new TextEditSplice();
+        _text = new DeckTextActions(deck, texts, _recorder, textSplice, new ParagraphLineMerge(textSplice));
         _design = new DeckDesignActions(deck, texts, _recorder, styleRelinker ?? new GraphicStyleRelinker());
         _layouts = new DeckLayoutActions(deck, history, texts, _recorder, slides, layoutCatalog ?? new SlideLayoutCatalog(), _slides, _design);
     }
@@ -235,6 +236,12 @@ public sealed class DeckActions
 
     public void SetSection(Slide slide, string? name) =>
         _slides.SetSection(slide, name);
+
+    public void RenameEmptySection(EmptySection section, string name) =>
+        _slides.RenameEmptySection(section, name);
+
+    public void RemoveEmptySection(EmptySection section) =>
+        _slides.RemoveEmptySection(section);
 
     public void SetBackgroundImage(Slide slide, PulseOffice.Drawing.Assets.RasterImageObject? image) =>
         _slides.SetBackgroundImage(slide, image);

@@ -65,7 +65,7 @@ public sealed class Round230EastAsianUprightTests
         Assert.True(text.Draws(With(new TextLayout { Flow = TextFlow.MongolianVertical })));
         Assert.True(text.Draws(With(new TextLayout { Flow = TextFlow.Stacked })));
         Assert.True(text.Draws(With(new TextLayout { Flow = TextFlow.StackedRightToLeft })));
-        Assert.False(text.Draws(With(new TextLayout { Flow = TextFlow.Vertical })));
+        Assert.True(text.Draws(With(new TextLayout { Flow = TextFlow.Vertical })));
         Assert.False(text.Draws(With(TextLayout.Default)));
     }
 

@@ -182,7 +182,9 @@ public sealed class OdpReader : IPresentationReader
             foreach (var page in body?.Elements(Draw + "page") ?? [])
                 deck.AddExisting(_slides.Read(_shapeIds.Assign(new OdpGroupFlattener().Flatten(page)), context, ids));
             new OdpSectionXml().ReadEmpty(body?.Elements(Draw + "page") ?? [], deck);
-            new OdpFirstSlideNumber().Read(styles, deck);
+            var firstNumber = new OdpFirstSlideNumber();
+            firstNumber.Read(styles, deck);
+            firstNumber.ReadAdjust(deck, content.Document, styles);
 
             _settings.Read(body?.Element(Presentation + "settings"), deck);
             if (!deck.HeaderFooter.Any && body is not null

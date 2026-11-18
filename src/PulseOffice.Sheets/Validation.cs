@@ -71,6 +71,10 @@ public sealed record SheetProtection
 
     public bool AllowFilter { get; init; }
 
+    public bool AllowEditObjects { get; init; }
+
+    public bool BlocksObjects => IsEnabled && !AllowEditObjects;
+
     public bool Accepts(string? password) =>
         PasswordHash is null || (password is not null && PasswordKey.Parse(PasswordHash).Matches(password));
 

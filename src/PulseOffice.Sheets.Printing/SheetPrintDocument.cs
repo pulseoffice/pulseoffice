@@ -213,6 +213,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
         if (index >= PageCount) return;
 
+        if (index == 0 && !string.IsNullOrWhiteSpace(_sheet.Name)) canvas.MarkHeading(1, _sheet.Name, 0);
+
         var numbered = _numbering.For(this, index);
         if (index >= _pages.Count)
         {
@@ -472,6 +474,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
         if (Setup.PrintGridLines) PaintGridLines(canvas, bounds, firstRow, firstColumn);
 
         PaintBorders(canvas, style, bounds);
+
+        if (cell.Hyperlink is { Length: > 0 } link && !link.StartsWith('#')) canvas.MarkLink(bounds, link);
 
         _conditionalPainter.PaintIcon(canvas, appearance, bounds);
         if (appearance.HideValue) return;

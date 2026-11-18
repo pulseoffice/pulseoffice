@@ -10,6 +10,8 @@ public interface ILayoutQueries
 {
     DocumentPosition? HitTest(DocumentLayout layout, int page, double x, double y);
 
+    DocumentPosition? CharacterAt(DocumentLayout layout, int page, double x, double y);
+
     CaretRect? Caret(DocumentLayout layout, DocumentPosition position);
 
     IReadOnlyList<DocumentRange> Block(DocumentLayout layout, int page, double left, double top, double right, double bottom);
@@ -43,6 +45,26 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
         if (lines.Count == 0) return null;
         var line = Nearest(lines, x, y);
         return new DocumentPosition(line.ParagraphId, offsets.OffsetAt(line, x));
+    }
+
+    public DocumentPosition? CharacterAt(DocumentLayout layout, int page, double x, double y)
+    {
+        if (page < 0 || page >= layout.Pages.Count) return null;
+        var turned = new HashSet<LineBox>(layout.Pages[page].TurnedFrames.SelectMany(frame => frame.Lines), ReferenceEqualityComparer.Instance);
+        foreach (var line in layout.Pages[page].AllLines)
+        {
+            if (turned.Contains(line) || y < line.Top || y >= line.Top + line.Line.Height || x < line.Left || x > line.Left + line.Line.Width) continue;
+            var start = offsets.StartOf(line);
+            var end = offsets.EndOf(line);
+            var near = offsets.OffsetAt(line, x);
+            foreach (var candidate in new[] { near - 1, near })
+            {
+                if (candidate < start || candidate >= end) continue;
+                var (from, to) = (offsets.XOf(line, candidate), offsets.XOf(line, candidate + 1));
+                if (x >= Math.Min(from, to) && x < Math.Max(from, to)) return new DocumentPosition(line.ParagraphId, candidate);
+            }
+        }
+        return null;
     }
 
     public CaretRect? Caret(DocumentLayout layout, DocumentPosition position)

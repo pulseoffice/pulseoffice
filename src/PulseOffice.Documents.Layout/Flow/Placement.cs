@@ -3,7 +3,14 @@ using PulseOffice.Documents.Objects;
 
 namespace PulseOffice.Documents.Layout.Flow;
 
-public sealed record ObjectFrame(PageGeometry Page, double ColumnLeft, double ColumnWidth, double ParagraphTop);
+public sealed record ObjectFrame(PageGeometry Page, double ColumnLeft, double ColumnWidth, double ParagraphTop)
+{
+    public double ParagraphHeight { get; init; } = double.NaN;
+
+    public double LineHeight { get; init; } = double.NaN;
+
+    public bool EvenPage { get; init; }
+}
 
 public interface IObjectPlacement
 {
@@ -26,13 +33,29 @@ public sealed class ObjectPlacement : IObjectPlacement
         var (top, down) = item.Placement.Vertical switch
         {
             VerticalRelation.Page => (0d, frame.Page.Height),
-            VerticalRelation.PageArea or VerticalRelation.Margin => (frame.Page.Content.Y, frame.Page.Content.Height),
-            _ => (frame.ParagraphTop, double.NaN),
+            VerticalRelation.Margin => (0d, frame.Page.Content.Y),
+            VerticalRelation.PageArea => (frame.Page.Content.Y, frame.Page.Content.Height),
+            VerticalRelation.Line or VerticalRelation.Character => (frame.ParagraphTop, double.IsFinite(frame.LineHeight) ? frame.LineHeight : frame.ParagraphHeight),
+            _ => (frame.ParagraphTop, frame.ParagraphHeight),
         };
-        var x = Aligned(item.Placement.HorizontalAlign, left, across, width) ?? left + item.Placement.X.ToPoints();
-        var y = Aligned(item.Placement.VerticalAlign, top, down, height) ?? top + item.Placement.Y.ToPoints();
+        var x = Aligned(Sided(item.Placement.HorizontalAlign, frame.EvenPage), left, across, width) ?? left + item.Placement.X.ToPoints();
+        var y = Aligned(Upright(item.Placement.VerticalAlign), top, down, height) ?? top + item.Placement.Y.ToPoints();
         return new LayoutRect(x, y, width, height);
     }
+
+    private ObjectAlignment Sided(ObjectAlignment alignment, bool even) => alignment switch
+    {
+        ObjectAlignment.Inside => even ? ObjectAlignment.End : ObjectAlignment.Start,
+        ObjectAlignment.Outside => even ? ObjectAlignment.Start : ObjectAlignment.End,
+        _ => alignment,
+    };
+
+    private ObjectAlignment Upright(ObjectAlignment alignment) => alignment switch
+    {
+        ObjectAlignment.Inside => ObjectAlignment.Start,
+        ObjectAlignment.Outside => ObjectAlignment.End,
+        _ => alignment,
+    };
 
     private double? Aligned(ObjectAlignment alignment, double start, double extent, double size) => alignment switch
     {

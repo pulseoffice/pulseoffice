@@ -1,9 +1,11 @@
 using PulseOffice.Foundation.Units;
 using PulseOffice.Drawing.Assets;
 
-namespace PulseOffice.Formats.Odf.Odt;
+using PulseOffice.Formats.Odf.Odt;
 
-internal sealed class OdtImageClip(OdtMeasure measure)
+namespace PulseOffice.Formats.Odf;
+
+internal sealed class OdfImageClip(OdtMeasure measure)
 {
     private const double PointsPerPixel = 72 / ImageHeader.ScreenDotsPerInch;
 

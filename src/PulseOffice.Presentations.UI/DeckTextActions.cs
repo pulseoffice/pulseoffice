@@ -6,7 +6,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckActionRecorder recorder, ITextEditSplice _splice)
+public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckActionRecorder recorder, ITextEditSplice _splice, IParagraphLineMerge _lines)
 {
     public void EditText(Slide slide, string elementId, RichText updated, string labelKey = "deck.action.editText")
     {
@@ -154,13 +154,13 @@ public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckA
         foreach (var (slide, title, body) in changes)
         {
             if (slide.Placeholder(PlaceholderRole.Title) is { } heading
-                && heading.Text.PlainText.Replace('\n', ' ') != title
-                && _splice.Apply(heading.Text, title) is var retitled && !ReferenceEquals(retitled, heading.Text))
+                && heading.Text.PlainText != title
+                && _lines.Merge(heading.Text, title.Split('\n')) is var retitled && !ReferenceEquals(retitled, heading.Text))
                 swaps.Add((slide, heading, Fitted(slide, heading with { Text = retitled })));
 
             if (slide.Placeholder(PlaceholderRole.Body) is not { } placeholder) continue;
             var before = placeholder.Text;
-            var after = Levelled(_splice.Apply(before, string.Join("\n", body.Select(line => line.Text))), body);
+            var after = Levelled(_lines.Merge(before, [.. body.Select(line => line.Text)]), body);
             if (ReferenceEquals(after, before)) continue;
             swaps.Add((slide, placeholder, Fitted(slide, placeholder with { Text = after })));
         }

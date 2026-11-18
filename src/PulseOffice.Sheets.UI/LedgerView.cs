@@ -170,7 +170,8 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         ShapeText.IShapeTextCellStyle? shapeTextStyle = null,
         Drawing.Shapes.IShapeTextEditing? shapeTextEditing = null,
         IContextMenuKey? menuKey = null,
-        Drawing.Shapes.IShapeTextParagraphs? shapeParagraphs = null)
+        Drawing.Shapes.IShapeTextParagraphs? shapeParagraphs = null,
+        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null)
     {
         _menuKey = menuKey ?? new ContextMenuKey();
         _contextMenus = contextMenus;
@@ -189,7 +190,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _history.Changed += (_, _) => RefreshEverything();
 
         var binding = formBinding ?? new FormControlBinding(new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale());
-        _grid = new SheetGridView(_engine, presenter, conditional, _selection, formBinding: binding)
+        _grid = new SheetGridView(_engine, presenter, conditional, _selection, formBinding: binding, linkTips: linkTips)
         {
             ChartRenderer = new PulseOffice.UI.Controls.Charts.ChartRenderer(_texts),
             ChartData = new Engine.Operations.ChartDataExtractor(new LocalizedSeriesNames(_texts), new Engine.Operations.PresentedChartCellText(presenter)),

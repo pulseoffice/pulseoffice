@@ -45,7 +45,7 @@ public sealed class OdtWriter : ITextDocumentWriter
             new FontworkObjectWriter(shapes, altText),
             new FreeformObjectWriter(shapes, altText),
             new ConnectorObjectWriter(shapes, altText),
-            new ImageObjectWriter(shapes, new OdfUnits(), altText),
+            new ImageObjectWriter(shapes, new OdfUnits(), altText, new OdfImageClip(new PulseOffice.Formats.Odf.Odt.OdtMeasure())),
         ]), new OdfFormControlMapper());
         var marks = new OdtMarkWriter(new OdtCommentWriter(), new OdtNoteWriter(vocabulary),
             new OdtObjectWriter(measure, frames, names, new OdfImageTypes(), new OdfImageMapCodec(), drawings, new OdtContours(measure), new OdfSignatureLineCodec(signatureImages)));

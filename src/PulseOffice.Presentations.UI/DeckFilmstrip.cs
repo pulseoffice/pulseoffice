@@ -15,12 +15,11 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IContextMenuFactory contextMenus, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages)
+internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IContextMenuFactory contextMenus, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, DeckSectionHeaders sectionHeaders, SlideStripLayout layout)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
     private readonly Presentation _deck = state.Deck;
-    private readonly DeckActions _actions = state.Actions;
     private readonly ITextCatalog _texts = state.Texts;
     private readonly DesignTokens.Metrics _metrics = state.Metrics;
     private readonly ISlideRenderer _renderer = renderer;
@@ -34,7 +33,8 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
     private TextBlock? _slidesCaption;
     private readonly SlideFrameCache<FilmstripEntry> _thumbnails = new();
     private readonly PulseOffice.UI.Controls.Objects.IAnimatedImageProbe _stillImages = stillImages;
-    private Dictionary<Slide, SectionHeaderEntry> _headers = new(ReferenceEqualityComparer.Instance);
+    private readonly DeckSectionHeaders _headers = sectionHeaders;
+    private readonly SlideStripLayout _layout = layout;
 
     public StackPanel Panel => _filmstrip;
 
@@ -99,22 +99,19 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
 
         var entries = _thumbnails.Refresh(_deck, _state.Current, Thumbnail);
         var children = new List<Control>(entries.Count);
-        var headers = new Dictionary<Slide, SectionHeaderEntry>(ReferenceEqualityComparer.Instance);
-        for (var index = 0; index < entries.Count; index++)
+        _headers.Begin();
+        foreach (var item in _layout.Items(_deck))
         {
-            var entry = entries[index];
-            Refresh(entry, index);
-            if (entry.Slide.SectionName is { } name)
+            if (item.Header is { } header)
             {
-                var header = _headers.TryGetValue(entry.Slide, out var kept) && kept.Name == name
-                    ? kept
-                    : new SectionHeaderEntry(name, SectionHeader(entry.Slide, name));
-                headers[entry.Slide] = header;
-                children.Add(header.Control);
+                children.Add(_headers.For(header));
+                continue;
             }
+            var entry = entries[item.SlideIndex];
+            Refresh(entry, item.SlideIndex);
             children.Add(entry.Frame);
         }
-        _headers = headers;
+        _headers.End();
 
         if (_filmstrip.Children.Count != children.Count || !_filmstrip.Children.Zip(children).All(pair => ReferenceEquals(pair.First, pair.Second)))
         {
@@ -145,69 +142,6 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
         if (target == _deck.IndexOf(_state.Current)) return;
         _filmstripHadFocus = true;
         _host.GoToSlide(target);
-    }
-
-    private Control SectionHeader(Slide slide, string name)
-    {
-        var label = new TextBlock
-        {
-            Text = name.ToUpperInvariant(),
-            FontSize = Math.Max(9, _metrics.FontSizeSmall - 1),
-            FontWeight = FontWeight.SemiBold,
-            LetterSpacing = 0.6,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
-
-        var header = new Border
-        {
-            Child = label,
-            Padding = new Thickness(_metrics.SpacingSmall, _metrics.SpacingSmall),
-            Margin = new Thickness(0, _metrics.SpacingSmall, 0, 0),
-            CornerRadius = new CornerRadius(_metrics.RadiusTight),
-            Cursor = new Cursor(StandardCursorType.Hand),
-        }.Themed(Border.BackgroundProperty, Palette.Keys.SurfaceRaised);
-
-        header.DoubleTapped += (_, _) => RenameSection(slide, name, header, label);
-        return header;
-    }
-
-    private void RenameSection(Slide slide, string current, Border header, TextBlock label)
-    {
-        var box = new TextBox
-        {
-            Text = current,
-            FontSize = _metrics.FontSizeSmall,
-            Padding = new Thickness(_metrics.SpacingSmall, 2),
-        };
-
-        var finished = false;
-
-        void Commit()
-        {
-            if (finished) return;
-            finished = true;
-            var name = box.Text?.Trim();
-            header.Child = label;
-            if (!string.IsNullOrEmpty(name) && name != current) _actions.SetSection(slide, name);
-        }
-
-        void Cancel()
-        {
-            if (finished) return;
-            finished = true;
-            header.Child = label;
-        }
-
-        box.AddHandler(InputElement.KeyDownEvent, (_, e) =>
-        {
-            if (e.Key == Avalonia.Input.Key.Enter) { Commit(); e.Handled = true; }
-            else if (e.Key == Avalonia.Input.Key.Escape) { Cancel(); e.Handled = true; }
-        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        box.LostFocus += (_, _) => Commit();
-
-        header.Child = box;
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => { box.Focus(); box.SelectAll(); });
     }
 
     private void Refresh(FilmstripEntry entry, int index)
@@ -284,8 +218,6 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
     }
 
     private sealed record FilmstripEntry(Slide Slide, Border Frame, SlideView Thumb);
-
-    private sealed record SectionHeaderEntry(string Name, Control Control);
 
     private string SlideAccessibleName(Slide slide, int index)
     {

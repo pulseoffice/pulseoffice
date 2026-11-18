@@ -242,7 +242,7 @@ public sealed class LedgerAnalysisDialogsTests(HeadlessDesktopSession headless)
         var view = new SheetProtectionView(provider.GetRequiredService<LedgerDialogKit>(), SheetProtection.None);
         var window = Show(view);
 
-        Assert.Equal(9, view.Permissions.Count);
+        Assert.Equal(10, view.Permissions.Count);
         view.Password.Text = "abc";
         Dispatcher.UIThread.RunJobs();
         Assert.False(view.CanConfirm);

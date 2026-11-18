@@ -100,23 +100,25 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
     private void RestoreRules(XElement root, Sheet sheet)
     {
         var used = new HashSet<int>();
-        var entries = root.Descendants(_pulse + "rule").ToList();
-        var pending = new List<XElement>();
-        foreach (var entry in entries)
+        var ambiguous = new List<XElement>();
+        foreach (var entry in root.Descendants(_pulse + "rule"))
         {
-            var index = RuleById(sheet.ConditionalRules, entry);
-            if (index >= 0 && !used.Contains(index) && RuleMatches(sheet.ConditionalRules[index], entry)) Apply(sheet, index, entry, used);
-            else pending.Add(entry);
+            var candidates = Candidates(sheet, entry, used);
+            if (candidates.Count == 1) Apply(sheet, candidates[0], entry, used);
+            else if (candidates.Count > 1) ambiguous.Add(entry);
         }
 
-        foreach (var entry in pending)
-            for (var index = 0; index < sheet.ConditionalRules.Count; index++)
-            {
-                if (used.Contains(index) || !RuleMatches(sheet.ConditionalRules[index], entry)) continue;
-                Apply(sheet, index, entry, used);
-                break;
-            }
+        foreach (var entry in ambiguous)
+        {
+            var candidates = Candidates(sheet, entry, used);
+            if (candidates.Count == 0) continue;
+            var byId = RuleById(sheet.ConditionalRules, entry);
+            Apply(sheet, candidates.Contains(byId) ? byId : candidates[0], entry, used);
+        }
     }
+
+    private List<int> Candidates(Sheet sheet, XElement entry, HashSet<int> used) =>
+        [.. Enumerable.Range(0, sheet.ConditionalRules.Count).Where(index => !used.Contains(index) && RuleMatches(sheet.ConditionalRules[index], entry))];
 
     private void Apply(Sheet sheet, int index, XElement entry, HashSet<int> used)
     {

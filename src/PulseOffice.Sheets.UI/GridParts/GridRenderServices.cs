@@ -24,4 +24,6 @@ internal sealed class GridRenderServices
     public Painting.IGridPaints Paints { get; set; } = new Painting.GridPaints();
 
     public ICellNavigator Navigator { get; set; } = new CellNavigator();
+
+    public IAnnotatedSpanMapping AnnotatedSpans { get; set; } = new AnnotatedSpanMapping();
 }

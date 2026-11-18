@@ -86,6 +86,7 @@ internal static class LedgerToolsComposition
         services.AddSingleton<LedgerChangeCommands>();
         services.AddSingleton<ILedgerChangeResolution, LedgerChangeResolution>();
         services.AddSingleton<LedgerReviewSource>();
+        services.AddSingleton<PulseOffice.Sheets.ICommentMentions, PulseOffice.Sheets.CommentMentions>();
         services.AddSingleton<PulseOffice.Scripting.IScriptEngine, PulseOffice.Scripting.JavaScript.JavaScriptEngine>();
         services.AddSingleton<PulseOffice.Scripting.Python.IronPythonScriptEngine>();
         services.AddSingleton<PulseOffice.Scripting.CPython.IPythonDiscovery>(provider => new PulseOffice.Scripting.CPython.PythonDiscovery(provider.GetRequiredService<PulseOffice.Platform.IHostSystem>()));

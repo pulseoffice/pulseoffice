@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText, IOutlineSlideMatching outlineMatching, IOutlineBlockMove outlineMove)
+internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText, IOutlineSlideMatching outlineMatching, IOutlineBlockMove outlineMove, DeckSectionHeaders sectionHeaders, SlideStripLayout stripLayout)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -57,7 +57,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
     {
         if (_sorterStrip is null || _sorterView is null)
         {
-            _sorterStrip = new SlideSorterStrip(new Thickness(_metrics.SpacingLarge), SorterFrame);
+            _sorterStrip = new SlideSorterStrip(new Thickness(_metrics.SpacingLarge), SorterFrame, sectionHeaders, stripLayout);
             _sorterView = new ScrollViewer
             {
                 Content = _sorterStrip.Panel,

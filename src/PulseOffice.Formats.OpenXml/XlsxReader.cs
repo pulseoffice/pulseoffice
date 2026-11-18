@@ -42,6 +42,7 @@ public sealed class XlsxReader
                     AllowDeleteColumns = protection.DeleteColumns?.Value == false,
                     AllowSort = protection.Sort?.Value == false,
                     AllowFilter = protection.AutoFilter?.Value == false,
+                    AllowEditObjects = protection.Objects?.Value != true,
                     AllowSelectLockedCells = protection.SelectLockedCells?.Value != true,
                     AllowSelectUnlockedCells = protection.SelectUnlockedCells?.Value != true,
                 };

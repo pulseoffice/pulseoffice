@@ -69,9 +69,6 @@ public sealed class PdfExporter(
             if (archiving && options.Security is { Encrypts: true })
                 diagnostics.Add(Diagnostic.Warning("PDF014", "PDF/A does not allow encryption, so the file was written as PDF/A without passwords."));
             var set = fonts.Create();
-            var pageSize = new DocumentSize(document.Setup.PageWidth, document.Setup.PageHeight);
-            var height = pageSize.Height.ToPoints();
-
             var fontObjects = new Dictionary<IPdfFontResource, int>(ReferenceEqualityComparer.Instance);
             var pageObjects = new List<int>();
             var written = new Dictionary<(string Fingerprint, int Width, int Height), int>();
@@ -81,6 +78,8 @@ public sealed class PdfExporter(
             foreach (var index in selected)
             {
                 var pageId = file.Reserve();
+                var pageSize = document.PageSize(index);
+                var height = pageSize.Height.ToPoints();
                 var canvas = new PdfContentCanvas(pageSize, set);
                 document.PaintPage(index, canvas);
 

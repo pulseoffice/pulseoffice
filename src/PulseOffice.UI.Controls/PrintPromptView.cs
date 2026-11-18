@@ -167,7 +167,8 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
             _source = _request.Source(options.Comments);
             _commentsBuilt = options.Comments;
         }
-        var valid = _request.Ranges.Parse(options.PageRange, _source.PageCount) is { Count: > 0 };
+        var valid = _request.Ranges.Parse(options.PageRange, _source.PageCount) is { Count: > 0 }
+            && _request.Imposition.SelectedPages(_source, options).Count > 0;
         _rangeError.IsVisible = !valid;
         _confirm.IsEnabled = valid;
         if (!valid) return;

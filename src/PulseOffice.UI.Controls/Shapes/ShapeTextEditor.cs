@@ -140,7 +140,7 @@ public sealed class ShapeTextEditor : Decorator
     public bool InPlaceFor(TextLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        return _flow.Stacks(layout) || layout.LinesLeftToRight;
+        return _flow.Composes(layout);
     }
 
     public ShapeObject? Live => _base is { } shape ? _editing.WithText(shape, _box.Text ?? string.Empty) : null;

@@ -20,7 +20,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
     public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, MainDocumentPart main, DocxWriteContext context) =>
         Write(style, restart, continuous, !continuous, null, main, context);
 
-    public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, bool headers, int? lineRestart, MainDocumentPart main, DocxWriteContext context)
+    public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, bool headers, int? lineRestart, MainDocumentPart main, DocxWriteContext context, int? lineStart = null)
     {
         var section = new W.SectionProperties();
         context.WrittenPageStyles.Add(style.Name);
@@ -59,7 +59,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
                 CountBy = (short)Math.Clamp(lines.Increment, 1, 100),
                 Distance = values.Twips(lines.Distance),
                 Restart = lines.RestartEachPage ? W.LineNumberRestartValues.NewPage : lines.RestartEachSection || lineRestart is not null ? W.LineNumberRestartValues.NewSection : W.LineNumberRestartValues.Continuous,
-                Start = (lineRestart ?? lines.Start) is var first && first > 1 ? new Int16Value((short)Math.Min(first - 1, short.MaxValue)) : null,
+                Start = (lineRestart ?? lineStart ?? lines.Start) is var first && first > 1 ? new Int16Value((short)Math.Min(first - 1, short.MaxValue)) : null,
             });
         var numbering = new W.PageNumberType();
         if (style.NumberFormat is not (NumberFormat.Arabic or NumberFormat.Bullet) && formats.TryWordPage(style.NumberFormat, out var format)) numbering.Format = format;

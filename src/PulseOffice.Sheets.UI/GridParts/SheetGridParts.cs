@@ -36,7 +36,8 @@ internal sealed record SheetGridDependencies(
     Engine.Operations.ISparklineData Sparklines,
     IAdjustHandleChrome Adjusting,
     IObjectFrameChrome Frame,
-    IGroupChildLinks GroupLinks);
+    IGroupChildLinks GroupLinks,
+    PulseOffice.UI.Controls.Links.ILinkTips LinkTips);
 
 internal sealed record SheetGridParts(
     GridViewport Viewport,
@@ -51,7 +52,8 @@ internal sealed record SheetGridParts(
     GridObjectPainter ObjectsPainter,
     GridNotePainter Notes,
     GridPointerInput Pointer,
-    GridKeyboardInput Keyboard);
+    GridKeyboardInput Keyboard,
+    PulseOffice.UI.Controls.Links.ILinkTips LinkTips);
 
 internal sealed class SheetGridPartsFactory
 {
@@ -99,7 +101,7 @@ internal sealed class SheetGridPartsFactory
             decorations, dependencies.Ordering, dependencies.Manipulator, dependencies.Adjusting, dependencies.Frame,
             dependencies.PathEditing, dependencies.FormInteraction, dependencies.GroupLinks,
             new GridCellLinkTarget(viewport, dependencies.Presenter, services, options, new CellLinkHitArea(), dependencies.Conditional, icons),
-            notes, new CommentBoxDrag());
+            notes, new CommentBoxDrag(), dependencies.LinkTips);
 
         var keyboard = new GridKeyboardInput(
             viewport, selection, options, surface, notifications, objects, services, drawing, chords,
@@ -107,6 +109,6 @@ internal sealed class SheetGridPartsFactory
 
         return new SheetGridParts(
             viewport, notifications, services, options, objects, drawing,
-            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, notes, pointer, keyboard);
+            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, notes, pointer, keyboard, dependencies.LinkTips);
     }
 }

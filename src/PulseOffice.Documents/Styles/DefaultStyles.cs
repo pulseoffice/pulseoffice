@@ -19,6 +19,7 @@ public static class DefaultStyleNames
     public const string Footer = "Footer";
     public const string HeaderAndFooter = "Header and Footer";
     public const string Footnote = "Footnote";
+    public const string FootnoteContinuation = "Footnote Continuation";
     public const string Endnote = "Endnote";
     public const string TableContents = "Table Contents";
     public const string TableHeading = "Table Heading";
@@ -173,6 +174,12 @@ public sealed class DefaultStyleSheetFactory : IDefaultStyleSheetFactory
         {
             style.Paragraph = new ParagraphProperties { MarginLeft = 17, Indent = -17 };
             style.Character = new CharacterProperties { FontSize = 10 };
+            style.Category = ParagraphStyleCategory.Special;
+        }));
+        sheet.Paragraph.Add(Child(DefaultStyleNames.FootnoteContinuation, DefaultStyleNames.Footnote, style =>
+        {
+            style.Paragraph = new ParagraphProperties { Align = TextAlign.Right, MarginLeft = 0, Indent = 0 };
+            style.Character = new CharacterProperties { Italic = true };
             style.Category = ParagraphStyleCategory.Special;
         }));
         sheet.Paragraph.Add(Child(DefaultStyleNames.Endnote, DefaultStyleNames.Standard, style =>

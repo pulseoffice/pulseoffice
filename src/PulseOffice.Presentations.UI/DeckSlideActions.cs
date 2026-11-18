@@ -207,18 +207,25 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
 
         var markersBefore = deck.Slides.Select(s => (s, s.SectionName, s.SectionId)).ToList();
         var markersAfter = new SlideSections().SectionsAfterMove(deck.Slides, from, to);
+        var emptiesBefore = deck.EmptySections.ToList();
+        var following = from + 1 < deck.Slides.Count ? deck.Slides[from + 1].Id : null;
+        var emptiesAfter = emptiesBefore
+            .Select(empty => empty.BeforeSlideId == slide.Id ? empty with { BeforeSlideId = following } : empty)
+            .ToList();
 
         Do(texts["deck.action.moveSlide"],
             () =>
             {
                 deck.Move(deck.IndexOf(slide), to);
                 for (var i = 0; i < deck.Slides.Count && i < markersAfter.Count; i++) (deck.Slides[i].SectionName, deck.Slides[i].SectionId) = (markersAfter[i]?.Name, markersAfter[i]?.Id);
+                ReplaceEmptySections(emptiesAfter);
                 Focus(slide);
             },
             () =>
             {
                 deck.Move(deck.IndexOf(slide), from);
                 foreach (var (s, name, id) in markersBefore) (s.SectionName, s.SectionId) = (name, id);
+                ReplaceEmptySections(emptiesBefore);
                 Focus(slide);
             });
     }
@@ -295,6 +302,33 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
         Do(texts[name is null ? "deck.action.removeSection" : before is null ? "deck.action.addSection" : "deck.action.renameSection"],
             () => { slide.SectionName = name; deck.Raise(); },
             () => { slide.SectionName = before; deck.Raise(); });
+    }
+
+    public void RenameEmptySection(EmptySection section, string name)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        if (section.Name == name) return;
+        ChangeEmptySection(section, section with { Name = name }, "deck.action.renameSection");
+    }
+
+    public void RemoveEmptySection(EmptySection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        ChangeEmptySection(section, null, "deck.action.removeSection");
+    }
+
+    private void ChangeEmptySection(EmptySection section, EmptySection? replacement, string labelKey)
+    {
+        var before = deck.EmptySections.ToList();
+        var index = before.IndexOf(section);
+        if (index < 0 || IsReadOnly) return;
+        var after = before.ToList();
+        if (replacement is null) after.RemoveAt(index);
+        else after[index] = replacement;
+
+        Do(texts[labelKey],
+            () => { ReplaceEmptySections(after); deck.Raise(); },
+            () => { ReplaceEmptySections(before); deck.Raise(); });
     }
 
     public void SetBackgroundImage(Slide slide, PulseOffice.Drawing.Assets.RasterImageObject? image)

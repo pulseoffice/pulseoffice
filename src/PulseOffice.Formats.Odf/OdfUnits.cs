@@ -27,12 +27,6 @@ internal sealed class OdfUnits
         _ => "start",
     };
 
-    public string Clip(DocumentRect bounds, (double Left, double Top, double Right, double Bottom) crop) =>
-        $"rect({Cm(new Twip((int)(crop.Top * bounds.Height.Value)))} " +
-        $"{Cm(new Twip((int)(crop.Right * bounds.Width.Value)))} " +
-        $"{Cm(new Twip((int)(crop.Bottom * bounds.Height.Value)))} " +
-        $"{Cm(new Twip((int)(crop.Left * bounds.Width.Value)))})";
-
     public string FileSafe(string id) => new([.. id.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')]);
 
     public string PackageFileName(string? name)

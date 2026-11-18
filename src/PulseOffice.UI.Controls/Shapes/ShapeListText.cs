@@ -89,5 +89,5 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
     }
 
     private bool Composed(TextLayout layout) =>
-        layout.Flow is TextFlow.EastAsianVertical or TextFlow.MongolianVertical || _flow.Stacks(layout);
+        _flow.Composes(layout);
 }

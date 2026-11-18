@@ -331,13 +331,17 @@ public sealed class DocumentLayoutEngine(
     private bool Collected(NoteSettings footnotes) => footnotes.Placement is NotePlacement.SectionEnd or NotePlacement.DocumentEnd;
 
     private ComposedStory Notice(TextDocument document, FlowContext notes, string text, double width) =>
-        stories.Compose(builder.Build(new BlockContainer([new ParagraphBlock(NoticeParagraph, text)]), notes with
+        stories.Compose(builder.Build(new BlockContainer([new ParagraphBlock(NoticeParagraph, text, NoticeStyle(document))]), notes with
         {
             Story = StoryKind.Footnote,
             StoryId = null,
             Sections = false,
             DefaultStyle = document.Notes.FootnoteSettings.ParagraphStyleName,
         }), width);
+
+    private string NoticeStyle(TextDocument document) =>
+        document.Styles.Paragraph.Find(DefaultStyleNames.FootnoteContinuation) is not null ? DefaultStyleNames.FootnoteContinuation
+        : document.Notes.FootnoteSettings.ParagraphStyleName ?? DefaultStyleNames.Footnote;
 
     private const string NoticeParagraph = "note-continuation-notice";
 

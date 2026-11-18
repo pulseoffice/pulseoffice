@@ -79,6 +79,7 @@ public sealed class PresentationWindow : Window
 
     private readonly PulseOffice.Document.Forms.IFormControlInteraction? _forms;
     private readonly PulseOffice.UI.Controls.Links.ILinkTips? _linkTips;
+    private readonly IDeckLinkTips? _deckLinkTips;
     private readonly Action<Slide, SlideElement>? _controlChanged;
 
     private readonly ShowMediaStage _media;
@@ -97,6 +98,7 @@ public sealed class PresentationWindow : Window
         _monitorIndex = options.MonitorIndex;
         _forms = options.Forms;
         _linkTips = options.LinkTips;
+        _deckLinkTips = options.DeckLinkTips;
         _controlChanged = options.ControlChanged;
         _penBrush = new SolidColorBrush(ParseColor(options.PenColor));
         _laser.Fill = _penBrush;
@@ -536,10 +538,7 @@ public sealed class PresentationWindow : Window
     private void ShowLinkTip(Point point)
     {
         if (_linkTips is not { } tips) return;
-        var action = _tool == PointerTool.Laser || _busy || _front.ElementAt(point) is not { } element
-            ? null
-            : _controller.Current?.Interaction(element.Id);
-        tips.Show(this, action is { Kind: InteractionKind.Hyperlink } ? tips.Text(action.Reference, action.Tip) : null);
+        tips.Show(this, _tool == PointerTool.Laser || _busy ? null : _deckLinkTips?.At(_front, point));
     }
 
     private InteractiveAction? MapTarget(PulseOffice.Drawing.Assets.RasterImageObject image, Rect bounds, Point point)

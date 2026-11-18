@@ -189,9 +189,40 @@ public sealed class StyledParagraph(
 {
     public string Content => content;
 
+    public IReadOnlyList<TextCluster> Cells { get; init; } = [];
+
+    private readonly Dictionary<int, double?> _cellSizes = [];
+
     public FormattedText Build(int start, int end, double maxWidth)
     {
-        var piece = content[start..end];
+        var formatted = Styled(content[start..end], start, end, maxWidth);
+        foreach (var cell in Cells)
+            if (cell.Start >= start && cell.End <= end && CellSize(cell) is { } size)
+                formatted.SetFontSize(size, cell.Start - start, cell.End - cell.Start);
+        return formatted;
+    }
+
+    public FormattedText Glyph(int start, int end, IVerticalForms forms)
+    {
+        ArgumentNullException.ThrowIfNull(forms);
+        return Styled(forms.Substitute(content[start..end]), start, end, double.PositiveInfinity);
+    }
+
+    private double? CellSize(TextCluster cell)
+    {
+        if (_cellSizes.TryGetValue(cell.Start, out var known)) return known;
+        var glyph = Styled(content[cell.Start..cell.End], cell.Start, cell.End, double.PositiveInfinity);
+        var advance = glyph.WidthIncludingTrailingWhitespace;
+        var run = RunAt(cell.Start);
+        double? size = advance > 0 && glyph.Height > advance
+            ? typesetter.Em((run?.FontSize ?? paragraph.FontSize) * (run is null || run.Baseline == TextBaseline.Normal ? 1.0 : 0.66)) * glyph.Height / advance
+            : null;
+        _cellSizes[cell.Start] = size;
+        return size;
+    }
+
+    private FormattedText Styled(string piece, int start, int end, double maxWidth)
+    {
         var formatted = typesetter.Typeset(piece.Length == 0 ? " " : piece, paragraph, typesetter.Ink(paragraph), maxWidth, runText.Culture(RunAt(start), fields));
         if (double.IsPositiveInfinity(maxWidth)) formatted.TextAlignment = TextAlignment.Start;
         var position = inline;
@@ -226,6 +257,7 @@ public sealed class TextBlockTypesetter(
 
     private readonly PulseOffice.Text.Rich.Bidi.AlignMirroring _aligns = new();
     private readonly EastAsianUprightText _eastAsian = new();
+    private readonly VerticalForms _forms = new();
     private readonly UprightGlyphs _glyphs = new();
 
     public TextBlockTypesetter(ITextTheme theme, IListLabels labels, RunText runText)
@@ -255,7 +287,10 @@ public sealed class TextBlockTypesetter(
             var hanging = label.Length > 0 && indent < 0;
             var inline = label.Length > 0 && !hanging ? (picture is null ? label : PictureSpace) + "  " : string.Empty;
             var content = inline + string.Concat(runs.Select(run => runText.Shown(run, fields)));
-            var styled = new StyledParagraph(content, inline.Length, runs, paragraph, typesetter, styler, runText, fields);
+            var styled = new StyledParagraph(content, inline.Length, runs, paragraph, typesetter, styler, runText, fields)
+            {
+                Cells = upright && !stacked ? _eastAsian.Clusters(content) : [],
+            };
 
             var width = Math.Max(1, area.Inner.Width - (mirrored ? startMargin : endMargin));
             var segments = stacked
@@ -292,11 +327,11 @@ public sealed class TextBlockTypesetter(
 
     private IReadOnlyList<TypesetSegment> Lifted(StyledParagraph styled, IReadOnlyList<TypesetSegment> segments)
     {
-        var clusters = _eastAsian.Clusters(styled.Content);
+        var clusters = styled.Cells;
         if (clusters.Count == 0) return segments;
         return [.. segments.Select(segment => segment with
         {
-            Upright = _glyphs.Lift(segment.Text, segment.Start, segment.End - segment.Start, clusters, (from, to) => styled.Build(from, to, double.PositiveInfinity)),
+            Upright = _glyphs.Lift(segment.Text, segment.Start, segment.End - segment.Start, clusters, (from, to) => styled.Glyph(from, to, _forms)),
         })];
     }
 

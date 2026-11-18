@@ -6,33 +6,64 @@ namespace PulseOffice.Presentations.UI;
 
 public sealed class SlideSorterStrip
 {
-    private readonly WrapPanel _wrap;
+    private readonly StackPanel _rows;
     private readonly SlideFrameCache<Border> _cache = new();
     private readonly Func<Slide, Border> _build;
+    private readonly DeckSectionHeaders _headers;
+    private readonly SlideStripLayout _layout;
+    private readonly List<Control> _children = [];
+    private IReadOnlyList<Border> _frames = [];
 
-    public SlideSorterStrip(Thickness margin, Func<Slide, Border> build)
+    public SlideSorterStrip(Thickness margin, Func<Slide, Border> build, DeckSectionHeaders headers, SlideStripLayout layout)
     {
-        _wrap = new WrapPanel { Margin = margin };
+        _rows = new StackPanel { Margin = margin };
         _build = build;
+        _headers = headers;
+        _layout = layout;
     }
 
-    public Panel Panel => _wrap;
+    public Panel Panel => _rows;
 
     public int Rebuilt => _cache.Rebuilt;
 
     public void Update(Presentation deck, Slide? current)
     {
         var frames = _cache.Refresh(deck, current, (slide, _) => _build(slide));
+        var children = new List<Control>();
+        _headers.Begin();
+        foreach (var item in _layout.Items(deck))
+            children.Add(item.Header is { } header ? _headers.For(header) : frames[item.SlideIndex]);
+        _headers.End();
+        _frames = frames;
 
-        if (_wrap.Children.Count == frames.Count && _wrap.Children.Zip(frames).All(pair => ReferenceEquals(pair.First, pair.Second))) return;
-        _wrap.Children.Clear();
-        foreach (var frame in frames) _wrap.Children.Add(frame);
+        if (_children.Count == children.Count && _children.Zip(children).All(pair => ReferenceEquals(pair.First, pair.Second))) return;
+        _children.Clear();
+        _children.AddRange(children);
+        foreach (var row in _rows.Children.OfType<WrapPanel>()) row.Children.Clear();
+        _rows.Children.Clear();
+        var slideFrames = frames.ToHashSet(ReferenceEqualityComparer.Instance);
+        WrapPanel? open = null;
+        foreach (var child in children)
+        {
+            if (child is Border frame && slideFrames.Contains(frame))
+            {
+                if (open is null)
+                {
+                    open = new WrapPanel();
+                    _rows.Children.Add(open);
+                }
+                open.Children.Add(frame);
+                continue;
+            }
+            open = null;
+            _rows.Children.Add(child);
+        }
     }
 
     public int DropTarget(Point position)
     {
-        for (var i = 0; i < _wrap.Children.Count; i++)
-            if (_wrap.Children[i].Bounds.Contains(position))
+        for (var i = 0; i < _frames.Count; i++)
+            if (_frames[i].TranslatePoint(default, _rows) is { } origin && new Rect(origin, _frames[i].Bounds.Size).Contains(position))
                 return i;
         return -1;
     }

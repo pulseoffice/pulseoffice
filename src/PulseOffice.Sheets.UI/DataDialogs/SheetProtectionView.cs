@@ -29,6 +29,7 @@ public sealed class SheetProtectionView : LedgerDialogView
             ("deleteColumns", kit.Check("protect.allow.deleteColumns", current.AllowDeleteColumns)),
             ("sort", kit.Check("protect.allow.sort", current.AllowSort)),
             ("filter", kit.Check("protect.allow.filter", current.AllowFilter)),
+            ("objects", kit.Check("protect.allow.objects", current.AllowEditObjects)),
         ];
         Current = current;
 
@@ -81,6 +82,7 @@ public sealed class SheetProtectionView : LedgerDialogView
         AllowDeleteColumns = Allowed("deleteColumns"),
         AllowSort = Allowed("sort"),
         AllowFilter = Allowed("filter"),
+        AllowEditObjects = Allowed("objects"),
     });
 
     protected override object? Result() => Choice;

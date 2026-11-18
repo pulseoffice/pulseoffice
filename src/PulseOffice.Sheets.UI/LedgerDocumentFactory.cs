@@ -52,7 +52,8 @@ public sealed class LedgerDocumentFactory(
     IFormControlBinding formBinding,
     IInterfaceCulture culture,
     PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters,
-    ICellLinkClicking cellLinks) : ILedgerDocumentFactory
+    ICellLinkClicking cellLinks,
+    PulseOffice.UI.Controls.Links.ILinkTips linkTips) : ILedgerDocumentFactory
 {
     private int _counter;
 
@@ -113,7 +114,7 @@ public sealed class LedgerDocumentFactory(
     {
         var view = new LedgerView(
             workbook, engine, presenter, conditional, sheetContext, workspace, history, status, texts,
-            validator, contextMenus, design, tools, spelling, autoCorrect, autoCorrectSettings, formBinding: formBinding)
+            validator, contextMenus, design, tools, spelling, autoCorrect, autoCorrectSettings, formBinding: formBinding, linkTips: linkTips)
         {
             FormEvents = formEvents,
             Fill = fill,

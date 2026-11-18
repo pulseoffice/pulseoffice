@@ -33,7 +33,8 @@ internal sealed class GridPointerInput(
     IGroupChildLinks groupLinks,
     GridCellLinkTarget cellLinks,
     GridNotePainter notes,
-    ICommentBoxDrag noteDrag)
+    ICommentBoxDrag noteDrag,
+    PulseOffice.UI.Controls.Links.ILinkTips linkTips)
 {
     private const double NoteGrip = 5;
 
@@ -303,7 +304,7 @@ internal sealed class GridPointerInput(
     {
         if (ObjectAt(point) is { } placed && LinkAt(placed, point) is { } objectLink)
         {
-            surface.ShowTip(placed.HyperlinkTip is { Length: > 0 } objectTip && objectLink == placed.Hyperlink ? objectTip : objectLink);
+            surface.ShowTip(linkTips.Text(objectLink, objectLink == placed.Hyperlink ? placed.HyperlinkTip : null));
             return;
         }
 
@@ -315,7 +316,7 @@ internal sealed class GridPointerInput(
 
         var text = sheet.Comments.GetValueOrDefault(address) is { } comment
             ? string.Join("\n", new[] { Line(comment.Author, comment.Text) }.Concat(comment.Replies.Select(reply => Line(reply.Author, reply.Text))))
-            : sheet[address] is { Hyperlink: { Length: > 0 } link } cell ? cell.HyperlinkTip is { Length: > 0 } tip ? tip : link : null;
+            : linkTips.Text(sheet[address].Hyperlink, sheet[address].HyperlinkTip);
 
         surface.ShowTip(text);
     }

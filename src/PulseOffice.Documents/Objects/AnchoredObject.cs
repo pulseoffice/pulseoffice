@@ -33,6 +33,7 @@ public enum VerticalRelation
     Margin,
     Line,
     Character,
+    ParagraphArea,
 }
 
 public abstract record ObjectAnchor
@@ -146,6 +147,8 @@ public enum ObjectAlignment
     Start,
     Center,
     End,
+    Inside,
+    Outside,
 }
 
 public readonly record struct ContourPoint(double X, double Y);

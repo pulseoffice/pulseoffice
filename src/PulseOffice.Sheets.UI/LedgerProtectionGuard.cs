@@ -27,9 +27,10 @@ public sealed class LedgerProtectionGuard(
     {
         if (!sheet.Protection.IsEnabled) return null;
         var after = ProtectedState.Of(sheet);
-        if (!after.Objects.SequenceEqual(before.Objects, ReferenceEqualityComparer.Instance)
-            || !after.Sparklines.SequenceEqual(before.Sparklines, ReferenceEqualityComparer.Instance)
-            || AddsComments(before.Comments, after.Comments)) return "status.protection.objects";
+        if (!after.Sparklines.SequenceEqual(before.Sparklines, ReferenceEqualityComparer.Instance)
+            || (sheet.Protection.BlocksObjects
+                && (!after.Objects.SequenceEqual(before.Objects, ReferenceEqualityComparer.Instance) || AddsComments(before.Comments, after.Comments))))
+            return "status.protection.objects";
         if (!after.Merges.SequenceEqual(before.Merges) || !after.RowBreaks.SequenceEqual(before.RowBreaks) || !after.ColumnBreaks.SequenceEqual(before.ColumnBreaks))
             return "status.protection.format";
         foreach (var address in before.Cells.Keys.Union(after.Cells.Keys))

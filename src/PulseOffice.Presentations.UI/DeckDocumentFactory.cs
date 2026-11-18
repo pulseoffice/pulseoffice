@@ -47,7 +47,8 @@ public sealed class DeckDocumentFactory(
     ISlideGroupEditing groupEditing,
     Motion.IDeckMotionEditors motionEditors,
     PulseOffice.Drawing.Assets.IImageExtents extents,
-    IInterfaceCulture culture) : IDeckDocumentFactory
+    IInterfaceCulture culture,
+    IDeckLinkTips linkTips) : IDeckDocumentFactory
 {
     private int _counter;
 
@@ -73,7 +74,7 @@ public sealed class DeckDocumentFactory(
         OpenDocument? document = null;
         var actions = new DeckActions(deck, history, slides, texts, () => document?.IsReadOnly == true, optionGroups: optionGroups, fitting: fitting, groupEditing: groupEditing);
         var renderer = new SlideRenderer(objectRenderer, texts);
-        var view = new DeckView(deck, actions, renderer, masters, scheduler, texts, contextMenus, deckContext, connectors, drawing, images, contextChooser, autoCorrect, autoCorrectSettings, spelling, autoSpell, userWords, design, forms, editing, formatter, zoomLadder, extents: extents)
+        var view = new DeckView(deck, actions, renderer, masters, scheduler, texts, contextMenus, deckContext, connectors, drawing, images, contextChooser, autoCorrect, autoCorrectSettings, spelling, autoSpell, userWords, design, forms, editing, formatter, zoomLadder, extents: extents, linkTips: linkTips)
         {
             RibbonState = ribbonState,
             ObjectEditing = objectEditing,

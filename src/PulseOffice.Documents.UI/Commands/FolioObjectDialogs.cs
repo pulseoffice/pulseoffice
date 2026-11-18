@@ -52,8 +52,10 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
 {
     private readonly ObjectAnchorKind[] _anchors = [ObjectAnchorKind.Page, ObjectAnchorKind.Paragraph, ObjectAnchorKind.Character, ObjectAnchorKind.AsCharacter];
     private readonly WrapMode[] _wraps = [WrapMode.None, WrapMode.Left, WrapMode.Right, WrapMode.Parallel, WrapMode.Through, WrapMode.Optimal];
-    private readonly HorizontalRelation[] _horizontal = [HorizontalRelation.Paragraph, HorizontalRelation.PageArea, HorizontalRelation.Page, HorizontalRelation.Margin, HorizontalRelation.Character];
-    private readonly VerticalRelation[] _vertical = [VerticalRelation.Paragraph, VerticalRelation.PageArea, VerticalRelation.Page, VerticalRelation.Margin, VerticalRelation.Line];
+    private readonly HorizontalRelation[] _horizontal = [HorizontalRelation.Paragraph, HorizontalRelation.Column, HorizontalRelation.PageArea, HorizontalRelation.Page, HorizontalRelation.Margin, HorizontalRelation.Character];
+    private readonly VerticalRelation[] _vertical = [VerticalRelation.Paragraph, VerticalRelation.ParagraphArea, VerticalRelation.PageArea, VerticalRelation.Page, VerticalRelation.Margin, VerticalRelation.Line];
+    private readonly (ObjectAlignment Value, string Key)[] _horizontalAligns = [(ObjectAlignment.None, "offset"), (ObjectAlignment.Start, "left"), (ObjectAlignment.Center, "center"), (ObjectAlignment.End, "right"), (ObjectAlignment.Inside, "inside"), (ObjectAlignment.Outside, "outside")];
+    private readonly (ObjectAlignment Value, string Key)[] _verticalAligns = [(ObjectAlignment.None, "offset"), (ObjectAlignment.Start, "top"), (ObjectAlignment.Center, "middle"), (ObjectAlignment.End, "bottom"), (ObjectAlignment.Inside, "inside"), (ObjectAlignment.Outside, "outside")];
 
     public async Task<ObjectPropertiesChoice?> PropertiesAsync(AnchoredObject item, ObjectAnchorKind anchor, ObjectDialogPage page, CancellationToken ct)
     {
@@ -65,8 +67,10 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
             new SizeLockField("size", texts["size.title"], new LockedSize(Centimetres(item.Size.Width), Centimetres(item.Size.Height), embedded is not null), "cm", 0.05, 500, 0.1, icons),
             new IconChoiceField("anchor", texts["folio.object.anchor"],
                 [.. _anchors.Select(kind => new IconChoice(Key(kind), $"folio.object.anchor.{Key(kind)}", texts[$"command.folio.object.anchor.{Key(kind)}.title"]))], icons, Math.Max(0, Array.IndexOf(_anchors, anchor))),
+            Aligns("horizontalAlign", "folio.object.align.horizontal", _horizontalAligns, item.Placement.HorizontalAlign),
             new NumberField("x", texts["folio.object.x"], Centimetres(item.Placement.X), -500, 500, 0.1) { Unit = "cm" },
             new ChoiceField("horizontal", texts["folio.object.horizontal"], [.. _horizontal.Select(relation => texts[$"folio.object.relation.{Key(relation)}"])], Math.Max(0, Array.IndexOf(_horizontal, item.Placement.Horizontal))),
+            Aligns("verticalAlign", "folio.object.align.vertical", _verticalAligns, item.Placement.VerticalAlign),
             new NumberField("y", texts["folio.object.y"], Centimetres(item.Placement.Y), -500, 500, 0.1) { Unit = "cm" },
             new ChoiceField("vertical", texts["folio.object.vertical"], [.. _vertical.Select(relation => texts[$"folio.object.relation.{Key(relation)}"])], Math.Max(0, Array.IndexOf(_vertical, item.Placement.Vertical))),
             new NumberField("rotation", texts["folio.object.rotation"], Math.Round(item.RotationDegrees, 2), 0, 359.99, 1) { Unit = "°" },
@@ -103,6 +107,8 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
             {
                 Horizontal = _horizontal[values.Choice("horizontal", _horizontal.Length)],
                 Vertical = _vertical[values.Choice("vertical", _vertical.Length)],
+                HorizontalAlign = _horizontalAligns[values.Choice("horizontalAlign", _horizontalAligns.Length)].Value,
+                VerticalAlign = _verticalAligns[values.Choice("verticalAlign", _verticalAligns.Length)].Value,
             },
             values.Number("rotation", item.RotationDegrees),
             _wraps[values.Choice("wrap", _wraps.Length)] is var chosenWrap && chosenWrap == wrap ? item.Wrap : chosenWrap,
@@ -183,8 +189,12 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
         _ => "none",
     };
 
+    private ChoiceField Aligns(string id, string label, (ObjectAlignment Value, string Key)[] choices, ObjectAlignment current) =>
+        new(id, texts[label], [.. choices.Select(choice => texts[$"folio.object.align.{choice.Key}"])], Math.Max(0, Array.FindIndex(choices, choice => choice.Value == current)));
+
     private string Key(HorizontalRelation relation) => relation switch
     {
+        HorizontalRelation.Column => "column",
         HorizontalRelation.PageArea => "pageArea",
         HorizontalRelation.Page => "page",
         HorizontalRelation.Margin => "margin",
@@ -194,9 +204,10 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
 
     private string Key(VerticalRelation relation) => relation switch
     {
+        VerticalRelation.ParagraphArea => "paragraphArea",
         VerticalRelation.PageArea => "pageArea",
         VerticalRelation.Page => "page",
-        VerticalRelation.Margin => "margin",
+        VerticalRelation.Margin => "topMargin",
         VerticalRelation.Line => "line",
         _ => "paragraph",
     };

@@ -10,6 +10,7 @@ public sealed class OdpWriter : IPresentationWriter
     private readonly OdpStylesBuilder _styles;
     private readonly OdpPackageWriter _package = new();
     private readonly OdpFidelityRules _fidelity = new();
+    private readonly OdpFirstSlideNumber _firstNumber = new();
     private readonly VectorFallback _vectors;
     private readonly PulseOffice.Text.Rich.ITextCultures _cultures;
 
@@ -69,7 +70,7 @@ public sealed class OdpWriter : IPresentationWriter
                     new FontworkObjectWriter(shapes, altText),
                     new FreeformObjectWriter(shapes, altText),
                     new ConnectorObjectWriter(shapes, altText),
-                    new ImageObjectWriter(shapes, units, altText),
+                    new ImageObjectWriter(shapes, units, altText, new OdfImageClip(new PulseOffice.Formats.Odf.Odt.OdtMeasure())),
                     new VectorObjectWriter(new OdpVectorFrame(shapes), altText),
                     new PackagedObjectWriter(shapes, units, altText),
                 ]),
@@ -95,7 +96,10 @@ public sealed class OdpWriter : IPresentationWriter
 
         using var package = OdfPackage.Create(stream, Format.MimeType);
         var session = new OdpWriteSession(deck, _vectors, _cultures.For(deck.TextLanguage));
-        _package.Write(package, session, _content.Build(session), _styles.Build(deck, session), Format.MimeType);
+        var content = _content.Build(session);
+        var styles = _styles.Build(deck, session);
+        _firstNumber.AdjustFields(deck, content, styles);
+        _package.Write(package, session, content, styles, Format.MimeType);
         return OperationResult<bool>.Ok(true);
     }
 }

@@ -1,4 +1,5 @@
 using PulseOffice.Foundation.Pages;
+using PulseOffice.Foundation.Units;
 namespace PulseOffice.Printing;
 
 public sealed class CompositePrintDocument : IPrintableDocument
@@ -30,6 +31,13 @@ public sealed class CompositePrintDocument : IPrintableDocument
     public PageSetup Setup => _parts[0].Setup;
 
     public int PageCount { get; }
+
+    public DocumentSize PageSize(int index)
+    {
+        for (var part = _parts.Count - 1; part >= 0; part--)
+            if (index >= _offsets[part]) return _parts[part].PageSize(index - _offsets[part]);
+        return _parts[0].PageSize(0);
+    }
 
     public void PaintPage(int index, IPageCanvas canvas)
     {

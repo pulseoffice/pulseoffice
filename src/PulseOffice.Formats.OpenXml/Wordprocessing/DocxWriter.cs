@@ -136,7 +136,7 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
                         || style.NextStyleName is { } next && next != style.Name && !(style.Name == DefaultStyleNames.FirstPage && next == DefaultStyleNames.Standard)),
             Diagnostic.Info("DOCX037", "Word sections have no left-only, right-only or mirrored page styles and no following page style: page usage and the next page style are lost in DOCX. ODT keeps them.")),
         new(document => KeptLineRestarts(document) is var kept && ParagraphBlocks(document).Any(paragraph => paragraph.Content.LineNumberRestart is not null && !kept.Contains(paragraph)),
-            Diagnostic.Info("DOCX248", "Word restarts line numbers only at sections of the body: line number restarts on the first paragraph, inside tables, frames, notes or comments, or with numbering restarted on every page are lost in DOCX. ODT keeps them.")),
+            Diagnostic.Info("DOCX248", "Word restarts line numbers only at sections of the body: line number restarts inside tables, frames, notes or comments, on a paragraph that defers a page style change, or with numbering restarted on every page are lost in DOCX. A restart on the first paragraph becomes the starting number. ODT keeps them.")),
         new(document => UsedPageStyles(document).Any(style => style.NumberFormat == NumberFormat.Hiragana),
             Diagnostic.Info("DOCX247", "Word page numbers have no Hiragana format: Hiragana page numbers are written as full-width Katakana in DOCX. ODT keeps them.")),
         new(document => GutterAtTop(document) && UsedPageStyles(document).Any(style => !style.GutterAtTop && style.Gutter.Value > 0),
@@ -249,7 +249,7 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
     {
         var kept = new HashSet<ParagraphBlock>(ReferenceEqualityComparer.Instance);
         var blocks = document.Body.Blocks;
-        for (var index = 1; index < blocks.Count; index++)
+        for (var index = 0; index < blocks.Count; index++)
         {
             var lead = blocks[index] switch
             {
@@ -381,6 +381,8 @@ public sealed class DocxWriter : ITextDocumentWriter
 
         public int? LineRestart { get; set; }
 
+        public int? LineStart { get; set; }
+
         public void Defer(TextParagraph lead)
         {
             Style = lead.NextPageStyleName!;
@@ -388,6 +390,7 @@ public sealed class DocxWriter : ITextDocumentWriter
             StartsContinuous = true;
             OwnHeaders = true;
             LineRestart = null;
+            LineStart = null;
         }
 
         public void Continue()
@@ -396,6 +399,7 @@ public sealed class DocxWriter : ITextDocumentWriter
             StartsContinuous = true;
             OwnHeaders = false;
             LineRestart = null;
+            LineStart = null;
         }
 
         public void Break(string style, int? restart)
@@ -405,11 +409,12 @@ public sealed class DocxWriter : ITextDocumentWriter
             StartsContinuous = false;
             OwnHeaders = false;
             LineRestart = null;
+            LineStart = null;
         }
     }
 
     private W.SectionProperties Section(TextDocument document, BodyState state, MainDocumentPart main, DocxWriteContext context) =>
-        _sections.Write(PageStyle(document, state.Style), state.Restart, state.StartsContinuous, !state.StartsContinuous || state.OwnHeaders, state.LineRestart, main, context);
+        _sections.Write(PageStyle(document, state.Style), state.Restart, state.StartsContinuous, !state.StartsContinuous || state.OwnHeaders, state.LineRestart, main, context, state.LineStart);
 
     private TextParagraph? Deferring(Block block) => block switch
     {
@@ -430,7 +435,10 @@ public sealed class DocxWriter : ITextDocumentWriter
                 { } first when Deferring(first) is { NextPageStyleName: { } deferred } => deferred,
                 _ => document.InitialPageStyle,
             },
-            blocks.FirstOrDefault() is ParagraphBlock { Content.PageNumberRestart: { } start } ? start : null);
+            blocks.FirstOrDefault() is ParagraphBlock { Content.PageNumberRestart: { } start } ? start : null)
+        {
+            LineStart = _pageUsage.LineRestart(document, blocks.FirstOrDefault() is SectionBlock firstSection ? firstSection.Content.Blocks.FirstOrDefault() : blocks.FirstOrDefault()),
+        };
         for (var index = 0; index < blocks.Count; index++)
         {
             switch (blocks[index])
@@ -475,9 +483,10 @@ public sealed class DocxWriter : ITextDocumentWriter
                     body.Append(inner);
                     var columns = PageStyle(document, state.Style).Clone() as PageStyle;
                     columns!.Columns = section.Columns;
-                    Close(body, _sections.Write(columns, state.Restart, true, opening || deferring is not null, lineRestart, main, context));
+                    Close(body, _sections.Write(columns, state.Restart, true, opening || deferring is not null, lineRestart, main, context, opening ? state.LineStart : null));
                     state.Restart = null;
                     state.LineRestart = null;
+                    state.LineStart = null;
                     state.StartsContinuous = true;
                     state.OwnHeaders = false;
                     break;

@@ -32,6 +32,9 @@ internal sealed class FolioObjectGestures(FolioCanvas canvas, FolioEditor editor
     public FolioObjectLinkTarget? PointMember(ObjectHit hit, Point point) =>
         services.ObjectLinks.Point(editor, hit.Box, (point.X - hit.Slot.X) / canvas.Scale, (point.Y - hit.Slot.Y) / canvas.Scale);
 
+    public FolioObjectLinkTarget? LocateMember(ObjectHit hit, Point point) =>
+        services.ObjectLinks.Locate(editor, hit.Box, (point.X - hit.Slot.X) / canvas.Scale, (point.Y - hit.Slot.Y) / canvas.Scale);
+
     public ObjectHit? ObjectAt(Point point)
     {
         var layout = editor.DisplayLayout;

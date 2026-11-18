@@ -79,6 +79,8 @@ internal static class SharedControlsComposition
         services.AddSingleton<PulseOffice.UI.Controls.Links.IHyperlinkPrompt, PulseOffice.UI.Controls.Links.HyperlinkPrompt>();
         services.AddSingleton<PulseOffice.UI.Controls.Links.ILinkFollower, PulseOffice.UI.Controls.Links.LinkFollower>();
         services.AddSingleton<PulseOffice.UI.Controls.Links.ILinkTips, PulseOffice.UI.Controls.Links.LinkTips>();
+        services.AddSingleton<PulseOffice.UI.Controls.Review.IMentionQuery, PulseOffice.UI.Controls.Review.MentionQuery>();
+        services.AddSingleton<PulseOffice.UI.Controls.Review.IMentionPickers, PulseOffice.UI.Controls.Review.MentionPickers>();
         services.AddSingleton<PulseOffice.Shell.StylePanels.ModuleStylesSource>();
         services.AddSingleton<PulseOffice.UI.Controls.StylePanels.IStyleRenamePrompt, PulseOffice.UI.Controls.StylePanels.StyleRenamePrompt>();
         services.AddSingleton<PulseOffice.Shell.Navigation.ModuleNavigatorSource>();

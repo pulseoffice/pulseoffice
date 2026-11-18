@@ -239,7 +239,7 @@ internal sealed class ConnectorObjectWriter(OdfDeckShapeMapper shapes, OdfAltTex
             : [placed]);
 }
 
-internal sealed class ImageObjectWriter(OdfDeckShapeMapper shapes, OdfUnits units, OdfAltTextMapper altText)
+internal sealed class ImageObjectWriter(OdfDeckShapeMapper shapes, OdfUnits units, OdfAltTextMapper altText, OdfImageClip clip)
     : OdpObjectWriter<PulseOffice.Drawing.Assets.RasterImageObject>(altText)
 {
     protected override XElement Build(ObjectElement element, PulseOffice.Drawing.Assets.RasterImageObject image, OdpWriteSession session)
@@ -258,7 +258,7 @@ internal sealed class ImageObjectWriter(OdfDeckShapeMapper shapes, OdfUnits unit
 
         var properties = new XElement(Style + "graphic-properties");
         if (grayscale) properties.Add(new XAttribute(Draw + "color-mode", "greyscale"));
-        if (image.Crop != default) properties.Add(new XAttribute(Fo + "clip", units.Clip(element.Bounds, image.Crop)));
+        if (image.Crop != default) properties.Add(new XAttribute(Fo + "clip", clip.Write(image, new PulseOffice.Foundation.Units.DocumentSize(element.Bounds.Width, element.Bounds.Height))));
 
         var name = session.NextStyle("gr");
         session.AddStyle(new XElement(Style + "style",

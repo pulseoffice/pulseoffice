@@ -92,11 +92,11 @@ public sealed class DocxParagraphFrames
 
     private HorizontalRelation Horizontal(W.HorizontalAnchorValues? anchor) =>
         anchor == W.HorizontalAnchorValues.Page ? HorizontalRelation.Page
-        : anchor == W.HorizontalAnchorValues.Margin ? HorizontalRelation.Margin
+        : anchor == W.HorizontalAnchorValues.Margin ? HorizontalRelation.PageArea
         : HorizontalRelation.Column;
 
     private VerticalRelation Vertical(W.VerticalAnchorValues? anchor) =>
         anchor == W.VerticalAnchorValues.Page ? VerticalRelation.Page
-        : anchor == W.VerticalAnchorValues.Margin ? VerticalRelation.Margin
+        : anchor == W.VerticalAnchorValues.Margin ? VerticalRelation.PageArea
         : VerticalRelation.Paragraph;
 }

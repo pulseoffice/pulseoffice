@@ -56,7 +56,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         Engine.Operations.ISparklineData? sparklines = null,
         IAdjustHandleChrome? adjusting = null,
         IObjectFrameChrome? frame = null,
-        IGroupChildLinks? groupLinks = null)
+        IGroupChildLinks? groupLinks = null,
+        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
@@ -82,7 +83,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
             sparklines ?? new Engine.Operations.SparklineData(),
             adjusting ?? new AdjustHandleChrome(),
             frame ?? new ObjectFrameChrome(handles, new FrameStyles().Filled),
-            groupLinks ?? new GroupChildLinks());
+            groupLinks ?? new GroupChildLinks(),
+            linkTips ?? new PulseOffice.UI.Controls.Links.LinkTips());
 
         _parts = new SheetGridPartsFactory().Create(dependencies, this, this, _theme, () => Bounds.Size, _chords);
 
@@ -433,13 +435,7 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
 
     void IGridSurface.ShowCursor(Cursor cursor) => Cursor = cursor;
 
-    void IGridSurface.ShowTip(string? text)
-    {
-        if (Equals(ToolTip.GetTip(this), text)) return;
-
-        ToolTip.SetTip(this, text);
-        ToolTip.SetIsOpen(this, text is not null);
-    }
+    void IGridSurface.ShowTip(string? text) => _parts.LinkTips.Show(this, text);
 
     public event EventHandler<CellAddress>? EditRequested { add => Events.EditRequested += value; remove => Events.EditRequested -= value; }
 

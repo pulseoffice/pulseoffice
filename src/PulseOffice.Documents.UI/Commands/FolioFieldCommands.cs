@@ -270,9 +270,16 @@ public sealed class FolioFieldCommands(
                 [.. Placements(footnote).Select(placement => texts[PlacementKey(placement)])],
                 Math.Max(0, Array.IndexOf(Placements(footnote), settings.Placement))),
         ];
+        var settings = notes.FootnoteSettings;
+        FormField[] notices =
+        [
+            new CheckField("foot.notices", texts["folio.note.continuation"], settings.ContinuationForward is not null || settings.ContinuationBackward is not null),
+            new TextField("foot.forward", texts["folio.note.continuation.forward"], settings.ContinuationForward ?? texts["folio.note.continuation.forward.default"]),
+            new TextField("foot.backward", texts["folio.note.continuation.backward"], settings.ContinuationBackward ?? texts["folio.note.continuation.backward.default"]),
+        ];
         var tabs = new List<FormTab>
         {
-            new(texts["folio.note.kind.footnote"], texts["folio.note.settings.explanation"], Tab("foot.", notes.FootnoteSettings, true)),
+            new(texts["folio.note.kind.footnote"], texts["folio.note.settings.explanation"], [.. Tab("foot.", notes.FootnoteSettings, true), .. notices]),
             new(texts["folio.note.kind.endnote"], texts["folio.note.settings.explanation"], Tab("end.", notes.EndnoteSettings, false)),
         };
         if (await tabbed.AskAsync("command.folio.format.notes.title", tabs, ct, 0, 460).ConfigureAwait(true) is not { } values) return;
@@ -283,7 +290,12 @@ public sealed class FolioFieldCommands(
             Restart = (NoteNumbering)values.Choice(prefix + "restart", restarts),
             Placement = Placements(prefix == "foot.")[values.Choice(prefix + "position", Placements(prefix == "foot.").Length, Math.Max(0, Array.IndexOf(Placements(prefix == "foot."), settings.Placement)))],
         };
-        var footnotes = Read("foot.", notes.FootnoteSettings, 3);
+        var shown = values.Flag("foot.notices");
+        var footnotes = Read("foot.", notes.FootnoteSettings, 3) with
+        {
+            ContinuationForward = shown ? Notice(values.Text("foot.forward")) : null,
+            ContinuationBackward = shown ? Notice(values.Text("foot.backward")) : null,
+        };
         var endnotes = Read("end.", notes.EndnoteSettings, 2);
         editor.Change(() =>
         {
@@ -297,6 +309,8 @@ public sealed class FolioFieldCommands(
             recorder.Commit(editor.History);
         });
     }
+
+    private string? Notice(string text) => text.Trim() is { Length: > 0 } trimmed ? trimmed : null;
 
     private NotePlacement[] Placements(bool footnote) => footnote
         ? [NotePlacement.PageBottom, NotePlacement.BelowText, NotePlacement.SectionEnd, NotePlacement.DocumentEnd]

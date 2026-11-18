@@ -159,11 +159,12 @@ public sealed class FolioShapeCommands(IActiveFolioContext context, FolioShapeSe
         var height = item.Placement.Vertical switch
         {
             VerticalRelation.Page => page.Height,
-            VerticalRelation.PageArea or VerticalRelation.Margin => page.Content.Height,
+            VerticalRelation.PageArea => page.Content.Height,
+            VerticalRelation.Margin => page.Content.Y,
             _ => lines.Count > 0 ? lines.Max(line => line.Top + line.Line.Height) - lines.Min(line => line.Top) : page.Content.Height,
         };
         var y = (height - item.Size.Height.ToPoints()) * fraction;
-        services.Objects.Change(editor, target => target.Placement = target.Placement with { Y = Twip.FromPoints(y) });
+        services.Objects.Change(editor, target => target.Placement = target.Placement with { Y = Twip.FromPoints(y), VerticalAlign = ObjectAlignment.None });
     }
 
     private async Task StyleAsync(int section, CancellationToken ct)

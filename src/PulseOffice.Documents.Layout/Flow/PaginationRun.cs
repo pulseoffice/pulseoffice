@@ -75,6 +75,8 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
 
     internal PageGeometry Geometry => _geometry;
 
+    internal bool EvenPage { get; private set; }
+
     internal double Y
     {
         get => _y;
@@ -523,6 +525,7 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         _previousStyle = null;
         _columnEmpty = true;
         _tableFlow.NewColumn();
+        EvenPage = number % 2 == 0;
         _anchored.OpenPage(number);
         var columns = _sections.Count == 0 && basis.Columns.Count > 1;
         var noteWidth = columns ? basis.Columns.Width(basis.Body.Width) : basis.Body.Width;

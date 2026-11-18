@@ -151,8 +151,10 @@ public sealed class PrintPagesView : Control
 
     private (double Width, double Height) Page()
     {
-        if (Document is null) return (0, 0);
-        return (Document.Setup.PageWidth.ToPoints(), Document.Setup.PageHeight.ToPoints());
+        if (Document is not { } document) return (0, 0);
+        var sizes = Visible.Select(document.PageSize).ToList();
+        if (sizes.Count == 0) return (document.Setup.PageWidth.ToPoints(), document.Setup.PageHeight.ToPoints());
+        return (sizes.Max(size => size.Width.ToPoints()), sizes.Max(size => size.Height.ToPoints()));
     }
 
     private (double Width, double Height) Block()
@@ -196,7 +198,6 @@ public sealed class PrintPagesView : Control
         var origin = new Point(
             Math.Max(Gap, (Bounds.Width - blockWidth * scale) / 2),
             Math.Max(Gap, (Bounds.Height - blockHeight * scale) / 2));
-        var size = new DocumentSize(document.Setup.PageWidth, document.Setup.PageHeight);
         var slots = _spreads.Slots(Layout, First, Columns, Rows);
         var shadow = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
         for (var slot = 0; slot < slots.Count; slot++)
@@ -207,7 +208,12 @@ public sealed class PrintPagesView : Control
             var row = slot / columns;
             var left = origin.X + column * (pageWidth + Gap) * scale;
             var top = origin.Y + row * (pageHeight + Gap) * scale;
-            var sheet = new Rect(left, top, pageWidth * scale, pageHeight * scale);
+            var size = document.PageSize(page);
+            var width = size.Width.ToPoints();
+            var height = size.Height.ToPoints();
+            left += (pageWidth - width) / 2 * scale;
+            top += (pageHeight - height) / 2 * scale;
+            var sheet = new Rect(left, top, width * scale, height * scale);
             context.FillRectangle(shadow, sheet.Translate(new Vector(Shadow, Shadow)));
             context.FillRectangle(Brushes.White, sheet);
             using (context.PushClip(sheet))

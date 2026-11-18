@@ -64,6 +64,8 @@ internal sealed class OdtWriteSession(TextDocument document)
 
     public List<OdtMediaEntry> Media { get; } = [];
 
+    private readonly Dictionary<string, string> _sharedMedia = new(StringComparer.Ordinal);
+
     public HashSet<string> Fonts { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public OdtListContinuity Lists { get; } = new();
@@ -71,6 +73,15 @@ internal sealed class OdtWriteSession(TextDocument document)
     public void AddMedia(string path, byte[] data, string mediaType)
     {
         if (Media.All(entry => entry.Path != path)) Media.Add(new OdtMediaEntry(path, data, mediaType));
+    }
+
+    public string SharedMedia(string path, byte[] data, string mediaType)
+    {
+        var key = $"{mediaType}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(data))}";
+        if (_sharedMedia.TryGetValue(key, out var existing)) return existing;
+        _sharedMedia[key] = path;
+        AddMedia(path, data, mediaType);
+        return path;
     }
 
     public int NextNote() => ++_note;

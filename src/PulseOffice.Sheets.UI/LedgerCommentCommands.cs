@@ -4,6 +4,7 @@ using PulseOffice.Foundation.Modules;
 using PulseOffice.Localization;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls;
+using PulseOffice.UI.Controls.Review;
 using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Sheets.UI;
@@ -13,7 +14,10 @@ public sealed class LedgerCommentCommands(
     IDialogService dialogs,
     IStatusBarService status,
     ITextCatalog texts,
-    PulseOffice.Foundation.Identity.IUserIdentity identity) : LedgerCommandSet(context)
+    PulseOffice.Foundation.Identity.IUserIdentity identity,
+    LedgerReviewSource reviews,
+    ICommentMentions mentions,
+    IMentionPickers pickers) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -57,9 +61,11 @@ public sealed class LedgerCommentCommands(
 
         var existing = sheet.Comments.GetValueOrDefault(address);
 
+        var people = ((IReviewSource)reviews).People;
+        var prompt = new TextPromptView(texts["comment.explanation"], existing?.Text ?? string.Empty, texts, multiline: true);
+        pickers.Create().Attach(prompt.Editor, () => people);
         var text = await dialogs.ShowAsync<string>(
-            new TextPromptView(
-                texts["comment.explanation"], existing?.Text ?? string.Empty, texts, multiline: true),
+            prompt,
             new DialogOptions { TitleKey = "dialog.comment.title", PreferredWidth = 460 }, ct)
             .ConfigureAwait(true);
 
@@ -79,8 +85,8 @@ public sealed class LedgerCommentCommands(
         var updated = trimmed.Length == 0
             ? null
             : existing is null
-                ? new CellComment { Text = trimmed, Author = identity.Name }
-                : existing.Text == trimmed ? existing : existing with { Text = trimmed };
+                ? new CellComment { Text = trimmed, Author = identity.Name, Mentions = mentions.Detect(trimmed, people) }
+                : existing.Text == trimmed ? existing : existing with { Text = trimmed, Mentions = mentions.Detect(trimmed, people) };
 
         if (Equals(updated, previous)) return;
 

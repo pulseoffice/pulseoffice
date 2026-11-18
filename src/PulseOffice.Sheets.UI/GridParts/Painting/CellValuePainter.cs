@@ -122,8 +122,8 @@ internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices
     {
         if (address is not { } cell || viewport.Sheet is not { } sheet) return;
         if (sheet.Comments.GetValueOrDefault(cell) is not { AnnotatedText: { } span }) return;
-        if (!string.Equals(sheet[cell].Value.ToString(), shown, StringComparison.Ordinal) || span.Start >= shown.Length) return;
-        if (text.BuildHighlightGeometry(origin, span.Start, Math.Min(span.Length, shown.Length - span.Start)) is not { } area) return;
+        if (services.AnnotatedSpans.Shown(sheet[cell].Value.ToString() ?? string.Empty, shown, span) is not { } mapped || mapped.Start >= shown.Length) return;
+        if (text.BuildHighlightGeometry(origin, mapped.Start, Math.Min(mapped.Length, shown.Length - mapped.Start)) is not { } area) return;
         using (context.PushOpacity(AnnotatedOpacity))
             context.DrawGeometry(theme.Brush(PulseOffice.UI.Theming.Palette.Keys.Warning, Brushes.Transparent), null, area);
     }

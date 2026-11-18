@@ -8,12 +8,12 @@ public interface IFolioLinkTips
 {
     string? At(FolioEditor editor, DocumentPosition position);
 
-    string? OfObject(FolioEditor editor, string objectId);
+    string? OfObject(FolioEditor editor, FolioObjectLinkTarget target);
 
     void Show(Control target, string? text);
 }
 
-public sealed class FolioLinkTips(ILinkTips tips) : IFolioLinkTips
+public sealed class FolioLinkTips(ILinkTips tips, IFolioObjectLinks links) : IFolioLinkTips
 {
     public string? At(FolioEditor editor, DocumentPosition position)
     {
@@ -30,11 +30,11 @@ public sealed class FolioLinkTips(ILinkTips tips) : IFolioLinkTips
         return null;
     }
 
-    public string? OfObject(FolioEditor editor, string objectId)
+    public string? OfObject(FolioEditor editor, FolioObjectLinkTarget target)
     {
         ArgumentNullException.ThrowIfNull(editor);
-        var item = editor.Document.Objects.Find(objectId);
-        return tips.Text(item?.Hyperlink, item?.HyperlinkTip);
+        ArgumentNullException.ThrowIfNull(target);
+        return tips.Text(links.EffectiveLink(editor, target), links.Tip(editor, target));
     }
 
     public void Show(Control target, string? text) => tips.Show(target, text);

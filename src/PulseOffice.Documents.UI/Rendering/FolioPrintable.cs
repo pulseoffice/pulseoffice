@@ -65,6 +65,14 @@ public sealed class FolioPrintable : IPrintableDocument
 
     public int PageCount => _layout.Pages.Count + Appendix.Count;
 
+    public DocumentSize PageSize(int index)
+    {
+        var page = index >= 0 && index < _layout.Pages.Count ? _layout.Pages[index]
+            : index >= _layout.Pages.Count && index < PageCount ? Appendix[index - _layout.Pages.Count]
+            : _layout.Pages[0];
+        return new DocumentSize(Twip.FromPoints(page.Width), Twip.FromPoints(page.Height));
+    }
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);

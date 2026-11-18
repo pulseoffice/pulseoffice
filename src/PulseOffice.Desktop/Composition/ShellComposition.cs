@@ -149,7 +149,7 @@ public sealed class ShellComposition(IServiceProvider services)
         panel.Register(new PulseOffice.UI.Controls.SidePanelPage("review", () => new PulseOffice.UI.Controls.Review.ReviewPanel(
             reviewSources, _services.GetRequiredService<IIconCatalog>(), _services.GetRequiredService<ITextCatalog>(),
             requests: _services.GetRequiredService<PulseOffice.UI.Controls.Review.IReviewPanelRequests>(),
-            mentions: new PulseOffice.UI.Controls.Review.MentionPicker(new PulseOffice.UI.Controls.Review.MentionQuery(), new PulseOffice.UI.Controls.Lists.ChoiceListPopup()))));
+            mentions: _services.GetRequiredService<PulseOffice.UI.Controls.Review.IMentionPickers>().Create())));
         _services.GetRequiredService<ITextReviewEditWatch>().Start();
         panel.Register(new PulseOffice.UI.Controls.SidePanelPage(PulseOffice.UI.Controls.Spelling.TextReviewSession.PageKey, () => new PulseOffice.UI.Controls.Spelling.TextReviewPanel(
             _services.GetRequiredService<PulseOffice.UI.Controls.Spelling.ITextReviewSession>(), _services.GetRequiredService<ITextCatalog>(), _services.GetRequiredService<IIconCatalog>(),

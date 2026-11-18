@@ -643,8 +643,14 @@ public sealed class FolioCanvas : Control
 
     private void ShowLinkTip(Point point) =>
         _services.LinkTips.Show(this, _objectGestures.ObjectAt(point) is { } hit
-            ? _services.LinkTips.OfObject(_editor, hit.Box.ObjectId)
-            : SlotAt(point) is not null && PositionAt(point) is { } position ? _services.LinkTips.At(_editor, position) : null);
+            ? _objectGestures.LocateMember(hit, point) is { } target ? _services.LinkTips.OfObject(_editor, target) : null
+            : CharacterAt(point) is { } position ? _services.LinkTips.At(_editor, position) : null);
+
+    private DocumentPosition? CharacterAt(Point point)
+    {
+        if (SlotAt(point) is not { } slot) return null;
+        return _services.Queries.CharacterAt(_editor.DisplayLayout, slot.Index, (point.X - slot.X) / Scale, (point.Y - slot.Y) / Scale);
+    }
 
     private ColumnDrag? BoundaryAt(Point point)
     {

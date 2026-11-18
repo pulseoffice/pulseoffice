@@ -109,9 +109,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
     {
         if (image.LinkPath is { Length: > 0 } linked)
             return new A.Blip { Link = context.Part.AddExternalRelationship(ImageRelationship, _targets.Of(_links.ToHref(linked))).Id };
-        var part = context.AddImage(types.PartOf(image.MediaType));
-        using (var stream = part.GetStream(FileMode.Create)) stream.Write(image.Data.Span);
-        return new A.Blip { Embed = context.Part.GetIdOfPart(part) };
+        return new A.Blip { Embed = context.SharedImage(types.PartOf(image.MediaType), image.Data.Span) };
     }
 
     private RasterImageObject? Linked(A.Blip? blip, DocxReadContext context, string id) =>
@@ -628,17 +626,18 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
 
     private readonly IReadOnlyList<(HorizontalRelation Relation, DW.HorizontalRelativePositionValues Word)> _horizontal =
     [
+        (HorizontalRelation.Column, DW.HorizontalRelativePositionValues.Column),
         (HorizontalRelation.Paragraph, DW.HorizontalRelativePositionValues.Column),
         (HorizontalRelation.PageArea, DW.HorizontalRelativePositionValues.Margin),
         (HorizontalRelation.Page, DW.HorizontalRelativePositionValues.Page),
         (HorizontalRelation.Margin, DW.HorizontalRelativePositionValues.LeftMargin),
         (HorizontalRelation.Character, DW.HorizontalRelativePositionValues.Character),
-        (HorizontalRelation.Column, DW.HorizontalRelativePositionValues.Column),
     ];
 
     private readonly IReadOnlyList<(VerticalRelation Relation, DW.VerticalRelativePositionValues Word)> _vertical =
     [
         (VerticalRelation.Paragraph, DW.VerticalRelativePositionValues.Paragraph),
+        (VerticalRelation.ParagraphArea, DW.VerticalRelativePositionValues.Paragraph),
         (VerticalRelation.PageArea, DW.VerticalRelativePositionValues.Margin),
         (VerticalRelation.Page, DW.VerticalRelativePositionValues.Page),
         (VerticalRelation.Margin, DW.VerticalRelativePositionValues.TopMargin),

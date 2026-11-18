@@ -210,5 +210,7 @@ public interface IPrintableDocument
 
     int PageCount { get; }
 
+    DocumentSize PageSize(int index) => new(Setup.PageWidth, Setup.PageHeight);
+
     void PaintPage(int index, IPageCanvas canvas);
 }

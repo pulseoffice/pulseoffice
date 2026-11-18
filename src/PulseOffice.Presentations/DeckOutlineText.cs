@@ -15,6 +15,8 @@ public sealed class DeckOutlineText : IDeckOutlineText
 {
     private const int MaxLevel = 8;
     private const string SpaceIndent = "    ";
+    private const char TitleMark = '\u00B6';
+    private const string TitleSeparator = " \u00B6 ";
 
     public string Render(IReadOnlyList<Slide> slides)
     {
@@ -22,7 +24,7 @@ public sealed class DeckOutlineText : IDeckOutlineText
         var lines = new List<string>();
         foreach (var slide in slides)
         {
-            lines.Add(slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText.Replace('\n', ' ') ?? string.Empty);
+            lines.Add(slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText.Replace("\n", TitleSeparator, StringComparison.Ordinal) ?? string.Empty);
             if (slide.Placeholder(PlaceholderRole.Body)?.Text is not { IsEmpty: false } body) continue;
             foreach (var paragraph in body.Paragraphs)
                 lines.Add(new string('\t', Math.Clamp(paragraph.BulletLevel, 0, MaxLevel) + 1) + paragraph.Text);
@@ -43,7 +45,7 @@ public sealed class DeckOutlineText : IDeckOutlineText
             if (depth == 0)
             {
                 if (title is not null) entries.Add(new OutlineEntry(title, body));
-                title = content;
+                title = TitleParagraphs(content);
                 body = [];
             }
             else
@@ -56,6 +58,11 @@ public sealed class DeckOutlineText : IDeckOutlineText
         if (title is not null) entries.Add(new OutlineEntry(title, body));
         return entries;
     }
+
+    private string TitleParagraphs(string content) =>
+        content.Contains(TitleMark, StringComparison.Ordinal)
+            ? string.Join("\n", content.Split(TitleMark).Select(part => part.Trim(' ')))
+            : content;
 
     private (int Depth, string Content) Indent(string line)
     {

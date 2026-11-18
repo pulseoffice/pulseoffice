@@ -31,7 +31,7 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
         var geometry = pagination.Geometry;
         foreach (var item in request.PageObjects(number))
         {
-            AddObject(item, placement.Place(item, new ObjectFrame(geometry, geometry.Body.X, geometry.Body.Width, geometry.Body.Y)));
+            AddObject(item, placement.Place(item, new ObjectFrame(geometry, geometry.Body.X, geometry.Body.Width, geometry.Body.Y) { EvenPage = pagination.EvenPage }));
         }
     }
 
@@ -44,14 +44,27 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
     public IReadOnlyList<Obstacle> Candidates(ParagraphEntry entry, double top)
     {
         var result = new List<Obstacle>();
+        ObjectFrame? frame = null;
         foreach (var id in entry.AnchoredObjects)
         {
             if (_placedObjects.Contains(id) || request.Object(id) is not { } item) continue;
-            var rect = Grown(item, placement.Place(item, new ObjectFrame(pagination.Geometry, pagination.ColumnLeft, pagination.ColumnWidth, top)));
+            frame ??= Frame(entry, top);
+            var rect = Grown(item, placement.Place(item, frame));
             var turned = RotatedRect.Around(rect, item.RotationDegrees);
             result.Add(Obstacle(item, rect, turned));
         }
         return result;
+    }
+
+    private ObjectFrame Frame(ParagraphEntry entry, double top)
+    {
+        var lines = entry.Lines(pagination.ColumnWidth);
+        return new ObjectFrame(pagination.Geometry, pagination.ColumnLeft, pagination.ColumnWidth, top)
+        {
+            ParagraphHeight = lines.Sum(line => line.Height),
+            LineHeight = lines.Count > 0 ? lines[0].Height : double.NaN,
+            EvenPage = pagination.EvenPage,
+        };
     }
 
     public bool Wrapped(IReadOnlyList<Obstacle> candidates)

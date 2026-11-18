@@ -30,6 +30,12 @@ public sealed class TextFlowFrame : ITextFlowFrame
         return layout.IsStacked || (layout.Upright && layout.Flow != TextFlow.Horizontal);
     }
 
+    public bool Composes(TextLayout layout)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        return layout.IsVertical || layout.Upright || Stacks(layout);
+    }
+
     public double Degrees(TextLayout layout, double textRotation, double containerRotation)
     {
         ArgumentNullException.ThrowIfNull(layout);

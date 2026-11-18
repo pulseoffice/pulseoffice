@@ -17,7 +17,7 @@ public sealed class SlideSorterStripTests
         deck.Master = new MasterFactory().CreateStandard(deck.Theme);
         for (var i = 0; i < 3; i++) deck.AddExisting(factory.Create(deck.NextId(), deck.Master, SlideLayout.TitleAndContent));
         var actions = new DeckActions(deck, new UndoStack(), factory, new FakeTextCatalog());
-        var strip = new SlideSorterStrip(new Thickness(0), _ => new Border());
+        var strip = new SlideSorterStrip(new Thickness(0), _ => new Border(), new DeckSectionHeaders(actions, new FakeTextCatalog(), PulseOffice.UI.Theming.DesignTokens.For(PulseOffice.UI.Theming.InterfaceDensity.Compact)), new SlideStripLayout());
 
         strip.Update(deck, deck.Slides[0]);
         Assert.Equal(3, strip.Rebuilt);
@@ -32,6 +32,6 @@ public sealed class SlideSorterStripTests
         actions.AddSlide(SlideLayout.Blank, 2);
         strip.Update(deck, deck.Slides[0]);
         Assert.Equal(1, strip.Rebuilt);
-        Assert.Equal(4, strip.Panel.Children.Count);
+        Assert.Equal(4, Assert.IsType<WrapPanel>(Assert.Single(strip.Panel.Children)).Children.Count);
     }
 }

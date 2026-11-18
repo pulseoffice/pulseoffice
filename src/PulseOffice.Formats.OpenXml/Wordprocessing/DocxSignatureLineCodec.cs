@@ -32,6 +32,7 @@ public sealed class DocxSignatureLineCodec(VmlSignatureLineCodec vml, VmlStyle s
         (VerticalRelation.Line, "line"),
         (VerticalRelation.Paragraph, "text"),
         (VerticalRelation.Character, "line"),
+        (VerticalRelation.ParagraphArea, "text"),
     ];
 
     public override bool Positions => true;

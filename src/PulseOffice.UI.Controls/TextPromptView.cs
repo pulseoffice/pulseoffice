@@ -24,6 +24,8 @@ public sealed class TextPromptView : UserControl, IDialogContent, IDialogFooterO
 
     public Control? Footer { get; private set; }
 
+    public TextBox Editor => _editor;
+
     public TextPromptView(
         string explanation, string initialText, ITextCatalog texts,
         bool multiline = false, InterfaceDensity density = InterfaceDensity.Compact,

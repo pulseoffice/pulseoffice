@@ -9,6 +9,8 @@ public sealed class DocxObjectAlignments
         ObjectAlignment.Start => "left",
         ObjectAlignment.Center => "center",
         ObjectAlignment.End => "right",
+        ObjectAlignment.Inside => "inside",
+        ObjectAlignment.Outside => "outside",
         _ => null,
     };
 
@@ -17,22 +19,28 @@ public sealed class DocxObjectAlignments
         ObjectAlignment.Start => "top",
         ObjectAlignment.Center => "center",
         ObjectAlignment.End => "bottom",
+        ObjectAlignment.Inside => "inside",
+        ObjectAlignment.Outside => "outside",
         _ => null,
     };
 
     public ObjectAlignment Horizontal(string? word) => word switch
     {
-        "left" or "inside" => ObjectAlignment.Start,
+        "left" => ObjectAlignment.Start,
         "center" => ObjectAlignment.Center,
-        "right" or "outside" => ObjectAlignment.End,
+        "right" => ObjectAlignment.End,
+        "inside" => ObjectAlignment.Inside,
+        "outside" => ObjectAlignment.Outside,
         _ => ObjectAlignment.None,
     };
 
     public ObjectAlignment Vertical(string? word) => word switch
     {
-        "top" or "inside" => ObjectAlignment.Start,
+        "top" => ObjectAlignment.Start,
         "center" => ObjectAlignment.Center,
-        "bottom" or "outside" => ObjectAlignment.End,
+        "bottom" => ObjectAlignment.End,
+        "inside" => ObjectAlignment.Inside,
+        "outside" => ObjectAlignment.Outside,
         _ => ObjectAlignment.None,
     };
 }

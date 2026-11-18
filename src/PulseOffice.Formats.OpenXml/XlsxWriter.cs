@@ -58,7 +58,7 @@ public sealed class XlsxWriter
                 ? new SheetProtection
                 {
                     Sheet = true,
-                    Objects = true,
+                    Objects = sheet.Protection.AllowEditObjects ? null : true,
                     Scenarios = true,
                     FormatCells = !sheet.Protection.AllowFormatCells,
                     InsertRows = !sheet.Protection.AllowInsertRows,

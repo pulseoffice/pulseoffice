@@ -401,7 +401,7 @@ internal sealed class OdtNoteWriter(OdtVocabulary vocabulary) : OdtXml
 
 internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, OdtStyleNames names, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingWriter drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
-    private readonly OdtImageClip _clip = new(measure);
+    private readonly OdfImageClip _clip = new(measure);
 
     private XElement? SignatureFallback(AnchoredObject item, OdtWriteSession session)
     {
@@ -458,11 +458,11 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
             new XAttribute(Style + "horizontal-pos", frames.HorizontalPosition(item.Placement.HorizontalAlign)),
             new XAttribute(Style + "horizontal-rel", frames.Horizontal(item.Placement.Horizontal)),
             new XAttribute(Style + "vertical-pos", frames.VerticalPosition(item.Placement.VerticalAlign)),
-            new XAttribute(Style + "vertical-rel", frames.Vertical(item.Placement.Vertical)),
             new XAttribute(Fo + "margin-left", measure.Length(item.WrapSpacing.Left)),
             new XAttribute(Fo + "margin-right", measure.Length(item.WrapSpacing.Right)),
             new XAttribute(Fo + "margin-top", measure.Length(item.WrapSpacing.Top)),
             new XAttribute(Fo + "margin-bottom", measure.Length(item.WrapSpacing.Bottom)));
+        frames.WriteVertical(graphic, item.Placement.Vertical);
         if (item.Wrap == WrapMode.TopAndBottom) graphic.Add(new XAttribute(Pt + "wrap", "top-and-bottom"));
         if (item.InBackground) graphic.Add(new XAttribute(Style + "run-through", "background"));
         if (item.WrapContour && item.Content is EmbeddedContent && item.Anchor is not AsCharacterAnchor) graphic.Add(new XAttribute(Style + "wrap-contour", "true"), new XAttribute(Style + "wrap-contour-mode", "full"));
@@ -546,11 +546,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
             case EmbeddedContent { Value: RasterImageObject image }:
                 string href;
                 if (image.LinkPath is { Length: > 0 } linked) href = new LinkedFiles().ToPackageHref(new LinkedFiles().ToHref(linked));
-                else
-                {
-                    href = $"Pictures/{Safe(item.Id)}.{images.Extension(image.MediaType)}";
-                    session.AddMedia(href, image.Data.ToArray(), image.MediaType);
-                }
+                else href = session.SharedMedia($"Pictures/{Safe(item.Id)}.{images.Extension(image.MediaType)}", image.Data.ToArray(), image.MediaType);
                 return new XElement(Draw + "image",
                     new XAttribute(Xlink + "href", href),
                     new XAttribute(Xlink + "type", "simple"),
