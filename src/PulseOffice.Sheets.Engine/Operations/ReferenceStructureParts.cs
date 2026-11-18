@@ -184,6 +184,9 @@ internal sealed class PivotsPart : StructurePart
             if (Same(pivot.DestinationSheet, edit) && edit.Shift.Move(pivot.Destination) is { } destination)
                 moved = moved with { Destination = destination };
 
+            if (Same(pivot.DestinationSheet, edit) && pivot.OutputRange is { } output)
+                moved = moved with { OutputRange = edit.Shift.Move(output) };
+
             if (moved != pivot) pivots[index] = moved;
         }
     }

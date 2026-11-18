@@ -278,6 +278,8 @@ internal sealed class OdtNumberFormats
     public string Token(NumberFormat format) => _formats.Token(format);
 
     public NumberFormat Value(string? token) => token is null ? NumberFormat.Arabic : _formats.Value(token);
+
+    public bool Knows(string? token) => token is null || _formats.Find(token) is not null;
 }
 
 internal sealed class OdtVocabulary

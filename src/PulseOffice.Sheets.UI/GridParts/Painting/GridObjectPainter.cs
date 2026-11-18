@@ -91,8 +91,9 @@ internal sealed class GridObjectPainter(
         {
             context.FillRectangle(Brushes.White, bounds);
             context.DrawRectangle(new Pen(Brushes.LightGray), bounds);
+            var refreshed = services.ChartErrorValues.Refresh(viewport.Engine.Workbook, chart);
             services.ChartRenderer.Render(
-                context, chart, services.ChartData.Extract(viewport.Engine.Workbook, chart, visibleOnly: true), bounds, renderers.Culture);
+                context, refreshed, services.ChartData.Extract(viewport.Engine.Workbook, chart, visibleOnly: true), bounds, renderers.Culture);
             return;
         }
 

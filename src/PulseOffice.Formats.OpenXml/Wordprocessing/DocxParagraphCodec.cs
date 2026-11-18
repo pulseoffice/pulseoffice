@@ -45,7 +45,7 @@ public sealed class DocxParagraphCodec(DocxValues values, DocxBorders boxes)
         if (properties.Widows is { } widows) yield return new W.WidowControl { Val = widows > 0 || (properties.Orphans ?? 0) > 0 };
         if (extras.ListId is { } listId)
             yield return new W.NumberingProperties(
-                new W.NumberingLevelReference { Val = extras.ListLevel },
+                new W.NumberingLevelReference { Val = Math.Clamp(extras.ListLevel, 0, DocxNumberingCodec.WordLevels - 1) },
                 new W.NumberingId { Val = listId });
         if (properties.Borders is { } borders) yield return boxes.Write(new W.ParagraphBorders(), borders);
         if (properties.Background is { } background)

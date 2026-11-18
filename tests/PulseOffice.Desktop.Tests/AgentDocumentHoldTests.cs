@@ -29,7 +29,7 @@ public class AgentDocumentHoldTests
         var ids = new AgentDocumentIds();
         var services = new ShellAgentServices(
             workspace, Fake<IDocumentOpenRouter>(), Fake<IDocumentFileServices>(), Fake<IDocumentOperationsCatalog>(),
-            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<PulseOffice.Platform.IAtomicFileWriter>(),
+            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<PulseOffice.Platform.IAtomicFileWriter>(), Fake<IDocumentCopyWriter>(),
             new PulseOffice.UI.Commands.CommandRegistry(Fake<PulseOffice.Localization.ITextCatalog>()), () => null!, ids, new InlineUi(),
             Fake<IAgentPageRenderer>(), Fake<PulseOffice.Localization.ITextCatalog>(), Fake<IUnattendedOpening>(),
             Fake<PulseOffice.UI.Commands.ICommandEffectChecks>(), new AgentOperationGate(workspace, Fake<PulseOffice.UI.Controls.Services.IDialogService>()));

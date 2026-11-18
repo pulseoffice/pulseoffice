@@ -131,6 +131,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
         new(document => Blocks(document.Body).OfType<SectionBlock>().Any(section => section.Columns.Count > 1 && !section.Columns.Balanced)
                         || UsedPageStyles(document).Any(style => style.Columns.Count > 1 && !style.Columns.Balanced),
             Diagnostic.Info("DOCX038", "Word balances section columns: columns set not to balance are balanced in DOCX. ODT keeps the setting.")),
+        new(document => Paragraphs(document).Any(paragraph => (paragraph.IsListItem || paragraph.ListStyleName is not null) && paragraph.BulletLevel >= DocxNumberingCodec.WordLevels
+                        || paragraph.OutlineLevel > DocxNumberingCodec.WordLevels),
+            Diagnostic.Warning("DOCX243", "Word lists and outlines have nine levels: list items on the tenth level are written on the ninth, and tenth-level headings become body text in Word. ODT keeps them.")),
         new(document => document.Styles.List.All.Any(style => style.Levels.Any(level => level.CharacterStyleName is not null)),
             Diagnostic.Info("DOCX039", "The character style of list numbers is not written to DOCX: numbers take the paragraph's formatting. ODT keeps it.")),
         new(document => document.Styles.Frame.All.Any(style => _frames.Value.Find(style.Name) is not { } standard || standard.Frame != style.Frame || standard.ParentName != style.ParentName),

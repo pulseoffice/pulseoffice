@@ -23,6 +23,7 @@ public sealed class SheetObjectRasterizer(
     IOriginalImageSources originals) : ISheetObjectImages
 {
     private const double PixelsPerPoint = 3;
+    private readonly Engine.Operations.ChartErrorValueRefresh _errorValues = new();
     private const int MaximumSide = 3000;
 
     public SheetObjectImage? Image(EmbeddedObject content, DocumentRect bounds)
@@ -31,7 +32,7 @@ public sealed class SheetObjectRasterizer(
             return Rasterized(bounds, bounds, (context, area) =>
             {
                 context.FillRectangle(Brushes.White, area);
-                renderer.Render(context, chart, data.Extract(workbook, chart, visibleOnly: true), area, culture);
+                renderer.Render(context, _errorValues.Refresh(workbook, chart), data.Extract(workbook, chart, visibleOnly: true), area, culture);
             });
 
         if (paths.IsExact(content) || !drawings.CanRender(content)) return null;

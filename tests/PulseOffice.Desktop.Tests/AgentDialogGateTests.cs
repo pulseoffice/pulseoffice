@@ -50,7 +50,7 @@ public class AgentDialogGateTests
         var registry = new PulseOffice.UI.Commands.CommandRegistry(Fake<PulseOffice.Localization.ITextCatalog>());
         var services = new ShellAgentServices(
             workspace, Fake<IDocumentOpenRouter>(), Fake<IDocumentFileServices>(), Fake<IDocumentOperationsCatalog>(),
-            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<PulseOffice.Platform.IAtomicFileWriter>(),
+            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<PulseOffice.Platform.IAtomicFileWriter>(), Fake<IDocumentCopyWriter>(),
             registry, () => null!, ids, new InlineUi(),
             Fake<IAgentPageRenderer>(), Fake<PulseOffice.Localization.ITextCatalog>(), Fake<IUnattendedOpening>(),
             new PulseOffice.UI.Commands.CommandEffectChecks([]), gate);

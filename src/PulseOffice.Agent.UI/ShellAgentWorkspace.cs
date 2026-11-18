@@ -16,6 +16,7 @@ public sealed record ShellAgentServices(
     IDocumentOperationsCatalog Operations,
     IPdfExporter Pdf,
     IAtomicFileWriter Atomic,
+    IDocumentCopyWriter Copies,
     CommandRegistry Registry,
     Func<CommandExecutor> Executor,
     IAgentDocumentIds Ids,
@@ -111,10 +112,12 @@ public sealed class ShellAgentWorkspace(ShellAgentServices services) : IAgentWor
                 : throw new AgentHostException($"The PDF export failed: {written.Diagnostics.FirstOrDefault()?.Message}");
         }
 
-        return operations.WriteTo(document, path)
-            ? Task.FromResult(path)
-            : throw new AgentHostException(
-                $"'{Path.GetExtension(path)}' is not a format this document can be exported to; use .pdf, .{operations.NativeExtension} or .{operations.OfficeExtension}.");
+        return services.Copies.Write(document, path) switch
+        {
+            DocumentCopyOutcome.Written or DocumentCopyOutcome.WrittenWithoutPassword => Task.FromResult(path),
+            _ => throw new AgentHostException(
+                $"'{Path.GetExtension(path)}' is not a format this document can be exported to; use .pdf, .{operations.NativeExtension} or .{operations.OfficeExtension}."),
+        };
     }), ct);
 
     public Task<IReadOnlyList<string>> ExportFormatsAsync(string documentId, CancellationToken ct) => services.Ui.InvokeAsync(() =>

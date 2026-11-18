@@ -44,8 +44,11 @@ public sealed class OdfMetaMapper
                 properties.EditingCycles.ToString(CultureInfo.InvariantCulture)));
 
         foreach (var (name, value) in properties.Custom)
+        {
+            var (kind, text) = Written(properties.KindOf(name), value);
             meta.Add(new XElement(Meta + "user-defined", new XAttribute(Meta + "name", name),
-                new XAttribute(Meta + "value-type", _kinds.Token(properties.KindOf(name))), value));
+                new XAttribute(Meta + "value-type", _kinds.Token(kind)), text));
+        }
 
         return new XDocument(new XElement(Office + "document-meta",
             new XAttribute(XNamespace.Xmlns + "office", Office.NamespaceName),
@@ -69,11 +72,11 @@ public sealed class OdfMetaMapper
         properties.Generator = Value(meta, Meta + "generator");
         properties.Language = Value(meta, Dc + "language");
 
-        if (Moment(Value(meta, Meta + "creation-date")) is { } created) properties.Created = created;
-        if (Moment(Value(meta, Dc + "date")) is { } modified) properties.Modified = modified;
-
-        if (int.TryParse(Value(meta, Meta + "editing-cycles"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var cycles) && cycles >= 0)
-            properties.EditingCycles = cycles;
+        properties.Created = Moment(Value(meta, Meta + "creation-date"));
+        properties.Modified = Moment(Value(meta, Dc + "date"));
+        properties.EditingCycles = int.TryParse(Value(meta, Meta + "editing-cycles"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var cycles) && cycles >= 0
+            ? cycles
+            : 0;
 
         properties.Keywords.Clear();
         foreach (var keyword in meta.Elements(Meta + "keyword"))
@@ -90,6 +93,14 @@ public sealed class OdfMetaMapper
                 else properties.CustomKinds[name] = kind;
             }
     }
+
+    private (CustomPropertyKind Kind, string Text) Written(CustomPropertyKind kind, string value) => kind switch
+    {
+        CustomPropertyKind.Number when !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _) => (CustomPropertyKind.Text, value),
+        CustomPropertyKind.Boolean => bool.TryParse(value, out var flag) ? (kind, flag ? "true" : "false") : (CustomPropertyKind.Text, value),
+        CustomPropertyKind.Date when !DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out _) => (CustomPropertyKind.Text, value),
+        _ => (kind, value),
+    };
 
     private string? Value(XElement parent, XName name) =>
         parent.Element(name)?.Value is { Length: > 0 } text ? text : null;

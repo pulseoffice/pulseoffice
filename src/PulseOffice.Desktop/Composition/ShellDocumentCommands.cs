@@ -21,6 +21,7 @@ public sealed class ShellDocumentCommands(
     PulseOffice.Foundation.Identity.IUserIdentity identity)
 {
     private readonly SafeFileName _fileNames = new();
+    private readonly KeywordListText _keywords = new();
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -127,24 +128,14 @@ public sealed class ShellDocumentCommands(
         if (action.Kind != PulseOffice.UI.Controls.Prompts.VersionActionKind.Save) return;
 
         document.CommitPendingEdits();
-        var snapshotFolder = Directory.CreateTempSubdirectory("pulseoffice-version-").FullName;
-        var snapshot = Path.Combine(snapshotFolder, $"snapshot.{module.NativeExtension}");
-        byte[] content;
-
-        try
+        using var snapshot = new MemoryStream();
+        if (!module.WriteTo(document, $"snapshot.{module.NativeExtension}", snapshot))
         {
-            if (!module.WriteTo(document, snapshot))
-            {
-                status.Report(texts["versions.failed"], NotificationSeverity.Error);
-                return;
-            }
+            status.Report(texts["versions.failed"], NotificationSeverity.Error);
+            return;
+        }
 
-            content = await File.ReadAllBytesAsync(snapshot, ct).ConfigureAwait(true);
-        }
-        finally
-        {
-            Directory.Delete(snapshotFolder, recursive: true);
-        }
+        var content = snapshot.ToArray();
 
         var saved = versions.Add(
             content,
@@ -218,7 +209,7 @@ public sealed class ShellDocumentCommands(
                 new TextField("title", texts["properties.title"], properties.Title ?? string.Empty),
                 new TextField("subject", texts["properties.subject"], properties.Subject ?? string.Empty),
                 new TextField("author", texts["properties.author"], properties.Author ?? string.Empty),
-                new TextField("keywords", texts["properties.keywords"], string.Join(", ", properties.Keywords), texts["properties.keywords.placeholder"]),
+                new TextField("keywords", texts["properties.keywords"], _keywords.Join(properties.Keywords), texts["properties.keywords.placeholder"]),
             ]),
             new FormTab(texts["properties.tab.description"], string.Empty,
             [
@@ -258,9 +249,7 @@ public sealed class ShellDocumentCommands(
                 if (kinds[Math.Clamp(item.Kind, 0, kinds.Length - 1)] is var kind and not CustomPropertyKind.Text) after.CustomKinds[item.Name] = kind;
             }
 
-        if (values["keywords"] as string is { Length: > 0 } keywords)
-            after.Keywords.AddRange(
-                keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        after.Keywords.AddRange(_keywords.Split(values["keywords"] as string));
 
         if (Same(before, after)) return;
 

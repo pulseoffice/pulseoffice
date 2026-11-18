@@ -23,6 +23,7 @@ public sealed class OdfChartMapper
     private readonly OdfDrawUnits _draw = new();
     private readonly ISheetPlacement _placement;
     private readonly SeriesSourceAddresses _sources = new();
+    private readonly PulseOffice.Sheets.Engine.Operations.ChartErrorValueRefresh _errorValues = new();
     private readonly PulseOffice.Sheets.Engine.Operations.ChartDataExtractor _data = new(
         new PulseOffice.Sheets.Engine.Operations.CanonicalSeriesNames(), new PulseOffice.Sheets.Engine.Operations.DocumentLanguageChartCellText());
 
@@ -43,7 +44,8 @@ public sealed class OdfChartMapper
         var frames = new Dictionary<CellAddress, List<XElement>>();
         foreach (var placed in sheet.Objects)
         {
-            if (placed.Content is not ChartDefinition definition) continue;
+            if (placed.Content is not ChartDefinition stored) continue;
+            var definition = _errorValues.Refresh(workbook, stored);
 
             var path = $"Object {_objects.Count + 1}";
             _objects.Add((path, _builder.Build(definition,

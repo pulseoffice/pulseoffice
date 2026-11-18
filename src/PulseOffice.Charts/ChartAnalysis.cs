@@ -8,7 +8,7 @@ public interface IChartTrendFit
 {
     IReadOnlyList<(double X, double Y)> Curve(ChartTrendline trendline, IReadOnlyList<(double X, double Y)> points, int samples = 48);
 
-    ChartTrendSummary? Summary(ChartTrendline trendline, IReadOnlyList<(double X, double Y)> points);
+    ChartTrendSummary? Summary(ChartTrendline trendline, IReadOnlyList<(double X, double Y)> points, IFormatProvider? format = null);
 }
 
 public sealed class ChartTrendFit : IChartTrendFit
@@ -38,14 +38,14 @@ public sealed class ChartTrendFit : IChartTrendFit
         return curve;
     }
 
-    public ChartTrendSummary? Summary(ChartTrendline trendline, IReadOnlyList<(double X, double Y)> points)
+    public ChartTrendSummary? Summary(ChartTrendline trendline, IReadOnlyList<(double X, double Y)> points, IFormatProvider? format = null)
     {
         ArgumentNullException.ThrowIfNull(trendline);
         ArgumentNullException.ThrowIfNull(points);
         var usable = points.Where(point => double.IsFinite(point.X) && double.IsFinite(point.Y)).OrderBy(point => point.X).ToList();
         if (usable.Count < 2 || trendline.Kind == TrendlineKind.MovingAverage) return null;
         var model = Model(trendline, usable);
-        var equation = Equation(trendline, usable);
+        var equation = Equation(trendline, usable, format ?? System.Globalization.CultureInfo.InvariantCulture);
         if (model is null || equation is null) return null;
         var fitted = usable.Select(point => (point.Y, Fitted: model(point.X))).Where(pair => double.IsFinite(pair.Fitted)).ToList();
         if (fitted.Count < 2) return null;
@@ -55,46 +55,46 @@ public sealed class ChartTrendFit : IChartTrendFit
         return new ChartTrendSummary(equation, total > 0 ? 1 - residual / total : 1);
     }
 
-    private string? Equation(ChartTrendline trendline, List<(double X, double Y)> points)
+    private string? Equation(ChartTrendline trendline, List<(double X, double Y)> points, IFormatProvider format)
     {
         switch (trendline.Kind)
         {
             case TrendlineKind.Linear:
-                return Line(points, trendline.Intercept) is { } line ? $"y = {Coefficient(line.Slope)}x {Signed(line.Intercept)}" : null;
+                return Line(points, trendline.Intercept) is { } line ? $"y = {Coefficient(line.Slope, format)}x {Signed(line.Intercept, format)}" : null;
             case TrendlineKind.Exponential:
             {
                 var fit = Line([.. points.Where(point => point.Y > 0).Select(point => (point.X, Math.Log(point.Y)))], trendline.Intercept is > 0 and var a ? Math.Log(a) : null);
-                return fit is { } exponential ? $"y = {Coefficient(Math.Exp(exponential.Intercept))}e^({Coefficient(exponential.Slope)}x)" : null;
+                return fit is { } exponential ? $"y = {Coefficient(Math.Exp(exponential.Intercept), format)}e^({Coefficient(exponential.Slope, format)}x)" : null;
             }
             case TrendlineKind.Logarithmic:
             {
                 var fit = Line([.. points.Where(point => point.X > 0).Select(point => (Math.Log(point.X), point.Y))], null);
-                return fit is { } logarithmic ? $"y = {Coefficient(logarithmic.Slope)}ln(x) {Signed(logarithmic.Intercept)}" : null;
+                return fit is { } logarithmic ? $"y = {Coefficient(logarithmic.Slope, format)}ln(x) {Signed(logarithmic.Intercept, format)}" : null;
             }
             case TrendlineKind.Power:
             {
                 var fit = Line([.. points.Where(point => point.X > 0 && point.Y > 0).Select(point => (Math.Log(point.X), Math.Log(point.Y)))], null);
-                return fit is { } power ? $"y = {Coefficient(Math.Exp(power.Intercept))}x^{Coefficient(power.Slope)}" : null;
+                return fit is { } power ? $"y = {Coefficient(Math.Exp(power.Intercept), format)}x^{Coefficient(power.Slope, format)}" : null;
             }
             case TrendlineKind.Polynomial:
             {
                 if (Polynomial(points, trendline.EffectiveOrder) is not { } coefficients) return null;
                 var terms = Enumerable.Range(0, coefficients.Length).Reverse().Select(power => (power, coefficients[power])).ToList();
                 var head = terms[0];
-                return "y = " + Term(head.Item2, head.power) + string.Concat(terms.Skip(1).Select(term => " " + Signed(term.Item2) + Power(term.power)));
+                return "y = " + Term(head.Item2, head.power, format) + string.Concat(terms.Skip(1).Select(term => " " + Signed(term.Item2, format) + Power(term.power)));
             }
             default:
                 return null;
         }
     }
 
-    private string Term(double coefficient, int power) => Coefficient(coefficient) + Power(power);
+    private string Term(double coefficient, int power, IFormatProvider format) => Coefficient(coefficient, format) + Power(power);
 
     private string Power(int power) => power switch { 0 => "", 1 => "x", _ => $"x^{power}" };
 
-    private string Coefficient(double value) => value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+    private string Coefficient(double value, IFormatProvider format) => value.ToString("0.####", format);
 
-    private string Signed(double value) => (value < 0 ? "- " : "+ ") + Coefficient(Math.Abs(value));
+    private string Signed(double value, IFormatProvider format) => (value < 0 ? "- " : "+ ") + Coefficient(Math.Abs(value), format);
 
     private List<(double X, double Y)> MovingAverage(List<(double X, double Y)> points, int period)
     {

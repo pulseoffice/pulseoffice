@@ -49,7 +49,7 @@ public class AgentOpenPathCaseTests
             Fake<PulseOffice.Localization.ITextCatalog>(), workspace, Fake<ITemplateLibrary>(), new PulseOffice.Platform.RuntimeHostSystem());
         var services = new ShellAgentServices(
             workspace, router, Fake<IDocumentFileServices>(), Fake<IDocumentOperationsCatalog>(),
-            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<IAtomicFileWriter>(),
+            Fake<PulseOffice.Formats.Pdf.IPdfExporter>(), Fake<IAtomicFileWriter>(), Fake<IDocumentCopyWriter>(),
             new PulseOffice.UI.Commands.CommandRegistry(Fake<PulseOffice.Localization.ITextCatalog>()), () => null!, new AgentDocumentIds(), new InlineUi(),
             Fake<IAgentPageRenderer>(), Fake<PulseOffice.Localization.ITextCatalog>(), Fake<IUnattendedOpening>(),
             Fake<PulseOffice.UI.Commands.ICommandEffectChecks>(), new AgentOperationGate(workspace, Fake<PulseOffice.UI.Controls.Services.IDialogService>()));

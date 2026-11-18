@@ -184,8 +184,20 @@ internal sealed class MovedPivotsPart : RangeMovePart
         for (var index = 0; index < pivots.Count; index++)
         {
             var pivot = pivots[index];
-            if (pivot.IsExternal || !move.Moves(pivot.SourceSheet, pivot.SourceRange)) continue;
-            pivots[index] = pivot with { SourceSheet = move.TargetSheet, SourceRange = move.Moved(pivot.SourceRange) };
+            var moved = pivot;
+
+            if (!pivot.IsExternal && move.Moves(pivot.SourceSheet, pivot.SourceRange))
+                moved = moved with { SourceSheet = move.TargetSheet, SourceRange = move.Moved(pivot.SourceRange) };
+
+            if (pivot.OutputRange is { } output && move.Moves(pivot.DestinationSheet, output))
+                moved = moved with
+                {
+                    DestinationSheet = move.TargetSheet,
+                    Destination = move.Moved(pivot.Destination),
+                    OutputRange = move.Moved(output),
+                };
+
+            if (moved != pivot) pivots[index] = moved;
         }
     }
 }

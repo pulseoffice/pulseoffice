@@ -9,6 +9,8 @@ internal sealed class GridRenderServices
 {
     public IChartDataExtractor ChartData { get; set; } = new ChartDataExtractor();
 
+    public IChartErrorValueRefresh ChartErrorValues { get; set; } = new ChartErrorValueRefresh();
+
     public ChartRenderer ChartRenderer { get; set; } = new();
 
     public ICellOverflow Overflow { get; set; } = new CellOverflow();

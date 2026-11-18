@@ -192,14 +192,37 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
 
     private int Compare(string left, string right, PivotField field)
     {
-        var result = grouping.OrderOf(left, field) is { } leftStart && grouping.OrderOf(right, field) is { } rightStart
-            ? leftStart.CompareTo(rightStart)
-            : double.TryParse(left, NumberStyles.Any, CultureInfo.InvariantCulture, out var leftNumber)
-            && double.TryParse(right, NumberStyles.Any, CultureInfo.InvariantCulture, out var rightNumber)
-                ? leftNumber.CompareTo(rightNumber)
-                : string.Compare(left, right, StringComparison.CurrentCulture);
-
+        var result = CompareAscending(left, right, field);
         return field.SortDescending ? -result : result;
+    }
+
+    private int CompareAscending(string left, string right, PivotField field)
+    {
+        var leftKey = SortKeyOf(left, field);
+        var rightKey = SortKeyOf(right, field);
+
+        if (leftKey.Rank != rightKey.Rank) return leftKey.Rank.CompareTo(rightKey.Rank);
+
+        var result = leftKey.Rank == ItemSortKey.TextRank
+            ? string.Compare(left, right, StringComparison.CurrentCulture)
+            : leftKey.Number.CompareTo(rightKey.Number);
+
+        return result != 0 ? result : string.CompareOrdinal(left, right);
+    }
+
+    private ItemSortKey SortKeyOf(string item, PivotField field)
+    {
+        if (grouping.OrderOf(item, field) is { } start) return new ItemSortKey(ItemSortKey.GroupRank, start);
+        return double.TryParse(item, NumberStyles.Any, CultureInfo.InvariantCulture, out var number)
+            ? new ItemSortKey(ItemSortKey.NumberRank, number)
+            : new ItemSortKey(ItemSortKey.TextRank, 0);
+    }
+
+    private readonly record struct ItemSortKey(int Rank, double Number)
+    {
+        public const int GroupRank = 0;
+        public const int NumberRank = 1;
+        public const int TextRank = 2;
     }
 }
 

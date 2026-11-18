@@ -137,7 +137,7 @@ public sealed class ChartAnalysisPainter
         }
         context.DrawGeometry(null, new Pen(new SolidColorBrush(colour, 0.85), 1.5) { DashStyle = new DashStyle([5, 3], 0) }, geometry);
         if (!trendline.DisplayEquation && !trendline.DisplayRSquared) return;
-        if (_trends.Summary(trendline, [.. points.Select(point => (point.Across, point.Value))]) is not { } summary) return;
+        if (_trends.Summary(trendline, [.. points.Select(point => (point.Across, point.Value))], culture) is not { } summary) return;
         var lines = new List<string>();
         if (trendline.DisplayEquation) lines.Add(summary.Equation);
         if (trendline.DisplayRSquared) lines.Add("R² = " + summary.RSquared.ToString("0.####", culture));

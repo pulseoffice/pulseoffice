@@ -85,6 +85,8 @@ public sealed class OoxmlCorePropertiesMapper
     private readonly IReadOnlyList<CustomValueCodec> _codecs =
         [new NumberValueCodec(), new BooleanValueCodec(), new DateValueCodec(), new TextValueCodec()];
 
+    private readonly KeywordListText _keywords = new();
+
     private const string CustomFormatId = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}";
     private const string VariantTypes = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes";
 
@@ -102,7 +104,7 @@ public sealed class OoxmlCorePropertiesMapper
         core.Description = properties.Description;
         core.Creator = properties.Author;
         core.LastModifiedBy = properties.LastModifiedBy;
-        core.Keywords = properties.Keywords.Count > 0 ? JoinKeywords(properties.Keywords) : null;
+        core.Keywords = properties.Keywords.Count > 0 ? _keywords.Join(properties.Keywords) : null;
         core.Created = properties.Created?.UtcDateTime;
         core.Modified = properties.Modified?.UtcDateTime;
         core.Language = properties.Language;
@@ -152,9 +154,7 @@ public sealed class OoxmlCorePropertiesMapper
 
         properties.Keywords.Clear();
 
-        if (core.Keywords is { Length: > 0 } keywords)
-            properties.Keywords.AddRange(
-                keywords.Split(keywords.Contains(';', StringComparison.Ordinal) ? ';' : ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        properties.Keywords.AddRange(_keywords.Split(core.Keywords));
 
         properties.EditingCycles = int.TryParse(core.Revision, NumberStyles.Integer, CultureInfo.InvariantCulture, out var revision) && revision > 0
             ? revision
@@ -172,9 +172,6 @@ public sealed class OoxmlCorePropertiesMapper
                 if (read.Value is not null && read.Kind != CustomPropertyKind.Text) properties.CustomKinds[name] = read.Kind;
             }
     }
-
-    private string JoinKeywords(IReadOnlyList<string> keywords) =>
-        string.Join(keywords.Any(keyword => keyword.Contains(',', StringComparison.Ordinal)) ? "; " : ", ", keywords);
 
     private DateTimeOffset Utc(DateTime moment) =>
         new(moment.Kind == DateTimeKind.Local ? moment.ToUniversalTime() : DateTime.SpecifyKind(moment, DateTimeKind.Utc));

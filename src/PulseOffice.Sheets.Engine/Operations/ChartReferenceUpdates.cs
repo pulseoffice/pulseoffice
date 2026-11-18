@@ -8,6 +8,7 @@ internal abstract class ChartReferenceRewrite
 {
     private readonly ChartSourceReferences _references = new();
     private readonly CellLinkTargets _links = new();
+    private readonly ChartErrorValueReferences _errorValues = new();
 
     protected IChartSourceReferences References => _references;
 
@@ -30,9 +31,10 @@ internal abstract class ChartReferenceRewrite
             if (!rewritten.SequenceEqual(chart.SeriesSources!)) sources = rewritten;
         }
 
-        return sheet == chart.SourceSheet && range == chart.SourceRange && ReferenceEquals(sources, chart.SeriesSources)
+        var moved = sheet == chart.SourceSheet && range == chart.SourceRange && ReferenceEquals(sources, chart.SeriesSources)
             ? chart
             : chart with { SourceSheet = sheet, SourceRange = range, SeriesSources = sources };
+        return _errorValues.Map(moved, text => Reference(text)!);
     }
 
     public PlacedObject Rewrite(PlacedObject placed, string ownerSheet)

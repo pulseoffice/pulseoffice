@@ -37,7 +37,7 @@ public sealed class DocxListMap
     {
         if (!_abstracts.TryGetValue(name, out var abstractId)) return IdOf(name);
         var id = Math.Max(_names.Keys.DefaultIfEmpty(0).Max(), _restarts.Select(restart => restart.Id).DefaultIfEmpty(0).Max()) + 1;
-        _restarts.Add(new DocxListRestart(id, abstractId, level, start));
+        _restarts.Add(new DocxListRestart(id, abstractId, Math.Clamp(level, 0, DocxNumberingCodec.WordLevels - 1), start));
         _ids[Key(name, thread)] = id;
         _names[id] = name;
         return id;
@@ -70,7 +70,7 @@ public sealed class DocxListMap
 
 public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pictures)
 {
-    private const int WordLevels = 9;
+    public const int WordLevels = 9;
     private const int LargestStart = 32_767;
     private const string AbstractThread = "docx-abstract-";
     private const string InstanceThread = "docx-num-";
@@ -189,6 +189,9 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         if (level.Legal && level.Format != NumberFormat.Bullet) element.InsertAfter(new W.IsLegalNumberingStyle(), element.GetFirstChild<W.NumberingFormat>());
         return element;
     }
+
+    public bool LosesFormats(W.Numbering? numbering) =>
+        numbering is not null && numbering.Descendants<W.NumberingFormat>().Any(format => format.Val?.Value is { } value && !_formats.Values.Contains(value));
 
     public bool LosesPictures(W.Numbering? numbering) =>
         numbering is not null && numbering.Descendants<W.LevelPictureBulletId>().Any(id => id.Val?.Value is not { } value || pictures.Read(numbering, value) is null);

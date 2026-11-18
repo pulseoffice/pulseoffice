@@ -41,6 +41,8 @@ public sealed class DocumentOpenRouter(
 
     private readonly List<string> _opening = [];
 
+    private readonly CanonicalPaths _canonical = new();
+
     public bool CanOpen(string path) => !string.IsNullOrEmpty(path) && _openers.Any(o => o.Handles(path));
 
     public async Task<bool> OpenAsNewAsync(string path, CancellationToken ct = default) =>
@@ -61,7 +63,7 @@ public sealed class DocumentOpenRouter(
         var opener = _openers.FirstOrDefault(o => o.Handles(path));
         if (opener is null) return;
 
-        var full = Path.GetFullPath(path);
+        var full = _canonical.Of(path);
         if (_opening.Any(pending => string.Equals(pending, full, PathComparison))) return;
         _opening.Add(full);
         try
@@ -103,8 +105,8 @@ public sealed class DocumentOpenRouter(
     public OpenDocument? FindOpen(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        var full = Path.GetFullPath(path);
-        return workspace.Documents.FirstOrDefault(document => document.Path is { } open && string.Equals(Path.GetFullPath(open), full, PathComparison));
+        var full = _canonical.Of(path);
+        return workspace.Documents.FirstOrDefault(document => document.Path is { } open && string.Equals(_canonical.Of(open), full, PathComparison));
     }
 
     private bool AlreadyOpen(string path)

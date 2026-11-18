@@ -16,6 +16,8 @@
   "DOCX161": ["fields"],
   "DOCX170": ["links"],
   "DOCX173": ["images", "lists"],
+  "DOCX243": ["lists"],
+  "DOCX244": ["lists"],
   "DOCX182": ["notes"],
   "DOCX184": ["shapes", "frames"],
   "DOCX195": ["fields"],

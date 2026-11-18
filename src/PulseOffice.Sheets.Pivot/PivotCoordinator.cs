@@ -32,8 +32,9 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
         if (!definition.IsExternal && source is null)
             return OperationResult<CellRange>.Fail(Diagnostic.Error("PVT002", $"Source sheet '{definition.SourceSheet}' does not exist.", definition.SourceSheet).With(definition.SourceSheet));
 
-        var destination = workbook.FindSheet(definition.DestinationSheet)
-            ?? workbook.AddSheet(definition.DestinationSheet);
+        var destination = workbook.FindSheet(definition.DestinationSheet);
+        if (destination is null && workbook.Protection.Structure)
+            return OperationResult<CellRange>.Fail(Diagnostic.Error("PVT007", "The workbook structure is protected: the destination sheet cannot be added.", definition.DestinationSheet).With(definition.DestinationSheet));
 
         if (ReferenceEquals(source, destination) && definition.SourceRange.Contains(definition.Destination))
             return OperationResult<CellRange>.Fail(Diagnostic.Error("PVT003", "The destination lies inside the source data."));
@@ -56,9 +57,11 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
         bool OwnedByThisPivot(CellAddress address) =>
             previous is { } owned && ReferenceEquals(previousSheet, destination) && owned.Contains(address);
 
-        if (extent.Cells().Any(address => !OwnedByThisPivot(address) && (!destination[address].Value.IsEmpty || destination[address].HasFormula)))
+        if (destination is not null && extent.Cells().Any(address => !OwnedByThisPivot(address) && (!destination[address].Value.IsEmpty || destination[address].HasFormula)))
             return OperationResult<CellRange>.Fail(Diagnostic.Error("PVT005", "The destination already contains data.", definition.DestinationSheet));
         if (previous is { } range) Clear(previousSheet!, range);
+
+        destination ??= workbook.AddSheet(definition.DestinationSheet);
 
         var written = renderer.Render(table, definition, destination, workbook.Styles, labels);
 

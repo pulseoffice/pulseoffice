@@ -319,6 +319,7 @@ internal sealed class OdtStylesReader(
         var image = element.Name.LocalName == "list-level-style-image";
         var picture = image ? pictures.Read(element, context.ReadBytes) : null;
         if (image && picture is null) context.Losses.Add(OdtReadLosses.PictureBullets);
+        if (!bullet && !image && !numbers.Knows((string?)element.Attribute(Style + "num-format"))) context.Losses.Add(OdtReadLosses.ListNumberFormats);
         var format = bullet ? NumberFormat.Bullet
             : element.Name.LocalName == "list-level-style-image" ? NumberFormat.Bullet
             : numbers.Value((string?)element.Attribute(Style + "num-format") ?? string.Empty);

@@ -24,6 +24,7 @@ public sealed class XlsxChartMapper
     private readonly ChartSourceLayout _layout = new();
     private readonly ModelSeriesSlots _slots = new();
     private readonly ChartDataExtractor _data = new(new CanonicalSeriesNames(), new DocumentLanguageChartCellText());
+    private readonly ChartErrorValueRefresh _errorValues = new();
 
     public XlsxChartMapper()
     {
@@ -40,7 +41,7 @@ public sealed class XlsxChartMapper
 
         foreach (var placed in sheet.Objects.Where(o => o.Content is ChartDefinition))
         {
-            var definition = (ChartDefinition)placed.Content;
+            var definition = _errorValues.Refresh(workbook, (ChartDefinition)placed.Content);
             var chartPart = drawingsPart.AddNewPart<ChartPart>();
             chartPart.ChartSpace = _builder.Build(
                 definition, _data.Extract(workbook, definition),
