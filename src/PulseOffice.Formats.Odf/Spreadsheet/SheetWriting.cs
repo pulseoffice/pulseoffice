@@ -129,13 +129,39 @@ internal sealed class OutlineNesting
     }
 }
 
+internal sealed class OdsHeaderColumns
+{
+    public IEnumerable<XElement> Wrap(
+        IReadOnlyList<XElement> columns, IReadOnlyList<OutlineGroup> groups, PrintTitleBand header, OutlineNesting nesting)
+    {
+        if (header.IsEmpty || header.End >= columns.Count
+            || groups.Any(group => !(group.Last < header.Start || group.First > header.End
+                || (group.First < header.Start && group.Last >= header.End))))
+            return nesting.Nest(columns, groups, "table-column-group");
+
+        var removed = header.Count - 1;
+        List<XElement> wrapped =
+        [
+            .. columns.Take(header.Start),
+            new XElement(Namespaces.Table + "table-header-columns", columns.Skip(header.Start).Take(header.Count)),
+            .. columns.Skip(header.End + 1),
+        ];
+        var shifted = groups.Select(group => group.First > header.End
+                ? group with { First = group.First - removed, Last = group.Last - removed }
+                : group.Last >= header.End ? group with { Last = group.Last - removed } : group)
+            .ToList();
+        return nesting.Nest(wrapped, shifted, "table-column-group");
+    }
+}
+
 internal sealed record OdsRowSpan(int First, int Last, XElement Element);
 
 internal sealed class OdsRowGrouping
 {
-    public void Write(XmlWriter writer, IEnumerable<OdsRowSpan> rows, IReadOnlyList<OutlineGroup> groups, int header, Action<XElement> emit)
+    public void Write(XmlWriter writer, IEnumerable<OdsRowSpan> rows, IReadOnlyList<OutlineGroup> groups, PrintTitleBand header, Action<XElement> emit)
     {
-        var headed = header > 0 && !groups.Any(group => group.First < header);
+        var headed = !header.IsEmpty && groups.All(group => group.Last < header.Start || group.First > header.End
+            || (group.First < header.Start && group.Last >= header.End));
         var inHeader = false;
         var open = new List<OutlineGroup>();
         var pending = groups.OrderBy(group => group.First).ThenByDescending(group => group.Last).ThenBy(group => group.Level).ToList();
@@ -144,16 +170,10 @@ internal sealed class OdsRowGrouping
 
         foreach (var row in rows)
         {
-            if (headed)
+            var titled = headed && row.First >= header.Start && row.Last <= header.End;
+            if (inHeader && !titled)
             {
-                if (row.Last < header)
-                {
-                    if (!inHeader) writer.WriteStartElement("table-header-rows", Namespaces.Table.NamespaceName);
-                    inHeader = true;
-                    emit(row.Element);
-                    continue;
-                }
-                if (inHeader) writer.WriteEndElement();
+                writer.WriteEndElement();
                 headed = inHeader = false;
             }
 
@@ -161,6 +181,14 @@ internal sealed class OdsRowGrouping
             {
                 writer.WriteEndElement();
                 open.RemoveAt(open.Count - 1);
+            }
+
+            if (titled)
+            {
+                if (!inHeader) writer.WriteStartElement("table-header-rows", Namespaces.Table.NamespaceName);
+                inHeader = true;
+                emit(row.Element);
+                continue;
             }
 
             while (next < pending.Count && pending[next].First <= row.First) waiting.Add(pending[next++]);

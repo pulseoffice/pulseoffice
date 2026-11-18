@@ -75,8 +75,8 @@ public class OdsTenthAuditTests
         var workbook = Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];
         sheet.SetValue(A("A20"), CellValue.Number(1));
-        sheet.RepeatedPrintRows = 2;
-        sheet.RepeatedPrintColumns = 1;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
+        sheet.PrintTitleColumns = new PulseOffice.Sheets.PrintTitleBand(0, 1);
         sheet.RowGroups.Add(new OutlineGroup { First = 11, Last = 13 });
         sheet.ColumnGroups.Add(new OutlineGroup { First = 4, Last = 5 });
 

@@ -17,12 +17,13 @@ public sealed class RoundFourteenLineTests
     [Fact]
     public void ALongJustifiedParagraphIsBrokenInLinearTime()
     {
-        var content = string.Join(' ', Enumerable.Range(0, 30_000).Select(index => "parola" + index % 7));
-        var watch = Stopwatch.StartNew();
-        var lines = _breaker.Break(content, 400, 400, (start, end) => Measured(content, start, end));
-        var elapsed = watch.Elapsed;
-        Assert.True(lines.Count > 3000, $"lines: {lines.Count}");
-        Assert.True(elapsed < TimeSpan.FromSeconds(1), $"broken in {elapsed}");
+        var lines = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(words =>
+        {
+            var content = string.Join(' ', Enumerable.Range(0, words).Select(index => "parola" + index % 7));
+            return () => lines = _breaker.Break(content, 400, 400, (start, end) => Measured(content, start, end)).Count;
+        }, 30_000);
+        Assert.True(lines > 3000, $"lines: {lines}");
     }
 
     [Fact]

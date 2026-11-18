@@ -41,8 +41,10 @@ public sealed class LedgerDataCommands(
 
         Sheet("ledger.print.repeatRows", "sheet/print", sheet =>
         {
-            sheet.RepeatedPrintRows = Context.Selection.End.Row + 1;
-            status.Report(texts.Format("status.print.repeatRows", sheet.RepeatedPrintRows));
+            var rows = new PrintTitleBand(Context.Selection.Start.Row, Context.Selection.End.Row - Context.Selection.Start.Row + 1);
+            sheet.PrintTitleRows = rows;
+            status.Report(texts.Format("status.print.repeatRows",
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"${rows.Start + 1}:${rows.End + 1}")));
         }),
 
         Sheet("ledger.outline.groupRows", "data/outline", sheet =>

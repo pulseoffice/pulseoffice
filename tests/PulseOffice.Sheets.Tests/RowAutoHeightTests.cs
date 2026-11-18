@@ -133,10 +133,20 @@ public class RowAutoHeightTests
     [Fact]
     public void LaModificaDiUnaCellaRimisuraSoloLaSuaRiga()
     {
+        var growth = new PulseOffice.Testing.GrowthCheck();
+        var small = OneEditFlush(10_000, out _);
+        var large = OneEditFlush(100_000, out var measured);
+
+        Assert.True(measured);
+        growth.Bounded(small, large, 1, $"flush after one edit: 10,000 rows {small}, 100,000 rows {large}");
+    }
+
+    private static TimeSpan OneEditFlush(int rows, out bool measured)
+    {
         var workbook = Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];
         var wrap = workbook.Styles.Intern(CellStyle.Default with { WrapText = true });
-        for (var row = 0; row < 100_000; row++)
+        for (var row = 0; row < rows; row++)
         {
             sheet.SetValue(new CellAddress(row, 0), CellValue.Text("riga " + row));
             sheet.SetStyle(new CellAddress(row, 0), wrap);
@@ -149,10 +159,9 @@ public class RowAutoHeightTests
         var watch = System.Diagnostics.Stopwatch.StartNew();
         Assert.True(tracker.Flush());
         watch.Stop();
-
-        Assert.True(sheet.Layout.AutomaticRowHeights.ContainsKey(500));
-        Assert.True(watch.ElapsedMilliseconds < 200, $"{watch.ElapsedMilliseconds} ms");
         Assert.False(tracker.Flush());
+        measured = sheet.Layout.AutomaticRowHeights.ContainsKey(500);
+        return watch.Elapsed;
     }
 
     [Fact]

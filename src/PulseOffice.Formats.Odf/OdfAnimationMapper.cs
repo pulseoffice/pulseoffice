@@ -124,8 +124,12 @@ public sealed class OdfAnimationMapper
         par.SetAttributeValue(Pres + "preset-sub-type", effect.Subtype);
         foreach (var target in par.DescendantsAndSelf().Attributes(Smil + "targetElement").ToList())
             target.Value = _paragraphs.Target(effect);
-        if (string.IsNullOrEmpty(effect.SoundPath))
-            par.Descendants(Anim + "audio").Remove();
+        var audio = par.Descendants(Anim + "audio").ToList();
+        if (audio.Count == 1 && (string?)audio[0].Attribute(Xlink + "href") == effect.SoundPath && !string.IsNullOrEmpty(effect.SoundPath))
+            return par;
+        foreach (var old in audio) old.Remove();
+        if (!string.IsNullOrEmpty(effect.SoundPath))
+            par.Add(new XElement(Anim + "audio", new XAttribute(Xlink + "href", effect.SoundPath)));
         return par;
     }
 

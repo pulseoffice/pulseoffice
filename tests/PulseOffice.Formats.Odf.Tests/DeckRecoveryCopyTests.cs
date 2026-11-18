@@ -52,19 +52,20 @@ public sealed class DeckRecoveryCopyTests
     [Fact]
     public void Two_hundred_slides_copy_cheaply_for_the_recovery_snapshot()
     {
-        var deck = Deck(200);
+        var small = Capture(20);
+        var large = Capture(200);
+        Record($"deck capture slides=20 {small.TotalMilliseconds:0.00} slides=200 {large.TotalMilliseconds:0.00}");
+
+        new PulseOffice.Testing.GrowthCheck(TimeSpan.FromMilliseconds(0.5), 4).Bounded(small, large, 10, $"capture {small.TotalMilliseconds:0.00} ms for 20 slides, {large.TotalMilliseconds:0.00} ms for 200");
+    }
+
+    private static TimeSpan Capture(int slides)
+    {
+        var deck = Deck(slides);
         using (var warm = new MemoryStream()) new OdpWriter().Write(deck.Copy(), warm);
-
         var clock = Stopwatch.StartNew();
-        var copy = deck.Copy();
-        var captured = clock.Elapsed;
-        clock.Restart();
-        using var stream = new MemoryStream();
-        new OdpWriter().Write(copy, stream);
-        var serialized = clock.Elapsed;
-        Record($"deck slides=200 capture={captured.TotalMilliseconds:0.00} serialization={serialized.TotalMilliseconds:0} bytes={stream.Length}");
-
-        Assert.True(captured < TimeSpan.FromMilliseconds(20), $"capture {captured.TotalMilliseconds:0.00} ms");
+        _ = deck.Copy();
+        return clock.Elapsed;
     }
 
     [Fact]

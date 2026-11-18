@@ -82,9 +82,23 @@ public sealed class PptxAnimationMapper
         var xml =
             $"<p:timing xmlns:p=\"{PNs}\" xmlns:a=\"{ANs}\"><p:tnLst>" +
             "<p:par><p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\"><p:childTnLst>" +
-            main + interactive + media + "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>";
+            main + interactive + media + "</p:childTnLst></p:cTn></p:par></p:tnLst>" + BuildList(slide, spidByElement) + "</p:timing>";
 
         return new P.Timing(xml);
+    }
+
+    private string BuildList(Slide slide, IReadOnlyDictionary<string, uint> spidByElement)
+    {
+        var paragraphs = slide.Animations
+            .Where(effect => effect.Paragraph is not null && spidByElement.ContainsKey(effect.TargetId))
+            .Select(effect => spidByElement[effect.TargetId])
+            .Distinct()
+            .ToList();
+        if (paragraphs.Count == 0) return string.Empty;
+        var list = new StringBuilder("<p:bldLst>");
+        foreach (var spid in paragraphs)
+            list.Append(CultureInfo.InvariantCulture, $"<p:bldP spid=\"{spid}\" grpId=\"0\" build=\"p\"/>");
+        return list.Append("</p:bldLst>").ToString();
     }
 
     private StringBuilder Groups(IReadOnlyList<AnimationEffect> animations, IReadOnlyDictionary<string, uint> spidByElement,
@@ -96,7 +110,7 @@ public sealed class PptxAnimationMapper
             var groupStart = id;
             var clickId = id++;
             var steps = new StringBuilder();
-            var targeted = new HashSet<(uint, int?, AnimationCategory, string)>();
+            var targeted = new Dictionary<(uint, int?, AnimationCategory, string), string>();
             var stepOffset = 0L;
             foreach (var step in _steps.Of(group))
             {
@@ -105,7 +119,8 @@ public sealed class PptxAnimationMapper
                 foreach (var effect in step)
                 {
                     if (!spidByElement.TryGetValue(effect.TargetId, out var spid)) continue;
-                    if (!targeted.Add((spid, effect.Paragraph, effect.Category, effect.Preset))) continue;
+                    if (!targeted.TryAdd((spid, effect.Paragraph, effect.Category, effect.Preset), effect.TargetId)
+                        && targeted[(spid, effect.Paragraph, effect.Category, effect.Preset)] != effect.TargetId) continue;
                     effects.Append(Effect(effect, spid, sounds, ref id));
                 }
                 if (effects.Length == 0)

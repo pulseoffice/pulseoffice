@@ -239,22 +239,10 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var container = element.ParagraphProperties;
         var extras = paragraphs.Extras(container);
         var styleName = context.Styles.NameOf(extras.StyleId) ?? (extras.StyleId is null ? DefaultStyleNames.Standard : null);
-        var listName = context.Lists.NameOf(extras.ListId);
-        var list = listName is null ? null : context.Document.Styles.List.Find(listName);
-        var level = list?.Level(extras.ListLevel);
         var id = context.Document.NextId("p");
         var content = inlines.Read(element, context, id, elements => Read(elements, context));
-        var paragraph = new TextParagraph(string.Empty)
-        {
-            StyleName = styleName,
-            ListStyleName = listName,
-            BulletLevel = listName is null ? 0 : extras.ListLevel,
-            ListRestart = context.Lists.TakeRestart(extras.ListId),
-            ListId = listName is null ? null : context.Lists.ThreadOf(extras.ListId),
-            Bullet = level?.Format == NumberFormat.Bullet,
-            Numbered = level is not null && level.Format is not NumberFormat.Bullet and not NumberFormat.None,
-            OutlineLevel = extras.OutlineLevel,
-        };
+        var paragraph = Listed(new TextParagraph(string.Empty) { StyleName = styleName }, extras, context);
+        paragraph = paragraph with { ListRestart = context.Lists.TakeRestart(extras.ListId) };
         paragraph = formatting.Set(paragraph, paragraphs.Read(container)).WithRuns(content.Runs);
         if (context.TableParagraphDefaults.TryPeek(out var tableDefaults) && tableDefaults is not null
             && tableParagraphs.Missing(tableDefaults, container, extras.StyleId, context) is { } inherited)
@@ -264,13 +252,8 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         {
             var before = change.ParagraphPropertiesExtended;
             var previousExtras = paragraphs.Extras(before);
-            var previous = formatting.Set(new TextParagraph(paragraph.Text)
-            {
-                StyleName = context.Styles.NameOf(previousExtras.StyleId) ?? DefaultStyleNames.Standard,
-                ListStyleName = context.Lists.NameOf(previousExtras.ListId),
-                BulletLevel = previousExtras.ListLevel,
-                OutlineLevel = previousExtras.OutlineLevel,
-            }, paragraphs.Read(before)).WithRuns(content.Runs);
+            var previous = formatting.Set(Listed(new TextParagraph(paragraph.Text) { StyleName = context.Styles.NameOf(previousExtras.StyleId) ?? DefaultStyleNames.Standard },
+                previousExtras, context), paragraphs.Read(before)).WithRuns(content.Runs);
             var tracked = new PulseOffice.Documents.Annotations.ParagraphFormatChange(context.Document.NextId("change"), change.Author?.Value ?? string.Empty,
                 change.Date?.Value is { } date ? new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Utc)) : DateTimeOffset.MinValue, previous);
             context.Document.Changes.Add(tracked);
@@ -278,6 +261,21 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         }
 
         return new ParagraphBlock(id, paragraph) { Marks = marks };
+    }
+
+    private TextParagraph Listed(TextParagraph paragraph, DocxParagraphExtras extras, DocxReadContext context)
+    {
+        var listName = context.Lists.NameOf(extras.ListId);
+        var level = listName is null ? null : context.Document.Styles.List.Find(listName)?.Level(extras.ListLevel);
+        return paragraph with
+        {
+            ListStyleName = listName,
+            BulletLevel = listName is null ? 0 : extras.ListLevel,
+            ListId = listName is null ? null : context.Lists.ThreadOf(extras.ListId),
+            Bullet = level?.Format == NumberFormat.Bullet,
+            Numbered = level is not null && level.Format is not NumberFormat.Bullet and not NumberFormat.None,
+            OutlineLevel = extras.OutlineLevel,
+        };
     }
 
     private TableBlock Table(W.Table element, DocxReadContext context)

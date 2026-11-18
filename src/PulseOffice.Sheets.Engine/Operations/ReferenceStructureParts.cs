@@ -59,17 +59,46 @@ internal sealed class FrozenPanesPart : StructurePart
     }
 }
 
+internal sealed class TitleBandShift
+{
+    public PrintTitleBand Adjusted(StructureEdit edit, PrintTitleBand band)
+    {
+        if (band.IsEmpty) return band;
+
+        var change = edit.Change;
+        var limit = edit.Shift.Rows ? CellAddress.MaxRows : CellAddress.MaxColumns;
+
+        if (change.IsInsertion)
+        {
+            if (change.Index > band.End) return band;
+            if (change.Index < band.Start)
+            {
+                var start = Math.Min(band.Start + change.Count, limit - 1);
+                return new PrintTitleBand(start, Math.Min(band.Count, limit - start));
+            }
+            return new PrintTitleBand(band.Start, Math.Min(band.Count + change.Count, limit - band.Start));
+        }
+
+        var last = change.Index + change.Count - 1;
+        if (change.Index > band.End) return band;
+
+        var removedBefore = Math.Max(0, Math.Min(last, band.Start - 1) - change.Index + 1);
+        var removedInside = Math.Max(0, Math.Min(last, band.End) - Math.Max(change.Index, band.Start) + 1);
+        return new PrintTitleBand(band.Start - removedBefore, band.Count - removedInside);
+    }
+}
+
 internal sealed class PrintTitlesPart : StructurePart
 {
-    private readonly LeadingBand _band = new();
+    private readonly TitleBandShift _band = new();
 
     public override bool WholeLinesOnly => true;
 
     public override void Apply(StructureEdit edit)
     {
         var sheet = edit.Sheet;
-        if (edit.Shift.Rows) sheet.RepeatedPrintRows = _band.Adjusted(edit, sheet.RepeatedPrintRows);
-        else sheet.RepeatedPrintColumns = _band.Adjusted(edit, sheet.RepeatedPrintColumns);
+        if (edit.Shift.Rows) sheet.PrintTitleRows = _band.Adjusted(edit, sheet.PrintTitleRows);
+        else sheet.PrintTitleColumns = _band.Adjusted(edit, sheet.PrintTitleColumns);
     }
 }
 

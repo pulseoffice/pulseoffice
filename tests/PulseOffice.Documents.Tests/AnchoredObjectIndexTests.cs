@@ -14,30 +14,37 @@ public sealed class AnchoredObjectIndexTests
     [Fact]
     public void ManyParagraphsAskingForTheirObjectsCostLinearTime()
     {
-        var objects = new AnchoredObjectCollection();
-        for (var index = 0; index < 5_000; index++) objects.Add(Box("o" + index, "p" + index * 4));
-        var clock = Stopwatch.StartNew();
         var found = 0;
-        for (var index = 0; index < 20_000; index++)
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
         {
-            found += objects.AnchoredTo("p" + index).Count();
-            if (objects.Find("o" + index % 5_000) is null) found = -1_000_000;
-        }
-        clock.Stop();
+            var objects = new AnchoredObjectCollection();
+            for (var index = 0; index < size; index++) objects.Add(Box("o" + index, "p" + index * 4));
+            return () =>
+            {
+                found = 0;
+                for (var index = 0; index < size * 4; index++)
+                {
+                    found += objects.AnchoredTo("p" + index).Count();
+                    if (objects.Find("o" + index % size) is null) found = -1_000_000;
+                }
+            };
+        }, 5_000);
         Assert.Equal(5_000, found);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1), $"looked up in {clock.Elapsed}");
     }
 
     [Fact]
     public void FindingEveryNoteOfALongBookCostsLinearTime()
     {
         var notes = new PulseOffice.Documents.Annotations.NoteCollection();
-        for (var index = 0; index < 30_000; index++) notes.Add(new PulseOffice.Documents.Annotations.Note("fn" + index, PulseOffice.Documents.Annotations.NoteKind.Footnote, new BlockContainer()));
-        var clock = Stopwatch.StartNew();
-        var found = Enumerable.Range(0, 30_000).Count(index => notes.Find("fn" + index) is not null);
-        clock.Stop();
+        var found = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            notes = new PulseOffice.Documents.Annotations.NoteCollection();
+            for (var index = 0; index < size; index++) notes.Add(new PulseOffice.Documents.Annotations.Note("fn" + index, PulseOffice.Documents.Annotations.NoteKind.Footnote, new BlockContainer()));
+            var current = notes;
+            return () => found = Enumerable.Range(0, size).Count(index => current.Find("fn" + index) is not null);
+        }, 30_000);
         Assert.Equal(30_000, found);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1), $"found in {clock.Elapsed}");
         notes.Remove("fn5");
         Assert.Null(notes.Find("fn5"));
     }
@@ -46,12 +53,15 @@ public sealed class AnchoredObjectIndexTests
     public void FindingEveryCommentOfAReviewedDocumentCostsLinearTime()
     {
         var comments = new PulseOffice.Documents.Annotations.CommentCollection();
-        for (var index = 0; index < 30_000; index++) comments.Add(new PulseOffice.Documents.Annotations.Comment("c" + index, "A", DateTimeOffset.MinValue, new BlockContainer()));
-        var clock = Stopwatch.StartNew();
-        var found = Enumerable.Range(0, 30_000).Count(index => comments.Find("c" + index) is not null);
-        clock.Stop();
+        var found = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            comments = new PulseOffice.Documents.Annotations.CommentCollection();
+            for (var index = 0; index < size; index++) comments.Add(new PulseOffice.Documents.Annotations.Comment("c" + index, "A", DateTimeOffset.MinValue, new BlockContainer()));
+            var current = comments;
+            return () => found = Enumerable.Range(0, size).Count(index => current.Find("c" + index) is not null);
+        }, 30_000);
         Assert.Equal(30_000, found);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1), $"found in {clock.Elapsed}");
         comments.Remove("c7");
         Assert.Null(comments.Find("c7"));
     }

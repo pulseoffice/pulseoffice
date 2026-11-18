@@ -112,8 +112,8 @@ public sealed class SheetDuplicator : ISheetDuplicator
             TabColorHex = source.TabColorHex,
             RightToLeft = source.RightToLeft,
             PageStyleName = source.PageStyleName,
-            RepeatedPrintRows = source.RepeatedPrintRows,
-            RepeatedPrintColumns = source.RepeatedPrintColumns,
+            PrintTitleRows = source.PrintTitleRows,
+            PrintTitleColumns = source.PrintTitleColumns,
             Protection = source.Protection,
         };
 

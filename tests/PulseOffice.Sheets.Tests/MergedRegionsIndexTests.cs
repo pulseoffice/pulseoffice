@@ -11,14 +11,19 @@ public class MergedRegionsIndexTests
     public void VentimilaUnioniSiAggiungonoELeggonoSenzaCostoQuadratico()
     {
         var merges = new MergedRegions();
-        var clock = Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Linear(rows =>
+        {
+            merges = new MergedRegions();
+            var current = merges;
+            return () =>
+            {
+                for (var row = 0; row < rows; row += 2)
+                    current.Add(new CellRange(new CellAddress(row, 0), new CellAddress(row + 1, 1)));
+                for (var row = 0; row < rows; row++)
+                    Assert.NotNull(current.At(new CellAddress(row, 1)));
+            };
+        }, 40_000);
 
-        for (var row = 0; row < 40_000; row += 2)
-            merges.Add(new CellRange(new CellAddress(row, 0), new CellAddress(row + 1, 1)));
-        for (var row = 0; row < 40_000; row++)
-            Assert.NotNull(merges.At(new CellAddress(row, 1)));
-
-        Assert.True(clock.ElapsedMilliseconds < 2_000, $"{clock.ElapsedMilliseconds} ms");
         Assert.Equal(20_000, merges.Count);
     }
 
@@ -38,16 +43,21 @@ public class MergedRegionsIndexTests
     public void MilleUnioniSuColonneIntereNonOccupanoUnaVocePerBlocco()
     {
         var merges = new MergedRegions();
-        var clock = Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Linear(columns =>
+        {
+            merges = new MergedRegions();
+            var current = merges;
+            return () =>
+            {
+                for (var column = 0; column < columns; column += 2)
+                    current.Add(new CellRange(new CellAddress(0, column), new CellAddress(CellAddress.MaxRows - 1, column + 1)));
+                for (var column = 0; column < columns; column++)
+                    Assert.NotNull(current.At(new CellAddress(CellAddress.MaxRows - 1 - column, column)));
+                for (var column = 0; column < columns; column += 4)
+                    Assert.True(current.Remove(new CellRange(new CellAddress(0, column), new CellAddress(CellAddress.MaxRows - 1, column + 1))));
+            };
+        }, 2_000);
 
-        for (var column = 0; column < 2_000; column += 2)
-            merges.Add(new CellRange(new CellAddress(0, column), new CellAddress(CellAddress.MaxRows - 1, column + 1)));
-        for (var column = 0; column < 2_000; column++)
-            Assert.NotNull(merges.At(new CellAddress(CellAddress.MaxRows - 1 - column, column)));
-        for (var column = 0; column < 2_000; column += 4)
-            Assert.True(merges.Remove(new CellRange(new CellAddress(0, column), new CellAddress(CellAddress.MaxRows - 1, column + 1))));
-
-        Assert.True(clock.ElapsedMilliseconds < 1_000, $"{clock.ElapsedMilliseconds} ms");
         Assert.Equal(500, merges.Count);
         Assert.Null(merges.At(new CellAddress(700_000, 0)));
         Assert.NotNull(merges.At(new CellAddress(700_000, 2)));

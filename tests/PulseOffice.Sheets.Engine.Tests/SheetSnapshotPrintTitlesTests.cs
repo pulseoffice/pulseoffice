@@ -13,16 +13,16 @@ public sealed class SheetSnapshotPrintTitlesTests(EngineFixture fixture) : IClas
         var checkpoints = new WorkbookCheckpoints(new SheetSnapshots());
         var before = checkpoints.Capture(workbook);
 
-        sheet.RepeatedPrintRows = 3;
-        sheet.RepeatedPrintColumns = 2;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 3);
+        sheet.PrintTitleColumns = new PulseOffice.Sheets.PrintTitleBand(0, 2);
         var after = checkpoints.Capture(workbook);
 
         checkpoints.Restore(engine, workbook, before);
-        Assert.Equal(0, sheet.RepeatedPrintRows);
-        Assert.Equal(0, sheet.RepeatedPrintColumns);
+        Assert.Equal(0, sheet.PrintTitleRows.Count);
+        Assert.Equal(0, sheet.PrintTitleColumns.Count);
 
         checkpoints.Restore(engine, workbook, after);
-        Assert.Equal(3, sheet.RepeatedPrintRows);
-        Assert.Equal(2, sheet.RepeatedPrintColumns);
+        Assert.Equal(3, sheet.PrintTitleRows.Count);
+        Assert.Equal(2, sheet.PrintTitleColumns.Count);
     }
 }

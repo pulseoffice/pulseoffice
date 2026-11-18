@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PulseOffice.Foundation.Modules;
@@ -49,6 +50,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
     private readonly ILogger<DocumentRecovery> _logger;
     private readonly string _directory;
     private readonly Dictionary<OpenDocument, string> _identifiers = [];
+    private readonly ConditionalWeakTable<OpenDocument, StrongBox<int>> _discards = [];
     private readonly IDocumentPasswordGate? _passwords;
     private readonly IPrivateFiles _privateFiles;
     private readonly Lock _queueGate = new();
@@ -79,7 +81,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
         lock (_queueGate)
         {
             var previous = _queueTail;
-            var next = SnapshotAfterAsync(previous, document, ct);
+            var next = SnapshotAfterAsync(previous, document, Discards(document), ct);
             _queueTail = next;
             return next;
         }
@@ -90,9 +92,12 @@ public sealed class DocumentRecovery : IDocumentRecovery
         lock (_queueGate) return _queueTail.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
-    private async Task SnapshotAfterAsync(Task previous, OpenDocument document, CancellationToken ct)
+    private int Discards(OpenDocument document) => _discards.TryGetValue(document, out var count) ? count.Value : 0;
+
+    private async Task SnapshotAfterAsync(Task previous, OpenDocument document, int discardsWhenAsked, CancellationToken ct)
     {
         await previous.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        if (Discards(document) != discardsWhenAsked) return;
         await WriteSnapshotAsync(document, ct).ConfigureAwait(true);
     }
 
@@ -238,6 +243,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
     {
         ArgumentNullException.ThrowIfNull(document);
 
+        _discards.GetOrCreateValue(document).Value++;
         if (!_identifiers.Remove(document, out var id)) return;
         Discard(id);
     }

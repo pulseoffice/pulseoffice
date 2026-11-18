@@ -37,14 +37,15 @@ public sealed class RoundTwoLimitsTests
     public void ClearingTheStyleOfVeryManyRunsMergesThemInLinearTime()
     {
         const int count = 80_000;
-        var runs = Enumerable.Range(0, count).Select(index => new TextRun("abcdefghij") { StyleName = "s" + index }).ToList();
-        var state = new ParagraphState(new TextParagraph(string.Empty).WithRuns(runs), []);
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        var mapped = new ParagraphText().Map(state, 0, count * 10, run => run with { StyleName = null });
-        clock.Stop();
+        ParagraphState mapped = null!;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            var runs = Enumerable.Range(0, size).Select(index => new TextRun("abcdefghij") { StyleName = "s" + index }).ToList();
+            var state = new ParagraphState(new TextParagraph(string.Empty).WithRuns(runs), []);
+            return () => mapped = new ParagraphText().Map(state, 0, size * 10, run => run with { StyleName = null });
+        }, count);
         Assert.Single(mapped.Content.Runs);
         Assert.Equal(count * 10, mapped.Content.Text.Length);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"mapped in {clock.Elapsed}");
     }
 
     [Fact]

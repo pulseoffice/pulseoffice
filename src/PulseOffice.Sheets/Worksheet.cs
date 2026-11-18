@@ -132,9 +132,9 @@ public sealed class Worksheet
 
     public string PageStyleName { get; set; } = "Default";
 
-    public int RepeatedPrintRows { get; set; }
+    public PrintTitleBand PrintTitleRows { get; set; }
 
-    public int RepeatedPrintColumns { get; set; }
+    public PrintTitleBand PrintTitleColumns { get; set; }
 
     public SheetProtection Protection { get; set; } = SheetProtection.None;
 

@@ -48,7 +48,7 @@ public class SheetPrintOptionsFactoryTests
     {
         var workbook = TenRows();
         var sheet = workbook.Sheets[0];
-        sheet.RepeatedPrintRows = 2;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
         sheet.PrintRanges.Add(new CellRange(new CellAddress(0, 0), new CellAddress(2, 0)));
         sheet.PrintRanges.Add(new CellRange(new CellAddress(4, 0), new CellAddress(8, 0)));
 

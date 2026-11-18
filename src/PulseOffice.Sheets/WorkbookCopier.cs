@@ -49,8 +49,8 @@ public sealed class WorkbookCopier : IWorkbookCopier
         copy.RightToLeft = source.RightToLeft;
         copy.Frozen = source.Frozen;
         copy.PageStyleName = source.PageStyleName;
-        copy.RepeatedPrintRows = source.RepeatedPrintRows;
-        copy.RepeatedPrintColumns = source.RepeatedPrintColumns;
+        copy.PrintTitleRows = source.PrintTitleRows;
+        copy.PrintTitleColumns = source.PrintTitleColumns;
         copy.Protection = source.Protection;
 
         source.Layout.CopyTo(copy.Layout);

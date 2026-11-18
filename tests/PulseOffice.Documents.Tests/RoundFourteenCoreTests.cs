@@ -31,25 +31,27 @@ public sealed class RoundFourteenCoreTests
     [Fact]
     public void DeletingTheWholeOfALongDocumentTakesLinearTime()
     {
-        var f = LongDocument(60_000, 0);
-        var last = f.Paragraph(f.Document.Body.Count - 1);
-        var watch = Stopwatch.StartNew();
-        f.Editor.Delete(f.Document, f.History, new DocumentRange(new DocumentPosition(f.First.Id, 0), new DocumentPosition(last.Id, last.Length)));
-        var elapsed = watch.Elapsed;
-        Assert.Equal(1, f.Document.Body.Count);
-        Assert.True(elapsed < TimeSpan.FromSeconds(2), $"deleted in {elapsed}");
+        Fixture deleted = null!;
+        new PulseOffice.Testing.GrowthCheck().Linear(size => DeleteAll(LongDocument(size, 0), done => deleted = done), 60_000);
+        Assert.Equal(1, deleted.Document.Body.Count);
     }
 
     [Fact]
     public void DeletingALongCommentedRangeTakesLinearTime()
     {
-        var f = LongDocument(20_000, 4);
+        Fixture deleted = null!;
+        new PulseOffice.Testing.GrowthCheck().Linear(size => DeleteAll(LongDocument(size, 4), done => deleted = done), 20_000);
+        Assert.Empty(deleted.Document.Comments.All);
+    }
+
+    private static Action DeleteAll(Fixture f, Action<Fixture> done)
+    {
         var last = f.Paragraph(f.Document.Body.Count - 1);
-        var watch = Stopwatch.StartNew();
-        f.Editor.Delete(f.Document, f.History, new DocumentRange(new DocumentPosition(f.First.Id, 0), new DocumentPosition(last.Id, last.Length)));
-        var elapsed = watch.Elapsed;
-        Assert.Empty(f.Document.Comments.All);
-        Assert.True(elapsed < TimeSpan.FromSeconds(2), $"deleted in {elapsed}");
+        return () =>
+        {
+            f.Editor.Delete(f.Document, f.History, new DocumentRange(new DocumentPosition(f.First.Id, 0), new DocumentPosition(last.Id, last.Length)));
+            done(f);
+        };
     }
 
     private static (Fixture Fixture, TableBlock Table) TableWithNote()

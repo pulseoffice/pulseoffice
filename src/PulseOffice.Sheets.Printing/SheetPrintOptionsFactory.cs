@@ -24,15 +24,13 @@ public sealed class SheetPrintOptionsFactory : ISheetPrintOptionsFactory
         {
             Setup = setup,
             Area = area,
-            RepeatedRows = sheet.RepeatedPrintRows,
-            RepeatedColumns = sheet.RepeatedPrintColumns,
-            RepeatedRowRange = Leading(sheet.RepeatedPrintRows),
-            RepeatedColumnRange = Leading(sheet.RepeatedPrintColumns),
+            RepeatedRowRange = Slice(sheet.PrintTitleRows),
+            RepeatedColumnRange = Slice(sheet.PrintTitleColumns),
             RowBreaks = sheet.RowBreaks,
             ColumnBreaks = sheet.ColumnBreaks,
             DocumentName = documentName,
         }).ToList();
     }
 
-    private BandSlice? Leading(int count) => count > 0 ? new BandSlice(0, count - 1) : null;
+    private BandSlice? Slice(PrintTitleBand band) => band.IsEmpty ? null : new BandSlice(band.Start, band.End);
 }

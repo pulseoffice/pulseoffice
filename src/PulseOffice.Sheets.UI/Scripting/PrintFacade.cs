@@ -150,15 +150,15 @@ public sealed class PrintFacade(
             throw new ArgumentOutOfRangeException(nameof(count), count, $"The repeated rows must be between 0 and {MaximumRepeatedRows}.");
         if (Sheet() is not { } sheet) return;
 
-        var before = sheet.RepeatedPrintRows;
-        var after = count;
+        var before = sheet.PrintTitleRows;
+        var after = new PrintTitleBand(0, count);
         if (before == after) return;
 
-        sheet.RepeatedPrintRows = after;
+        sheet.PrintTitleRows = after;
         context.History?.Push(new PulseOffice.Document.Commands.DelegateAction(
             "RepeatRows",
-            redo: () => sheet.RepeatedPrintRows = after,
-            undo: () => sheet.RepeatedPrintRows = before));
+            redo: () => sheet.PrintTitleRows = after,
+            undo: () => sheet.PrintTitleRows = before));
     });
 
     public int PageCount => Read(() =>

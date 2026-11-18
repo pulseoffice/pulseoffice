@@ -33,7 +33,7 @@ public sealed class StreamingSheetTests
         sheet.Comments[new CellAddress(15_000, 2)] = new CellComment { Text = "In fondo" };
         sheet.RowGroups.Add(new OutlineGroup { First = 100, Last = 199 });
         sheet.RowGroups.Add(new OutlineGroup { First = 120, Last = 129, Level = 2, IsCollapsed = true });
-        sheet.RepeatedPrintRows = 2;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
         return workbook;
     }
 
@@ -47,7 +47,7 @@ public sealed class StreamingSheetTests
         Assert.Equal($"=SUM(A1:A{Rows})", back[new CellAddress(Rows, 0)].Formula);
         Assert.Equal("In fondo", back.Comments[new CellAddress(15_000, 2)].Text);
         Assert.Contains(new CellRange(new CellAddress(10, 4), new CellAddress(11, 5)), back.Merges.All);
-        Assert.Equal(2, back.RepeatedPrintRows);
+        Assert.Equal(2, back.PrintTitleRows.Count);
         Assert.Contains(back.RowGroups, group => group is { First: 100, Last: 199 });
         Assert.Contains(back.RowGroups, group => group is { First: 120, Last: 129, IsCollapsed: true });
     }

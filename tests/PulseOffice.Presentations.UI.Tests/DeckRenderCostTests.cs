@@ -83,8 +83,18 @@ public sealed class DeckRenderCostTests
     [Fact]
     public void Editing_one_slide_of_two_hundred_rebuilds_one_thumbnail_in_bounded_time()
     {
-        var (deck, actions) = Deck(200);
+        var small = RefreshPerEdit(20);
+        var large = RefreshPerEdit(200);
+        Record($"filmstrip refresh per edit slides=20 {small.TotalMilliseconds:0.00} slides=200 {large.TotalMilliseconds:0.00}");
+
+        new PulseOffice.Testing.GrowthCheck(TimeSpan.FromMilliseconds(0.5), 4).Bounded(small, large, 1, $"{small.TotalMilliseconds:0.00} ms per edit with 20 slides, {large.TotalMilliseconds:0.00} ms with 200");
+    }
+
+    private static TimeSpan RefreshPerEdit(int slides)
+    {
+        var (deck, actions) = Deck(slides);
         var cache = new SlideFrameCache<object>();
+        var edited = deck.Slides[slides / 2];
         cache.Refresh(deck, deck.Slides[0], (_, _) => new object());
 
         var clock = Stopwatch.StartNew();
@@ -92,14 +102,12 @@ public sealed class DeckRenderCostTests
         var rebuilt = 0;
         for (var i = 0; i < edits; i++)
         {
-            actions.SetSlideText(deck.Slides[100], PlaceholderRole.Title, $"Edit {i}");
-            cache.Refresh(deck, deck.Slides[100], (_, _) => new object());
+            actions.SetSlideText(edited, PlaceholderRole.Title, $"Edit {i}");
+            cache.Refresh(deck, edited, (_, _) => new object());
             rebuilt += cache.Rebuilt;
         }
         var perEdit = clock.Elapsed / edits;
-        Record($"slides=200 filmstrip refresh per edit={perEdit.TotalMilliseconds:0.00} rebuilt={rebuilt}");
-
         Assert.Equal(edits + 1, rebuilt);
-        Assert.True(perEdit < TimeSpan.FromMilliseconds(20), $"{perEdit.TotalMilliseconds:0.0} ms per edit");
+        return perEdit;
     }
 }

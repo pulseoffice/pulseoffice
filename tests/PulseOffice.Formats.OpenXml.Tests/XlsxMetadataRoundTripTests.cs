@@ -78,12 +78,12 @@ public class XlsxMetadataRoundTripTests
 
         sheet.SetValue(CellAddress.First, CellValue.Number(1));
         sheet.PrintRanges.Add(Range(0, 0, 4, 2));
-        sheet.RepeatedPrintRows = 2;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
 
         var reread = RoundTrip(workbook).Sheets[0];
 
         Assert.Equal(Range(0, 0, 4, 2), Assert.Single(reread.PrintRanges));
-        Assert.Equal(2, reread.RepeatedPrintRows);
+        Assert.Equal(2, reread.PrintTitleRows.Count);
     }
 
     [Fact]

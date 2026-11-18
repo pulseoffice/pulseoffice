@@ -49,10 +49,28 @@ public sealed class ScriptableCommandPolicy : IScriptableCommandPolicy
 
 public sealed record RecordedCommands(OpenDocument? Owner, IReadOnlyList<CommandId> Commands);
 
-public sealed class CommandRecorder(IScriptableCommandPolicy policy, IDocumentWorkspace workspace) : ICommandRecorder
+public sealed class CommandRecorder : ICommandRecorder
 {
+    private readonly IScriptableCommandPolicy policy;
+    private readonly IDocumentWorkspace workspace;
     private readonly List<CommandId> _recorded = [];
     private OpenDocument? _owner;
+
+    public CommandRecorder(IScriptableCommandPolicy policy, IDocumentWorkspace workspace)
+    {
+        this.policy = policy;
+        this.workspace = workspace;
+        workspace.DocumentClosed += OnDocumentClosed;
+    }
+
+    private void OnDocumentClosed(object? sender, OpenDocument document)
+    {
+        if (!IsRecording || !ReferenceEquals(document, _owner)) return;
+        IsRecording = false;
+        _recorded.Clear();
+        _owner = null;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     public bool IsRecording { get; private set; }
 

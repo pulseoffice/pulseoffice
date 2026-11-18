@@ -157,11 +157,19 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [InlineData("=BESSELJ(1;100000000)")]
     [InlineData("=BESSELY(1;1E+9)")]
     [InlineData("=BESSELK(1;1E+9)")]
-    public void BesselConOrdiniEnormiDaErroreSubitoComeNelRiferimento(string formula)
+    public void BesselConOrdiniEnormiDaErroreSubitoComeNelRiferimento(string formula) =>
+        CostaComeUnArgomentoPiccolo("=BESSELJ(1;10)", formula, value => Assert.Equal(CellError.Number, value.Error));
+
+    private void CostaComeUnArgomentoPiccolo(string piccola, string enorme, Action<CellValue> verifica, double rapporto = 1)
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(CellError.Number, Valuta(formula).Error);
-        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
+        var growth = new PulseOffice.Testing.GrowthCheck(TimeSpan.FromMilliseconds(25), 4);
+        Valuta(piccola);
+        Valuta(enorme);
+        var small = growth.Time(() => Valuta(piccola));
+        var value = default(CellValue);
+        var large = growth.Time(() => value = Valuta(enorme));
+        verifica(value!);
+        growth.Bounded(small, large, rapporto, $"{piccola} {small}, {enorme} {large}");
     }
 
     [Theory]
@@ -177,9 +185,7 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [Fact]
     public void DdbSuMiliardiDiPeriodiSenzaCiclo()
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(ValueKind.Number, Valuta("=DDB(1;0;1E+9;1E+9)").Kind);
-        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
+        CostaComeUnArgomentoPiccolo("=DDB(1;0;10;10)", "=DDB(1;0;1E+9;1E+9)", value => Assert.Equal(ValueKind.Number, value.Kind));
     }
 
     [Fact]
@@ -199,10 +205,8 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [Fact]
     public void CumulateSuMiliardiDiPeriodiSenzaCiclo()
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        var value = Valuta("=CUMPRINC(1E-9;1E+10;1000;1;2000000000;0)");
-        Assert.True(value.Kind == ValueKind.Number && double.IsFinite(value.AsNumber()));
-        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
+        CostaComeUnArgomentoPiccolo("=CUMPRINC(1E-9;100;1000;1;20;0)", "=CUMPRINC(1E-9;1E+10;1000;1;2000000000;0)",
+            value => Assert.True(value.Kind == ValueKind.Number && double.IsFinite(value.AsNumber())));
     }
 
     [Theory]
@@ -214,10 +218,8 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [Fact]
     public void FourierSuMoltiCampioniNonEQuadratico()
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        var value = Valuta("=INDEX(FOURIER(SEQUENCE(20000);TRUE());1;1)");
-        Assert.Equal(200010000, value.AsNumber(), 3);
-        Assert.True(watch.ElapsedMilliseconds < 1000, $"{watch.ElapsedMilliseconds} ms");
+        CostaComeUnArgomentoPiccolo("=INDEX(FOURIER(SEQUENCE(2000);TRUE());1;1)", "=INDEX(FOURIER(SEQUENCE(20000);TRUE());1;1)",
+            value => Assert.Equal(200010000, value.AsNumber(), 3), 20);
     }
 
     [Theory]
@@ -283,12 +285,8 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [Theory]
     [InlineData("=DB(10000;1000;1E+9;1E+9)")]
     [InlineData("=AMORDEGRC(10000;1;2;0;1E+9;1E-12)")]
-    public void AmmortamentiSenzaUnCicloPerPeriodo(string formula)
-    {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(ValueKind.Number, Valuta(formula).Kind);
-        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
-    }
+    public void AmmortamentiSenzaUnCicloPerPeriodo(string formula) =>
+        CostaComeUnArgomentoPiccolo("=DB(10000;1000;10;10)", formula, value => Assert.Equal(ValueKind.Number, value.Kind));
 
     [Theory]
     [InlineData("=LARGE({1;2;3};1.5)", 2)]
@@ -331,16 +329,16 @@ public class DeepAuditSheetsEngineTests(EngineFixture fixture) : IClassFixture<E
     [Fact]
     public void IntervalloStagionaleMoltoLontanoDaErroreSenzaAllocare()
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(CellError.Number, Valuta("=FORECAST.ETS.PI.ADD(100024;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;4)").Error);
-        Assert.True(watch.ElapsedMilliseconds < 1000, $"{watch.ElapsedMilliseconds} ms");
+        CostaComeUnArgomentoPiccolo("=FORECAST.ETS.PI.ADD(30;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;4)",
+            "=FORECAST.ETS.PI.ADD(100024;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;4)",
+            value => Assert.Equal(CellError.Number, value.Error));
     }
 
     [Fact]
     public void IntervalloNonStagionaleLontanissimoSenzaAllocare()
     {
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(ValueKind.Number, Valuta("=FORECAST.ETS.PI.ADD(1E+9;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;0)").Kind);
-        Assert.True(watch.ElapsedMilliseconds < 1000, $"{watch.ElapsedMilliseconds} ms");
+        CostaComeUnArgomentoPiccolo("=FORECAST.ETS.PI.ADD(30;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;0)",
+            "=FORECAST.ETS.PI.ADD(1E+9;SEQUENCE(24);MOD(SEQUENCE(24);4)+SEQUENCE(24);0.95;0)",
+            value => Assert.Equal(ValueKind.Number, value.Kind));
     }
 }

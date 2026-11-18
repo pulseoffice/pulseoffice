@@ -88,7 +88,7 @@ public sealed class OdsSpreadsheetAuditTests
             else firstRow.AddBeforeSelf(header);
         });
 
-        Assert.InRange(back.Sheets[0].RepeatedPrintRows, 0, CellAddress.MaxRows);
+        Assert.InRange(back.Sheets[0].PrintTitleRows.Count, 0, CellAddress.MaxRows);
     }
 
     [Fact]

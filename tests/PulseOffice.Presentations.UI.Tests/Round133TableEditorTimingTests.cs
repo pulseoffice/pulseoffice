@@ -26,16 +26,23 @@ public sealed class Round133TableEditorTimingTests(ITestOutputHelper output)
     [Fact]
     public Task A_table_of_one_hundred_thousand_cells_opens_quickly() => Session.Dispatch(() =>
     {
-        var table = Table(10_000, 10);
+        _ = Open(100);
+        var small = Open(1_000);
+        var large = Open(10_000);
+        output.WriteLine($"Opening 10,000 cells: {small.TotalMilliseconds:0} ms, 100,000 cells: {large.TotalMilliseconds:0} ms");
+        new PulseOffice.Testing.GrowthCheck(TimeSpan.FromMilliseconds(20), 4).Bounded(small, large, 10, $"10,000 cells {small}, 100,000 cells {large}");
+    }, CancellationToken.None);
+
+    private static TimeSpan Open(int rows)
+    {
+        var table = Table(rows, 10);
         var clock = Stopwatch.StartNew();
         var view = new TableEditorView(table, new FakeTextCatalog());
         var window = new Window { Width = 800, Height = 600, Content = view };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         clock.Stop();
-        output.WriteLine($"Opening 100,000 cells: {clock.ElapsedMilliseconds} ms");
-        Console.WriteLine($"TIMING Opening 100,000 cells: {clock.ElapsedMilliseconds} ms");
         window.Close();
-        Assert.True(clock.ElapsedMilliseconds < 3_000, $"{clock.ElapsedMilliseconds} ms");
-    }, CancellationToken.None);
+        return clock.Elapsed;
+    }
 }

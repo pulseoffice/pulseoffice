@@ -14,14 +14,14 @@ public class Round159PrintStructureTests(EngineFixture fixture) : IClassFixture<
     {
         var (workbook, engine) = fixture.CreateWorkbook();
         var sheet = workbook.Sheets[0];
-        sheet.RepeatedPrintRows = 2;
-        sheet.RepeatedPrintColumns = 1;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
+        sheet.PrintTitleColumns = new PulseOffice.Sheets.PrintTitleBand(0, 1);
 
         new SheetStructure().InsertRows(engine, 0, 1, 3);
         new SheetStructure().InsertColumns(engine, 0, 4, 2);
 
-        Assert.Equal(5, sheet.RepeatedPrintRows);
-        Assert.Equal(1, sheet.RepeatedPrintColumns);
+        Assert.Equal(5, sheet.PrintTitleRows.Count);
+        Assert.Equal(1, sheet.PrintTitleColumns.Count);
     }
 
     [Fact]
@@ -29,11 +29,11 @@ public class Round159PrintStructureTests(EngineFixture fixture) : IClassFixture<
     {
         var (workbook, engine) = fixture.CreateWorkbook();
         var sheet = workbook.Sheets[0];
-        sheet.RepeatedPrintColumns = 3;
+        sheet.PrintTitleColumns = new PulseOffice.Sheets.PrintTitleBand(0, 3);
 
         new SheetStructure().DeleteColumns(engine, 0, 2, 4);
 
-        Assert.Equal(2, sheet.RepeatedPrintColumns);
+        Assert.Equal(2, sheet.PrintTitleColumns.Count);
     }
 
     [Fact]

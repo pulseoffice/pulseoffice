@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Shared/TestProcessWatchdog.cs" Link="Shared/TestProcessWatchdog.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/GrowthCheck.cs" Link="Shared/GrowthCheck.cs" />
     <AssemblyAttribute Include="Xunit.AssemblyFixtureAttribute">
       <_Parameter1>typeof(PulseOffice.Testing.TestProcessWatchdog)</_Parameter1>
       <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>

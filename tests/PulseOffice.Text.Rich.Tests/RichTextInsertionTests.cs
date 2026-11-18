@@ -46,16 +46,16 @@ public sealed class RichTextInsertionTests
     [Fact]
     public void Molte_parti_con_lo_stesso_formato_si_fondono_in_tempo_lineare()
     {
-        var runs = Enumerable.Range(0, 200_000).Select(index => new TextRun(index % 2 == 0 ? "ab" : "c")).ToList();
-        var fragment = new TextParagraph(string.Concat(runs.Select(run => run.Text))).WithRuns(runs);
+        IReadOnlyList<TextRun> merged = [];
+        new PulseOffice.Testing.GrowthCheck().Linear(count =>
+        {
+            var runs = Enumerable.Range(0, count).Select(index => new TextRun(index % 2 == 0 ? "ab" : "c")).ToList();
+            var fragment = new TextParagraph(string.Concat(runs.Select(run => run.Text))).WithRuns(runs);
+            return () => merged = _insertion.Insert(Text("x"), null, [fragment]).Paragraphs[0].Runs;
+        }, 200_000);
 
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        var result = _insertion.Insert(Text("x"), null, [fragment]);
-        watch.Stop();
-
-        Assert.Single(result.Paragraphs[0].Runs);
-        Assert.Equal(1 + 300_000, result.Paragraphs[0].Runs[0].Text.Length);
-        Assert.True(watch.ElapsedMilliseconds < 1000, $"merging took {watch.ElapsedMilliseconds} ms");
+        Assert.Single(merged);
+        Assert.Equal(1 + 300_000, merged[0].Text.Length);
     }
 
     [Fact]

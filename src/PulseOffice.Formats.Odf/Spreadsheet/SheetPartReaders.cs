@@ -174,6 +174,27 @@ internal sealed class SparklinePartReader(OdfSparklineMapper sparklines) : IOdsS
 
 internal sealed class PrintRangePartReader(TableRows rows) : IOdsSheetPartReader
 {
+    private PrintTitleBand HeaderBand(IEnumerable<(XElement Element, int Repeat)> lines, XName header, int limit)
+    {
+        long index = 0;
+        long start = -1;
+        long count = 0;
+
+        foreach (var (element, repeat) in lines)
+        {
+            if (element.Parent?.Name == header)
+            {
+                if (start < 0) start = index;
+                if (start + count == index) count += repeat;
+            }
+            index += repeat;
+            if (index >= limit && start < 0) break;
+        }
+
+        if (start < 0 || start >= limit) return default;
+        return new PrintTitleBand((int)start, (int)Math.Min(count, limit - start));
+    }
+
     private string Cell(string text)
     {
         var dot = text.LastIndexOf('.');
@@ -203,10 +224,11 @@ internal sealed class PrintRangePartReader(TableRows rows) : IOdsSheetPartReader
 
     public void Read(XElement table, Worksheet sheet, OdsReadContext context)
     {
-        if (table.Element(Namespaces.Table + "table-header-rows") is { } header)
-            sheet.RepeatedPrintRows = (int)Math.Min(rows.In(new XElement(Namespaces.Table + "table", header.Elements())).Sum(row => (long)row.Repeat), CellAddress.MaxRows);
-        if (table.Element(Namespaces.Table + "table-header-columns") is { } headerColumns)
-            sheet.RepeatedPrintColumns = (int)Math.Min(rows.Columns(headerColumns).Sum(column => (long)rows.Repeat(column, Namespaces.Table + "number-columns-repeated")), CellAddress.MaxColumns);
+        sheet.PrintTitleRows = HeaderBand(
+            rows.In(table).Select(row => (row.Element, row.Repeat)), Namespaces.Table + "table-header-rows", CellAddress.MaxRows);
+        sheet.PrintTitleColumns = HeaderBand(
+            rows.Columns(table).Select(column => (column, rows.Repeat(column, Namespaces.Table + "number-columns-repeated"))),
+            Namespaces.Table + "table-header-columns", CellAddress.MaxColumns);
 
         var declared = table.Attribute(Namespaces.Table + "print-ranges")?.Value;
         if (string.IsNullOrWhiteSpace(declared)) return;

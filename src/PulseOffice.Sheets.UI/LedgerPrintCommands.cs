@@ -52,7 +52,7 @@ public sealed class LedgerPrintCommands(
         var input = new PageLayout.SheetPageSetupInput(
             current, papers.All,
             string.Join(' ', sheet.PrintRanges.Select(range => range.ToString())),
-            sheet.RepeatedPrintRows, sheet.RepeatedPrintColumns,
+            sheet.PrintTitleRows.Count, sheet.PrintTitleColumns.Count,
             sheet.Name, workspace.Active?.Title ?? sheet.Name,
             sources.For(Dialogs.ReferenceShape.RangeList));
         var view = new PageLayout.SheetPageSetupView(input, pageServices, texts);
@@ -83,21 +83,23 @@ public sealed class LedgerPrintCommands(
             return;
         }
         var areasBefore = sheet.PrintRanges.ToList();
-        var rowsBefore = sheet.RepeatedPrintRows;
-        var columnsBefore = sheet.RepeatedPrintColumns;
-        var sheetChanged = !areasBefore.SequenceEqual(areas) || rowsBefore != result.RepeatRows || columnsBefore != result.RepeatColumns;
+        var rowsBefore = sheet.PrintTitleRows;
+        var columnsBefore = sheet.PrintTitleColumns;
+        var rowsAfter = rowsBefore.WithCount(result.RepeatRows);
+        var columnsAfter = columnsBefore.WithCount(result.RepeatColumns);
+        var sheetChanged = !areasBefore.SequenceEqual(areas) || rowsBefore != rowsAfter || columnsBefore != columnsAfter;
         if (setup == current && !sheetChanged) return;
 
         var previousName = sheet.PageStyleName;
         var name = workbook.PageStyles.OwnNameFor(sheet, workbook.Sheets);
         var previousStyle = workbook.PageStyles.Find(name);
 
-        void Areas(IEnumerable<CellRange> ranges, int rows, int columns)
+        void Areas(IEnumerable<CellRange> ranges, PrintTitleBand rows, PrintTitleBand columns)
         {
             sheet.PrintRanges.Clear();
             sheet.PrintRanges.AddRange(ranges);
-            sheet.RepeatedPrintRows = rows;
-            sheet.RepeatedPrintColumns = columns;
+            sheet.PrintTitleRows = rows;
+            sheet.PrintTitleColumns = columns;
         }
 
         void Redo()
@@ -107,7 +109,7 @@ public sealed class LedgerPrintCommands(
                 workbook.PageStyles.Define(name, setup);
                 sheet.PageStyleName = name;
             }
-            Areas(areas, result.RepeatRows, result.RepeatColumns);
+            Areas(areas, rowsAfter, columnsAfter);
         }
 
         void Undo()

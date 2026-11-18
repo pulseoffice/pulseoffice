@@ -10,16 +10,16 @@ public sealed class StyleCollectionRound98Tests
     public void Many_styles_chained_deeply_resolve_in_near_linear_time()
     {
         const int count = 20_000;
-        var sheet = new StyleSheet();
-        for (var index = 0; index < count; index++)
-            sheet.Paragraph.Add(new ParagraphStyle("S" + index) { ParentName = index == 0 ? null : "S" + (index - 1) });
+        var chainLength = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            var sheet = new StyleSheet();
+            for (var index = 0; index < size; index++)
+                sheet.Paragraph.Add(new ParagraphStyle("S" + index) { ParentName = index == 0 ? null : "S" + (index - 1) });
+            return () => chainLength = new StyleChain().RootFirst(sheet.Paragraph, "S" + (size - 1)).Count;
+        }, count);
 
-        var clock = Stopwatch.StartNew();
-        var chain = new StyleChain().RootFirst(sheet.Paragraph, "S" + (count - 1));
-        clock.Stop();
-
-        Assert.Equal(count, chain.Count);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"resolved in {clock.Elapsed}");
+        Assert.Equal(count, chainLength);
     }
 
     [Fact]

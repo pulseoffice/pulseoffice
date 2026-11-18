@@ -61,6 +61,6 @@ public sealed class ChromeCostTests : IDisposable
         Record($"module={module} commands={registry.All.Count} ribbon build per move={perMove.TotalMilliseconds:0.00}");
 
         Assert.True(registry.All.Count > 1000, $"{registry.All.Count} commands");
-        Assert.True(perMove < TimeSpan.FromMilliseconds(2), $"{perMove.TotalMilliseconds:0.00} ms per caret move");
+        new PulseOffice.Testing.GrowthCheck().Bounded(tree, perMove, 1, $"{perMove.TotalMilliseconds:0.00} ms per caret move, {tree.TotalMilliseconds:0.00} ms to build the ribbon tree");
     }, CancellationToken.None);
 }

@@ -70,39 +70,33 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     private double EffectiveScale()
     {
-        var requested = double.IsFinite(Setup.Scale) && Setup.Scale > 0 ? Math.Clamp(Setup.Scale, 0.1, 4) : 1;
+        var requested = double.IsFinite(Setup.Scale) && Setup.Scale > 0 ? Math.Clamp(Setup.Scale, MinimumScale, 4) : 1;
         if (!Setup.FitsToPages || Area is not { } area) return requested;
+        if (Fits(area, 1)) return 1;
+        if (!Fits(area, MinimumScale)) return MinimumScale;
 
-        var content = Setup.ContentArea;
-        var headingWidth = Setup.PrintHeadings ? HeadingWidth.Value : 0;
-        var headingHeight = Setup.PrintHeadings ? HeadingHeight.Value : 0;
-        var fit = 1.0;
-
-        if (Setup.FitToWidthPages is > 0 and var across)
+        var low = MinimumScale;
+        var high = 1.0;
+        for (var step = 0; step < FitSearchSteps; step++)
         {
-            var total = VisibleSize(area.Start.Column, area.End.Column, _sheet.Layout.IsColumnHidden, _sheet.Layout.ColumnWidth);
-            if (total > 0) fit = Math.Min(fit, (double)across * (content.Width.Value - headingWidth) / total);
+            var middle = (low + high) / 2;
+            if (Fits(area, middle)) low = middle;
+            else high = middle;
         }
 
-        if (Setup.FitToHeightPages is > 0 and var down)
-        {
-            var total = VisibleSize(area.Start.Row, area.End.Row, _sheet.Layout.IsRowHidden, _sheet.Layout.RowHeight);
-            if (total > 0) fit = Math.Min(fit, (double)down * (content.Height.Value - headingHeight) / total);
-        }
-
-        return Math.Clamp(fit * 0.999, 0.1, 1);
+        return low;
     }
 
-    private static long VisibleSize(int first, int last, Func<int, bool> hidden, Func<int, Twip> size)
+    private bool Fits(CellRange area, double scale)
     {
-        long total = 0;
-
-        for (var index = first; index <= last; index++)
-            if (!hidden(index))
-                total += size(index).Value;
-
-        return total;
+        var (columns, rows) = Slices(area, scale);
+        return (Setup.FitToWidthPages is not > 0 || columns.Count <= Setup.FitToWidthPages)
+            && (Setup.FitToHeightPages is not > 0 || rows.Count <= Setup.FitToHeightPages);
     }
+
+    private const double MinimumScale = 0.1;
+
+    private const int FitSearchSteps = 12;
 
     public PageSetup Setup => _options.Setup;
 
@@ -151,17 +145,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
     {
         if (Area is not { } area) return;
 
-        var paginator = new BandPaginator();
-        var content = ContentArea();
-
-        var columns = paginator.Split(
-            new ColumnBand(_sheet.Layout, area.Start.Column, area.End.Column, _options.ColumnBreaks),
-            content.Width, RepeatedColumns(area));
-
-        var rows = paginator.Split(
-            new RowBand(_sheet.Layout, area.Start.Row, area.End.Row, _options.RowBreaks),
-            content.Height, RepeatedRows(area));
-
+        var (columns, rows) = Slices(area, _scale);
         if (columns.Count == 0 || rows.Count == 0) return;
 
         var number = 1;
@@ -176,12 +160,30 @@ public sealed class SheetPrintDocument : IPrintableDocument
                     _pages.Add(new SheetPage(column, row, number++));
     }
 
-    private DocumentRect ContentArea()
+    private (IReadOnlyList<BandSlice> Columns, IReadOnlyList<BandSlice> Rows) Slices(CellRange area, double scale)
+    {
+        var paginator = new BandPaginator();
+        var content = ContentArea(scale);
+
+        var columns = paginator.Split(
+            new ColumnBand(_sheet.Layout, area.Start.Column, area.End.Column, _options.ColumnBreaks),
+            content.Width, RepeatedColumns(area));
+
+        var rows = paginator.Split(
+            new RowBand(_sheet.Layout, area.Start.Row, area.End.Row, _options.RowBreaks),
+            content.Height, RepeatedRows(area));
+
+        return (columns, rows);
+    }
+
+    private DocumentRect ContentArea() => ContentArea(_scale);
+
+    private DocumentRect ContentArea(double scale)
     {
         var physical = Setup.ContentArea;
         var area = new DocumentRect(
             physical.Left, physical.Top,
-            new Twip((int)(physical.Width.Value / _scale)), new Twip((int)(physical.Height.Value / _scale)));
+            new Twip((int)(physical.Width.Value / scale)), new Twip((int)(physical.Height.Value / scale)));
         if (!Setup.PrintHeadings) return area;
 
         return new DocumentRect(

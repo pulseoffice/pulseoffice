@@ -63,11 +63,11 @@ public class OdsMetadataRoundTripTests
 
         sheet.SetValue(CellAddress.First, CellValue.Text("Titolo"));
         sheet.SetValue(new CellAddress(5, 0), CellValue.Number(42));
-        sheet.RepeatedPrintRows = 2;
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 2);
 
         var reread = RoundTrip(workbook).Sheets[0];
 
-        Assert.Equal(2, reread.RepeatedPrintRows);
+        Assert.Equal(2, reread.PrintTitleRows.Count);
         Assert.Equal("Titolo", reread.GetValue(CellAddress.First).AsText());
         Assert.Equal(42, reread.GetValue(new CellAddress(5, 0)).AsNumber());
     }

@@ -55,8 +55,8 @@ public sealed class OdsSheetFeatureRoundTripTests
         sheet.SetValue(At("A1"), CellValue.Number(1));
         sheet.RowBreaks.Add(10);
         sheet.ColumnBreaks.Add(4);
-        sheet.RepeatedPrintColumns = 2;
-        sheet.RepeatedPrintRows = 1;
+        sheet.PrintTitleColumns = new PulseOffice.Sheets.PrintTitleBand(0, 2);
+        sheet.PrintTitleRows = new PulseOffice.Sheets.PrintTitleBand(0, 1);
 
         var read = RoundTrip(source);
         var back = read.Sheets[0];
@@ -72,8 +72,8 @@ public sealed class OdsSheetFeatureRoundTripTests
         Assert.True(setup.CenterHorizontally);
         Assert.Contains(10, back.RowBreaks);
         Assert.Contains(4, back.ColumnBreaks);
-        Assert.Equal(2, back.RepeatedPrintColumns);
-        Assert.Equal(1, back.RepeatedPrintRows);
+        Assert.Equal(2, back.PrintTitleColumns.Count);
+        Assert.Equal(1, back.PrintTitleRows.Count);
     }
 
     [Fact]

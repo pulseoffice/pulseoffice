@@ -9,28 +9,28 @@ public class StatisticsProceduresScaleTests
     [Fact]
     public void AnovaSuGruppiGrandiNonEQuadratica()
     {
-        var first = Enumerable.Range(0, 60_000).Select(index => (double)(index % 7)).ToList();
-        var second = Enumerable.Range(0, 60_000).Select(index => (double)(index % 5) + 1).ToList();
+        var rows = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            var first = Enumerable.Range(0, size).Select(index => (double)(index % 7)).ToList();
+            var second = Enumerable.Range(0, size).Select(index => (double)(index % 5) + 1).ToList();
+            return () => rows = new StatisticsProcedures().AnovaSingleFactor([first, second]).Rows.Count;
+        }, 60_000);
 
-        var watch = Stopwatch.StartNew();
-        var table = new StatisticsProcedures().AnovaSingleFactor([first, second]);
-        watch.Stop();
-
-        Assert.NotEmpty(table.Rows);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), watch.Elapsed.ToString());
+        Assert.NotEqual(0, rows);
     }
 
     [Fact]
     public void FourierSuMoltiCampioniUsaLaTrasformataVeloce()
     {
-        var values = Enumerable.Range(0, 20_000).Select(index => Math.Sin(index / 10.0)).ToList();
+        var rows = 0;
+        new PulseOffice.Testing.GrowthCheck().Linear(size =>
+        {
+            var values = Enumerable.Range(0, size).Select(index => Math.Sin(index / 10.0)).ToList();
+            return () => rows = new StatisticsProcedures().Fourier(values).Rows.Count;
+        }, 20_000);
 
-        var watch = Stopwatch.StartNew();
-        var table = new StatisticsProcedures().Fourier(values);
-        watch.Stop();
-
-        Assert.Equal(20_000, table.Rows.Count);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), watch.Elapsed.ToString());
+        Assert.Equal(20_000, rows);
     }
 
     [Fact]

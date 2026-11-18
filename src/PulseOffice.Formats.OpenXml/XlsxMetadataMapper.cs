@@ -128,10 +128,10 @@ public sealed class XlsxMetadataMapper
                 };
 
             var titles = new List<string>();
-            if (sheet.RepeatedPrintColumns > 0)
-                titles.Add($"{Quoted(sheet.Name)}!$A:${CellAddress.ColumnName(sheet.RepeatedPrintColumns - 1)}");
-            if (sheet.RepeatedPrintRows > 0)
-                titles.Add(string.Create(CultureInfo.InvariantCulture, $"{Quoted(sheet.Name)}!$1:${sheet.RepeatedPrintRows}"));
+            if (sheet.PrintTitleColumns is { IsEmpty: false } columns)
+                titles.Add($"{Quoted(sheet.Name)}!${CellAddress.ColumnName(columns.Start)}:${CellAddress.ColumnName(columns.End)}");
+            if (sheet.PrintTitleRows is { IsEmpty: false } rows)
+                titles.Add(string.Create(CultureInfo.InvariantCulture, $"{Quoted(sheet.Name)}!${rows.Start + 1}:${rows.End + 1}"));
             if (titles.Count > 0)
                 yield return new DocumentFormat.OpenXml.Spreadsheet.DefinedName
                 {
@@ -204,12 +204,25 @@ public sealed class XlsxMetadataMapper
             {
                 var bounds = Strip(piece).Split(':');
                 if (bounds.Length != 2) continue;
-                if (int.TryParse(bounds[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var last))
-                    sheet.RepeatedPrintRows = last;
-                else if (CellAddress.TryParseA1(bounds[1] + "1", out var column))
-                    sheet.RepeatedPrintColumns = column.Column + 1;
+                if (int.TryParse(bounds[0], NumberStyles.None, CultureInfo.InvariantCulture, out var top)
+                    && int.TryParse(bounds[1], NumberStyles.None, CultureInfo.InvariantCulture, out var bottom))
+                {
+                    if (TitleBand(top - 1, bottom - 1, CellAddress.MaxRows) is { } rows) sheet.PrintTitleRows = rows;
+                }
+                else if (CellAddress.TryParseA1(bounds[0] + "1", out var left) && CellAddress.TryParseA1(bounds[1] + "1", out var right))
+                {
+                    if (TitleBand(left.Column, right.Column, CellAddress.MaxColumns) is { } columns) sheet.PrintTitleColumns = columns;
+                }
             }
         }
+    }
+
+    private PrintTitleBand? TitleBand(int first, int last, int limit)
+    {
+        var start = Math.Min(first, last);
+        var end = Math.Max(first, last);
+        if (start < 0 || end >= limit) return null;
+        return new PrintTitleBand(start, end - start + 1);
     }
 
     private CellRange? PrintArea(string reference)

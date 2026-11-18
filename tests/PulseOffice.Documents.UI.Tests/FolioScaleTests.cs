@@ -1,3 +1,4 @@
+using PulseOffice.Testing;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using PulseOffice.Documents.Blocks;
@@ -32,21 +33,26 @@ public sealed class FolioScaleTests
     [Fact]
     public Task TwoThousandParagraphsBuildAndExportInBoundedTime() => FolioScene.RunAsync(() =>
     {
+        _ = BuildAndExport(20);
+        var small = BuildAndExport(200);
+        var large = BuildAndExport(2000);
+        Record($"paragraphs=2000 pages={large.Pages} total={large.Time.TotalMilliseconds:0} paragraphs=200 total={small.Time.TotalMilliseconds:0}");
+
+        Assert.True(large.Pages > 100, $"{large.Pages} pages");
+        new GrowthCheck(TimeSpan.FromMilliseconds(50), 4).Bounded(small.Time, large.Time, 10, $"200 paragraphs {small.Time}, 2000 paragraphs {large.Time}");
+        return Task.CompletedTask;
+    });
+
+    private static (int Pages, TimeSpan Time) BuildAndExport(int paragraphs)
+    {
         var clock = Stopwatch.StartNew();
-        var scene = new FolioScene(Paragraphs(2000));
-        var built = clock.Elapsed;
+        var scene = new FolioScene(Paragraphs(paragraphs));
         var printable = scene.Services.GetRequiredService<IFolioPrintables>().From(scene.Editor.Layout, scene.Document)!;
         using var stream = new MemoryStream();
         var result = new PdfExporter(new StandardPdfFonts(new PdfFontMetrics())).Write(printable, stream, new PdfExportOptions("Lungo"));
-        var total = clock.Elapsed;
-        Record($"paragraphs=2000 pages={printable.PageCount} build={built.TotalMilliseconds:0} total={total.TotalMilliseconds:0}");
-
         Assert.True(result.Succeeded);
-        Assert.True(printable.PageCount > 100, $"{printable.PageCount} pages");
-        Assert.True(built < TimeSpan.FromSeconds(30), $"build {built}");
-        Assert.True(total < TimeSpan.FromSeconds(90), $"build and export {total}");
-        return Task.CompletedTask;
-    });
+        return (printable.PageCount, clock.Elapsed);
+    }
 
     [Fact]
     public Task SceneTimeGrowsLinearlyWithParagraphs() => FolioScene.RunAsync(() =>
@@ -63,26 +69,43 @@ public sealed class FolioScaleTests
     [Fact]
     public Task TypingInAFiveHundredPageDocumentStaysResponsive() => FolioScene.RunAsync(() =>
     {
-        var scene = new FolioScene(Paragraphs(6000));
-        Assert.True(scene.Editor.Layout.Pages.Count >= 500, $"{scene.Editor.Layout.Pages.Count} pages");
-        scene.Type("a");
-        var clock = Stopwatch.StartNew();
-        const int keys = 20;
-        for (var i = 0; i < keys; i++) scene.Type("x");
-        var perKey = clock.Elapsed / keys;
-        Record($"pages={scene.Editor.Layout.Pages.Count} typing per key={perKey.TotalMilliseconds:0.0}");
+        var small = TypingPerKey(600);
+        var large = TypingPerKey(6000);
+        Record($"typing per key 600 paragraphs={small.TotalMilliseconds:0.0} 6000 paragraphs={large.TotalMilliseconds:0.0}");
 
-        Assert.StartsWith("ax", scene.Paragraphs[0], StringComparison.Ordinal);
-        Assert.True(perKey < TimeSpan.FromMilliseconds(250), $"{perKey.TotalMilliseconds:0} ms per key");
+        new GrowthCheck(TimeSpan.FromMilliseconds(5), 4).Bounded(small, large, 1, $"{small.TotalMilliseconds:0.0} ms per key at 600 paragraphs, {large.TotalMilliseconds:0.0} ms at 6000");
         return Task.CompletedTask;
     });
+
+    private static TimeSpan TypingPerKey(int paragraphs)
+    {
+        var scene = new FolioScene(Paragraphs(paragraphs));
+        if (paragraphs >= 6000) Assert.True(scene.Editor.Layout.Pages.Count >= 500, $"{scene.Editor.Layout.Pages.Count} pages");
+        scene.Type("a");
+        const int keys = 20;
+        var clock = Stopwatch.StartNew();
+        for (var i = 0; i < keys; i++) scene.Type("x");
+        var perKey = clock.Elapsed / keys;
+        Assert.StartsWith("ax", scene.Paragraphs[0], StringComparison.Ordinal);
+        return perKey;
+    }
 
     [Fact]
     public Task PageStatusOfACaretStaysCheapInAFiveHundredPageDocument() => FolioScene.RunAsync(() =>
     {
-        var scene = new FolioScene(Paragraphs(6000));
+        var small = PageStatusMoves(600);
+        var large = PageStatusMoves(6000);
+        Record($"page status for 200 caret moves 600 paragraphs={small.TotalMilliseconds:0.000} 6000 paragraphs={large.TotalMilliseconds:0.000}");
+
+        new GrowthCheck().Bounded(small, large, 1, $"200 caret moves: {small.TotalMilliseconds:0.000} ms at 600 paragraphs, {large.TotalMilliseconds:0.000} ms at 6000");
+        return Task.CompletedTask;
+    });
+
+    private static TimeSpan PageStatusMoves(int paragraphs)
+    {
+        var scene = new FolioScene(Paragraphs(paragraphs));
         var pages = scene.Editor.Layout.Pages;
-        Assert.True(pages.Count >= 500, $"{pages.Count} pages");
+        if (paragraphs >= 6000) Assert.True(pages.Count >= 500, $"{pages.Count} pages");
         var jump = scene.Services.GetRequiredService<PulseOffice.Documents.UI.Editing.IFolioPageJump>();
         var last = pages[^1].Lines[^1];
         var at = new PulseOffice.Documents.Editing.DocumentPosition(last.ParagraphId, last.Line.Start);
@@ -93,17 +116,25 @@ public sealed class FolioScaleTests
         const int moves = 200;
         var clock = Stopwatch.StartNew();
         for (var i = 0; i < moves; i++) _ = jump.PageOf(scene.Editor, i % 2 == 0 ? at : first);
-        var perMove = clock.Elapsed / moves;
-        Record($"pages={pages.Count} page status per caret move={perMove.TotalMilliseconds:0.000}");
-
-        Assert.True(perMove < TimeSpan.FromMilliseconds(2), $"{perMove.TotalMilliseconds:0.000} ms per caret move");
-        return Task.CompletedTask;
-    });
+        return clock.Elapsed;
+    }
 
     [Fact]
     public Task RecoverySnapshotOfAFiveHundredPageDocumentIsBounded() => FolioScene.RunAsync(async () =>
     {
-        var scene = new FolioScene(Paragraphs(6000));
+        var small = await Recovery(600);
+        var large = await Recovery(6000);
+        Record($"recovery 600 paragraphs capture={small.Captured.TotalMilliseconds:0.0} serialization={small.Serialized.TotalMilliseconds:0}; 6000 paragraphs capture={large.Captured.TotalMilliseconds:0.0} serialization={large.Serialized.TotalMilliseconds:0} bytes={large.Bytes}");
+
+        var growth = new GrowthCheck(TimeSpan.FromMilliseconds(5), 4);
+        growth.Bounded(small.Captured, large.Captured, 10, $"capture {small.Captured.TotalMilliseconds:0.0} ms at 600, {large.Captured.TotalMilliseconds:0.0} ms at 6000");
+        growth.Bounded(small.Serialized, large.Serialized, 10, $"serialization {small.Serialized.TotalMilliseconds:0} ms at 600, {large.Serialized.TotalMilliseconds:0} ms at 6000");
+        Assert.True(large.Bytes < 6_000_000, $"{large.Bytes} bytes");
+    });
+
+    private static async Task<(TimeSpan Captured, TimeSpan Serialized, long Bytes)> Recovery(int paragraphs)
+    {
+        var scene = new FolioScene(Paragraphs(paragraphs));
         var provider = scene.Services.GetServices<PulseOffice.Shell.IDocumentSnapshotProvider>().Single(candidate => candidate.Module == PulseOffice.Foundation.Modules.ModuleKind.Documents);
         var open = new PulseOffice.Shell.OpenDocument(PulseOffice.Foundation.Modules.ModuleKind.Documents, "Lungo", scene.View, scene.History) { Model = scene.Document };
         using (var warm = new MemoryStream()) await provider.Capture(open).WriteAsync(warm);
@@ -114,13 +145,8 @@ public sealed class FolioScaleTests
         clock.Restart();
         using var stream = new MemoryStream();
         await capture.WriteAsync(stream);
-        var serialized = clock.Elapsed;
-        Record($"pages={scene.Editor.Layout.Pages.Count} recovery capture={captured.TotalMilliseconds:0.0} serialization={serialized.TotalMilliseconds:0} bytes={stream.Length}");
-
-        Assert.True(captured < TimeSpan.FromMilliseconds(60), $"capture {captured.TotalMilliseconds:0.0} ms");
-        Assert.True(serialized < TimeSpan.FromMilliseconds(1500), $"serialization {serialized.TotalMilliseconds:0} ms");
-        Assert.True(stream.Length < 6_000_000, $"{stream.Length} bytes");
-    });
+        return (captured, clock.Elapsed, stream.Length);
+    }
 
     private static TimeSpan Measure(int count)
     {

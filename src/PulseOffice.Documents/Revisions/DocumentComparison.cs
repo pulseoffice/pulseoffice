@@ -1,6 +1,7 @@
 using PulseOffice.Document.Comparison;
 using PulseOffice.Document.Commands;
 using PulseOffice.Documents.Blocks;
+using PulseOffice.Documents.Clipboard;
 using PulseOffice.Documents.Editing;
 
 namespace PulseOffice.Documents.Revisions;
@@ -70,7 +71,7 @@ public sealed class DocumentComparison(
             if (removed.Count > 0) RemoveParagraphs(current, history, mine, removed, signature);
             var added = gap.Inserted.Skip(gap.Pairs).Select(index => theirs[index]).ToList();
             if (added.Count > 0) AddParagraphs(current, history, mine, gap.OldStart + gap.Pairs - 1, gap.OldStart + gap.Pairs, added, signature);
-            for (var t = gap.Pairs - 1; t >= 0; t--) MergeWords(current, history, mine[gap.Deleted[t]], theirs[gap.Inserted[t]].Text, signature);
+            for (var t = gap.Pairs - 1; t >= 0; t--) MergeWords(current, other, history, mine[gap.Deleted[t]], theirs[gap.Inserted[t]], signature);
         }
         return current.Changes.All.Count - before;
     }
@@ -174,12 +175,15 @@ public sealed class DocumentComparison(
             new BlockContainer([new ParagraphBlock(current.NextId("p"), string.Empty), .. copies]), signature);
     }
 
-    private void MergeWords(TextDocument current, UndoStack history, ParagraphBlock mine, string theirs, RevisionSignature signature)
+    private void MergeWords(TextDocument current, TextDocument other, UndoStack history, ParagraphBlock mine, ParagraphBlock theirs, RevisionSignature signature)
     {
-        foreach (var edit in Words(mine.Text, theirs).Reverse())
+        foreach (var edit in Words(mine.Text, theirs.Text).Reverse())
         {
-            var inserted = theirs[edit.NewStart..edit.NewEnd];
-            if (inserted.Length > 0) tracked.InsertText(current, history, new DocumentPosition(mine.Id, edit.OldEnd), inserted, signature);
+            if (edit.NewEnd > edit.NewStart)
+            {
+                var words = new ParagraphBlock(current.NextId("p"), theirs.Content.WithRuns(text.Slice(theirs.State, edit.NewStart, edit.NewEnd)));
+                tracked.Paste(current, history, new DocumentPosition(mine.Id, edit.OldEnd), new DocumentFragment(new BlockContainer([words]), other.Styles, [], [], []), signature);
+            }
             if (edit.OldEnd > edit.OldStart)
                 tracked.Delete(current, history, DocumentRange.In(mine.Id, edit.OldStart, edit.OldEnd), signature);
         }

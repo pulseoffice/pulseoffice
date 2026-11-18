@@ -48,6 +48,7 @@ public sealed class DocxReader : ITextDocumentReader
         ["DOCX113"] = Diagnostic.Info("DOCX113", "Comments and notes that are not anchored anywhere in the text, which Word does not show, are not imported."),
         ["DOCX117"] = Diagnostic.Info("DOCX117", "Tracked changes inside field instructions are not imported: each field keeps its current instruction."),
         ["DOCX120"] = Diagnostic.Warning("DOCX120", "Tracked changes in the text of grouped shapes are imported as accepted."),
+        ["DOCX224"] = Diagnostic.Info("DOCX224", "Moved text is imported as a tracked deletion where it was and a tracked insertion where it went: accepting or rejecting one side no longer settles the other, and the move is written back as a deletion and an insertion."),
         ["DOCX121"] = Diagnostic.Warning("DOCX121", "Tracked insertions, deletions and merges of single table cells are imported as accepted: the table keeps its current cells."),
         ["DOCX160"] = Diagnostic.Info("DOCX160", "Fields nested inside the instruction of a Word field are imported as the value they last showed, except merge fields, document variables and references compared by an IF field, which become names in its condition."),
         ["DOCX161"] = Diagnostic.Info("DOCX161", "Fields nested inside the result of a Word form field or hyperlink field are imported as part of that result: the inner field is not kept on its own."),
@@ -155,9 +156,10 @@ public sealed class DocxReader : ITextDocumentReader
             Settings(main.DocumentSettingsPart?.Settings, document);
             document.Notes.ContinuousEndnotes = true;
             if (_unanchored.Remove(document).Any) context.Losses.Add("DOCX113");
-            if (body.Descendants<W.DeletedFieldCode>().Any(code => !WholeDeletedField(code)) || body.Descendants<W.InsertedRun>().Any(run => run.Descendants<W.FieldCode>().Any())) context.Losses.Add("DOCX117");
+            if (body.Descendants<W.DeletedFieldCode>().Any(code => !WholeDeletedField(code)) || body.Descendants<W.InsertedRun>().Concat<OpenXmlElement>(body.Descendants<W.MoveToRun>()).Any(run => run.Descendants<W.FieldCode>().Any())) context.Losses.Add("DOCX117");
             if (body.Descendants<DocumentFormat.OpenXml.Office2010.Word.DrawingGroup.WordprocessingGroup>().Concat<OpenXmlElement>(body.Descendants<DocumentFormat.OpenXml.Vml.Group>())
-                .Any(group => group.Descendants<W.InsertedRun>().Any() || group.Descendants<W.DeletedRun>().Any())) context.Losses.Add("DOCX120");
+                .Any(group => group.Descendants<W.InsertedRun>().Any() || group.Descendants<W.DeletedRun>().Any() || group.Descendants<W.MoveToRun>().Any() || group.Descendants<W.MoveFromRun>().Any())) context.Losses.Add("DOCX120");
+            if (body.Descendants<W.MoveFromRun>().Any() || body.Descendants<W.MoveToRun>().Any() || body.Descendants<W.MoveFrom>().Any() || body.Descendants<W.MoveTo>().Any()) context.Losses.Add("DOCX224");
             if (body.Descendants<W.CellInsertion>().Any() || body.Descendants<W.CellDeletion>().Any() || body.Descendants<W.CellMerge>().Any()) context.Losses.Add("DOCX121");
             if (body.Descendants<W.Paragraph>().Any(paragraph => _paragraphMarks.Deletion(paragraph) is not null && paragraph.ParagraphProperties?.SectionProperties is not null)) context.Losses.Add("DOCX150");
             document.Fonts = _fonts.Read(main, main.DocumentSettingsPart?.Settings?.GetFirstChild<W.EmbedTrueTypeFonts>() is { } embed && (embed.Val?.Value ?? true), context.Losses);

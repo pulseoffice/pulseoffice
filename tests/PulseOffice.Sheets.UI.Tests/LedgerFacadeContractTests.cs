@@ -807,10 +807,10 @@ public sealed class LedgerFacadeContractTests
         ["page.RepeatRows"] = f =>
         {
             f.Page.RepeatRows(2);
-            Assert.Equal(2, f.First.RepeatedPrintRows);
+            Assert.Equal(2, f.First.PrintTitleRows.Count);
             Assert.Throws<ArgumentOutOfRangeException>(() => f.Page.RepeatRows(-1));
             Assert.Throws<ArgumentOutOfRangeException>(() => f.Page.RepeatRows(101));
-            Assert.Equal(2, f.First.RepeatedPrintRows);
+            Assert.Equal(2, f.First.PrintTitleRows.Count);
         },
         ["page.PageCount"] = f => Assert.Equal(1, f.Page.PageCount),
         ["page.Printers"] = f => Assert.Empty(f.Page.Printers),

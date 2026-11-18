@@ -92,6 +92,8 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
         private readonly OdfTableStyleMapper _tableStyles = new();
         private readonly OutlineNesting _nesting = new();
         private readonly OdsRowGrouping _rowGroups = new();
+
+        private readonly OdsHeaderColumns _headerColumns = new();
         private readonly OdsAnnotationBuilder _annotations = new(paragraphs);
         private readonly OdsNamedExpressionWriter _names = new();
         private OdsCellWriter? _cellWriter;
@@ -271,19 +273,14 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 columns.Add(element);
             }
 
-            var nested = _nesting.Nest(columns, sheet.ColumnGroups, "table-column-group").ToList();
+            var nested = _headerColumns.Wrap(columns, sheet.ColumnGroups, sheet.PrintTitleColumns, _nesting).ToList();
             var trailing = TrailingColumns(sheet, count).ToList();
             var covered = Math.Max(count, StyledWidth(sheet));
             if (covered < CellAddress.MaxColumns)
                 trailing.Add(Repeated(new XElement(Namespaces.Table + "table-column"), CellAddress.MaxColumns - covered));
             foreach (var column in trailing.Where(column => column.Attribute(Namespaces.Table + "style-name") is null))
                 column.Add(new XAttribute(Namespaces.Table + "style-name", _layout.ColumnStyle(sheet.Layout.DefaultColumnWidth, false)));
-            var header = sheet.RepeatedPrintColumns;
-            if (header <= 0) return [.. nested, .. trailing];
-
-            var leading = nested.TakeWhile((element, index) => index < header && element.Name == Namespaces.Table + "table-column").ToList();
-            if (leading.Count == 0) return [.. nested, .. trailing];
-            return [new XElement(Namespaces.Table + "table-header-columns", leading), .. nested.Skip(leading.Count), .. trailing];
+            return [.. nested, .. trailing];
         }
 
         private IEnumerable<XElement> TrailingColumns(Worksheet sheet, int count)
@@ -363,12 +360,13 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 .Append(sheet.Layout.StyleBlocks.LastRow)
                 .Concat(sheet.RowGroups.Select(group => group.Last))
                 .Concat(sheet.RowBreaks)
+                .Append(sheet.PrintTitleRows.IsEmpty ? -1 : sheet.PrintTitleRows.End)
                 .Max();
             var columnCount = new[] { index.ColumnCount }
                 .Concat(sheet.Layout.ColumnWidths.Runs.Select(run => run.Last + 1))
                 .Concat(sheet.ColumnGroups.Select(group => group.Last + 1))
                 .Concat(sheet.ColumnBreaks.Select(column => column + 1))
-                .Append(sheet.RepeatedPrintColumns)
+                .Append(sheet.PrintTitleColumns.IsEmpty ? 0 : sheet.PrintTitleColumns.End + 1)
                 .Max();
 
             foreach (var column in BuildColumns(sheet, Math.Max(columnCount, 1))) Emit(writer, column);
@@ -381,7 +379,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             }
             else
             {
-                _rowGroups.Write(writer, RowSpans(sheet, index, lastRow, frames, sources), sheet.RowGroups, sheet.RepeatedPrintRows,
+                _rowGroups.Write(writer, RowSpans(sheet, index, lastRow, frames, sources), sheet.RowGroups, sheet.PrintTitleRows,
                     element => Emit(writer, element));
             }
 
@@ -399,9 +397,13 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             IReadOnlyDictionary<CellAddress, List<XElement>> frames,
             IReadOnlyDictionary<CellAddress, List<XElement>> sources)
         {
-            var header = sheet.RepeatedPrintRows;
+            var header = sheet.PrintTitleRows;
             var boundaries = new SortedSet<int>(sheet.RowGroups.SelectMany(group => new[] { group.First, group.Last + 1 }));
-            if (header > 0) boundaries.Add(header);
+            if (!header.IsEmpty)
+            {
+                boundaries.Add(header.Start);
+                boundaries.Add(header.End + 1);
+            }
 
             bool Significant(int row) =>
                 index.Contains(row) || sheet.Layout.RowHeights.ContainsKey(row)
