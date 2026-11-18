@@ -75,6 +75,8 @@ public sealed record InteractiveAction
     public string? Reference { get; init; }
 
     public string? SoundPath { get; init; }
+
+    public string? Tip { get; init; }
 }
 
 public enum InteractionKind

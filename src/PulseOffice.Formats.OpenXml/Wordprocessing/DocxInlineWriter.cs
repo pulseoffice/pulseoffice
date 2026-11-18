@@ -16,7 +16,10 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
 {
     private abstract record Segment;
 
-    private sealed record Piece(OpenXmlElement Element, string? Hyperlink, string? Change) : Segment;
+    private sealed record Piece(OpenXmlElement Element, string? Hyperlink, string? Change) : Segment
+    {
+        public string? Tip { get; init; }
+    }
 
     private sealed record ControlEdge(string Id, ContentControl? Control) : Segment;
 
@@ -62,7 +65,7 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
                     ? marks[next].Offset - position
                     : run.Text.Length;
                 if (stop <= start && run.Text.Length > 0) stop = run.Text.Length;
-                foreach (var element in Runs(run, start, stop, context, state)) pieces.Add(new Piece(element, run.Hyperlink, state.Change));
+                foreach (var element in Runs(run, start, stop, context, state)) pieces.Add(new Piece(element, run.Hyperlink, state.Change) { Tip = run.HyperlinkTip });
                 start = stop;
                 if (run.Text.Length == 0) break;
             }
@@ -156,8 +159,10 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
             }
 
             var link = target.StartsWith('#') ? new W.Hyperlink { Anchor = target[1..] } : new W.Hyperlink { Id = context.Link(target) };
+            var tip = pieces[index].Tip;
+            if (tip is { Length: > 0 }) link.Tooltip = tip;
             var inside = new List<Piece>();
-            while (index < pieces.Count && pieces[index].Hyperlink == target) inside.Add(pieces[index++]);
+            while (index < pieces.Count && pieces[index].Hyperlink == target && pieces[index].Tip == tip) inside.Add(pieces[index++]);
             link.Append(Insertions(inside, context));
             yield return link;
         }

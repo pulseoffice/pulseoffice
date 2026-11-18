@@ -51,7 +51,8 @@ public sealed class LedgerDocumentFactory(
     PulseOffice.UI.Controls.Links.ILinkFollower links,
     IFormControlBinding formBinding,
     IInterfaceCulture culture,
-    PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters) : ILedgerDocumentFactory
+    PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters,
+    ICellLinkClicking cellLinks) : ILedgerDocumentFactory
 {
     private int _counter;
 
@@ -124,6 +125,7 @@ public sealed class LedgerDocumentFactory(
             Formulas = formulas,
             Inputs = inputs,
             Links = links,
+            CellLinks = cellLinks,
         };
 
         view.ObjectEditRequested += (_, _) =>

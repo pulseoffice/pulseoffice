@@ -46,7 +46,7 @@ minor unit does not divide the major one), `chart:logarithmic`, `chart:reverse-d
 (start, end or value) and `style:data-style-name` with a number style written by the shared `OdfNumberStyleWriter`;
 secondary axis `chart:axis` named `secondary-y` and `chart:attached-axis` on its series. Per series:
 `chart:regression-curve` with a style carrying `chart:regression-type`, `-max-degree`, `-period`,
-`-extrapolate-forward`/`-backward`, `-force-intercept`, `-intercept-value`, `-name` (read also from the `loext`
+`-extrapolate-forward`/`-backward`, `-force-intercept`, `-intercept-value`, `-name` (read also from the vendor extension
 namespace) and `chart:equation`; `chart:error-indicator` (dimension y) with `chart:error-category`,
 `-upper-indicator`, `-lower-indicator`, `-upper-limit`/`-lower-limit`, `-percentage`; `chart:symbol-type`,
 `chart:symbol-name`, `chart:symbol-width`/`-height`; `svg:stroke-width`; data labels `chart:data-label-number`

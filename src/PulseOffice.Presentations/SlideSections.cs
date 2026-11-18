@@ -2,6 +2,8 @@ namespace PulseOffice.Presentations;
 
 public sealed record DeckSection(string Name, IReadOnlyList<Slide> Slides);
 
+public sealed record SectionMarker(string Name, string? Id);
+
 public sealed class SlideSections
 {
     public IReadOnlyList<DeckSection> Group(IReadOnlyList<Slide> slides)
@@ -42,10 +44,13 @@ public sealed class SlideSections
         return null;
     }
 
-    public IReadOnlyList<string?> MarkersAfterMove(IReadOnlyList<Slide> slides, int from, int to)
+    public IReadOnlyList<string?> MarkersAfterMove(IReadOnlyList<Slide> slides, int from, int to) =>
+        [.. SectionsAfterMove(slides, from, to).Select(marker => marker?.Name)];
+
+    public IReadOnlyList<SectionMarker?> SectionsAfterMove(IReadOnlyList<Slide> slides, int from, int to)
     {
         ArgumentNullException.ThrowIfNull(slides);
-        var markers = slides.Select(slide => slide.SectionName).ToList();
+        var markers = slides.Select(slide => slide.SectionName is { } name ? new SectionMarker(name, slide.SectionId) : null).ToList();
         if (from < 0 || from >= markers.Count) return markers;
 
         var moved = markers[from];

@@ -78,6 +78,8 @@ internal sealed class LedgerCellEditing
             BorderThickness = new Thickness(2),
         };
 
+        AnnotatedRange = new PulseOffice.UI.Controls.Text.TextRangeHighlight(CellEditor);
+
         CellEditor.KeyDown += OnEditorKeyDown;
         CellEditor.TextChanged += (_, _) =>
         {
@@ -103,6 +105,8 @@ internal sealed class LedgerCellEditing
     public TextBox FormulaBox { get; }
 
     public TextBox CellEditor { get; }
+
+    public PulseOffice.UI.Controls.Text.TextRangeHighlight AnnotatedRange { get; }
 
     public bool IsEditing { get; private set; }
 
@@ -165,6 +169,13 @@ internal sealed class LedgerCellEditing
         Canvas.SetTop(CellEditor, bounds.Y);
         CellEditor.Width = Math.Max(bounds.Width, 60);
         CellEditor.Height = bounds.Height;
+        Canvas.SetLeft(AnnotatedRange, bounds.X);
+        Canvas.SetTop(AnnotatedRange, bounds.Y);
+        AnnotatedRange.Width = CellEditor.Width;
+        AnnotatedRange.Height = bounds.Height;
+        if (replaceContent is null && sheet.Comments.GetValueOrDefault(_selection.Active)?.AnnotatedText is { } annotated)
+            AnnotatedRange.Show(annotated.Start, annotated.Length);
+        else AnnotatedRange.Hide();
 
         _suggesting = true;
         CellEditor.Text = replaceContent

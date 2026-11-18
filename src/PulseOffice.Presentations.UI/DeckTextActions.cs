@@ -147,6 +147,37 @@ public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckA
             () => { foreach (var swap in swaps) swap.Slide.Replace(swap.Before); deck.Raise(); });
     }
 
+    public void SetSlideOutline(IReadOnlyList<(Slide Slide, string Title, IReadOnlyList<OutlineLine> Body)> changes)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        var swaps = new List<(Slide Slide, TextElement Before, TextElement After)>();
+        foreach (var (slide, title, body) in changes)
+        {
+            if (slide.Placeholder(PlaceholderRole.Title) is { } heading
+                && heading.Text.PlainText.Replace('\n', ' ') != title
+                && _splice.Apply(heading.Text, title) is var retitled && !ReferenceEquals(retitled, heading.Text))
+                swaps.Add((slide, heading, Fitted(slide, heading with { Text = retitled })));
+
+            if (slide.Placeholder(PlaceholderRole.Body) is not { } placeholder) continue;
+            var before = placeholder.Text;
+            var after = Levelled(_splice.Apply(before, string.Join("\n", body.Select(line => line.Text))), body);
+            if (ReferenceEquals(after, before)) continue;
+            swaps.Add((slide, placeholder, Fitted(slide, placeholder with { Text = after })));
+        }
+        if (swaps.Count == 0) return;
+
+        Do(texts["deck.action.editText"],
+            () => { foreach (var swap in swaps) swap.Slide.Replace(swap.After); deck.Raise(); },
+            () => { foreach (var swap in swaps.AsEnumerable().Reverse()) swap.Slide.Replace(swap.Before); deck.Raise(); });
+    }
+
+    private RichText Levelled(RichText text, IReadOnlyList<OutlineLine> body)
+    {
+        if (text.Paragraphs.Count != body.Count) return text;
+        if (text.Paragraphs.Select((paragraph, index) => paragraph.BulletLevel == body[index].Level).All(same => same)) return text;
+        return text with { Paragraphs = [.. text.Paragraphs.Select((paragraph, index) => paragraph with { BulletLevel = body[index].Level })] };
+    }
+
     private bool IsReadOnly => recorder.IsReadOnly;
 
     private void Do(string description, Action redo, Action undo) => recorder.Do(description, redo, undo);

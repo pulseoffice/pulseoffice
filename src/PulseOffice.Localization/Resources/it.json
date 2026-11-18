@@ -8715,6 +8715,8 @@
   "chart.seriesRange.noTables": "Nessuna tabella in questa cartella",
   "command.ledger.connector.sites.title": "Estremità del connettore…",
   "command.ledger.connector.sites.description": "Sceglie il lato di ciascun oggetto da cui parte e a cui arriva il connettore selezionato",
+  "command.deck.connector.sites.title": "Estremità del connettore…",
+  "command.deck.connector.sites.description": "Sceglie il lato di ciascun oggetto da cui parte e a cui arriva il connettore selezionato",
   "connector.sites.explanation": "Scegli dove il connettore lascia il primo oggetto e dove raggiunge il secondo. Automatico usa il lato rivolto verso l'altro oggetto.",
   "connector.sites.start": "Inizio",
   "connector.sites.end": "Fine",
@@ -8730,5 +8732,9 @@
   "shape.text.flow.stackedRightToLeft": "In pila, da destra a sinistra",
   "deck.textFrame.flow.EastAsianVertical": "Verticale dell'Asia orientale",
   "deck.textFrame.flow.MongolianVertical": "Verticale, righe da sinistra a destra",
-  "deck.textFrame.flow.StackedRightToLeft": "In pila, da destra a sinistra"
+  "deck.textFrame.flow.StackedRightToLeft": "In pila, da destra a sinistra",
+  "settingCategory.spreadsheets": "Fogli di calcolo",
+  "setting.ledger.links.followOnClick.title": "Apri i collegamenti delle celle con un clic",
+  "setting.ledger.links.followOnClick.description": "Un clic sul testo di una cella collegata segue il collegamento; un clic accanto al testo, o un clic tenuto premuto, seleziona la cella. Se disattivato, usa Ctrl+clic o il comando Apri collegamento.",
+  "history.comment.box": "Sposta o ridimensiona nota"
 }

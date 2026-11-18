@@ -286,4 +286,7 @@ public sealed class DeckActions
 
     public void SetSlideTexts(IReadOnlyList<(Slide Slide, PlaceholderRole Role, string Text)> changes) =>
         _text.SetSlideTexts(changes);
+
+    public void SetSlideOutline(IReadOnlyList<(Slide Slide, string Title, IReadOnlyList<OutlineLine> Body)> changes) =>
+        _text.SetSlideOutline(changes);
 }

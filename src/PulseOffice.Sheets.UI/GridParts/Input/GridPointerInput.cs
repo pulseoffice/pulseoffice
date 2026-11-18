@@ -30,9 +30,19 @@ internal sealed class GridPointerInput(
     IObjectFrameChrome frame,
     IPathEditing pathEditing,
     IFormControlInteraction formInteraction,
-    IGroupChildLinks groupLinks)
+    IGroupChildLinks groupLinks,
+    GridCellLinkTarget cellLinks,
+    GridNotePainter notes,
+    ICommentBoxDrag noteDrag)
 {
+    private const double NoteGrip = 5;
+
+    private const ulong LinkHoldMilliseconds = 500;
+    private const double LinkSlop = 4;
+
     private readonly Dictionary<StandardCursorType, Cursor> _cursors = [];
+
+    private (string Link, Point Point, ulong Timestamp)? _pendingLink;
 
     public GridGesture? Gesture { get; private set; }
 
@@ -48,6 +58,7 @@ internal sealed class GridPointerInput(
 
     public void Press(Point point, PointerPressedEventArgs e, bool rightButton)
     {
+        _pendingLink = null;
         if (rightButton)
         {
             if (!options.PickingReference) ShowContextMenu(point);
@@ -80,6 +91,8 @@ internal sealed class GridPointerInput(
             PressControl(control, point, e);
             return;
         }
+
+        if (BeginNoteDrag(point, e)) return;
 
         if (FollowLink(point, e)) return;
 
@@ -115,11 +128,17 @@ internal sealed class GridPointerInput(
             return;
         }
 
+        if (e.KeyModifiers == KeyModifiers.None && e.ClickCount == 1 && cellLinks.LinkAt(point) is { } link)
+            _pendingLink = (link, point, e.Timestamp);
+
         PressSelection(point, e);
     }
 
     public void Move(Point point, KeyModifiers modifiers)
     {
+        if (_pendingLink is { } pending && (Math.Abs(point.X - pending.Point.X) > LinkSlop || Math.Abs(point.Y - pending.Point.Y) > LinkSlop))
+            _pendingLink = null;
+
         if (Gesture is { Stage: GestureStage.BeforeDrawing } exclusive)
         {
             exclusive.Move(point, modifiers);
@@ -144,13 +163,17 @@ internal sealed class GridPointerInput(
         Gesture?.Move(point, modifiers);
     }
 
-    public void Release()
+    public void Release(ulong timestamp)
     {
         drawing.Release();
 
         var ending = Gesture;
         Gesture = null;
         ending?.Release();
+
+        if (_pendingLink is not { } pending) return;
+        _pendingLink = null;
+        if (timestamp - pending.Timestamp < LinkHoldMilliseconds) notifications.FollowLink(pending.Link);
     }
 
     private void Begin(GridGesture gesture, IPointer pointer)
@@ -296,11 +319,21 @@ internal sealed class GridPointerInput(
         return true;
     }
 
+    private bool BeginNoteDrag(Point point, PointerPressedEventArgs e)
+    {
+        if (options.DesignMode || notes.NoteAt(point) is not { } note) return false;
+        var edges = noteDrag.EdgesAt(note.Bounds.Width, note.Bounds.Height, point.X - note.Bounds.X, point.Y - note.Bounds.Y, NoteGrip);
+        Begin(new NoteBoxGesture(options, surface, notifications, noteDrag, note.Address, note.Box, edges, point), e.Pointer);
+        e.Handled = true;
+        return true;
+    }
+
     private bool FollowLink(Point point, PointerPressedEventArgs e)
     {
         var modifiers = e.KeyModifiers;
         if (!(modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Meta)) || modifiers.HasFlag(KeyModifiers.Shift)) return false;
-        if (ObjectAt(point) is not { } placed || LinkAt(placed, point) is not { } link) return false;
+        var link = ObjectAt(point) is { } placed ? LinkAt(placed, point) : cellLinks.LinkAt(point, whateverTheSetting: true);
+        if (link is null) return false;
         notifications.FollowLink(link);
         e.Handled = true;
         return true;

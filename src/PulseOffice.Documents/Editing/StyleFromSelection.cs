@@ -114,7 +114,7 @@ public sealed class StyleFromSelection(IStoryCatalog stories, IParagraphText tex
 
     private TextRun Strip(TextRun run, CharacterProperties moved) =>
         moved != CharacterProperties.None && direct.Run(run) == moved
-            ? direct.Clear(run) with { Field = run.Field, FieldArgument = run.FieldArgument, Hyperlink = run.Hyperlink, StyleName = run.StyleName }
+            ? direct.Clear(run) with { Field = run.Field, FieldArgument = run.FieldArgument, Hyperlink = run.Hyperlink, HyperlinkTip = run.HyperlinkTip, StyleName = run.StyleName }
             : run;
 
     private TextRun? First(TextDocument document, DocumentRange range)

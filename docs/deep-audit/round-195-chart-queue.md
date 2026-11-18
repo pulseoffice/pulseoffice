@@ -62,12 +62,12 @@ Tests: `Round195InlineErrorColumnTests` (Charts), the ODF case in `Round195Chart
   `c:multiLvlStrRef` when several row fields exist. The pivot table definition lists `chartFormats` linking each chart
   format id and series to a pivot area. Spreadsheet applications rebuild the chart from the pivot table on refresh and
   use the formulas and caches only until then.
-- **ODS, other applications.** The reference suite marks a pivot chart with `loext:data-pilot-source` on
+- **ODS, other applications.** The reference suite marks a pivot chart with the vendor extension attribute `data-pilot-source` on
   `chart:chart` and rebuilds its data from the pivot table; the cell range addresses in the chart are informative.
   There is no standard ODF attribute for the link.
 - **Our files.** XLSX writes `c:pivotSource` (`[]Sheet!Pivot`, `c:fmtId`), `c:pivotFmts` and the drop-zone extension,
   series formulas over the leaf rows (multi-area unions) and, now, `c:multiLvlStrRef` with the outer levels. We do not
-  write `chartFormats` in the pivot table definition. ODS writes `loext:data-pilot-source` plus our `pulseoffice:pivot-*`
+  write `chartFormats` in the pivot table definition. ODS writes the vendor extension attribute `data-pilot-source` plus our `pulseoffice:pivot-*`
   attributes and the leaf ranges. Both readers rebuild the chart from the pivot definition after loading
   (`FollowCharts`).
 - **Remaining risk.** Excel may rename or rebuild a link whose `c:name` lacks the file name, and may expect

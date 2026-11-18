@@ -56,12 +56,16 @@ internal sealed class SectionsExtension : PresentationExtension
 {
     private const string P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 
+    private const string LeadingSectionName = "Default Section";
+
     protected override string Uri => "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 
     protected override string Body(PptxWriteSession session)
     {
-        var groups = new SlideSections().Group(session.Deck.Slides);
+        var groups = new SlideSections().Group(session.Deck.Slides).ToList();
         if (groups.Count == 0) return string.Empty;
+        var leading = session.Deck.Slides.TakeWhile(slide => slide.SectionName is null).ToList();
+        if (leading.Count > 0) groups.Insert(0, new DeckSection(LeadingSectionName, leading));
 
         var xml = new StringBuilder().Append("<p14:sectionLst xmlns:p14=\"").Append(P14).Append("\">");
         var used = new HashSet<Guid>();

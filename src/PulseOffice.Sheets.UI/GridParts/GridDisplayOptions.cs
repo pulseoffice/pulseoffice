@@ -25,5 +25,11 @@ internal sealed class GridDisplayOptions
 
     public ShapeObject? LiveShape { get; set; }
 
+    public NotePreview? NotePreview { get; set; }
+
+    public ICellLinkClicking CellLinks { get; set; } = new FixedCellLinkClicking(true);
+
     public Func<CellAddress, bool> ChoicesAvailable { get; set; } = _ => false;
 }
+
+internal sealed record NotePreview(CellAddress Address, CommentBox Box);

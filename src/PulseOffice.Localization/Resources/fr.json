@@ -8715,6 +8715,8 @@
   "chart.seriesRange.noTables": "Aucune table dans ce classeur",
   "command.ledger.connector.sites.title": "Extrémités du connecteur…",
   "command.ledger.connector.sites.description": "Choisit le côté de chaque objet d'où part et où arrive le connecteur sélectionné",
+  "command.deck.connector.sites.title": "Extrémités du connecteur…",
+  "command.deck.connector.sites.description": "Choisit le côté de chaque objet d'où part et où arrive le connecteur sélectionné",
   "connector.sites.explanation": "Choisissez où le connecteur quitte le premier objet et où il atteint le second. Automatique prend le côté tourné vers l'autre objet.",
   "connector.sites.start": "Début",
   "connector.sites.end": "Fin",
@@ -8730,5 +8732,9 @@
   "shape.text.flow.stackedRightToLeft": "Empilé, de droite à gauche",
   "deck.textFrame.flow.EastAsianVertical": "Vertical d'Asie orientale",
   "deck.textFrame.flow.MongolianVertical": "Vertical, lignes de gauche à droite",
-  "deck.textFrame.flow.StackedRightToLeft": "Empilé, de droite à gauche"
+  "deck.textFrame.flow.StackedRightToLeft": "Empilé, de droite à gauche",
+  "settingCategory.spreadsheets": "Feuilles de calcul",
+  "setting.ledger.links.followOnClick.title": "Ouvrir les liens hypertexte des cellules d’un clic",
+  "setting.ledger.links.followOnClick.description": "Un clic sur le texte d’une cellule liée suit le lien ; un clic à côté du texte, ou un clic maintenu, sélectionne la cellule. Désactivé, utilisez Ctrl+clic ou la commande Ouvrir le lien hypertexte.",
+  "history.comment.box": "Déplacer ou redimensionner la note"
 }

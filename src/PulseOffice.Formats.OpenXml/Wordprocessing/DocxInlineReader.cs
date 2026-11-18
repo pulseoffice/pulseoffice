@@ -161,7 +161,11 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         var previous = collector.Hyperlink;
         collector.Hyperlink = link.Id?.Value is { } id ? collector.Context.Link(id) : link.Anchor?.Value is { } anchor ? "#" + anchor : null;
         var reached = (collector.Length, collector.Marks.Count);
+        var first = collector.Runs.Count;
         Walk(link.ChildElements, collector);
+        if (link.Tooltip?.Value is { Length: > 0 } tip && collector.Hyperlink is { } target)
+            for (var index = first; index < collector.Runs.Count; index++)
+                if (collector.Runs[index].Hyperlink == target) collector.Runs[index] = collector.Runs[index] with { HyperlinkTip = tip };
         if (collector.Hyperlink is not null && reached == (collector.Length, collector.Marks.Count)) collector.Context.Losses.Add("DOCX170");
         collector.Hyperlink = previous;
     }

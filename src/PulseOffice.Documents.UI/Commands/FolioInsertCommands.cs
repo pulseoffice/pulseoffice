@@ -173,9 +173,12 @@ public sealed class FolioInsertCommands(
     private async Task HyperlinkAsync(CancellationToken ct)
     {
         if (Editor is not { } editor) return;
-        var current = editor.EffectiveRun().Hyperlink;
+        var effective = editor.EffectiveRun();
+        var current = effective.Hyperlink;
         var request = new LinkRequest("command.folio.insert.hyperlink.title")
         {
+            ShowsTip = true,
+            Tip = current is null ? null : effective.HyperlinkTip,
             Address = current ?? string.Empty,
             Text = editor.HasSelection ? editor.SelectedText().ReplaceLineEndings(" ") : null,
             TextEditable = !editor.HasSelection,
@@ -185,15 +188,16 @@ public sealed class FolioInsertCommands(
         if (await hyperlinks.AskAsync(request, ct).ConfigureAwait(true) is not { } choice || Editor is not { } target) return;
         if (choice.Remove)
         {
-            target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "remove-hyperlink", run => run with { Hyperlink = null }), links.Range(target));
+            target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "remove-hyperlink", run => run with { Hyperlink = null, HyperlinkTip = null }), links.Range(target));
             return;
         }
         using (target.History.BeginTransaction("hyperlink"))
         {
             var address = links.Settle(target.Document, target.History, choice.Address);
+            var tip = choice.Tip is { Length: > 0 } given ? given : null;
             if (target.HasSelection || current is not null)
             {
-                target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "hyperlink", run => run with { Hyperlink = address }), links.Range(target));
+                target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "hyperlink", run => run with { Hyperlink = address, HyperlinkTip = tip }), links.Range(target));
                 return;
             }
             var shown = choice.Text.ReplaceLineEndings(" ");
@@ -201,7 +205,7 @@ public sealed class FolioInsertCommands(
             {
                 documents.InsertText(target.Document, target.History, at, shown);
                 documents.MapRuns(target.Document, target.History, DocumentRange.In(at.ParagraphId, at.Offset, at.Offset + shown.Length), "hyperlink",
-                    run => run with { Hyperlink = address });
+                    run => run with { Hyperlink = address, HyperlinkTip = tip });
             }, "hyperlink");
         }
     }

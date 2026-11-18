@@ -308,7 +308,8 @@ internal sealed class OdfRichTextWriter(
                 new XAttribute(Text + "style-name", spanName),
                 run.Field == TextFieldKind.None ? text.Paragraph(run.Text).Nodes() : Field(run, sink));
             p.Add(run.Hyperlink is { Length: > 0 } link
-                ? new XElement(Text + "a", new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "href", link), span)
+                ? new XElement(Text + "a", new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "href", link),
+                    run.HyperlinkTip is { Length: > 0 } tip ? new XAttribute(Office + "title", tip) : null, span)
                 : span);
         }
         return p;

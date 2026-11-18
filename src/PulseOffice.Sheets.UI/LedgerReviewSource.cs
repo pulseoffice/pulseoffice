@@ -12,6 +12,7 @@ public sealed class LedgerReviewSource : IReviewSource
     private readonly PulseOffice.Foundation.Review.IAuthorPalette _palette;
     private readonly ITextCatalog _texts;
     private readonly PulseOffice.Foundation.Identity.IUserIdentity _identity;
+    private readonly CommentMentions _mentions = new();
 
     public LedgerReviewSource(IActiveSheetContext context, ILedgerChangeResolution resolution, PulseOffice.Foundation.Review.IAuthorPalette palette, ITextCatalog texts, PulseOffice.Foundation.Identity.IUserIdentity identity)
     {
@@ -102,15 +103,23 @@ public sealed class LedgerReviewSource : IReviewSource
     public void Reply(string id, string text)
     {
         if (text.Trim() is not { Length: > 0 } trimmed) return;
+        var mentions = _mentions.Detect(trimmed, People());
         Change(id, "command.ledger.comment.edit.title", (comment, _) =>
-            comment with { Replies = [.. comment.Replies, new CommentReply { Text = trimmed, Author = _identity.Name }] });
+            comment with { Replies = [.. comment.Replies, new CommentReply { Text = trimmed, Author = _identity.Name, Mentions = mentions }] });
     }
 
     public void Edit(string id, string text) => Change(id, "command.ledger.comment.edit.title", (comment, reply) => reply is { } position
         ? position < comment.Replies.Count && !string.Equals(comment.Replies[position].Text, text, StringComparison.Ordinal)
-            ? comment with { Replies = [.. comment.Replies.Select((item, index) => index == position ? item with { Text = text } : item)] }
+            ? comment with { Replies = [.. comment.Replies.Select((item, index) => index == position ? item with { Text = text, Mentions = _mentions.Detect(text, People()) } : item)] }
             : comment
-        : string.Equals(comment.Text, text, StringComparison.Ordinal) ? comment : comment with { Text = text });
+        : string.Equals(comment.Text, text, StringComparison.Ordinal) ? comment : comment with { Text = text, Mentions = _mentions.Detect(text, People()) });
+
+    private IEnumerable<string> People() => _context.Workbook is { } workbook
+        ? workbook.Sheets.SelectMany(sheet => sheet.Comments.Values)
+            .SelectMany(comment => new[] { comment.Author }.Concat(comment.Replies.Select(reply => reply.Author)))
+            .OfType<string>()
+            .Append(_identity.Name)
+        : [_identity.Name];
 
     public void ToggleResolved(string id) =>
         Change(id, "history.comment.resolve", (comment, _) => comment with { IsResolved = !comment.IsResolved });

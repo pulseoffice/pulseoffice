@@ -9,6 +9,8 @@ public interface IDeckConnectors
         ConnectorSite fromSite = ConnectorSite.Automatic, ConnectorSite toSite = ConnectorSite.Automatic);
 
     bool Reroute(Slide slide);
+
+    ObjectElement? Resite(Slide slide, ObjectElement placed, ConnectorSite startSite, ConnectorSite endSite);
 }
 
 public sealed class DeckConnectors(IConnectorFramer framer) : IDeckConnectors
@@ -47,6 +49,23 @@ public sealed class DeckConnectors(IConnectorFramer framer) : IDeckConnectors
         }
 
         return changed;
+    }
+
+    public ObjectElement? Resite(Slide slide, ObjectElement placed, ConnectorSite startSite, ConnectorSite endSite)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        ArgumentNullException.ThrowIfNull(placed);
+        if (placed.Content is not ConnectorObject connector) return null;
+
+        var resited = placed with
+        {
+            Content = connector with
+            {
+                Start = connector.Start with { Site = startSite },
+                End = connector.End with { Site = endSite },
+            },
+        };
+        return Reroute(slide, resited) ?? resited;
     }
 
     private ObjectElement? Reroute(Slide slide, ObjectElement placed)

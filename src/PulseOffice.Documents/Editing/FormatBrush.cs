@@ -50,6 +50,7 @@ public sealed class FormatBrush(IStoryCatalog stories, IParagraphText text, IDir
                     Field = item.Field,
                     FieldArgument = item.FieldArgument,
                     Hyperlink = item.Hyperlink,
+                    HyperlinkTip = item.HyperlinkTip,
                     StyleName = sample.CharacterStyle,
                 }, sample.Character));
             if (whole || paragraphs)

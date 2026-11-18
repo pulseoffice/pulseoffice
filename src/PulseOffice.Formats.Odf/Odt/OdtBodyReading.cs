@@ -229,6 +229,8 @@ internal sealed class OdtInlineReader(
     private sealed record Format(CharacterProperties Properties, string? Style, string? Link)
     {
         public string? Ruby { get; init; }
+
+        public string? Tip { get; init; }
     }
 
     private sealed class Builder
@@ -260,7 +262,7 @@ internal sealed class OdtInlineReader(
 
     private TextRun Run(string text, Format format, TextFieldKind field, string? argument)
     {
-        var run = direct.Apply(new TextRun(text) { StyleName = format.Style, Hyperlink = format.Link, Field = field, FieldArgument = argument, Ruby = format.Ruby }, format.Properties);
+        var run = direct.Apply(new TextRun(text) { StyleName = format.Style, Hyperlink = format.Link, HyperlinkTip = format.Link is null ? null : format.Tip, Field = field, FieldArgument = argument, Ruby = format.Ruby }, format.Properties);
         var properties = format.Properties;
         var flags = RunOverrides.None;
         if (properties.Bold == false) flags |= RunOverrides.Bold;
@@ -345,7 +347,7 @@ internal sealed class OdtInlineReader(
             {
                 if ((string?)child.Attribute(Xlink + "href") is not { Length: > 0 } || child.Value.Length == 0 && !child.Descendants().Any(item => item.Name.Namespace == Draw))
                     context.Losses.Add(OdtReadLosses.EmptyLinks);
-                var inner = format with { Link = (string?)child.Attribute(Xlink + "href") ?? format.Link };
+                var inner = format with { Link = (string?)child.Attribute(Xlink + "href") ?? format.Link, Tip = (string?)child.Attribute(Office + "title") is { Length: > 0 } title ? title : format.Tip };
                 if ((string?)child.Attribute(Text + "style-name") is { } linkStyle && styles.TextStyle(linkStyle, context) is { } linkFormat && linkFormat.Parent is { } parentStyle && format.Style is null && parentStyle != PulseOffice.Documents.Styles.DefaultStyleNames.InternetLink)
                     inner = inner with { Style = parentStyle };
                 Walk(child, inner, builder, paragraphId, context, blocks);

@@ -112,29 +112,31 @@ internal sealed class RunReader(IOdfFieldKinds fields, IOdfParagraphText text) :
 {
     public IReadOnlyList<TextRun> Read(XElement paragraph, ParagraphFormat properties, OdfTextStyles styles)
     {
-        var inline = Inline(paragraph, null).ToList();
+        var inline = Inline(paragraph, null, null).ToList();
         if (!inline.Any(item => item.Link is not null || item.Node is XElement e && (e.Name == Text + "span" || IsField(e)))) return [];
 
         var runs = new List<TextRun>();
         var loose = new XElement(Text + "p");
         string? looseLink = null;
+        string? looseTip = null;
 
-        foreach (var (node, link) in inline)
+        foreach (var (node, link, tip) in inline)
         {
             if (node is XElement span && span.Name == Text + "span")
             {
                 Flush();
-                runs.Add(Styled(span, properties, styles.Spans) with { FieldDetail = fields.DetailOf(span, styles.DataStyles), Hyperlink = link });
+                runs.Add(Styled(span, properties, styles.Spans) with { FieldDetail = fields.DetailOf(span, styles.DataStyles), Hyperlink = link, HyperlinkTip = tip });
             }
             else if (node is XElement field && IsField(field))
             {
                 Flush();
-                runs.Add(Plain(text.Line(Wrapped(field)), properties) with { Field = fields.Of(Wrapped(field)), FieldDetail = fields.DetailOf(Wrapped(field), styles.DataStyles), Hyperlink = link });
+                runs.Add(Plain(text.Line(Wrapped(field)), properties) with { Field = fields.Of(Wrapped(field)), FieldDetail = fields.DetailOf(Wrapped(field), styles.DataStyles), Hyperlink = link, HyperlinkTip = tip });
             }
             else
             {
-                if (link != looseLink) Flush();
+                if (link != looseLink || tip != looseTip) Flush();
                 looseLink = link;
+                looseTip = tip;
                 loose.Add(node is XText plain ? new XText(plain.Value) : new XElement((XElement)node));
             }
         }
@@ -145,9 +147,10 @@ internal sealed class RunReader(IOdfFieldKinds fields, IOdfParagraphText text) :
         void Flush()
         {
             var line = text.Line(loose);
-            if (line.Length > 0) runs.Add(Plain(line, properties) with { Hyperlink = looseLink });
+            if (line.Length > 0) runs.Add(Plain(line, properties) with { Hyperlink = looseLink, HyperlinkTip = looseTip });
             loose.RemoveNodes();
             looseLink = null;
+            looseTip = null;
         }
     }
 
@@ -155,18 +158,20 @@ internal sealed class RunReader(IOdfFieldKinds fields, IOdfParagraphText text) :
 
     private XElement Wrapped(XElement element) => new(Text + "span", new XElement(element));
 
-    private IEnumerable<(XNode Node, string? Link)> Inline(XElement container, string? link) =>
+    private IEnumerable<(XNode Node, string? Link, string? Tip)> Inline(XElement container, string? link, string? tip) =>
         container.Nodes().SelectMany(node => node switch
         {
-            XElement anchor when anchor.Name == Text + "a" => Inline(anchor, (string?)anchor.Attribute(Xlink + "href") ?? link),
-            XElement span when span.Name == Text + "span" && span.Elements(Text + "a").Any() => Split(span, link),
-            _ => [(node, link)],
+            XElement anchor when anchor.Name == Text + "a" => Inline(anchor, (string?)anchor.Attribute(Xlink + "href") ?? link, TipOf(anchor) ?? tip),
+            XElement span when span.Name == Text + "span" && span.Elements(Text + "a").Any() => Split(span, link, tip),
+            _ => [(node, link, tip)],
         });
 
-    private IEnumerable<(XNode Node, string? Link)> Split(XElement span, string? link) =>
+    private IEnumerable<(XNode Node, string? Link, string? Tip)> Split(XElement span, string? link, string? tip) =>
         span.Nodes().Select(child => child is XElement anchor && anchor.Name == Text + "a"
-            ? ((XNode)new XElement(span.Name, span.Attributes(), anchor.Nodes()), (string?)anchor.Attribute(Xlink + "href") ?? link)
-            : (new XElement(span.Name, span.Attributes(), child), link));
+            ? ((XNode)new XElement(span.Name, span.Attributes(), anchor.Nodes()), (string?)anchor.Attribute(Xlink + "href") ?? link, TipOf(anchor) ?? tip)
+            : (new XElement(span.Name, span.Attributes(), child), link, tip));
+
+    private string? TipOf(XElement anchor) => (string?)anchor.Attribute(Office + "title") is { Length: > 0 } title ? title : null;
 
     private TextRun Plain(string value, ParagraphFormat properties) => new(value)
     {

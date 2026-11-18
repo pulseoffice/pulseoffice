@@ -119,6 +119,7 @@ public sealed class SlideFactory : ISlideFactory
             Notes = source.Notes,
             Hidden = source.Hidden,
             SectionName = source.SectionName,
+            SectionId = source.SectionId,
             Transition = source.Transition,
             MasterId = source.MasterId,
             ShowMasterBackground = source.ShowMasterBackground,

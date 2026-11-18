@@ -36,7 +36,11 @@ internal sealed class RunPropertiesBuilder(OoxmlWriteUnits units, ITextScripts s
         if (lang is not null) properties.Language = lang;
         if (altLang is not null) properties.AlternativeLanguage = altLang;
         if (run.Outline) properties.InsertAt(new D.Outline(new D.SolidFill(new D.RgbColorModelHex { Val = colour })) { Width = 9525 }, 0);
-        if (run.Hyperlink is { Length: > 0 } target && links.Build(target) is { } link) properties.Append(link);
+        if (run.Hyperlink is { Length: > 0 } target && links.Build(target) is { } link)
+        {
+            if (run.HyperlinkTip is { Length: > 0 } tip) link.Tooltip = tip;
+            properties.Append(link);
+        }
 
         return properties;
     }

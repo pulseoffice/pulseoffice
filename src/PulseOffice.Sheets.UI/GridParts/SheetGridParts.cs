@@ -92,10 +92,13 @@ internal sealed class SheetGridPartsFactory
             dependencies.Adjusting, dependencies.PathEditing, dependencies.FormInteraction,
             new ObjectSnapping());
 
+        var notes = new GridNotePainter(viewport, theme, options);
         var pointer = new GridPointerInput(
             viewport, selection, options, surface, notifications, objects, renderers, gestures, drawing, overlay,
             decorations, dependencies.Ordering, dependencies.Manipulator, dependencies.Adjusting, dependencies.Frame,
-            dependencies.PathEditing, dependencies.FormInteraction, dependencies.GroupLinks);
+            dependencies.PathEditing, dependencies.FormInteraction, dependencies.GroupLinks,
+            new GridCellLinkTarget(viewport, dependencies.Presenter, services, options, new CellLinkHitArea()),
+            notes, new CommentBoxDrag());
 
         var keyboard = new GridKeyboardInput(
             viewport, selection, options, surface, notifications, objects, services, drawing, chords,
@@ -103,6 +106,6 @@ internal sealed class SheetGridPartsFactory
 
         return new SheetGridParts(
             viewport, notifications, services, options, objects, drawing,
-            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, new GridNotePainter(viewport, theme), pointer, keyboard);
+            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, notes, pointer, keyboard);
     }
 }

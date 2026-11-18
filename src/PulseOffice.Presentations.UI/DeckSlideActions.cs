@@ -41,6 +41,7 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
         var next = index + 1 < deck.Slides.Count ? deck.Slides[index + 1] : null;
         var inherits = slide.SectionName is not null && next is { SectionName: null };
         var section = slide.SectionName;
+        var sectionId = slide.SectionId;
 
         Do(texts["deck.action.deleteSlide"],
             () =>
@@ -48,12 +49,12 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
                 deck.Remove(slide);
                 ReplaceShows(showsAfter);
                 deck.Setup = setupAfter;
-                if (inherits) next!.SectionName = section;
+                if (inherits) (next!.SectionName, next.SectionId) = (section, sectionId);
                 Focus(deck.Slides[Math.Clamp(index, 0, deck.Slides.Count - 1)]);
             },
             () =>
             {
-                if (inherits) next!.SectionName = null;
+                if (inherits) (next!.SectionName, next.SectionId) = (null, null);
                 deck.Setup = setupBefore;
                 ReplaceShows(showsBefore);
                 deck.InsertExisting(index, slide);
@@ -187,20 +188,20 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
         to = Math.Clamp(to, 0, deck.Slides.Count - 1);
         if (from == to) return;
 
-        var markersBefore = deck.Slides.Select(s => (s, s.SectionName)).ToList();
-        var markersAfter = new SlideSections().MarkersAfterMove(deck.Slides, from, to);
+        var markersBefore = deck.Slides.Select(s => (s, s.SectionName, s.SectionId)).ToList();
+        var markersAfter = new SlideSections().SectionsAfterMove(deck.Slides, from, to);
 
         Do(texts["deck.action.moveSlide"],
             () =>
             {
                 deck.Move(deck.IndexOf(slide), to);
-                for (var i = 0; i < deck.Slides.Count && i < markersAfter.Count; i++) deck.Slides[i].SectionName = markersAfter[i];
+                for (var i = 0; i < deck.Slides.Count && i < markersAfter.Count; i++) (deck.Slides[i].SectionName, deck.Slides[i].SectionId) = (markersAfter[i]?.Name, markersAfter[i]?.Id);
                 Focus(slide);
             },
             () =>
             {
                 deck.Move(deck.IndexOf(slide), from);
-                foreach (var (s, name) in markersBefore) s.SectionName = name;
+                foreach (var (s, name, id) in markersBefore) (s.SectionName, s.SectionId) = (name, id);
                 Focus(slide);
             });
     }

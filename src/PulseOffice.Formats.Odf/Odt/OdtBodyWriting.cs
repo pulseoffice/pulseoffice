@@ -256,6 +256,7 @@ internal sealed class OdtInlineWriter(
         if (run.Hyperlink is { } link)
         {
             var anchor = new XElement(Text + "a", new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "href", link));
+            if (run.HyperlinkTip is { Length: > 0 } tip) anchor.Add(new XAttribute(Office + "title", tip));
             anchor.Add(wrapper is null ? body : [wrapper]);
             return anchor;
         }

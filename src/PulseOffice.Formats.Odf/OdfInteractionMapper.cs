@@ -11,6 +11,8 @@ public sealed class OdfInteractionMapper
     private static readonly XNamespace Script = OdfPackage.Namespaces.Script;
     private static readonly XNamespace Xlink = OdfPackage.Namespaces.Xlink;
 
+    private readonly XName _title = XNamespace.Get("urn:pulseoffice:interaction") + "title";
+
     private readonly TokenMap<InteractionKind> _actions = new(InteractionKind.None, "none",
         (InteractionKind.NextSlide, "next-page"), (InteractionKind.PreviousSlide, "previous-page"),
         (InteractionKind.FirstSlide, "first-page"), (InteractionKind.LastSlide, "last-page"),
@@ -27,6 +29,7 @@ public sealed class OdfInteractionMapper
 
         var href = HrefFor(action);
         if (href is not null) listener.Add(new XAttribute(Xlink + "href", href));
+        if (action.Tip is { Length: > 0 } tip) listener.Add(new XAttribute(_title, tip));
 
         if (action.SoundPath is { Length: > 0 } sound)
             listener.Add(new XElement(Pres + "sound", new XAttribute(Xlink + "href", sound), new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "show", "new"), new XAttribute(Xlink + "actuate", "onRequest")));
@@ -54,6 +57,7 @@ public sealed class OdfInteractionMapper
             Kind = kind,
             Reference = kind == InteractionKind.GoToSlide && href is { } h && h.StartsWith('#') ? h[1..] : href,
             SoundPath = sound,
+            Tip = (string?)listener.Attribute(_title) is { Length: > 0 } tip ? tip : null,
         };
     }
 

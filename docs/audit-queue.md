@@ -16,18 +16,26 @@ the round that fixes it is joined and the join run is green.
   down keys in stacked text boxes move one character; up and down keys in Mongolian text boxes follow the stored line
   order, not the mirrored one. Shape text column breaks are probed per character on the composed text, which costs a
   geometry per character for long texts. (218, 225)
-- ODF has no native 270-degree flow, upright text or text box rotation: they use our `urn:pulseoffice:shape-text`
-  extension; shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
-  standard `draw:text-rotate-angle`. The sign of `draw:text-rotate-angle` follows the ODF counter-clockwise convention
-  and has not been checked against another application. (214)
+- ODF has no form for upright text or text box rotation: they keep our `urn:pulseoffice:shape-text` extension; the
+  270-degree flow is now written as the extension writing mode `bt-lr` beside `tb-rl`, not yet opened in another
+  application. Shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
+  standard `draw:text-rotate-angle`; its sign has not been checked against another application. (214, 227)
 - Connector glue output (`p:cxnSp`, `draw:connector`, the automatic-end extension) has not been opened in PowerPoint,
   Excel or the reference suite here. (213, 214)
-- Deck has no command to choose a connector's sites after creation (Ledger's Connector Ends dialog is shared in
-  `PulseOffice.UI.Controls.Shapes` but wired only into Ledger); the dialog has not been seen live. (225)
+- Deck's Connector Ends command (shared `ConnectorSitesDialog`) is on the Advanced surface only, not in the slide
+  context menu; neither module's dialog has been seen live. (225, 227)
+- Deleting a title line in the Deck outline shifts the following texts up one slide instead of merging the two
+  slides; lines cannot move slides and the outline does not delete slides. Outline edits keep paragraph formatting
+  only through the text splice, and titles with several paragraphs are shown joined on one line. (229)
+- Empty sections are lost: the model marks a section on its first slide, so `p14:section` elements without slides
+  and sections whose slides are all deleted do not survive. Slides before the first section are written to PPTX in a
+  leading "Default Section", which reads back as a named section. Neither has been opened in PowerPoint here. (229)
+- Deck has no "number slides from" setting: `p:presentation/@firstSlideNum` and ODP page number offsets are not read
+  or written. (229)
 
 ## Charts
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
-  `loext:data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
+  the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
 - Pivot chart categories keep the one-column `c:multiLvlStrRef` with the full multi-level cache (round 209 research:
   applications rebuild a chart linked by `c:pivotSource` from the pivot table, not from the category formula, and no
@@ -48,7 +56,6 @@ the round that fixes it is joined and the join run is green.
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 
-- `FolioCanvas.cs` (about 1,150 lines) and `Paginator.cs` (about 1,300 lines) are over the 800-line cap: split them along coherent responsibilities. (223, 225 join)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
@@ -62,16 +69,14 @@ the round that fixes it is joined and the join run is green.
   is not announced, only drawn as the placeholder. (220)
 - XLSX table-reference rule forms are matched by priority and ordinal within range and priority, then by range and
   flat formula; a rule Excel renumbered and edited keeps the flat form (by design). Not opened in Excel. (220)
-- Round 221 (Ledger comments and cell links), open: cell hyperlinks open from the context command or Ctrl+click
-  only, not with a plain click. (221)
-- Round 224 (Ledger comments), open: note boxes cannot be moved or resized with the mouse (they come from files and are
-  drawn and printed where the model says); mentions are plain names in the text (XLSX `mentions` elements are neither
-  written nor read, so the person link is lost); ODS replies are extra `office:annotation` elements of the same cell,
-  which other readers either ignore or show as separate notes; the annotated text range of `office:annotation-end`
-  is kept only within the cell's first paragraph and is not shown in the grid; Fill down/right/up/left commands do not
-  copy comments (only the fill handle does); the single-note show command has no ribbon placement; comments printed at
-  the end are not wrapped to the page width; only Ledger's use of the shared link dialog shows the ScreenTip field
-  (Folio and Deck links have no tip in the model). Not opened in Excel or the reference suite. (224)
+- Round 228 (Ledger notes and links), open: the plain click on a cell link measures the text with the cell font but
+  ignores conditional-format icons and overflow into neighbours; no hand cursor over link text. Dragging a note has no
+  move/resize cursor, keeps `CommentBox.Default` as the undo state of a note that had no box, and is refused only as a
+  whole on a protected sheet. Mentions are detected only for people already in the workbook; there is no mention
+  picker. The annotated range is highlighted in the cell editor only (not in the grid) and is not adjusted when the cell
+  text is edited. Printed comment wrapping estimates widths (0.55 em per character) instead of measuring. Folio object
+  links (anchored objects) and Ledger object links still have no ScreenTip, and Folio and Deck do not show the tip on
+  hover. Not opened in Excel, Word, PowerPoint or the reference suite. (228)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over

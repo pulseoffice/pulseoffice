@@ -14,6 +14,8 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
 
     public const string LegacyAuthorPrefix = "tc=";
 
+    private readonly CommentMentions _mentions = new();
+
     public void Read(WorksheetPart part, Sheet sheet, XlsxReadContext context)
     {
         var entries = part.WorksheetThreadedCommentsParts
@@ -41,11 +43,12 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
             {
                 Text = Text(root),
                 Author = Author(root, people),
+                Mentions = Mentions(root, people),
                 CreatedAt = Created(root),
                 IsAlwaysVisible = legacy?.IsAlwaysVisible ?? false,
                 Box = legacy?.Box,
                 IsResolved = root.Done?.Value == true,
-                Replies = [.. replies.Select(reply => new CommentReply { Text = Text(reply), Author = Author(reply, people), CreatedAt = Created(reply) })],
+                Replies = [.. replies.Select(reply => new CommentReply { Text = Text(reply), Author = Author(reply, people), CreatedAt = Created(reply), Mentions = Mentions(reply, people) })],
             };
         }
     }
@@ -55,16 +58,16 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
         var threads = sheet.Comments.Where(pair => pair.Value.IsThread).OrderBy(pair => pair.Key.Row).ThenBy(pair => pair.Key.Column).ToList();
         if (threads.Count == 0) return;
 
-        var persons = Persons(part, threads.SelectMany(pair => new[] { pair.Value.Author }.Concat(pair.Value.Replies.Select(reply => reply.Author))).Select(author => author ?? string.Empty).Distinct(StringComparer.Ordinal));
+        var persons = Persons(part, threads.SelectMany(pair => new[] { pair.Value.Author }.Concat(pair.Value.Replies.Select(reply => reply.Author)).Concat(pair.Value.Mentions.Concat(pair.Value.Replies.SelectMany(reply => reply.Mentions)).Select(mention => mention.Person))).Select(author => author ?? string.Empty).Distinct(StringComparer.Ordinal));
         var entries = new List<Tc.ThreadedComment>();
         foreach (var (address, comment) in threads)
         {
             var rootId = ThreadId(sheetIndex, address);
-            entries.Add(Entry(address, rootId, null, comment.Text, comment.Author, comment.CreatedAt, persons, comment.IsResolved));
+            entries.Add(Entry(address, rootId, null, comment.Text, comment.Author, comment.CreatedAt, persons, comment.IsResolved, comment.Mentions));
             for (var index = 0; index < comment.Replies.Count; index++)
             {
                 var reply = comment.Replies[index];
-                entries.Add(Entry(address, Identifier($"{sheetIndex}:{address.ToA1()}:{index}"), rootId, reply.Text, reply.Author, reply.CreatedAt, persons, null));
+                entries.Add(Entry(address, Identifier($"{sheetIndex}:{address.ToA1()}:{index}"), rootId, reply.Text, reply.Author, reply.CreatedAt, persons, null, reply.Mentions));
             }
         }
 
@@ -83,7 +86,7 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
         return text.ToString();
     }
 
-    private Tc.ThreadedComment Entry(CellAddress address, string id, string? parent, string text, string? author, DateTimeOffset created, Dictionary<string, string> persons, bool? done)
+    private Tc.ThreadedComment Entry(CellAddress address, string id, string? parent, string text, string? author, DateTimeOffset created, Dictionary<string, string> persons, bool? done, IEnumerable<CommentMention> mentions)
     {
         var entry = new Tc.ThreadedComment(new Tc.ThreadedCommentText(escape.Encode(text)))
         {
@@ -94,6 +97,15 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
         };
         if (parent is not null) entry.ParentId = parent;
         if (done == true) entry.Done = true;
+        var kept = _mentions.Kept(text, mentions);
+        if (kept.Count > 0)
+            entry.ThreadedCommentMentions = new Tc.ThreadedCommentMentions(kept.Select((mention, index) => new Tc.Mention
+            {
+                MentionpersonId = persons[mention.Person],
+                MentionId = Identifier($"{id}:mention:{index}"),
+                StartIndex = (uint)mention.Start,
+                Length = (uint)mention.Length,
+            }));
         return entry;
     }
 
@@ -138,6 +150,11 @@ internal sealed class XlsxThreadedComments(OoxmlTextEscape escape) : IXlsxSheetP
 
     private string? Author(Tc.ThreadedComment comment, Dictionary<string, string> people) =>
         comment.PersonId?.Value is { } id && people.TryGetValue(id, out var name) ? name : null;
+
+    private IReadOnlyList<CommentMention> Mentions(Tc.ThreadedComment comment, Dictionary<string, string> people) =>
+        _mentions.Kept(Text(comment), (comment.ThreadedCommentMentions?.Elements<Tc.Mention>() ?? [])
+            .Where(mention => mention.StartIndex?.Value is not null && mention.Length?.Value is not null && mention.MentionpersonId?.Value is { } person && people.ContainsKey(person))
+            .Select(mention => new CommentMention((int)Math.Min(mention.StartIndex!.Value, (uint)int.MaxValue), (int)Math.Min(mention.Length!.Value, (uint)int.MaxValue), people[mention.MentionpersonId!.Value!])));
 
     private string Text(Tc.ThreadedComment comment) => escape.Decode(comment.ThreadedCommentText?.Text ?? string.Empty);
 }

@@ -81,6 +81,12 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
     public PulseOffice.UI.Controls.Links.ILinkFollower? Links { get; init; }
 
+    public ICellLinkClicking CellLinks
+    {
+        get => _grid.CellLinks;
+        init => _grid.CellLinks = value;
+    }
+
     public bool GoToPlace(string place)
     {
         var reference = place.TrimStart('#');
@@ -236,6 +242,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _segments = new LedgerStatusSegments(_status, _texts, _selection, new SelectionSummary(), _engine);
 
         _overlay.Children.Add(_editing.CellEditor);
+        _overlay.Children.Add(_editing.AnnotatedRange);
         _overlay.Children.Add(_shapeText.Editor);
 
         _grid.ZoomChanged += (_, zoom) => ShowZoom(zoom);
@@ -259,6 +266,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _grid.ClearRequested += (_, range) => _operations.ClearContents(range);
         _grid.ObjectsDeleteRequested += (_, objects) => _objects.DeleteObjects(objects);
         _grid.ResizeRequested += (_, request) => _operations.ApplyResize(request);
+        _grid.NoteBoxChanged += (_, change) => _operations.ApplyNoteBox(change);
         _grid.OutlineRequested += (_, button) => _operations.ApplyOutline(button);
         _grid.FormControlChanged += (_, change) => _objects.ApplyFormControl(change);
         _grid.FreeformCompleted += (_, completed) => _objects.InsertFreeform(completed);

@@ -157,6 +157,12 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         set { Viewport.ShowHeaders = value; InvalidateVisual(); }
     }
 
+    public ICellLinkClicking CellLinks
+    {
+        get => Options.CellLinks;
+        set => Options.CellLinks = value;
+    }
+
     public bool ShowFormulas
     {
         get => Options.ShowFormulas;
@@ -385,7 +391,7 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        _parts.Pointer.Release();
+        _parts.Pointer.Release(e.Timestamp);
         e.Pointer.Capture(null);
     }
 
@@ -475,6 +481,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
 
     public event EventHandler<ResizeRequest>? ResizeRequested { add => Events.ResizeRequested += value; remove => Events.ResizeRequested -= value; }
 
+    public event EventHandler<NoteBoxChange>? NoteBoxChanged { add => Events.NoteBoxChanged += value; remove => Events.NoteBoxChanged -= value; }
+
     public event EventHandler<Outline.OutlineButton>? OutlineRequested { add => Events.OutlineRequested += value; remove => Events.OutlineRequested -= value; }
 
     public sealed record FillRequest(CellRange Source, CellRange Target);
@@ -484,6 +492,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         DocumentSize Size, double? RotationDegrees);
 
     public sealed record ResizeRequest(bool IsColumn, int Index, Twip? Before, Twip After);
+
+    public sealed record NoteBoxChange(CellAddress Address, CommentBox Before, CommentBox After);
 
     public enum GridPart { Corner, RowHeader, ColumnHeader, Cell }
 

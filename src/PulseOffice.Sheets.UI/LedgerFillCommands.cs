@@ -72,6 +72,11 @@ public sealed class LedgerFillCommands(
                     else
                         engine.SetValue(new SheetCell(Context.SheetIndex, address), cell.Value);
             });
+
+            if (sheet.Protection.IsEnabled) return;
+            foreach (var (address, comment) in fill.Comments(sheet, source, selection, direction))
+                if (comment is null) sheet.Comments.Remove(address);
+                else sheet.Comments[address] = comment;
         });
 
     private static CellRange SourceOf(CellRange selection, FillDirection direction) => direction switch

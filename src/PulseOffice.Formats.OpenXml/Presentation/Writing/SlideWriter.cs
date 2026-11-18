@@ -126,7 +126,7 @@ internal sealed class PptxSlideWriter(
         }
 
         foreach (var (connection, placed, connector) in glued) _glue.Write(connection, placed, connector, targets);
-        foreach (var chrome in _headerFooter.Shapes(session.Deck.HeaderFooter, slide, session.Deck.IndexOf(slide) + 1, session.Deck.Size, shapeId, session.Deck.TextLanguage))
+        foreach (var chrome in _headerFooter.Shapes(session.Deck.HeaderFooter, slide, session.Deck.IndexOf(slide) + 1, session.Deck.Size, shapeId, session.Deck.TextLanguage, session.Deck.MasterOf(slide).Elements))
             tree.Append(chrome);
         nodes.Declare(slide.Groups);
         _groups.Wrap(nodes);

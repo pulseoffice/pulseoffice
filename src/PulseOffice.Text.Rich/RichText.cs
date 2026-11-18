@@ -138,6 +138,8 @@ public sealed record TextRun(string Text)
 
     public string? Hyperlink { get; init; }
 
+    public string? HyperlinkTip { get; init; }
+
     public string? Language { get; init; }
 
     public string? AsianFont { get; init; }

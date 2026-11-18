@@ -30,6 +30,7 @@ public sealed class PptxInteractionMapper
         else
         {
             var jump = new D.HyperlinkOnClick { Id = string.Empty, Action = SlideJumpClickAction.Jump };
+            if (action.Tip is { Length: > 0 } tip) jump.Tooltip = tip;
             session.PendingSlideLinks.Add((part, jump, target));
             nvPr.RemoveAllChildren<D.HyperlinkOnClick>();
             nvPr.PrependChild(jump);
@@ -47,6 +48,7 @@ public sealed class PptxInteractionMapper
     public void Apply(P.NonVisualDrawingProperties nvPr, InteractiveAction action, SlidePart part)
     {
         if (_actions.FirstOrDefault(candidate => candidate.Builds(action))?.Build(action, part) is not { } link) return;
+        if (action.Tip is { Length: > 0 } tip) link.Tooltip = tip;
 
         nvPr.RemoveAllChildren<D.HyperlinkOnClick>();
         nvPr.PrependChild(link);
@@ -54,7 +56,8 @@ public sealed class PptxInteractionMapper
 
     public InteractiveAction? Read(P.NonVisualDrawingProperties nvPr, SlidePart part, string targetId) =>
         nvPr.GetFirstChild<D.HyperlinkOnClick>() is { } link
-            ? _actions.Select(candidate => candidate.Read(link, part, targetId)).FirstOrDefault(read => read is not null)
+            && _actions.Select(candidate => candidate.Read(link, part, targetId)).FirstOrDefault(read => read is not null) is { } read
+            ? link.Tooltip?.Value is { Length: > 0 } tip ? read with { Tip = tip } : read
             : null;
 }
 

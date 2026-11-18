@@ -6,19 +6,33 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI.GridParts.Painting;
 
-internal sealed class GridNotePainter(GridViewport viewport, IGridTheme theme)
+internal sealed class GridNotePainter(GridViewport viewport, IGridTheme theme, GridDisplayOptions options)
 {
     private const double Padding = 4;
 
     public Rect NoteBounds(CellAddress address, CellComment comment)
     {
         var cell = viewport.MergedRect(address);
-        var box = comment.Box ?? CommentBox.Default;
+        var box = options.NotePreview is { } preview && preview.Address == address ? preview.Box : comment.Box ?? CommentBox.Default;
         return new Rect(
             cell.Right + GridGeometry.ToPixels(Twip.FromPoints(box.OffsetX)),
             Math.Max(cell.Y + GridGeometry.ToPixels(Twip.FromPoints(box.OffsetY)), viewport.Geometry.ColumnHeaderHeight),
             GridGeometry.ToPixels(Twip.FromPoints(box.Width)),
             GridGeometry.ToPixels(Twip.FromPoints(box.Height)));
+    }
+
+    public (CellAddress Address, CommentBox Box, Rect Bounds)? NoteAt(Point point)
+    {
+        if (viewport.Sheet is not { } sheet || sheet.Comments.Count == 0 || !viewport.GridArea().Contains(point)) return null;
+
+        foreach (var (address, comment) in sheet.Comments.Reverse())
+        {
+            if (!comment.IsAlwaysVisible) continue;
+            var bounds = NoteBounds(address, comment);
+            if (bounds.Contains(point)) return (address, comment.Box ?? CommentBox.Default, bounds);
+        }
+
+        return null;
     }
 
     public void PaintNotes(DrawingContext context)

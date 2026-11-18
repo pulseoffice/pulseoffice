@@ -8715,6 +8715,8 @@
   "chart.seriesRange.noTables": "No tables in this workbook",
   "command.ledger.connector.sites.title": "Connector Ends…",
   "command.ledger.connector.sites.description": "Chooses the side of each object the selected connector leaves from and arrives at",
+  "command.deck.connector.sites.title": "Connector Ends…",
+  "command.deck.connector.sites.description": "Chooses the side of each object the selected connector leaves from and arrives at",
   "connector.sites.explanation": "Choose where the connector leaves the first object and where it reaches the second. Automatic picks the side facing the other object.",
   "connector.sites.start": "Start",
   "connector.sites.end": "End",
@@ -8730,5 +8732,9 @@
   "shape.text.flow.stackedRightToLeft": "Stacked, right to left",
   "deck.textFrame.flow.EastAsianVertical": "East Asian vertical",
   "deck.textFrame.flow.MongolianVertical": "Vertical, lines left to right",
-  "deck.textFrame.flow.StackedRightToLeft": "Stacked, right to left"
+  "deck.textFrame.flow.StackedRightToLeft": "Stacked, right to left",
+  "settingCategory.spreadsheets": "Spreadsheets",
+  "setting.ledger.links.followOnClick.title": "Open cell hyperlinks with a click",
+  "setting.ledger.links.followOnClick.description": "A click on the text of a linked cell follows the link; a click beside the text, or a click held down, selects the cell. When off, use Ctrl+click or the Open Hyperlink command.",
+  "history.comment.box": "Move or resize note"
 }

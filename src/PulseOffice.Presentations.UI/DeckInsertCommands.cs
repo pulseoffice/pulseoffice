@@ -223,6 +223,8 @@ public sealed class DeckInsertCommands(
         {
             Address = Address(current),
             ShowsText = false,
+            ShowsTip = true,
+            Tip = current?.Tip,
             Places = Places(t.Deck),
             CanRemove = current is not null && current.Kind != InteractionKind.None,
         };
@@ -238,7 +240,10 @@ public sealed class DeckInsertCommands(
         _ => _jumps.FirstOrDefault(jump => jump.Kind == action.Kind).Address ?? string.Empty,
     };
 
-    private InteractiveAction Interaction(string elementId, LinkChoice choice)
+    private InteractiveAction Interaction(string elementId, LinkChoice choice) =>
+        Untipped(elementId, choice) with { Tip = choice.Tip is { Length: > 0 } tip ? tip : null };
+
+    private InteractiveAction Untipped(string elementId, LinkChoice choice)
     {
         if (choice.Kind != LinkKind.Place)
             return new InteractiveAction { TargetId = elementId, Kind = InteractionKind.Hyperlink, Reference = choice.Address };

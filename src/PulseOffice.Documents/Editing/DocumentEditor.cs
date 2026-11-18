@@ -272,7 +272,7 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
 
     public DocumentEdit ClearDirectFormatting(TextDocument document, UndoStack history, DocumentRange range) =>
         EachParagraph(document, history, range, "clear-formatting", (state, start, end) => text.Map(state, start, end,
-            run => direct.Clear(run) with { Field = run.Field, FieldArgument = run.FieldArgument, Hyperlink = run.Hyperlink, StyleName = run.StyleName }));
+            run => direct.Clear(run) with { Field = run.Field, FieldArgument = run.FieldArgument, Hyperlink = run.Hyperlink, HyperlinkTip = run.HyperlinkTip, StyleName = run.StyleName }));
 
     public DocumentEdit RemoveObject(TextDocument document, UndoStack history, string objectId)
     {

@@ -78,6 +78,8 @@ public sealed class FolioCanvas : Control
         _editor = editor;
         _services = services;
         _scroll = scroll;
+        _overlays = new FolioTextOverlays(editor, services);
+        _objectGestures = new FolioObjectGestures(this, editor, services);
         Focusable = false;
         Cursor = new Cursor(StandardCursorType.Ibeam);
         _editor.Brush.Changed += (_, _) => Cursor = new Cursor(_editor.Brush.Sample is null ? StandardCursorType.Ibeam : StandardCursorType.Cross);
@@ -203,6 +205,10 @@ public sealed class FolioCanvas : Control
 
     private readonly Dictionary<int, IReadOnlyList<CommentBalloon>> _balloons = [];
 
+    private readonly FolioTextOverlays _overlays;
+
+    private readonly FolioObjectGestures _objectGestures;
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var sidebar = Sidebar;
@@ -280,11 +286,11 @@ public sealed class FolioCanvas : Control
         var top = _scroll.Offset.Y - 50;
         var bottom = _scroll.Viewport.Height > 0 ? _scroll.Offset.Y + _scroll.Viewport.Height + 50 : Bounds.Height;
         var cells = _editor.Preedit is null ? _editor.CellRange() : null;
-        var selection = cells is null ? SelectionMap() : [];
+        var selection = cells is null ? _overlays.SelectionMap() : [];
         var marks = _services.FieldNames.Apply(_services.Spotlight.Apply(_services.Lines.Apply(_services.Marks.Current with { ChangeBar = _services.Bars.For(_editor.Document) }, _editor.Document, layout), _editor.Document));
         var sheet = _services.Comments.Shows(_editor.Document) ? _services.Comments.Sheet(_editor.Document) : null;
-        var current = sheet is null ? null : sheet.Anchors.LastOrDefault(anchor => Covers(anchor, _editor.Caret))?.Comment.Id;
-        var controls = ControlRanges(layout, marks.FieldShadings);
+        var current = sheet is null ? null : sheet.Anchors.LastOrDefault(anchor => _overlays.Covers(anchor, _editor.Caret))?.Comment.Id;
+        var controls = _overlays.ControlRanges(layout, marks.FieldShadings);
         _balloons.Clear();
         foreach (var slot in _arrangement.Pages.Where(slot => slot.Intersects(top, bottom)))
         {
@@ -295,17 +301,17 @@ public sealed class FolioCanvas : Control
             using var shift = context.PushTransform(Matrix.CreateScale(Scale, Scale) * Matrix.CreateTranslation(slot.X, slot.Y));
             using (context.PushClip(new Rect(0, slot.CropTop / Scale, page.Width, (slot.Height - slot.CropTop - slot.CropBottom) / Scale)))
             {
-                if (sheet is not null) PaintCommentRanges(context, page, sheet);
-                PaintControls(context, page, controls);
-                PaintSelection(context, page, selection);
+                if (sheet is not null) _overlays.PaintCommentRanges(context, page, sheet);
+                _overlays.PaintControls(context, page, controls, Accent);
+                _overlays.PaintSelection(context, page, selection, Accent);
                 _services.Renderer.Paint(_services.Surfaces.Screen(context, _editor.Document.Language), page, Content, marks);
-                PaintGrids(context, page, (top - slot.Y) / Scale, (bottom - slot.Y) / Scale);
-                if (cells is not null) PaintCells(context, page, cells);
+                _overlays.PaintGrids(context, page, (top - slot.Y) / Scale, (bottom - slot.Y) / Scale, Scale, Accent, _objectGestures.Helpline(page.Index));
+                if (cells is not null) _overlays.PaintCells(context, page, cells, Accent);
                 PaintColumnDrag(context, slot);
-                PaintWaves(context, page);
-                PaintObjectSelection(context, page);
-                PaintAdjustHandles(context, page);
-                PaintOtherSelections(context, page);
+                _overlays.PaintWaves(context, page);
+                _objectGestures.PaintObjectSelection(context, page, Accent);
+                _objectGestures.PaintAdjustHandles(context, page);
+                _objectGestures.PaintOtherSelections(context, page, Accent);
             }
             if (sheet is null) continue;
             var balloons = _services.Comments.Place(_editor.Document, sheet, page);
@@ -324,7 +330,7 @@ public sealed class FolioCanvas : Control
         if (point.Properties.IsRightButtonPressed)
         {
             PointerPlaced?.Invoke(this, EventArgs.Empty);
-            if (ObjectAt(point.Position) is { } target)
+            if (_objectGestures.ObjectAt(point.Position) is { } target)
             {
                 _editor.SelectObject(target.Box.ObjectId);
                 MenuRequested?.Invoke(this, EventArgs.Empty);
@@ -339,7 +345,7 @@ public sealed class FolioCanvas : Control
         if (!point.Properties.IsLeftButtonPressed) return;
         PointerPlaced?.Invoke(this, EventArgs.Empty);
         if (BeginDrawing(point.Position, e)) return;
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && ObjectAt(point.Position) is { } added)
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _objectGestures.ObjectAt(point.Position) is { } added)
         {
             _editor.ToggleObject(added.Box.ObjectId);
             e.Handled = true;
@@ -358,34 +364,34 @@ public sealed class FolioCanvas : Control
             e.Handled = true;
             return;
         }
-        if (FollowsLink(e.KeyModifiers) && ObjectAt(point.Position) is { } linked && PointMember(linked, point.Position) is { } member
+        if (FollowsLink(e.KeyModifiers) && _objectGestures.ObjectAt(point.Position) is { } linked && _objectGestures.PointMember(linked, point.Position) is { } member
             && _services.ObjectLinks.EffectiveLink(_editor, member) is not null)
         {
             _services.ObjectLinks.Follow(_editor, member);
             e.Handled = true;
             return;
         }
-        if (ObjectAt(point.Position) is { } control && _services.FormEvents.Activate(_editor, control.Box.ObjectId))
+        if (_objectGestures.ObjectAt(point.Position) is { } control && _services.FormEvents.Activate(_editor, control.Box.ObjectId))
         {
             e.Handled = true;
             return;
         }
-        if (BeginAdjust(point.Position, e.ClickCount) || BeginObjectGesture(point.Position, e.ClickCount))
+        if (_objectGestures.BeginAdjust(point.Position, e.ClickCount) || _objectGestures.BeginObjectGesture(point.Position, e.ClickCount))
         {
             e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
-        if (e.ClickCount >= 2 && ObjectAt(point.Position) is { } framed && _editor.Objects.EnterFrame(framed.Box.ObjectId, PositionAt(point.Position)))
+        if (e.ClickCount >= 2 && _objectGestures.ObjectAt(point.Position) is { } framed && _editor.Objects.EnterFrame(framed.Box.ObjectId, PositionAt(point.Position)))
         {
             e.Handled = true;
             return;
         }
-        if (ObjectAt(point.Position) is { } hit)
+        if (_objectGestures.ObjectAt(point.Position) is { } hit)
         {
             _editor.SelectObject(hit.Box.ObjectId);
-            PointMember(hit, point.Position);
-            if (BeginObjectGesture(point.Position, e.ClickCount)) e.Pointer.Capture(this);
+            _objectGestures.PointMember(hit, point.Position);
+            if (_objectGestures.BeginObjectGesture(point.Position, e.ClickCount)) e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
@@ -445,28 +451,8 @@ public sealed class FolioCanvas : Control
             e.Handled = true;
             return;
         }
-        if (_adjust is { } adjusting)
+        if (_objectGestures.Drag(e.GetPosition(this), e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
         {
-            var at = e.GetPosition(this);
-            _adjust = adjusting with
-            {
-                Grip = _services.Adjusting.Drag(adjusting.Grip, adjusting.Frame,
-                    new Point((at.X - adjusting.Slot.X) / Scale, (at.Y - adjusting.Slot.Y) / Scale)),
-            };
-            InvalidateVisual();
-            e.Handled = true;
-            return;
-        }
-        if (_gesture is { } gesture)
-        {
-            var at = e.GetPosition(this);
-            var dx = (at.X - gesture.Origin.X) / Scale;
-            var dy = (at.Y - gesture.Origin.Y) / Scale;
-            var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            var session = gesture.Session;
-            session.Track(dx, dy, (at.X - gesture.Slot.X) / Scale, (at.Y - gesture.Slot.Y) / Scale, shift);
-            session.Settle(Snap(session, gesture.Slot.Index));
-            _gesture = gesture with { Moved = gesture.Moved || !session.Moving || Math.Abs(dx) + Math.Abs(dy) > 2 / Scale };
             InvalidateVisual();
             e.Handled = true;
             return;
@@ -681,14 +667,6 @@ public sealed class FolioCanvas : Control
         context.DrawLine(pen, new Point(drag.Preview, drag.Top), new Point(drag.Preview, drag.Bottom));
     }
 
-    private void PaintCells(DrawingContext context, PageBox page, PulseOffice.Documents.Editing.Tables.TableSelection cells)
-    {
-        var brush = new SolidColorBrush(Accent is ISolidColorBrush accent ? accent.Color : Colors.DodgerBlue, 0.22);
-        foreach (var table in page.Tables.Where(table => table.TableId == cells.Table.Id))
-            foreach (var cell in table.Cells.Where(cell => cells.Range.Contains(cell.Row, cell.Column)))
-                context.FillRectangle(brush, new Rect(cell.Bounds.X, cell.Bounds.Y, cell.Bounds.Width, cell.Bounds.Height));
-    }
-
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -709,21 +687,8 @@ public sealed class FolioCanvas : Control
             e.Handled = true;
             return;
         }
-        if (_adjust is { } adjusted)
+        if (_objectGestures.Release(e.GetPosition(this), e.Pointer))
         {
-            _adjust = null;
-            e.Pointer.Capture(null);
-            if (adjusted.Grip.Changed)
-                _services.ObjectEditing.Replace(_editor, value => value is PulseOffice.Drawing.Shapes.ShapeObject ? adjusted.Grip.Preview : value);
-            InvalidateVisual();
-            e.Handled = true;
-            return;
-        }
-        if (_gesture is { } done)
-        {
-            _gesture = null;
-            e.Pointer.Capture(null);
-            if (done.Moved) Commit(done, e.GetPosition(this));
             InvalidateVisual();
             e.Handled = true;
             return;
@@ -740,184 +705,18 @@ public sealed class FolioCanvas : Control
     {
         base.OnPointerCaptureLost(e);
         _dragging = false;
-        _gesture = null;
-        _adjust = null;
+        _objectGestures.Cancel();
         _column = null;
     }
 
     private PulseOffice.Document.Embedding.EmbeddedObject? Content(string objectId) =>
         _editor.Document.Objects.Find(objectId)?.Content is PulseOffice.Documents.Objects.EmbeddedContent embedded ? _services.GroupText.Painted(embedded) : null;
 
-    private sealed record ObjectGesture(PulseOffice.Drawing.Shapes.ObjectTransformSession Session, Point Origin, PageSlot Slot, bool Moved = false)
-    {
-        public PulseOffice.Drawing.Shapes.ObjectHandle Handle => Session.Handle;
-
-        public PulseOffice.Drawing.Shapes.ObjectBox Preview => Session.Preview;
-
-        public double Rotation => Session.Rotation;
-    }
-
-    private sealed record ObjectHit(ObjectBox Box, PageSlot Slot);
-
-    private ObjectGesture? _gesture;
-
-    private PageSlot? SlotAt(Point point) =>
+    internal PageSlot? SlotAt(Point point) =>
         _arrangement.Pages.FirstOrDefault(candidate => candidate.Contains(point.X, point.Y));
 
     private bool FollowsLink(KeyModifiers modifiers) =>
         (modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Meta)) && !modifiers.HasFlag(KeyModifiers.Shift);
-
-    private FolioObjectLinkTarget? PointMember(ObjectHit hit, Point point) =>
-        _services.ObjectLinks.Point(_editor, hit.Box, (point.X - hit.Slot.X) / Scale, (point.Y - hit.Slot.Y) / Scale);
-
-    private ObjectHit? ObjectAt(Point point)
-    {
-        var layout = _editor.DisplayLayout;
-        if (SlotAt(point) is not { } slot || slot.Index >= layout.Pages.Count) return null;
-        return _services.Objects.At(layout.Pages[slot.Index], (point.X - slot.X) / Scale, (point.Y - slot.Y) / Scale) is { } box ? new ObjectHit(box, slot) : null;
-    }
-
-    private sealed record AdjustGesture(PulseOffice.UI.Controls.Shapes.AdjustHandleGrip Grip, PulseOffice.UI.Controls.Shapes.AdjustFrame Frame, PageSlot Slot);
-
-    private AdjustGesture? _adjust;
-
-    private (PulseOffice.Drawing.Shapes.ShapeObject Shape, PulseOffice.UI.Controls.Shapes.AdjustFrame Frame, PageSlot Slot)? Adjustable()
-    {
-        if (_editor.ReadOnly() || _editor.SelectedObjectIds.Count > 1 || _editor.SelectedObjectId is not { } id
-            || _editor.Document.Objects.Find(id) is not { Content: PulseOffice.Documents.Objects.EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject shape } } item
-            || _editor.Objects.Locked(item))
-            return null;
-        if (_services.Objects.Find(_editor.DisplayLayout, id, out var index) is not { } box || index >= _arrangement.Pages.Count) return null;
-        return (shape, new PulseOffice.UI.Controls.Shapes.AdjustFrame(new Rect(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height), item.RotationDegrees, item.FlipHorizontal, item.FlipVertical), _arrangement.Pages[index]);
-    }
-
-    private double AdjustSize => (_services.Manipulator.HandleSize / 2 + 1) / Scale;
-
-    private bool BeginAdjust(Point point, int clicks)
-    {
-        if (clicks > 1 || Adjustable() is not { } adjustable) return false;
-        var local = new Point((point.X - adjustable.Slot.X) / Scale, (point.Y - adjustable.Slot.Y) / Scale);
-        if (_services.Adjusting.Grip(adjustable.Shape, adjustable.Frame, local, AdjustSize + 1 / Scale) is not { } grip) return false;
-        _adjust = new AdjustGesture(grip, adjustable.Frame, adjustable.Slot);
-        return true;
-    }
-
-    private void PaintAdjustHandles(DrawingContext context, PageBox page)
-    {
-        if (_gesture is not null || Adjustable() is not { } adjustable || adjustable.Slot.Index != page.Index) return;
-        if (_adjust is { } adjusting) _services.Adjusting.DrawPreview(context, adjusting.Grip, adjusting.Frame, AdjustSize, 1 / Scale);
-        else _services.Adjusting.Draw(context, adjustable.Shape, adjustable.Frame, AdjustSize);
-    }
-
-    private bool BeginObjectGesture(Point point, int clicks)
-    {
-        if (clicks > 1 || _editor.ReadOnly() || _editor.SelectedObjectId is not { } id || _editor.Document.Objects.Find(id) is not { } item) return false;
-        if (_services.Objects.Find(_editor.DisplayLayout, id, out var index) is not { } box || index >= _arrangement.Pages.Count) return false;
-        var slot = _arrangement.Pages[index];
-        var area = new PulseOffice.Drawing.Shapes.ObjectBox(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height);
-        var handle = _services.Frame.HandleAt(new PulseOffice.UI.Controls.Shapes.FrameScene(area, item.RotationDegrees, Brushes.Transparent, 1 / Scale), new Point((point.X - slot.X) / Scale, (point.Y - slot.Y) / Scale));
-        if (handle == PulseOffice.Drawing.Shapes.ObjectHandle.None) return false;
-        _gesture = new ObjectGesture(_services.Manipulator.Begin(handle, area, item.RotationDegrees), point, slot);
-        return true;
-    }
-
-    private void Commit(ObjectGesture gesture, Point release)
-    {
-        if (_editor.SelectedObjectId is not { } id) return;
-        switch (gesture.Handle)
-        {
-            case PulseOffice.Drawing.Shapes.ObjectHandle.Body:
-                var target = SlotAt(release) ?? gesture.Slot;
-                var shiftX = (gesture.Slot.X - target.X) / Scale;
-                var shiftY = (gesture.Slot.Y - target.Y) / Scale;
-                _services.Mover.Move(_editor, id, new ObjectDrop(target.Index, gesture.Preview.X + shiftX, gesture.Preview.Y + shiftY,
-                    (release.X - target.X) / Scale, (release.Y - target.Y) / Scale));
-                break;
-            case PulseOffice.Drawing.Shapes.ObjectHandle.Rotate:
-                _editor.Objects.Rotate(gesture.Rotation);
-                break;
-            default:
-                _editor.Objects.Resize(new PulseOffice.Foundation.Units.DocumentSize(
-                    PulseOffice.Foundation.Units.Twip.FromPoints(Math.Max(1, gesture.Preview.Width)), PulseOffice.Foundation.Units.Twip.FromPoints(Math.Max(1, gesture.Preview.Height))));
-                break;
-        }
-    }
-
-    private PulseOffice.Drawing.Shapes.ObjectBox Snap(PulseOffice.Drawing.Shapes.ObjectTransformSession session, int page)
-    {
-        var view = _services.ViewLayout;
-        var pages = _editor.DisplayLayout.Pages;
-        var step = view.GridSpacing;
-        if (!view.SnapToGrid || page >= pages.Count || step <= 0) return session.Preview;
-        var sheet = pages[page];
-        var content = sheet.Content;
-        var left = content.X - Math.Ceiling(content.X / step) * step;
-        var top = content.Y - Math.Ceiling(content.Y / step) * step;
-        var lines = _services.Snapping.Lattice(left, top, sheet.Width, sheet.Height, step);
-        return _services.Snapping.Snap(session, lines, step / 2);
-    }
-
-    private double FirstLine(double start, double step, double visibleTop) =>
-        visibleTop <= start ? start : start + Math.Floor((visibleTop - start) / step) * step;
-
-    private void PaintGrids(DrawingContext context, PageBox page, double visibleTop, double visibleBottom)
-    {
-        var view = _services.ViewLayout;
-        var content = page.Content;
-        var last = Math.Min(content.Bottom, visibleBottom);
-        if (view.Grid)
-        {
-            var dot = new SolidColorBrush(Color.FromArgb(150, 100, 116, 139));
-            var size = 1.2 / Scale;
-            var dots = new StreamGeometry();
-            using (var pen = dots.Open())
-            {
-                for (var y = FirstLine(content.Y, view.GridSpacing, visibleTop); y <= last + 0.01; y += view.GridSpacing)
-                    for (var x = content.X; x <= content.Right + 0.01; x += view.GridSpacing)
-                    {
-                        pen.BeginFigure(new Point(x - size / 2, y - size / 2), true);
-                        pen.LineTo(new Point(x + size / 2, y - size / 2));
-                        pen.LineTo(new Point(x + size / 2, y + size / 2));
-                        pen.LineTo(new Point(x - size / 2, y + size / 2));
-                        pen.EndFigure(true);
-                    }
-            }
-            context.DrawGeometry(dot, null, dots);
-        }
-        if (view.BaselineGrid)
-        {
-            var pen = new Pen(new SolidColorBrush(Color.FromArgb(90, 37, 99, 235)), 0.5 / Scale);
-            var spacing = Math.Max(6, (_editor.Document.Styles.DefaultCharacter.FontSize ?? 12) * 1.17);
-            for (var y = FirstLine(content.Y + spacing, spacing, visibleTop); y <= last; y += spacing)
-                context.DrawLine(pen, new Point(content.X, y), new Point(content.Right, y));
-        }
-        if (view.Helplines && _gesture is { Moved: true } gesture && gesture.Slot.Index == page.Index)
-        {
-            var pen = new Pen(Accent ?? Brushes.DodgerBlue, 0.6 / Scale, new DashStyle([4, 3], 0));
-            var area = gesture.Preview;
-            foreach (var x in new[] { area.X, area.X + area.Width })
-                context.DrawLine(pen, new Point(x, 0), new Point(x, page.Height));
-            foreach (var y in new[] { area.Y, area.Y + area.Height })
-                context.DrawLine(pen, new Point(0, y), new Point(page.Width, y));
-        }
-    }
-
-    private void PaintOtherSelections(DrawingContext context, PageBox page)
-    {
-        var accent = Accent ?? Brushes.DodgerBlue;
-        foreach (var id in _editor.SelectedObjectIds.Skip(1))
-            if (_services.Objects.Find(_editor.DisplayLayout, id, out var index) is { } box && index == page.Index)
-                _services.Frame.DrawSecondary(context, new PulseOffice.UI.Controls.Shapes.FrameScene(
-                    new PulseOffice.Drawing.Shapes.ObjectBox(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height), box.RotationDegrees, accent, 1 / Scale));
-    }
-
-    private void PaintObjectSelection(DrawingContext context, PageBox page)
-    {
-        if (_editor.SelectedObjectId is not { } id || _services.Objects.Find(_editor.DisplayLayout, id, out var index) is not { } box || index != page.Index) return;
-        var area = _gesture?.Preview ?? new PulseOffice.Drawing.Shapes.ObjectBox(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height);
-        var rotation = _gesture?.Rotation ?? box.RotationDegrees;
-        _services.Frame.Draw(context, new PulseOffice.UI.Controls.Shapes.FrameScene(area, rotation, Accent ?? Brushes.DodgerBlue, 1 / Scale, !_editor.ReadOnly()));
-    }
 
     public DocumentPosition? PositionAt(Point point)
     {
@@ -928,14 +727,6 @@ public sealed class FolioCanvas : Control
         var y = Math.Clamp((point.Y - slot.Y) / Scale, slot.CropTop / Scale, (slot.Height - slot.CropBottom) / Scale);
         return _services.Queries.HitTest(_editor.DisplayLayout, slot.Index, x, y);
     }
-
-    private ITurnedFrame? TurnedOwner(PageBox page, LineBox line) =>
-        page.TurnedFrames.FirstOrDefault(frame => frame.Lines.Contains(line));
-
-    private DrawingContext.PushedState? Turn(DrawingContext context, PageBox page, LineBox line) =>
-        TurnedOwner(page, line) is { } owner
-            ? context.PushTransform(new ObjectTransform(owner.RotationDegrees).Around(new Rect(owner.Bounds.X, owner.Bounds.Y, owner.Bounds.Width, owner.Bounds.Height)))
-            : null;
 
     public (PageSlot Slot, PageBox Page)? CaretPage()
     {
@@ -980,165 +771,10 @@ public sealed class FolioCanvas : Control
         return context.PushTransform(new ObjectTransform(owner.RotationDegrees).Around(bounds));
     }
 
-    private Dictionary<string, (int From, int To)> SelectionMap()
-    {
-        var map = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
-        if (_editor.Preedit is not null) return map;
-        if (_editor.BlockRanges.Count > 0)
-        {
-            foreach (var block in _editor.BlockRanges) map[block.Start.ParagraphId] = (block.Start.Offset, block.End.Offset);
-            return map;
-        }
-        if (!_editor.HasSelection) return map;
-        var range = _editor.Selection;
-        foreach (var paragraph in _services.Order.Between(_editor.Document, range.Start, range.End))
-        {
-            var from = paragraph.Id == range.Start.ParagraphId ? range.Start.Offset : 0;
-            var to = paragraph.Id == range.End.ParagraphId ? range.End.Offset : paragraph.Length + 1;
-            map[paragraph.Id] = (from, to);
-        }
-        return map;
-    }
-
-    private void PaintSelection(DrawingContext context, PageBox page, Dictionary<string, (int From, int To)> selection)
-    {
-        if (selection.Count == 0) return;
-        var brush = new SolidColorBrush(Accent is ISolidColorBrush accent ? accent.Color : Colors.DodgerBlue, 0.28);
-        foreach (var line in page.AllLines)
-        {
-            if (!selection.TryGetValue(line.ParagraphId, out var span)) continue;
-            var composed = line.Line;
-            var from = Math.Max(span.From, composed.Start);
-            var to = Math.Min(span.To, composed.End);
-            var tail = span.To > composed.End && composed.IsLast;
-            if (to <= from && !tail) continue;
-            var left = _services.Geometry.XOf(line, from);
-            var right = to > from ? _services.Geometry.XOf(line, to) : left;
-            if (tail) right += 4;
-            using (Turn(context, page, line)) context.FillRectangle(brush, new Rect(left, line.Top, Math.Max(1, right - left), composed.CaretHeight));
-        }
-    }
-
-    private bool Covers(PulseOffice.Documents.Commenting.CommentAnchor anchor, PulseOffice.Documents.Editing.DocumentPosition caret)
-    {
-        var order = _editor.Services.Order;
-        return order.Contains(_editor.Document, anchor.Start.ParagraphId) && order.Contains(_editor.Document, anchor.End.ParagraphId)
-            && order.Compare(_editor.Document, anchor.Start, caret) <= 0 && order.Compare(_editor.Document, caret, anchor.End) <= 0;
-    }
-
-    private sealed record ControlRange(int From, int To, bool Active, bool First, string? Title);
-
-    private sealed record ControlRangeKey(DocumentLayout Layout, long Revision, DocumentPosition Caret, bool Shade);
-
-    private (ControlRangeKey Key, Dictionary<string, List<ControlRange>> Ranges)? _controls;
-
-    private Dictionary<string, List<ControlRange>> ControlRanges(DocumentLayout layout, bool shade)
-    {
-        var key = new ControlRangeKey(layout, _editor.Document.Revision, _editor.Caret, shade);
-        if (_controls is { } cached && cached.Key == key) return cached.Ranges;
-        var ranges = CollectControlRanges(shade);
-        _controls = (key, ranges);
-        return ranges;
-    }
-
-    private Dictionary<string, List<ControlRange>> CollectControlRanges(bool shade)
-    {
-        var ranges = new Dictionary<string, List<ControlRange>>(StringComparer.Ordinal);
-        var catalog = _editor.Services.Controls.Catalog;
-        var spans = catalog.All(_editor.Document);
-        if (spans.Count == 0) return ranges;
-        var active = _editor.ControlAt(_editor.Caret)?.Id;
-        foreach (var span in spans)
-        {
-            var current = span.Id == active;
-            if (!shade && !current) continue;
-            foreach (var paragraph in _services.Order.Between(_editor.Document, span.Start, span.End))
-            {
-                var from = paragraph.Id == span.Start.ParagraphId ? span.Start.Offset : 0;
-                var to = paragraph.Id == span.End.ParagraphId ? span.End.Offset : paragraph.Length;
-                if (!ranges.TryGetValue(paragraph.Id, out var list)) ranges[paragraph.Id] = list = [];
-                list.Add(new ControlRange(from, to, current, paragraph.Id == span.Start.ParagraphId, span.Control.Title));
-            }
-        }
-        return ranges;
-    }
-
-    private void PaintControls(DrawingContext context, PageBox page, Dictionary<string, List<ControlRange>> ranges)
-    {
-        if (ranges.Count == 0) return;
-        var accent = Accent is ISolidColorBrush solid ? solid.Color : Colors.DodgerBlue;
-        var shade = new SolidColorBrush(accent, 0.08);
-        var frame = new Pen(new SolidColorBrush(accent, 0.75), 0.75);
-        var titled = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var line in page.AllLines)
-        {
-            if (!ranges.TryGetValue(line.ParagraphId, out var list)) continue;
-            var composed = line.Line;
-            foreach (var range in list)
-            {
-                var from = Math.Max(range.From, composed.Start);
-                var to = Math.Min(range.To, composed.End);
-                if (to < from || to == from && range.To > range.From) continue;
-                var left = _services.Geometry.XOf(line, from) - 1;
-                var right = Math.Max(left + 4, _services.Geometry.XOf(line, to) + 1);
-                var box = new Rect(left, line.Top, right - left, composed.CaretHeight);
-                context.FillRectangle(shade, box);
-                if (!range.Active) continue;
-                context.DrawRectangle(null, frame, box, 1.5, 1.5);
-                if (!range.First || range.Title is not { Length: > 0 } title || !titled.Add(line.ParagraphId)) continue;
-                var label = new FormattedText(title, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Typeface.Default, 7.5, Brushes.White);
-                var tab = new Rect(left, line.Top - label.Height - 2, label.Width + 6, label.Height + 2);
-                context.FillRectangle(new SolidColorBrush(accent, 0.9), tab, 1.5f);
-                context.DrawText(label, new Point(tab.X + 3, tab.Y + 1));
-            }
-        }
-    }
-
-    private void PaintCommentRanges(DrawingContext context, PageBox page, CommentSheet sheet)
-    {
-        if (sheet.Ranges.Count == 0) return;
-        foreach (var line in page.AllLines)
-        {
-            if (!sheet.Ranges.TryGetValue(line.ParagraphId, out var ranges)) continue;
-            var composed = line.Line;
-            foreach (var range in ranges)
-            {
-                var from = Math.Max(range.From, composed.Start);
-                var to = Math.Min(range.To, composed.End);
-                if (to <= from) continue;
-                var left = _services.Geometry.XOf(line, from);
-                var right = _services.Geometry.XOf(line, to);
-                context.FillRectangle(new SolidColorBrush(Color.FromUInt32(range.Color), range.Resolved ? 0.08 : 0.18), new Rect(left, line.Top, Math.Max(1, right - left), composed.CaretHeight));
-            }
-        }
-    }
-
     public string? BalloonAt(Point point)
     {
         if (SlotAt(point) is not { } slot || !_balloons.TryGetValue(slot.Index, out var balloons)) return null;
         var local = new Point((point.X - slot.X) / Scale, (point.Y - slot.Y) / Scale);
         return balloons.FirstOrDefault(balloon => balloon.Bounds.Contains(local))?.Anchor.Comment.Id;
-    }
-
-    private void PaintWaves(DrawingContext context, PageBox page)
-    {
-        if (!_services.Proofing.Enabled) return;
-        foreach (var group in page.AllLines.GroupBy(line => line.ParagraphId))
-        {
-            if (_editor.Preedit is not null && group.Key == _editor.PreeditAt.ParagraphId) continue;
-            if (_editor.ContentOf(group.Key) is not { } paragraph) continue;
-            foreach (var mark in _services.Proofing.Marks(_editor.Document, paragraph))
-            {
-                foreach (var line in group)
-                {
-                    var from = Math.Max(mark.Start, line.Line.Start);
-                    var to = Math.Min(mark.Start + mark.Length, line.Line.End);
-                    if (to <= from) continue;
-                    var left = _services.Geometry.XOf(line, from);
-                    var right = _services.Geometry.XOf(line, to);
-                    using (Turn(context, page, line)) _services.Waves.PaintWave(context, new Rect(left, line.Top, right - left, line.Line.CaretHeight), 0.05, mark.Grammar);
-                }
-            }
-        }
     }
 }

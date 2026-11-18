@@ -8715,6 +8715,8 @@
   "chart.seriesRange.noTables": "No hay tablas en este libro",
   "command.ledger.connector.sites.title": "Extremos del conector…",
   "command.ledger.connector.sites.description": "Elige el lado de cada objeto del que sale y al que llega el conector seleccionado",
+  "command.deck.connector.sites.title": "Extremos del conector…",
+  "command.deck.connector.sites.description": "Elige el lado de cada objeto del que sale y al que llega el conector seleccionado",
   "connector.sites.explanation": "Elija dónde sale el conector del primer objeto y dónde llega al segundo. Automático usa el lado orientado hacia el otro objeto.",
   "connector.sites.start": "Inicio",
   "connector.sites.end": "Fin",
@@ -8730,5 +8732,9 @@
   "shape.text.flow.stackedRightToLeft": "Apilado, de derecha a izquierda",
   "deck.textFrame.flow.EastAsianVertical": "Vertical de Asia oriental",
   "deck.textFrame.flow.MongolianVertical": "Vertical, líneas de izquierda a derecha",
-  "deck.textFrame.flow.StackedRightToLeft": "Apilado, de derecha a izquierda"
+  "deck.textFrame.flow.StackedRightToLeft": "Apilado, de derecha a izquierda",
+  "settingCategory.spreadsheets": "Hojas de cálculo",
+  "setting.ledger.links.followOnClick.title": "Abrir los hipervínculos de celda con un clic",
+  "setting.ledger.links.followOnClick.description": "Un clic en el texto de una celda vinculada sigue el vínculo; un clic junto al texto, o un clic mantenido, selecciona la celda. Si está desactivado, usa Ctrl+clic o el comando Abrir hipervínculo.",
+  "history.comment.box": "Mover o cambiar el tamaño de la nota"
 }

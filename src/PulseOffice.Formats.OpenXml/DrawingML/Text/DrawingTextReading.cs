@@ -9,15 +9,17 @@ internal sealed class DrawingRunReader(IDrawingFieldTypes fields, LevelStyleRead
 {
     private readonly PptxRunLanguages _languages = new();
 
+    private string? Tip(D.HyperlinkOnClick? link) => link?.Tooltip?.Value is { Length: > 0 } tip ? tip : null;
+
     public TextRun? Read(OpenXmlElement element, LevelStyle inherited, IDrawingRunLinks links) => element switch
     {
-        D.Run run => Read(run, inherited) with { Hyperlink = links.Read(run.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()) },
+        D.Run run => Read(run, inherited) with { Hyperlink = links.Read(run.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()), HyperlinkTip = Tip(run.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()) },
         D.Break line => Read(new D.Run(
             line.RunProperties?.CloneNode(true) ?? new D.RunProperties(),
             new D.Text("\n")), inherited),
         D.Field field => Read(new D.Run(
             field.RunProperties?.CloneNode(true) ?? new D.RunProperties(),
-            new D.Text(field.Text?.Text ?? string.Empty)), inherited) with { Hyperlink = links.Read(field.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()), Field = fields.KindOf(field.Type?.Value), FieldDetail = fields.DetailOf(field.Type?.Value) },
+            new D.Text(field.Text?.Text ?? string.Empty)), inherited) with { Hyperlink = links.Read(field.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()), HyperlinkTip = Tip(field.RunProperties?.GetFirstChild<D.HyperlinkOnClick>()), Field = fields.KindOf(field.Type?.Value), FieldDetail = fields.DetailOf(field.Type?.Value) },
         _ => null,
     };
 

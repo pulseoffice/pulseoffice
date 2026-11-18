@@ -29,11 +29,11 @@ pivot's drawn output, the link was lost silently, and a refresh that grew the pi
   (name after the last `!`). Static charts are written with literal values (`numLit`/`strLit`) and read back as
   `InlineData` when no series has a formula.
 - ODS: writes `pulseoffice:pivot-source`, `pulseoffice:pivot-format` and `pulseoffice:pivot-field-buttons` on
-  `chart:chart`, plus the vendor `loext:data-pilot-source` attribute that the reference suite uses for the same link;
+  `chart:chart`, plus the vendor the vendor extension attribute `data-pilot-source` attribute that the reference suite uses for the same link;
   reads either. Static charts are written with a local table only and read back as `InlineData`.
 - Declared: an application that knows neither attribute sees an ordinary chart over the pivot output (the series still
   reference the output cells), so nothing is lost silently for data; only the link degrades. The written
-  `loext:data-pilot-source` and the XLSX link were not opened in the other applications in this round.
+  the vendor extension attribute `data-pilot-source` and the XLSX link were not opened in the other applications in this round.
 
 ## Command
 

@@ -639,6 +639,7 @@ public static class PulseRibbonLayout
 
         ("ledger.comment.edit", "review/comments"),
         ("ledger.comment.delete", "review/comments"),
+        ("ledger.comment.toggleShown", "review/comments"),
         ("ledger.comment.showAll", "review/comments"),
         ("ledger.comment.hideAll", "review/comments"),
         ("ledger.comment.deleteAll", "review/comments"),

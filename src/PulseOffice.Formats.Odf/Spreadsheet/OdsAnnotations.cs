@@ -15,6 +15,22 @@ internal sealed class OdsAnnotationVocabulary
 
     public XName Resolved => Pulse + "resolved";
 
+    public XName Reply => Pulse + "reply";
+
+    public XName ReplyHeader => Pulse + "reply-header";
+
+    public XName Creator => Pulse + "creator";
+
+    public XName Date => Pulse + "date";
+
+    public XName Mention => Pulse + "mention";
+
+    public XName Start => Pulse + "start";
+
+    public XName Length => Pulse + "length";
+
+    public XName Person => Pulse + "person";
+
     public XName Annotation => Namespaces.Office + "annotation";
 
     public XName AnnotationEnd => Namespaces.Office + "annotation-end";
@@ -32,13 +48,13 @@ internal sealed class OdsAnnotationBuilder(IOdfParagraphText paragraphs)
 
     private readonly OdsAnnotationVocabulary _names = new();
     private readonly CommentBoxGeometry _geometry = new();
+    private readonly CommentMentions _mentions = new();
 
     public void Place(XElement cell, CellComment comment, Worksheet sheet, CellAddress address)
     {
-        var named = comment.Replies.Count > 0 || comment.AnnotatedText is not null;
         var name = _names.NameOf(address);
         var root = Annotation(comment.Text, comment.Author, comment.CreatedAt, comment.IsAlwaysVisible);
-        if (named) root.Add(new XAttribute(_names.Name, name));
+        if (comment.AnnotatedText is not null) root.Add(new XAttribute(_names.Name, name));
         if (comment.IsResolved) root.Add(new XAttribute(_names.Resolved, "true"));
         if (comment.Box is { } box)
         {
@@ -50,29 +66,86 @@ internal sealed class OdsAnnotationBuilder(IOdfParagraphText paragraphs)
                 new XAttribute(Namespaces.Svg + "height", Points(bounds.Height)));
         }
 
-        var replies = comment.Replies.Select(reply =>
-        {
-            var annotation = Annotation(reply.Text, reply.Author, reply.CreatedAt, false);
-            annotation.Add(new XAttribute(_names.ParentName, name));
-            return annotation;
-        }).ToList();
+        for (var index = 0; index < comment.Replies.Count; index++) AddReply(root, comment.Replies[index], index);
+        AddMentions(root, comment.Text, comment.Mentions, null);
+        for (var index = 0; index < comment.Replies.Count; index++) AddMentions(root, comment.Replies[index].Text, comment.Replies[index].Mentions, index);
 
-        var paragraph = cell.Element(_names.Paragraph);
-        if (comment.AnnotatedText is { } span && paragraph is not null && Insert(paragraph, span.Start + span.Length, new XElement(_names.AnnotationEnd, new XAttribute(_names.Name, name))))
+        if (comment.AnnotatedText is { } span && Locate(cell, span.Start + span.Length) is { } end
+            && Insert(end.Paragraph, end.Offset, new XElement(_names.AnnotationEnd, new XAttribute(_names.Name, name))))
         {
-            if (span.Start > 0 && Insert(paragraph, span.Start, root)) cell.AddFirst(replies);
-            else cell.AddFirst(new object[] { root }.Concat(replies));
+            if (span.Start == 0 || Locate(cell, span.Start) is not { } start || !Insert(start.Paragraph, start.Offset, root)) cell.AddFirst(root);
             return;
         }
 
-        cell.AddFirst(new object[] { root }.Concat(replies));
+        cell.AddFirst(root);
     }
+
+    private (XElement Paragraph, int Offset)? Locate(XElement cell, int offset)
+    {
+        var origin = 0;
+        foreach (var paragraph in cell.Elements(_names.Paragraph))
+        {
+            var length = paragraphs.Line(paragraph).Length;
+            if (offset <= origin + length) return (paragraph, offset - origin);
+            origin += length + 1;
+        }
+
+        return null;
+    }
+
+    public int CellOffsetOf(XElement cell, XElement marker)
+    {
+        if (marker.Parent == cell) return 0;
+        var origin = 0;
+        foreach (var paragraph in cell.Elements(_names.Paragraph))
+        {
+            if (marker.Ancestors(_names.Paragraph).Contains(paragraph)) return origin + OffsetOf(paragraph, marker);
+            origin += paragraphs.Line(paragraph).Length + 1;
+        }
+
+        return -1;
+    }
+
+    private void AddReply(XElement root, CommentReply reply, int index)
+    {
+        var order = index.ToString(CultureInfo.InvariantCulture);
+        var header = paragraphs.Paragraph(Header(reply));
+        header.Add(new XAttribute(_names.Reply, order), new XAttribute(_names.ReplyHeader, "true"), new XAttribute(_names.Date, Stamp(reply.CreatedAt)));
+        if (reply.Author is { Length: > 0 } author) header.Add(new XAttribute(_names.Creator, author));
+        root.Add(header);
+        foreach (var line in paragraphs.Paragraphs(reply.Text))
+        {
+            line.Add(new XAttribute(_names.Reply, order));
+            root.Add(line);
+        }
+    }
+
+    private void AddMentions(XElement root, string text, IEnumerable<CommentMention> mentions, int? reply)
+    {
+        foreach (var mention in _mentions.Kept(text, mentions))
+        {
+            var element = new XElement(_names.Mention,
+                new XAttribute(_names.Start, mention.Start.ToString(CultureInfo.InvariantCulture)),
+                new XAttribute(_names.Length, mention.Length.ToString(CultureInfo.InvariantCulture)),
+                new XAttribute(_names.Person, mention.Person));
+            if (reply is { } index) element.Add(new XAttribute(_names.Reply, index.ToString(CultureInfo.InvariantCulture)));
+            root.Add(element);
+        }
+    }
+
+    private string Header(CommentReply reply)
+    {
+        var date = reply.CreatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return reply.Author is { Length: > 0 } author ? $"{author}, {date}:" : $"{date}:";
+    }
+
+    public string Stamp(DateTimeOffset created) => created.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
     private XElement Annotation(string text, string? author, DateTimeOffset created, bool display)
     {
         var annotation = new XElement(_names.Annotation, new XAttribute(Namespaces.Office + "display", display ? "true" : "false"));
         if (author is { Length: > 0 }) annotation.Add(new XElement(Namespaces.Dc + "creator", author));
-        annotation.Add(new XElement(Namespaces.Dc + "date", created.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)));
+        annotation.Add(new XElement(Namespaces.Dc + "date", Stamp(created)));
         annotation.Add(paragraphs.Paragraphs(text));
         return annotation;
     }
@@ -148,6 +221,9 @@ internal sealed class CommentPartReader(TableCells cells, IOdfParagraphText para
     private readonly OdsAnnotationBuilder _offsets = new(paragraphs);
     private readonly OdfLength _length = new();
     private readonly CommentBoxGeometry _geometry = new();
+    private readonly CommentMentions _mentions = new();
+
+    private const int MaximumReplies = 10_000;
 
     public void Read(XElement table, Worksheet sheet, OdsReadContext context)
     {
@@ -158,13 +234,18 @@ internal sealed class CommentPartReader(TableCells cells, IOdfParagraphText para
                 .ToList();
             if (annotations.FirstOrDefault(annotation => annotation.Attribute(_names.ParentName) is null) is not { } root) continue;
 
-            var text = paragraphs.Read(root);
             var name = root.Attribute(_names.Name)?.Value;
-            var replies = name is null
-                ? []
-                : annotations.Where(annotation => annotation.Attribute(_names.ParentName)?.Value == name)
-                    .Select(reply => new CommentReply { Text = paragraphs.Read(reply), Author = Author(reply), CreatedAt = Created(reply) })
-                    .ToList();
+            var structured = root.Elements(_names.Paragraph).Any(paragraph => paragraph.Attribute(_names.Reply) is not null);
+            var text = structured
+                ? string.Join('\n', root.Elements(_names.Paragraph).Where(paragraph => paragraph.Attribute(_names.Reply) is null).Select(paragraphs.Line))
+                : paragraphs.Read(root);
+            var replies = structured
+                ? StructuredReplies(root)
+                : name is null
+                    ? []
+                    : annotations.Where(annotation => annotation.Attribute(_names.ParentName)?.Value == name)
+                        .Select(reply => new CommentReply { Text = paragraphs.Read(reply), Author = Author(reply), CreatedAt = Created(reply) })
+                        .ToList();
             if (text.Length == 0 && replies.Count == 0) continue;
 
             sheet.Comments[cell.Address] = new CellComment
@@ -175,11 +256,43 @@ internal sealed class CommentPartReader(TableCells cells, IOdfParagraphText para
                 CreatedAt = Created(root),
                 IsResolved = root.Attribute(_names.Resolved)?.Value == "true",
                 Replies = replies,
+                Mentions = Mentions(root, text, null),
                 Box = Box(root, sheet, cell.Address),
                 AnnotatedText = name is null ? null : Span(cell.Element, root, name),
             };
         }
     }
+
+    private List<CommentReply> StructuredReplies(XElement root)
+    {
+        var replies = new List<CommentReply>();
+        foreach (var header in root.Elements(_names.Paragraph).Where(paragraph => paragraph.Attribute(_names.ReplyHeader)?.Value == "true"))
+        {
+            if (replies.Count >= MaximumReplies) break;
+            var order = header.Attribute(_names.Reply)?.Value ?? string.Empty;
+            var text = string.Join('\n', root.Elements(_names.Paragraph)
+                .Where(paragraph => paragraph.Attribute(_names.Reply)?.Value == order && paragraph.Attribute(_names.ReplyHeader) is null)
+                .Select(paragraphs.Line));
+            replies.Add(new CommentReply
+            {
+                Text = text,
+                Author = header.Attribute(_names.Creator)?.Value,
+                CreatedAt = Parsed(header.Attribute(_names.Date)?.Value),
+                Mentions = int.TryParse(order, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) ? Mentions(root, text, index) : [],
+            });
+        }
+
+        return replies;
+    }
+
+    private IReadOnlyList<CommentMention> Mentions(XElement root, string text, int? reply) =>
+        _mentions.Kept(text, root.Elements(_names.Mention)
+            .Where(mention => Number(mention.Attribute(_names.Reply)?.Value) == reply)
+            .Select(mention => (Start: Number(mention.Attribute(_names.Start)?.Value), Length: Number(mention.Attribute(_names.Length)?.Value), Person: mention.Attribute(_names.Person)?.Value))
+            .Where(mention => mention.Start is not null && mention.Length is not null && mention.Person is not null)
+            .Select(mention => new CommentMention(mention.Start!.Value, mention.Length!.Value, mention.Person!)));
+
+    private int? Number(string? value) => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;
 
     private CommentBox? Box(XElement annotation, Worksheet sheet, CellAddress address)
     {
@@ -193,15 +306,16 @@ internal sealed class CommentPartReader(TableCells cells, IOdfParagraphText para
 
     private CommentTextSpan? Span(XElement cell, XElement root, string name)
     {
-        if (cell.Elements(_names.Paragraph).FirstOrDefault() is not { } paragraph) return null;
-        if (paragraph.Descendants(_names.AnnotationEnd).FirstOrDefault(end => end.Attribute(_names.Name)?.Value == name) is not { } end) return null;
-        var start = root.Parent == cell ? 0 : root.Ancestors(_names.Paragraph).FirstOrDefault() == paragraph ? _offsets.OffsetOf(paragraph, root) : 0;
-        var stop = _offsets.OffsetOf(paragraph, end);
+        if (cell.Elements(_names.Paragraph).SelectMany(paragraph => paragraph.Descendants(_names.AnnotationEnd)).FirstOrDefault(end => end.Attribute(_names.Name)?.Value == name) is not { } end) return null;
+        var start = Math.Max(_offsets.CellOffsetOf(cell, root), 0);
+        var stop = _offsets.CellOffsetOf(cell, end);
         return stop > start ? new CommentTextSpan(start, stop - start) : null;
     }
 
     private string? Author(XElement annotation) => annotation.Element(Namespaces.Dc + "creator")?.Value;
 
-    private DateTimeOffset Created(XElement annotation) =>
-        DateTimeOffset.TryParse(annotation.Element(Namespaces.Dc + "date")?.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created) ? created : DateTimeOffset.Now;
+    private DateTimeOffset Created(XElement annotation) => Parsed(annotation.Element(Namespaces.Dc + "date")?.Value);
+
+    private DateTimeOffset Parsed(string? value) =>
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created) ? created : DateTimeOffset.Now;
 }

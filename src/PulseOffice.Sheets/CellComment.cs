@@ -20,7 +20,9 @@ public sealed record CellComment
 
     public CommentTextSpan? AnnotatedText { get; init; }
 
-    public bool IsThread => Replies.Count > 0 || IsResolved;
+    public IReadOnlyList<CommentMention> Mentions { get; init; } = [];
+
+    public bool IsThread => Replies.Count > 0 || IsResolved || Mentions.Count > 0;
 
     public IEnumerable<string> Texts => new[] { Text }.Concat(Replies.Select(reply => reply.Text));
 }
@@ -31,6 +33,8 @@ public sealed record CommentReply
 
     public string? Author { get; init; }
 
+    public IReadOnlyList<CommentMention> Mentions { get; init; } = [];
+
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.Now;
 }
 
@@ -40,6 +44,8 @@ public sealed record CommentBox(double OffsetX, double OffsetY, double Width, do
 }
 
 public sealed record CommentTextSpan(int Start, int Length);
+
+public sealed record CommentMention(int Start, int Length, string Person);
 
 public sealed record OutlineSummary(bool Below = true, bool Right = true)
 {

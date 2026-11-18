@@ -173,6 +173,7 @@ public sealed class DirectFormatting : IDirectFormatting
         FieldDetail = run.FieldDetail,
         StyleName = run.StyleName,
         Hyperlink = run.Hyperlink,
+        HyperlinkTip = run.HyperlinkTip,
         Ruby = run.Ruby,
     };
 

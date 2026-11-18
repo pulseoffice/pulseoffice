@@ -16,9 +16,7 @@ public sealed class DesignRulesTests
     {
         ["PulseOffice.Sheets.Engine:FunctionNameVocabulary"] = "tabella dei nomi delle funzioni nelle cinque lingue: dato, non logica",
         ["PulseOffice.Desktop:PulseMenuLayout"] = "dichiarazione dei menu: dato",
-        ["PulseOffice.Documents.Layout:Paginator"] = "da dividere: impaginazione, note e colonne nello stesso ciclo (revisione 2026-10, resta)",
         ["PulseOffice.Presentations.UI:SlideView"] = "da dividere: gesti degli oggetti da condividere con Ledger e Folio (revisione 2026-10, resta)",
-        ["PulseOffice.Documents.UI:FolioCanvas"] = "da dividere: gesti degli oggetti da condividere con Ledger e Deck (revisione 2026-10, resta)",
         ["PulseOffice.Formats.Interchange:RtfReadSession"] = "da dividere per gruppi di parole di controllo (revisione 2026-10, resta)",
     };
 

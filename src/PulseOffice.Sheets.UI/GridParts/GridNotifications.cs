@@ -25,6 +25,7 @@ internal sealed class GridNotifications(object sender)
     public event EventHandler<IReadOnlyList<PlacedObject>>? ObjectsDeleteRequested;
     public event EventHandler<SheetGridView.ResizeRequest>? ResizeRequested;
     public event EventHandler<PulseOffice.Sheets.UI.Outline.OutlineButton>? OutlineRequested;
+    public event EventHandler<SheetGridView.NoteBoxChange>? NoteBoxChanged;
 
     public void Edit(CellAddress address) => EditRequested?.Invoke(sender, address);
 
@@ -67,4 +68,6 @@ internal sealed class GridNotifications(object sender)
     public void Resize(SheetGridView.ResizeRequest request) => ResizeRequested?.Invoke(sender, request);
 
     public void Outline(PulseOffice.Sheets.UI.Outline.OutlineButton button) => OutlineRequested?.Invoke(sender, button);
+
+    public void NoteBox(SheetGridView.NoteBoxChange change) => NoteBoxChanged?.Invoke(sender, change);
 }

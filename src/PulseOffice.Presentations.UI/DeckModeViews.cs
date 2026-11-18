@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages)
+internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -169,17 +169,12 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
 
     private string BuildOutlineText()
     {
-        var lines = new List<string>();
-        foreach (var slide in _deck.Slides)
-        {
-            lines.Add(slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText ?? string.Empty);
-            if (slide.Placeholder(PlaceholderRole.Body)?.Text.PlainText is { Length: > 0 } body)
-                foreach (var bl in body.Replace("\r\n", "\n").Split('\n'))
-                    lines.Add("\t" + bl);
-        }
-        _outlineOriginal = [.. lines.Select(line => line.TrimStart('\t'))];
-        return string.Join(Environment.NewLine, lines);
+        var text = _outlineText.Render(_deck.Slides);
+        _outlineOriginal = [.. _outlineText.Parse(text).SelectMany(entry => entry.Body.Select(line => line.Text).Prepend(entry.Title))];
+        return text;
     }
+
+    private readonly IDeckOutlineText _outlineText = outlineText;
 
     private HashSet<string> _outlineOriginal = [];
 
@@ -187,34 +182,20 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
 
     private void ApplyOutline(string text)
     {
-        var slideIndex = -1;
-        string? title = null;
-        var body = new List<string>();
-        var changes = new List<(Slide, PlaceholderRole, string)>();
+        var entries = _outlineText.Parse(text)
+            .Select(entry => new OutlineEntry(CorrectedLine(entry.Title), [.. entry.Body.Select(line => line with { Text = CorrectedLine(line.Text) })]))
+            .ToList();
+        var existing = Math.Min(entries.Count, _deck.Slides.Count);
+        var changes = Enumerable.Range(0, existing)
+            .Select(index => (_deck.Slides[index], entries[index].Title, entries[index].Body))
+            .ToList();
+        var added = entries.Skip(existing)
+            .Where(entry => entry.Title.Length > 0 || entry.Body.Any(line => line.Text.Length > 0))
+            .Select(entry => new OutlineSlide(entry.Title, [.. entry.Body.Select(line => new TextParagraph(line.Text) { BulletLevel = line.Level })]))
+            .ToList();
 
-        void Flush()
-        {
-            if (slideIndex < 0 || slideIndex >= _deck.Slides.Count) return;
-            var slide = _deck.Slides[slideIndex];
-            changes.Add((slide, PlaceholderRole.Title, CorrectedLine(title ?? string.Empty)));
-            changes.Add((slide, PlaceholderRole.Body, string.Join(Environment.NewLine, body.Select(CorrectedLine))));
-        }
-
-        foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
-        {
-            if (raw.StartsWith('\t') || raw.StartsWith("    ", StringComparison.Ordinal))
-            {
-                body.Add(raw.TrimStart('\t', ' '));
-            }
-            else
-            {
-                Flush();
-                slideIndex++;
-                title = raw;
-                body = [];
-            }
-        }
-        Flush();
-        _actions.SetSlideTexts(changes);
+        using var step = _actions.History.BeginTransaction(_texts["deck.action.editText"]);
+        _actions.SetSlideOutline(changes);
+        if (added.Count > 0) _actions.InsertOutlineSlides(_deck.Slides.Count - 1, added, "deck.action.editText");
     }
 }

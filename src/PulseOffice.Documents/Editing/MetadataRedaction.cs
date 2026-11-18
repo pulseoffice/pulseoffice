@@ -59,7 +59,7 @@ public sealed class MetadataRedaction(IStoryCatalog stories, IFieldRunRewriter r
             var after = text(before);
             if (after == before) continue;
             var first = paragraph.Content.Runs.FirstOrDefault() ?? new TextRun(string.Empty);
-            paragraph.State = new ParagraphState(paragraph.Content.WithRuns([first with { Text = after, Field = TextFieldKind.None, FieldArgument = null, Hyperlink = null }]), []);
+            paragraph.State = new ParagraphState(paragraph.Content.WithRuns([first with { Text = after, Field = TextFieldKind.None, FieldArgument = null, Hyperlink = null, HyperlinkTip = null }]), []);
             count++;
         }
         return count;

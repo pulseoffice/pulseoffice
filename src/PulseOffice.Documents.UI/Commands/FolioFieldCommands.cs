@@ -318,7 +318,7 @@ public sealed class FolioFieldCommands(
     }
 
     private void RemoveLink(FolioEditor editor) =>
-        editor.Apply((documents, target) => documents.MapRuns(editor.Document, editor.History, target, "remove-hyperlink", run => run with { Hyperlink = null }), links.Range(editor));
+        editor.Apply((documents, target) => documents.MapRuns(editor.Document, editor.History, target, "remove-hyperlink", run => run with { Hyperlink = null, HyperlinkTip = null }), links.Range(editor));
 
     private void Refreshed(bool changed)
     {

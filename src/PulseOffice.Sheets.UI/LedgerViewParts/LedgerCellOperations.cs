@@ -99,6 +99,37 @@ internal sealed class LedgerCellOperations(
         grid.Refresh();
     }
 
+    public void ApplyNoteBox(SheetGridView.NoteBoxChange change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var sheet = workbook.Sheets[grid.SheetIndex];
+        if (!writer.CanEdit() || !sheet.Comments.ContainsKey(change.Address))
+        {
+            grid.Refresh();
+            return;
+        }
+
+        if (sheet.Protection.IsEnabled)
+        {
+            status.Report(texts["status.protection.format"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            grid.Refresh();
+            return;
+        }
+
+        void Set(CommentBox box)
+        {
+            if (sheet.Comments.TryGetValue(change.Address, out var comment)) sheet.Comments[change.Address] = comment with { Box = box };
+        }
+
+        Set(change.After);
+        history.Push(new PulseOffice.Document.Commands.DelegateAction(
+            texts["history.comment.box"],
+            redo: () => Set(change.After),
+            undo: () => Set(change.Before)));
+
+        grid.Refresh();
+    }
+
     public void ApplyOutline(Outline.OutlineButton button)
     {
         ArgumentNullException.ThrowIfNull(button);

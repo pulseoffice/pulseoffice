@@ -22,7 +22,12 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
     private static readonly PrintColor Fill = new(255, 255, 225);
     private static readonly PrintColor Edge = new(128, 128, 128);
 
+    private const double AverageAdvance = 0.55;
+
+    private static readonly Twip NarrowestColumn = Twip.FromPoints(36);
+
     private readonly CommentBoxGeometry _geometry = new();
+    private readonly TextWrapper _wrapper = new();
 
     public IReadOnlyList<IReadOnlyList<string>> EndPages(Worksheet sheet, CellRange? area, DocumentRect content)
     {
@@ -32,8 +37,8 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
             if (area is { } range && !range.Contains(address)) continue;
             if (lines.Count > 0) lines.Add(string.Empty);
             lines.Add(address.ToA1());
-            lines.AddRange(Lines(comment.Author, comment.Text).Select(line => "    " + line));
-            foreach (var reply in comment.Replies) lines.AddRange(Lines(reply.Author, reply.Text).Select(line => "        " + line));
+            lines.AddRange(Wrapped("    ", Lines(comment.Author, comment.Text), content.Width));
+            foreach (var reply in comment.Replies) lines.AddRange(Wrapped("        ", Lines(reply.Author, reply.Text), content.Width));
         }
 
         var perPage = Math.Max((int)(content.Height.Value / LineHeight.Value), 1);
@@ -72,7 +77,7 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
             using (canvas.Clip(bounds))
             {
                 var y = bounds.Top + Padding;
-                foreach (var line in Lines(comment.Author, comment.Text).Concat(comment.Replies.SelectMany(reply => Lines(reply.Author, reply.Text))))
+                foreach (var line in Wrapped(string.Empty, Lines(comment.Author, comment.Text).Concat(comment.Replies.SelectMany(reply => Lines(reply.Author, reply.Text))), bounds.Width - Padding * 2))
                 {
                     if ((y + LineHeight).Value > bounds.Bottom.Value) break;
                     canvas.DrawText(line, new DocumentRect(bounds.Left + Padding, y, bounds.Width - Padding * 2, LineHeight), Font, Ink, baseline: TextBaseline.Top);
@@ -81,6 +86,14 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
             }
         }
     }
+
+    private IEnumerable<string> Wrapped(string indent, IEnumerable<string> lines, Twip width)
+    {
+        var available = new Twip(Math.Max(width.Value - Estimate(indent).Value, NarrowestColumn.Value));
+        return lines.SelectMany(line => line.Length == 0 ? new[] { string.Empty } : _wrapper.Wrap(line, available, Estimate)).Select(part => indent + part);
+    }
+
+    private Twip Estimate(string text) => Twip.FromPoints(text.Length * Font.SizePoints * AverageAdvance);
 
     private Twip Max(Twip first, Twip second) => first.Value >= second.Value ? first : second;
 

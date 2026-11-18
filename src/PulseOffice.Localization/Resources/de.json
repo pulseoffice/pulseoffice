@@ -8715,6 +8715,8 @@
   "chart.seriesRange.noTables": "Keine Tabellen in dieser Arbeitsmappe",
   "command.ledger.connector.sites.title": "Verbinderenden…",
   "command.ledger.connector.sites.description": "Wählt die Seite jedes Objekts, an der der ausgewählte Verbinder beginnt und endet",
+  "command.deck.connector.sites.title": "Verbinderenden…",
+  "command.deck.connector.sites.description": "Wählt die Seite jedes Objekts, an der der ausgewählte Verbinder beginnt und endet",
   "connector.sites.explanation": "Wählen Sie, wo der Verbinder das erste Objekt verlässt und das zweite erreicht. Automatisch nimmt die dem anderen Objekt zugewandte Seite.",
   "connector.sites.start": "Anfang",
   "connector.sites.end": "Ende",
@@ -8730,5 +8732,9 @@
   "shape.text.flow.stackedRightToLeft": "Gestapelt, von rechts nach links",
   "deck.textFrame.flow.EastAsianVertical": "Ostasiatisch vertikal",
   "deck.textFrame.flow.MongolianVertical": "Vertikal, Zeilen von links nach rechts",
-  "deck.textFrame.flow.StackedRightToLeft": "Gestapelt, von rechts nach links"
+  "deck.textFrame.flow.StackedRightToLeft": "Gestapelt, von rechts nach links",
+  "settingCategory.spreadsheets": "Tabellen",
+  "setting.ledger.links.followOnClick.title": "Zellhyperlinks mit einem Klick öffnen",
+  "setting.ledger.links.followOnClick.description": "Ein Klick auf den Text einer verknüpften Zelle folgt dem Link; ein Klick neben den Text oder ein gedrückt gehaltener Klick markiert die Zelle. Wenn deaktiviert, Strg+Klick oder den Befehl „Hyperlink öffnen“ verwenden.",
+  "history.comment.box": "Notiz verschieben oder Größe ändern"
 }

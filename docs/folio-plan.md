@@ -263,7 +263,7 @@ author and text, accept and reject, replies and resolved), wired into Folio, Led
 comments; "Manage changes" opens the panel) and Deck (slide comments); the **spell-check
 dialog** (`ISpellingPrompt`) in Folio, Ledger and Deck; the author palette. Formats:
 ODT (`text:tracked-changes` with the true default of `track-changes`, regions across several paragraphs,
-`office:annotation` with `loext:parent-name` and `loext:resolved`, section key, document
+`office:annotation` with the vendor extension attribute `parent-name` and the vendor extension attribute `resolved`, section key, document
 protection) and DOCX (`w:ins`/`w:del`/`w:rPrChange`/`w:pPrChange`, **inserted paragraph end** in
 `w:pPr/w:rPr/w:ins`, `comments.xml` with `commentsExtended` and `commentsIds`, `w:documentProtection`);
 declared losses `ODT005`, `DOCX026`, `DOCX027`. Round trips through the reference suite run headless in `ReviewRoundTripTests`

@@ -17,7 +17,7 @@ internal sealed class OdfTextLayouts
         else if (layout.IsVertical)
             yield return new XAttribute(Namespaces.Style + "writing-mode", "tb-rl");
         if (layout.Flow == TextFlow.Vertical270)
-            yield return new XAttribute(_pulse + "text-flow", "vertical-270");
+            yield return new XAttribute(Namespaces.Loext + "writing-mode", "bt-lr");
         if (layout.Flow == TextFlow.EastAsianVertical)
             yield return new XAttribute(_pulse + "text-flow", "east-asian");
         if (layout.IsStacked)
@@ -35,7 +35,7 @@ internal sealed class OdfTextLayouts
     public TextLayout? Read(XElement? properties)
     {
         if (properties is null) return null;
-        var mode = (string?)properties.Attribute(Namespaces.Style + "writing-mode") ?? (string?)properties.Attribute(Namespaces.Loext + "writing-mode");
+        var mode = (string?)properties.Attribute(Namespaces.Loext + "writing-mode") ?? (string?)properties.Attribute(Namespaces.Style + "writing-mode");
         var flow = (string?)properties.Attribute(_pulse + "text-flow");
         var direction = (string?)properties.Attribute(Namespaces.Style + "direction");
         var upright = (string?)properties.Attribute(_pulse + "upright");
