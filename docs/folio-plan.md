@@ -150,7 +150,7 @@ in pagination, rows that do not split, sorting with up to three keys, formulas i
 edit, conversion between text and table in both directions, tabbed properties dialog, contextual
 "Table" ribbon (at the end of the tabs, only with the caret in a table), menu and context menu.
 Everything goes through ODT and DOCX, also tested in the four round trips through the reference suite run headless
-(`tools/table-fixtures.sh`); the only loss is `DOCX019` (a heading that does not repeat).
+(`tools/table-fixtures.sh`); the only loss is `DOCX019` (a heading of more than one row that does not repeat; since round 186 a one-row non-repeating heading crosses DOCX as `tblLook` firstRow without `tblHeader`).
 **Unification with Deck**: the model stays double for a substantive reason — Deck's cells are
 values of a data table (with its query), Folio's are containers of blocks — but
 the cell range, the merge algebra, the widths, sorting, formulas and predefined styles

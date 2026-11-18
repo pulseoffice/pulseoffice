@@ -95,14 +95,14 @@ public sealed class ScriptCallSource
         string? missing = null;
         foreach (var parameter in parameters)
         {
-            if (arguments.Raw(parameter.Name) is not { } value)
+            if (!arguments.Values.TryGetPropertyValue(parameter.Name, out var value))
             {
                 missing ??= parameter.Name;
                 continue;
             }
 
             if (missing is not null) throw new AgentArgumentException($"The argument '{missing}' is required before '{parameter.Name}'.");
-            values.Add(value.ToJsonString());
+            values.Add(value?.ToJsonString() ?? "null");
         }
 
         return $"{root}.{member}({string.Join(", ", values)})";

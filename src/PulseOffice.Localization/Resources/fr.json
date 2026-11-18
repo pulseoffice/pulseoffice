@@ -4271,7 +4271,7 @@
   "deck.action.altText": "Modifier le texte de remplacement",
   "command.deck.object.mediaOptions.title": "Options multimédia…",
   "deck.action.mediaOptions": "Modifier les options multimédia",
-  "deck.media.options.explanation": "Lecture de l’audio ou de la vidéo sélectionnés : répétition, volume, découpage et fondus, en secondes.",
+  "deck.media.options.explanation": "Lecture de l’audio ou de la vidéo sélectionnés : répétition, volume, découpage et fondus, en secondes. Ils sont enregistrés dans le fichier pour les autres logiciels de présentation ; le diaporama ouvre le média dans le lecteur du système, qui ne les applique pas.",
   "deck.media.options.loop": "Répéter jusqu’à l’arrêt",
   "deck.media.options.mute": "Muet",
   "deck.media.options.volume": "Volume",

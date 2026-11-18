@@ -113,8 +113,10 @@ public sealed class DeckExchange(
                 insertion.Insert(target, paragraphs, FreeFontSize);
                 return true;
             case ExchangePasteMode.UnformattedText when package.TextOf(ExchangeFlavor.Text) is { Length: > 0 } text:
-                if (target.IsTyping() && target.TypeAtCaret(text)) return true;
-                insertion.Insert(target, new TextRun(text), FreeFontSize);
+                var lines = text.ReplaceLineEndings("\n").Split('\n');
+                if (target.IsTyping() && target.TypeAtCaret(string.Join("\n", lines))) return true;
+                if (lines.Length == 1) insertion.Insert(target, new TextRun(lines[0]), FreeFontSize);
+                else insertion.Insert(target, [.. lines.Select(line => new TextParagraph(line))], FreeFontSize);
                 return true;
             case ExchangePasteMode.Image when package.BytesOf(ExchangeFlavor.Png) is { } png:
                 return target.InsertImageBytes(png, "image.png");

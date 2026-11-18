@@ -119,6 +119,7 @@ public sealed class TableCellEditing(ITableGrid grid, ITableCellFactory cells) :
             if (grid.Origin(table, row, c) is { } origin && raised.Add(origin.Cell)) origin.Cell.RowSpan = Math.Max(1, origin.Cell.RowSpan) + parts - 1;
         }
         if (source.Height is { } height) foreach (var r in Enumerable.Range(row, parts)) table.Rows[r].Height = new Twip(height.Value / parts);
+        if (row < table.HeaderRows) table.HeaderRows += parts - 1;
     }
 
     private void SplitColumns(TextDocument document, TableBlock table, int row, int column, int parts)

@@ -25,6 +25,7 @@ public sealed class PresentationWindow : Window
     private readonly SlideView _back;
     private readonly Panel _stage;
     private readonly TransitionStage _transitions = new();
+    private readonly ShowPointerGestures _gestures = new();
 
     private readonly Canvas _ink = new() { IsHitTestVisible = false };
     private readonly Ellipse _laser = new()
@@ -123,6 +124,7 @@ public sealed class PresentationWindow : Window
         KeyDown += OnKeyDown;
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
+        PointerWheelChanged += OnPointerWheelChanged;
         PointerReleased += (_, _) => _stroke = null;
         Opened += (_, _) => { PlaceOnMonitor(); Focus(); };
     }
@@ -364,8 +366,28 @@ public sealed class PresentationWindow : Window
         if (result != AdvanceResult.None) Jump();
     }
 
+    private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        Move(_gestures.ForWheel(e.Delta.Y));
+        e.Handled = true;
+    }
+
+    private void Move(ShowMove move)
+    {
+        if (move == ShowMove.Forward) Advance();
+        else if (move == ShowMove.Backward) Back();
+    }
+
     private void OnPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
+        var move = _gestures.ForPress(e.GetCurrentPoint(this).Properties.PointerUpdateKind);
+        if (move != ShowMove.Forward)
+        {
+            if (_tool == PointerTool.None) Move(move);
+            e.Handled = true;
+            return;
+        }
+
         if (_tool == PointerTool.Pen)
         {
             var at = e.GetPosition(_stage);

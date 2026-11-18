@@ -471,7 +471,8 @@ native macOS menu, modal service, settings schema.
    touched by all four run once (`tools/run-tests.py --changed <commit before the merges>`), and `work` is squashed onto
    `main`. The cycle repeats while any audit still reports medium or serious defects. Audit agents run **no tests and no
    builds** (user correction, 2026-11-18): they audit, fix, write the tests and commit; all tests run once, at the join
-   (`--changed`), and the coordinator fixes what fails there.
+   (`--changed`), and the coordinator fixes what fails there. Every open item a round reports, minor ones included, is queued in
+   [docs/audit-queue.md](docs/audit-queue.md) and assigned to the next cycle (user rule, 2026-11-18).
 2-bis. **Restructure instead of patching**: if a change requires redoing the
    structure, it is redone. A sequence of minimal patches on a structure that no longer holds
    produces unmaintainable code precisely while the project grows.

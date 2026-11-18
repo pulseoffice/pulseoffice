@@ -43,7 +43,7 @@ public sealed class ScriptableCommandPolicy : IScriptableCommandPolicy
     public bool Allows(CommandDefinition command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return !command.OutsideHistory && Allows(command.Id);
+        return !command.OutsideHistory && !command.RunsDocumentQueries && Allows(command.Id);
     }
 }
 

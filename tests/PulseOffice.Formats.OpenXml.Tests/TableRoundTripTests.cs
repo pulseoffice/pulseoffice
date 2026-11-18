@@ -156,13 +156,14 @@ public sealed class TableRoundTripTests
     }
 
     [Fact]
-    public void UnIntestazioneCheNonSiRipeteSiDichiaraPersaInDocx()
+    public void UnIntestazioneDiPiuRigheCheNonSiRipeteSiDichiaraPersaInDocx()
     {
         var document = _sample.Build();
         var writer = _composer.Writer(DocxFlavour.Document);
         Assert.DoesNotContain(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX019");
 
         Table(document).RepeatHeaderRows = false;
+        Table(document).HeaderRows = 2;
 
         Assert.Contains(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX019");
         Assert.False(Table(Through(document, new OdtWriter(), new OdtReader())).RepeatHeaderRows);

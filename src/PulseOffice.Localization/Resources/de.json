@@ -4271,7 +4271,7 @@
   "deck.action.altText": "Alternativtext ändern",
   "command.deck.object.mediaOptions.title": "Medienoptionen…",
   "deck.action.mediaOptions": "Medienoptionen ändern",
-  "deck.media.options.explanation": "Wiedergabe des ausgewählten Audios oder Videos: Wiederholung, Lautstärke, Kürzen und Ein-/Ausblenden, in Sekunden.",
+  "deck.media.options.explanation": "Wiedergabe des ausgewählten Audios oder Videos: Wiederholung, Lautstärke, Kürzen und Ein-/Ausblenden, in Sekunden. Sie werden für andere Präsentationsprogramme in der Datei gespeichert; die Bildschirmpräsentation öffnet das Medium im Systemplayer, der sie nicht anwendet.",
   "deck.media.options.loop": "Wiederholen bis zum Stopp",
   "deck.media.options.mute": "Stumm",
   "deck.media.options.volume": "Lautstärke",

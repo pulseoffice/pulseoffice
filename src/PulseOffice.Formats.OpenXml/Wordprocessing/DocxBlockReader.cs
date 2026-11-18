@@ -318,10 +318,19 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var countingHeader = true;
         var widest = columns.Count;
         var open = new List<(TableCell Origin, int Column)?>();
+        var skipped = new List<TableCell>();
         foreach (var rowElement in Unwrapped<W.TableRow>(element.ChildElements))
         {
             var cells = new List<TableCell>();
             var reaching = new List<(TableCell Origin, int Column)?>();
+            var before = Math.Clamp(rowElement.TableRowProperties?.GetFirstChild<W.GridBefore>()?.Val?.Value ?? 0, 0, Math.Max(0, (columns.Count > 0 ? columns.Count : LargestGridSpan) - 1));
+            for (var index = 0; index < before; index++)
+            {
+                var placeholder = new TableCell(new BlockContainer());
+                skipped.Add(placeholder);
+                cells.Add(placeholder);
+                reaching.Add((placeholder, index));
+            }
             foreach (var cellElement in Unwrapped<W.TableCell>(rowElement.ChildElements))
             {
                 if (cells.Count >= LargestGridSpan)
@@ -421,6 +430,12 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         if (table.Alignment == TableAlignment.Left && tableProperties?.TableIndentation is { } indentation && indentation.Type?.Value != W.TableWidthUnitValues.Pct)
             table.Indent = new Twip(values.Bounded(indentation.Width?.Value ?? 0, -LargestLength, LargestLength));
         var styled = appearance.Style(context.Document.Styles, table);
+        if (headerRows == 0 && rows.Count > 1 && LooksHeaded(tableProperties?.GetFirstChild<W.TableLook>())
+            && (styled.HeaderBackground is not null || styled.HeaderColor is not null || styled.HeaderBold == true))
+        {
+            table.HeaderRows = 1;
+            table.RepeatHeaderRows = false;
+        }
         table.Direct = table.Direct with
         {
             CellPadding = styled.CellPadding is null ? 5.4 : table.Direct.CellPadding,
@@ -428,6 +443,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         };
         Edges(table, own, tableStyles.Borders(tableProperties?.GetFirstChild<W.TableBorders>()), context);
         Closings(table, closings, context);
+        foreach (var placeholder in skipped) placeholder.Borders = new PulseOffice.Text.Rich.BoxBorders();
         if (margins.Count > 0)
         {
             var padded = appearance.Style(context.Document.Styles, table);
@@ -438,6 +454,13 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
     }
 
     public const string TruncatedTable = "DOCX222";
+
+    private bool LooksHeaded(W.TableLook? look)
+    {
+        if (look is null) return false;
+        if (look.FirstRow?.Value is { } first) return first;
+        return int.TryParse(look.Val?.Value, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var flags) && (flags & 0x0020) != 0;
+    }
 
     private TableAlignment Alignment(W.TableRowAlignmentValues? value) =>
         value == W.TableRowAlignmentValues.Center ? TableAlignment.Center

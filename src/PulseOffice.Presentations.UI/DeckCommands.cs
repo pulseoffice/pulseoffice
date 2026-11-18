@@ -26,6 +26,7 @@ public sealed class DeckCommands(
     ICustomShowEditing customShows)
 {
     private readonly ShowStart _showStart = new();
+    private readonly ShowPlaylist _playlists = new();
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -141,24 +142,10 @@ public sealed class DeckCommands(
     {
         if (workspace.Active?.Model is not Presentation deck) return Task.CompletedTask;
 
-        var playlist = MainPlaylist(deck);
+        var playlist = _playlists.Main(deck);
         var shownStart = _showStart.PositionFor(deck.Slides, playlist, startIndex);
 
         return Present(deck, playlist, shownStart, withPresenter);
-    }
-
-    private static List<Slide> MainPlaylist(Presentation deck)
-    {
-        var setup = deck.Setup;
-        var from = setup.FromSlide > 0 ? setup.FromSlide : 1;
-        var to = setup.ToSlide > 0 ? setup.ToSlide : deck.Slides.Count;
-
-        return deck.Slides
-            .Select((slide, index) => (slide, number: index + 1))
-            .Where(entry => !entry.slide.Hidden
-                && (!setup.HasRange || (entry.number >= from && entry.number <= to)))
-            .Select(entry => entry.slide)
-            .ToList();
     }
 
     private async Task ManageCustomShowsAsync(CancellationToken ct)
@@ -205,7 +192,7 @@ public sealed class DeckCommands(
         if (workspace.Active?.Model is not Presentation deck) return;
         if (deckContext.Target is not { } target) return;
 
-        var playlist = deck.Slides.Where(s => !s.Hidden).ToList();
+        var playlist = _playlists.Main(deck);
         if (playlist.Count == 0)
         {
             status.Report(texts["deck.present.empty"], NotificationSeverity.Warning);

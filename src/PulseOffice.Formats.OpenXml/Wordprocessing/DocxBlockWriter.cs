@@ -193,7 +193,7 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
                     Val = (uint)Math.Max(0, height.Value),
                     HeightType = source.MinimumHeight ? W.HeightRuleValues.AtLeast : W.HeightRuleValues.Exact,
                 });
-            if (row < table.HeaderRows) rowProperties.Append(new W.TableHeader());
+            if (row < table.HeaderRows && table.RepeatHeaderRows) rowProperties.Append(new W.TableHeader());
             if (rowChanges.Write(source, context) is { } change) rowProperties.Append(change);
             if (rowProperties.HasChildren) target.Append(rowProperties);
             for (var column = 0; column < source.Cells.Count;)

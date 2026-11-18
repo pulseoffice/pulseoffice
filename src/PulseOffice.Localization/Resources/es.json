@@ -4271,7 +4271,7 @@
   "deck.action.altText": "Cambiar el texto alternativo",
   "command.deck.object.mediaOptions.title": "Opciones multimedia…",
   "deck.action.mediaOptions": "Cambiar las opciones multimedia",
-  "deck.media.options.explanation": "Reproducción del audio o vídeo seleccionado: repetición, volumen, recorte y fundidos, en segundos.",
+  "deck.media.options.explanation": "Reproducción del audio o vídeo seleccionado: repetición, volumen, recorte y fundidos, en segundos. Se guardan en el archivo para otros programas de presentaciones; la presentación abre el medio en el reproductor del sistema, que no las aplica.",
   "deck.media.options.loop": "Repetir hasta detener",
   "deck.media.options.mute": "Silenciar",
   "deck.media.options.volume": "Volumen",

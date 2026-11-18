@@ -4271,7 +4271,7 @@
   "deck.action.altText": "Change alt text",
   "command.deck.object.mediaOptions.title": "Media Options…",
   "deck.action.mediaOptions": "Change media options",
-  "deck.media.options.explanation": "Playback of the selected audio or video: repeat, volume, trimming and fades, in seconds.",
+  "deck.media.options.explanation": "Playback of the selected audio or video: repeat, volume, trimming and fades, in seconds. They are saved in the file for other presentation programs; the slide show opens the media in the system player, which does not apply them.",
   "deck.media.options.loop": "Repeat until stopped",
   "deck.media.options.mute": "Mute",
   "deck.media.options.volume": "Volume",

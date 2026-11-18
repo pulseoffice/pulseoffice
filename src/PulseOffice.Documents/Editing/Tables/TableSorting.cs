@@ -49,6 +49,12 @@ public sealed class TableSorting(ITableGrid grid, ITableSorter sorter) : ITableS
         var texts = rows.Select(r => (IReadOnlyList<string>)[.. Enumerable.Range(range.Left, range.ColumnCount).Select(c => grid.PlainText(table.Rows[r].Cells[c]))]).ToList();
         var shifted = keys.Select(key => key with { Column = key.Column - range.Left }).ToList();
         var order = sorter.Order(texts, shifted, culture);
+        if (range.Left == 0 && rows.All(r => range.Right >= table.Rows[r].Cells.Count - 1))
+        {
+            var whole = rows.Select(r => table.Rows[r]).ToList();
+            for (var index = 0; index < rows.Count; index++) table.Rows[rows[index]] = whole[order[index]];
+            return recorder.Commit(history);
+        }
         var slices = rows.Select(r => table.Rows[r].Cells.Skip(range.Left).Take(range.ColumnCount).ToList()).ToList();
         for (var index = 0; index < rows.Count; index++)
         {

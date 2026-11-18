@@ -6,7 +6,7 @@ namespace PulseOffice.Presentations.UI.Tests;
 
 public sealed class VideoSlideDurationTests
 {
-    private readonly VideoSlideDuration _durations = new();
+    private readonly VideoSlideDuration _durations = new(new AnimationScheduler());
 
     [Theory]
     [InlineData(int.MaxValue, VideoSlideDuration.LongestSlideMs)]
