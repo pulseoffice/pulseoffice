@@ -195,7 +195,7 @@ public sealed class XlsxMetadataMapper
 
             if (name.Name == "_xlnm.Print_Area")
                 foreach (var piece in name.Text.Split(',', StringSplitOptions.RemoveEmptyEntries))
-                    if (CellRange.TryParseA1(Strip(piece), out var range))
+                    if (PrintArea(Strip(piece)) is { } range)
                         sheet.PrintRanges.Add(range);
 
             if (name.Name != "_xlnm.Print_Titles") continue;
@@ -210,6 +210,21 @@ public sealed class XlsxMetadataMapper
                     sheet.RepeatedPrintColumns = column.Column + 1;
             }
         }
+    }
+
+    private CellRange? PrintArea(string reference)
+    {
+        if (CellRange.TryParseA1(reference, out var range)) return range;
+
+        var bounds = reference.Split(':');
+        if (bounds.Length != 2) return null;
+        if (int.TryParse(bounds[0], NumberStyles.None, CultureInfo.InvariantCulture, out var top)
+            && int.TryParse(bounds[1], NumberStyles.None, CultureInfo.InvariantCulture, out var bottom)
+            && top is > 0 and <= CellAddress.MaxRows && bottom is > 0 and <= CellAddress.MaxRows)
+            return new CellRange(new CellAddress(top - 1, 0), new CellAddress(bottom - 1, CellAddress.MaxColumns - 1));
+        if (CellAddress.TryParseA1(bounds[0] + "1", out var left) && CellAddress.TryParseA1(bounds[1] + "1", out var right))
+            return new CellRange(new CellAddress(0, left.Column), new CellAddress(CellAddress.MaxRows - 1, right.Column));
+        return null;
     }
 
     private string Strip(string reference)

@@ -59,6 +59,7 @@ internal sealed class XlsxPageSetupCodec
     private const int MaxColumn = 16383;
     private const int MaxRow = 1048575;
     private const double MaximumMarginInches = 49;
+    private const uint DefaultFitPages = 1;
 
     private readonly IPaperCatalog _papers;
 
@@ -178,8 +179,8 @@ internal sealed class XlsxPageSetupCodec
             Orientation = page?.Orientation?.Value == OrientationValues.Landscape ? PageOrientation.Landscape : PageOrientation.Portrait,
             Order = page?.PageOrder?.Value == PageOrderValues.OverThenDown ? PageOrder.AcrossThenDown : PageOrder.DownThenAcross,
             Scale = page?.Scale?.Value is { } scale and > 0 ? Math.Clamp(scale, 10u, 400u) / 100.0 : 1.0,
-            FitToWidthPages = fits && page?.FitToWidth?.Value is { } across and > 0 ? (int)Math.Min(across, short.MaxValue) : null,
-            FitToHeightPages = fits && page?.FitToHeight?.Value is { } down and > 0 ? (int)Math.Min(down, short.MaxValue) : null,
+            FitToWidthPages = fits ? Pages(page?.FitToWidth?.Value) : null,
+            FitToHeightPages = fits ? Pages(page?.FitToHeight?.Value) : null,
             Margins = margins is null
                 ? fallback.Margins
                 : new Margins(Inches(margins.Left?.Value) ?? fallback.Margins.Left, header ?? fallback.Margins.Top,
@@ -207,6 +208,8 @@ internal sealed class XlsxPageSetupCodec
         var existing = workbook.PageStyles.All.FirstOrDefault(style => style.Setup == setup);
         sheet.PageStyleName = existing?.Name ?? workbook.PageStyles.Define("PageStyle_" + sheet.Name, setup).Name;
     }
+
+    private int? Pages(uint? declared) => (declared ?? DefaultFitPages) is var pages and > 0 ? (int)Math.Min(pages, (uint)short.MaxValue) : null;
 
     private Twip? Inches(double? value) => value is { } inches && double.IsFinite(inches) ? Twip.FromInches(Math.Clamp(inches, 0, MaximumMarginInches)) : null;
 }

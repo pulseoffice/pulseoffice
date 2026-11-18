@@ -14,6 +14,8 @@ public interface ITrackedRows
     IReadOnlySet<string> Ids(TextDocument document);
 
     void Resolve(TextDocument document, UndoStack history, TrackedChange change, RevisionVerdict verdict);
+
+    void Reinstate(TextDocument document, UndoStack history, TrackedChange change, RevisionSignature signature);
 }
 
 public sealed class TrackedRows(IStoryCatalog stories, IBlockTree tree, ITableEditing tables, IChangeMarking marking, IDeletedAnnotations annotations) : ITrackedRows
@@ -60,6 +62,17 @@ public sealed class TrackedRows(IStoryCatalog stories, IBlockTree tree, ITableEd
             marking.Remove(document, removal, orphan);
         }
         removal.Commit(history);
+    }
+
+    public void Reinstate(TextDocument document, UndoStack history, TrackedChange change, RevisionSignature signature)
+    {
+        TrackedChange reversed = change is Insertion
+            ? new Deletion(change.Id, signature.Author, signature.Date, new BlockContainer())
+            : new Insertion(change.Id, signature.Author, signature.Date);
+        var recorder = new EditRecorder(document, "reinstate-change");
+        foreach (var tracked in Of(document, change.Id)) recorder.Touch(tracked.Table);
+        marking.Replace(document, recorder, reversed);
+        recorder.Commit(history);
     }
 
     private TableCellLocation? Location(TextDocument document, TrackedRow tracked) =>

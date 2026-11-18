@@ -8,6 +8,7 @@ namespace PulseOffice.Formats.Odf;
 public sealed class OdfAnimationMapper
 {
     private readonly AnimationClickGroups _groups = new();
+    private readonly AnimationSteps _steps = new();
     private readonly TokenMap<AnimationTrigger> _triggers = new(AnimationTrigger.OnClick, "on-click",
         (AnimationTrigger.WithPrevious, "with-previous"), (AnimationTrigger.AfterPrevious, "after-previous"));
     private readonly TokenMap<AnimationCategory> _categories = new(AnimationCategory.MotionPath, "motion-path",
@@ -56,54 +57,58 @@ public sealed class OdfAnimationMapper
         var triggered = slide.Animations.Where(effect => effect.IsTriggered).ToList();
         var main = slide.Animations.Except(triggered).ToList();
         if (main.Count > 0 || triggered.Count == 0)
-            root.Add(Sequence(new XElement(Anim + "seq", new XAttribute(Pres + "node-type", "main-sequence")), main));
+            root.Add(Sequence(new XElement(Anim + "seq", new XAttribute(Pres + "node-type", "main-sequence")), main, "indefinite"));
         foreach (var sequence in triggered.GroupBy(effect => effect.TriggerShapeId!))
             root.Add(Sequence(new XElement(Anim + "seq",
                 new XAttribute(Smil + "begin", sequence.Key + ".click"),
-                new XAttribute(Pres + "node-type", "interactive-sequence")), [.. sequence]));
+                new XAttribute(Pres + "node-type", "interactive-sequence")), [.. sequence], "0s"));
         return root;
     }
 
-    private XElement Sequence(XElement seq, IReadOnlyList<AnimationEffect> animations)
+    private XElement Sequence(XElement seq, IReadOnlyList<AnimationEffect> animations, string firstBegin)
     {
         foreach (var group in _groups.Of(animations))
         {
-            var click = new XElement(Anim + "par",
-                new XAttribute(Pres + "node-type", "on-click"));
-
-            foreach (var effect in group)
+            var begin = seq.HasElements ? "indefinite" : group[0].Trigger == AnimationTrigger.OnClick ? firstBegin : "0s";
+            var click = new XElement(Anim + "par", new XAttribute(Smil + "begin", begin));
+            var offset = 0L;
+            foreach (var step in _steps.Of(group))
             {
-                if (effect.CurrentNative is { Format: NativeAnimation.Odf } native)
-                {
-                    click.Add(Native(native, effect));
-                    continue;
-                }
-
-                var effectPar = _codec.Write(_behaviours.Resolve(effect), _paragraphs.Target(effect));
-                effectPar.Add(
-                    new XAttribute(Smil + "begin", Time(effect.DelayMs)),
-                    new XAttribute(Smil + "fill", Fill(effect)),
-                    new XAttribute(Pres + "node-type", _triggers.Token(effect.Trigger)),
-                    new XAttribute(Pres + "preset-class", _categories.Token(effect.Category)),
-                    new XAttribute(Pres + "preset-id", _presets.OdfPresetId(effect.Category, effect.Preset)));
-
-                if (!string.IsNullOrEmpty(effect.SoundPath))
-                    effectPar.Add(new XElement(Anim + "audio",
-                        new XAttribute(Xlink + "href", effect.SoundPath)));
-
-                if (effect.Repeat > 1)
-                    effectPar.Add(new XAttribute(Smil + "repeatCount", effect.Repeat.ToString(CultureInfo.InvariantCulture)));
-
-                if (!string.IsNullOrEmpty(effect.Subtype))
-                    effectPar.Add(new XAttribute(Pres + "preset-sub-type", effect.Subtype));
-
-                click.Add(effectPar);
+                var stepPar = new XElement(Anim + "par", new XAttribute(Smil + "begin", Time((int)Math.Min(offset, int.MaxValue))));
+                foreach (var effect in step) stepPar.Add(Effect(effect));
+                click.Add(stepPar);
+                offset += _steps.Length(step);
             }
-
             seq.Add(click);
         }
 
         return seq;
+    }
+
+    private XElement Effect(AnimationEffect effect)
+    {
+        if (effect.CurrentNative is { Format: NativeAnimation.Odf } native)
+            return Native(native, effect);
+
+        var effectPar = _codec.Write(_behaviours.Resolve(effect), _paragraphs.Target(effect));
+        effectPar.Add(
+            new XAttribute(Smil + "begin", Time(effect.DelayMs)),
+            new XAttribute(Smil + "fill", Fill(effect)),
+            new XAttribute(Pres + "node-type", _triggers.Token(effect.Trigger)),
+            new XAttribute(Pres + "preset-class", _categories.Token(effect.Category)),
+            new XAttribute(Pres + "preset-id", _presets.OdfPresetId(effect.Category, effect.Preset)));
+
+        if (!string.IsNullOrEmpty(effect.SoundPath))
+            effectPar.Add(new XElement(Anim + "audio",
+                new XAttribute(Xlink + "href", effect.SoundPath)));
+
+        if (effect.Repeat > 1)
+            effectPar.Add(new XAttribute(Smil + "repeatCount", effect.Repeat.ToString(CultureInfo.InvariantCulture)));
+
+        if (!string.IsNullOrEmpty(effect.Subtype))
+            effectPar.Add(new XAttribute(Pres + "preset-sub-type", effect.Subtype));
+
+        return effectPar;
     }
 
     private string Fill(AnimationEffect effect) => effect.Rewind ? "remove" : "hold";

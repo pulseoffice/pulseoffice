@@ -68,7 +68,7 @@ public sealed class DocumentComparison(
         {
             var removed = gap.Deleted.Skip(gap.Pairs).Select(index => mine[index]).ToList();
             if (removed.Count > 0) RemoveParagraphs(current, history, mine, removed, signature);
-            var added = gap.Inserted.Skip(gap.Pairs).Select(index => theirs[index].Text).ToList();
+            var added = gap.Inserted.Skip(gap.Pairs).Select(index => theirs[index]).ToList();
             if (added.Count > 0) AddParagraphs(current, history, mine, gap.OldStart + gap.Pairs - 1, gap.OldStart + gap.Pairs, added, signature);
             for (var t = gap.Pairs - 1; t >= 0; t--) MergeWords(current, history, mine[gap.Deleted[t]], theirs[gap.Inserted[t]].Text, signature);
         }
@@ -185,17 +185,35 @@ public sealed class DocumentComparison(
         }
     }
 
-    private void AddParagraphs(TextDocument current, UndoStack history, IReadOnlyList<ParagraphBlock> mine, int previous, int next, IReadOnlyList<string> added, RevisionSignature signature)
+    private void AddParagraphs(TextDocument current, UndoStack history, IReadOnlyList<ParagraphBlock> mine, int previous, int next, IReadOnlyList<ParagraphBlock> added, RevisionSignature signature)
     {
+        var lines = added.Select(paragraph => paragraph.Text).ToList();
         if (previous >= 0 && previous < mine.Count)
         {
             var anchor = mine[previous];
-            tracked.InsertText(current, history, new DocumentPosition(anchor.Id, anchor.Length), "\n" + string.Join("\n", added), signature);
+            tracked.InsertText(current, history, new DocumentPosition(anchor.Id, anchor.Length), "\n" + string.Join("\n", lines), signature);
+            var location = stories.Find(current, anchor.Id).Location;
+            Adopt(current, history, location.Container, location.Index + 1, added);
         }
         else if (next >= 0 && next < mine.Count)
         {
-            tracked.InsertText(current, history, new DocumentPosition(mine[next].Id, 0), string.Join("\n", added) + "\n", signature);
+            tracked.InsertText(current, history, new DocumentPosition(mine[next].Id, 0), string.Join("\n", lines) + "\n", signature);
+            var location = stories.Find(current, mine[next].Id).Location;
+            var first = location.Container[location.Index] is ParagraphBlock held && held.Text == lines[0] && mine[next].Text != lines[0] ? location.Index : location.Index - added.Count;
+            Adopt(current, history, location.Container, first, added);
         }
+    }
+
+    private void Adopt(TextDocument current, UndoStack history, BlockContainer container, int first, IReadOnlyList<ParagraphBlock> added)
+    {
+        var recorder = new EditRecorder(current, "merge-documents");
+        for (var i = 0; i < added.Count; i++)
+        {
+            if (first + i < 0 || first + i >= container.Count || container[first + i] is not ParagraphBlock target || target.Text != added[i].Text) continue;
+            recorder.Touch(target);
+            target.State = target.State with { Content = added[i].Content };
+        }
+        recorder.Commit(history);
     }
 
     private void RemoveParagraphs(TextDocument current, UndoStack history, IReadOnlyList<ParagraphBlock> mine, IReadOnlyList<ParagraphBlock> removed, RevisionSignature signature)

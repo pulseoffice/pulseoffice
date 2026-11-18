@@ -11,7 +11,10 @@ public sealed class PptxAnimationMapper
 {
     private const int MaxTimingMs = AnimationEffect.LongestTimingMs;
 
+    private const int MainSequenceId = 100000;
+
     private readonly AnimationClickGroups _groups = new();
+    private readonly AnimationSteps _steps = new();
     private readonly TokenMap<AnimationCategory> _categories = new(AnimationCategory.MotionPath, "path",
         (AnimationCategory.Entrance, "entr"), (AnimationCategory.Emphasis, "emph"), (AnimationCategory.Exit, "exit"), (AnimationCategory.MotionPath, "path"), (AnimationCategory.Media, "mediacall"));
 
@@ -70,7 +73,7 @@ public sealed class PptxAnimationMapper
         }
 
         var main = mainSeq.Length == 0 && interactive.Length > 0 ? string.Empty :
-            "<p:seq concurrent=\"1\" nextAc=\"seek\"><p:cTn id=\"100000\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>" +
+            "<p:seq concurrent=\"1\" nextAc=\"seek\"><p:cTn id=\"" + MainSequenceId + "\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>" +
             mainSeq +
             "</p:childTnLst></p:cTn>" +
             "<p:prevCondLst><p:cond evt=\"onPrev\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>" +
@@ -92,64 +95,79 @@ public sealed class PptxAnimationMapper
         {
             var groupStart = id;
             var clickId = id++;
-            var withId = id++;
-            var effects = new StringBuilder();
+            var steps = new StringBuilder();
             var targeted = new HashSet<(uint, int?, AnimationCategory, string)>();
-
-            foreach (var effect in group)
+            var stepOffset = 0L;
+            foreach (var step in _steps.Of(group))
             {
-                if (!spidByElement.TryGetValue(effect.TargetId, out var spid)) continue;
-                if (!targeted.Add((spid, effect.Paragraph, effect.Category, effect.Preset))) continue;
-
-                if (effect.CurrentNative is { Format: NativeAnimation.Ooxml } native)
+                var stepId = id++;
+                var effects = new StringBuilder();
+                foreach (var effect in step)
                 {
-                    effects.Append(Native(native, effect, spid, ref id, sounds(effect.SoundPath)));
+                    if (!spidByElement.TryGetValue(effect.TargetId, out var spid)) continue;
+                    if (!targeted.Add((spid, effect.Paragraph, effect.Category, effect.Preset))) continue;
+                    effects.Append(Effect(effect, spid, sounds, ref id));
+                }
+                if (effects.Length == 0)
+                {
+                    id = stepId;
                     continue;
                 }
-
-                var behaviours = _behaviours.Resolve(effect);
-                if (!_codec.Children(behaviours, spid, new TimeNodeIdSequence(0)).Any())
-                    behaviours = _behaviours.Fallback(effect);
-                var ids = new TimeNodeIdSequence(id);
-                System.Xml.Linq.XNamespace p = PNs;
-                var head = new System.Xml.Linq.XElement(p + "cTn",
-                    new System.Xml.Linq.XAttribute("id", ids.Next()),
-                    new System.Xml.Linq.XAttribute("presetID", _presets.OoxmlPresetId(effect.Category, effect.Preset)),
-                    new System.Xml.Linq.XAttribute("presetClass", _categories.Token(effect.Category)),
-                    new System.Xml.Linq.XAttribute("presetSubtype", Subtype(effect)),
-                    effect.Repeat > 1 ? new System.Xml.Linq.XAttribute("repeatCount", effect.Repeat * 1000) : null,
-                    _codec.RootAttributes(behaviours),
-                    new System.Xml.Linq.XAttribute("fill", Fill(effect)),
-                    new System.Xml.Linq.XAttribute("grpId", "0"),
-                    new System.Xml.Linq.XAttribute("nodeType", NodeType(effect)),
-                    new System.Xml.Linq.XElement(p + "stCondLst", new System.Xml.Linq.XElement(p + "cond", new System.Xml.Linq.XAttribute("delay", effect.DelayMs))),
-                    _codec.Iterate(behaviours),
-                    new System.Xml.Linq.XElement(p + "childTnLst", _codec.Children(behaviours, spid, ids)));
-                if (sounds(effect.SoundPath) is { } sound) head.Add(_sound.Build(sound, ids.Next()));
-                var effectPar = new System.Xml.Linq.XElement(p + "par",
-                    new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "p", PNs),
-                    new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "a", ANs),
-                    head);
-                _paragraphs.Target(effectPar, effect.Paragraph);
-                effects.Append(effectPar.ToString(System.Xml.Linq.SaveOptions.DisableFormatting));
-                id = ids.Peek;
+                steps.Append(CultureInfo.InvariantCulture,
+                    $"<p:par><p:cTn id=\"{stepId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"{Math.Min(stepOffset, int.MaxValue)}\"/></p:stCondLst><p:childTnLst>");
+                steps.Append(effects);
+                steps.Append("</p:childTnLst></p:cTn></p:par>");
+                stepOffset += _steps.Length(step);
             }
 
-            if (effects.Length == 0)
+            if (steps.Length == 0)
             {
                 id = groupStart;
                 continue;
             }
-            var delay = sequence.Length == 0 ? firstDelay : "indefinite";
+            var start = sequence.Length > 0 ? "<p:cond delay=\"indefinite\"/>"
+                : firstDelay != "indefinite" ? $"<p:cond delay=\"{firstDelay}\"/>"
+                : group[0].Trigger == AnimationTrigger.OnClick ? "<p:cond delay=\"indefinite\"/>"
+                : $"<p:cond delay=\"indefinite\"/><p:cond evt=\"onBegin\" delay=\"0\"><p:tn val=\"{MainSequenceId}\"/></p:cond>";
             sequence.Append(CultureInfo.InvariantCulture,
-                $"<p:par><p:cTn id=\"{clickId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"{delay}\"/></p:stCondLst><p:childTnLst>");
-            sequence.Append(CultureInfo.InvariantCulture,
-                $"<p:par><p:cTn id=\"{withId}\" fill=\"hold\"><p:stCondLst><p:cond delay=\"0\"/></p:stCondLst><p:childTnLst>");
-            sequence.Append(effects);
-            sequence.Append("</p:childTnLst></p:cTn></p:par>");
+                $"<p:par><p:cTn id=\"{clickId}\" fill=\"hold\"><p:stCondLst>{start}</p:stCondLst><p:childTnLst>");
+            sequence.Append(steps);
             sequence.Append("</p:childTnLst></p:cTn></p:par>");
         }
         return sequence;
+    }
+
+    private string Effect(AnimationEffect effect, uint spid, Func<string?, PptxSoundReference?> sounds, ref int id)
+    {
+        if (effect.CurrentNative is { Format: NativeAnimation.Ooxml } native)
+            return Native(native, effect, spid, ref id, sounds(effect.SoundPath));
+
+        var behaviours = _behaviours.Resolve(effect);
+        if (!_codec.Children(behaviours, spid, new TimeNodeIdSequence(0)).Any())
+            behaviours = _behaviours.Fallback(effect);
+        var ids = new TimeNodeIdSequence(id);
+        System.Xml.Linq.XNamespace p = PNs;
+        var head = new System.Xml.Linq.XElement(p + "cTn",
+            new System.Xml.Linq.XAttribute("id", ids.Next()),
+            new System.Xml.Linq.XAttribute("presetID", _presets.OoxmlPresetId(effect.Category, effect.Preset)),
+            new System.Xml.Linq.XAttribute("presetClass", _categories.Token(effect.Category)),
+            new System.Xml.Linq.XAttribute("presetSubtype", Subtype(effect)),
+            effect.Repeat > 1 ? new System.Xml.Linq.XAttribute("repeatCount", effect.Repeat * 1000) : null,
+            _codec.RootAttributes(behaviours),
+            new System.Xml.Linq.XAttribute("fill", Fill(effect)),
+            new System.Xml.Linq.XAttribute("grpId", "0"),
+            new System.Xml.Linq.XAttribute("nodeType", NodeType(effect)),
+            new System.Xml.Linq.XElement(p + "stCondLst", new System.Xml.Linq.XElement(p + "cond", new System.Xml.Linq.XAttribute("delay", effect.DelayMs))),
+            _codec.Iterate(behaviours),
+            new System.Xml.Linq.XElement(p + "childTnLst", _codec.Children(behaviours, spid, ids)));
+        if (sounds(effect.SoundPath) is { } sound) head.Add(_sound.Build(sound, ids.Next()));
+        var effectPar = new System.Xml.Linq.XElement(p + "par",
+            new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "p", PNs),
+            new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "a", ANs),
+            head);
+        _paragraphs.Target(effectPar, effect.Paragraph);
+        id = ids.Peek;
+        return effectPar.ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
     }
 
     private string NodeType(AnimationEffect effect) => effect.Trigger switch

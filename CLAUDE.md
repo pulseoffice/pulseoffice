@@ -55,7 +55,9 @@ The rules below apply to every build and test run, by hand or by agents:
   break**: `tools/run-tests.py --changed [base]` (default `main`) selects the test projects that depend, through
   `ProjectReference` and linked source files, on the files changed since `base` plus the uncommitted ones, and builds
   only those; `--files <path …>` prints the test projects a file affects, `--list` prints the selection without
-  running. A change to `Directory.*.props`, `PulseOffice.slnx` or `global.json` selects everything. After merging an
+  running. `--classes <fragment …>` (2026-11-18) builds only the test projects whose sources contain one of the fragments
+  and runs only the classes whose full name contains one (for example `--classes Round158`: seconds instead of whole
+  projects); it never marks a project green in the cache. The coordinator uses it for quick reruns after the join. A change to `Directory.*.props`, `PulseOffice.slnx` or `global.json` selects everything. After merging an
   agent's branch, `--changed` against the commit before the merge; the full run is started only when the user asks (user rule, 2026-11-15), also before a push, which is verified with `--changed main`. `tools/run-tests.py [--no-build] [--no-cache] [fragment …]`
   builds the selection in **one** MSBuild invocation (a generated `selection.slnf`; the whole solution only for a full
   run), then runs each test assembly **directly with its own xUnit v3 runner** (`dotnet exec <Tests>.dll -class … -xml`,
@@ -106,7 +108,7 @@ The rules below apply to every build and test run, by hand or by agents:
   `dotnet build-server shutdown` after the build.
 - **Test processes use the workstation GC and give memory back**: `DOTNET_gcServer=0`, `DOTNET_GCConserveMemory=7`,
   `DOTNET_TieredPGO=0`.
-- **At most two agents at a time**, never nested (except the audit cycle below, which uses six), and never two app builds or two full test runs in parallel; live
+- **At most two agents at a time**, never nested (except the audit cycle below, which uses four), and never two app builds or two full test runs in parallel; live
   tests with `tools/uiprobe-linux` use one virtual display per agent.
 
 ## Verified environment
@@ -460,11 +462,12 @@ native macOS menu, modal service, settings schema.
    piece of work (these local commits need no request). Only when the user says so, the branch is squashed into a
    single commit and merged into `main`; pushing still follows rule 2 and needs `tools/run-tests.py --changed main` green first (the full suite only when the user asks).
 2-quater. **Releases are made only by the user** (2026-11-17): versions, tags and GitHub releases are created only by the user with `pulse-cmd.py`; agents never bump, tag or release.
-2-quinquies. **Audit cycle of six** (2026-11-17): audits run six at a time, one agent per area in its own worktree.
-   When all six have finished and applied their fixes, their branches are joined into `work`, the tests of the areas
-   touched by all six run once (`tools/run-tests.py --changed <commit before the merges>`), and `work` is squashed onto
-   `main`. The cycle repeats while any audit still reports medium or serious defects. During the cycle each agent runs
-   only its own targeted test classes; the `--changed` run is done once, at the join.
+2-quinquies. **Audit cycle of four** (2026-11-17): audits run four at a time, one agent per area in its own worktree.
+   When all four have finished and applied their fixes, their branches are joined into `work`, the tests of the areas
+   touched by all four run once (`tools/run-tests.py --changed <commit before the merges>`), and `work` is squashed onto
+   `main`. The cycle repeats while any audit still reports medium or serious defects. Audit agents run **no tests and no
+   builds** (user correction, 2026-11-18): they audit, fix, write the tests and commit; all tests run once, at the join
+   (`--changed`), and the coordinator fixes what fails there.
 2-bis. **Restructure instead of patching**: if a change requires redoing the
    structure, it is redone. A sequence of minimal patches on a structure that no longer holds
    produces unmaintainable code precisely while the project grows.

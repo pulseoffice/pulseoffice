@@ -148,7 +148,7 @@ public sealed class SheetRangeMove(ISheetStructure structure) : ISheetRangeMove
     [
         new MovedChangesPart(), new MovedFiltersPart(), new MovedCellsPart(), new MovedNamesPart(), new MovedChartsPart(), new MovedFormLinksPart(), new MovedRulesPart(),
         new MovedValidationsPart(), new MovedCommentsPart(), new MovedMergesPart(), new MovedObjectsPart(),
-        new MovedSparklinesPart(), new MovedPivotsPart(),
+        new MovedSparklinesPart(), new MovedPivotsPart(), new MovedPrintRangesPart(),
     ];
 }
 

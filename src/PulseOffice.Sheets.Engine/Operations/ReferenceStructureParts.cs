@@ -30,23 +30,46 @@ internal sealed class BreaksPart : StructurePart
     }
 }
 
+internal sealed class LeadingBand
+{
+    public int Adjusted(StructureEdit edit, int count)
+    {
+        var change = edit.Change;
+        if (change.Index >= count) return count;
+
+        var limit = edit.Shift.Rows ? CellAddress.MaxRows - 1 : CellAddress.MaxColumns - 1;
+        return change.IsInsertion
+            ? Math.Min(count + change.Count, limit)
+            : count - (Math.Min(count, change.Index + change.Count) - change.Index);
+    }
+}
+
 internal sealed class FrozenPanesPart : StructurePart
 {
+    private readonly LeadingBand _band = new();
+
     public override bool WholeLinesOnly => true;
 
     public override void Apply(StructureEdit edit)
     {
         var frozen = edit.Sheet.Frozen;
-        var count = edit.Shift.Rows ? frozen.Rows : frozen.Columns;
-        var change = edit.Change;
-        if (change.Index >= count) return;
+        edit.Sheet.Frozen = edit.Shift.Rows
+            ? frozen with { Rows = _band.Adjusted(edit, frozen.Rows) }
+            : frozen with { Columns = _band.Adjusted(edit, frozen.Columns) };
+    }
+}
 
-        var limit = edit.Shift.Rows ? CellAddress.MaxRows - 1 : CellAddress.MaxColumns - 1;
-        var adjusted = change.IsInsertion
-            ? Math.Min(count + change.Count, limit)
-            : count - (Math.Min(count, change.Index + change.Count) - change.Index);
+internal sealed class PrintTitlesPart : StructurePart
+{
+    private readonly LeadingBand _band = new();
 
-        edit.Sheet.Frozen = edit.Shift.Rows ? frozen with { Rows = adjusted } : frozen with { Columns = adjusted };
+    public override bool WholeLinesOnly => true;
+
+    public override void Apply(StructureEdit edit)
+    {
+        var sheet = edit.Sheet;
+        if (edit.Shift.Rows) sheet.RepeatedPrintRows = _band.Adjusted(edit, sheet.RepeatedPrintRows);
+        else sheet.RepeatedPrintColumns = _band.Adjusted(edit, sheet.RepeatedPrintColumns);
     }
 }
 

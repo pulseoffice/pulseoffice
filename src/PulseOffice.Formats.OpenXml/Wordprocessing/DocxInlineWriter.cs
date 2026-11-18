@@ -35,7 +35,7 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
 
         public FormatChange? Format { get; set; }
 
-        public int FormatIndex { get; set; }
+        public int FormatOffset { get; set; }
     }
 
     public OpenXmlElement? Drawing(AnchoredObject item, DocxWriteContext context, DocxBlockSink blocks) => drawings.Write(item, context, blocks);
@@ -187,8 +187,37 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
 
     private IEnumerable<OpenXmlElement> Runs(TextRun run, int start, int stop, DocxWriteContext context, State state)
     {
-        if (start == 0 && stop == run.Text.Length && ComplexField(run, context, state.Deletion is not null && state.Insertion is null) is { } complex) return complex;
-        return [Run(run, run.Text[start..stop], context, state)];
+        if (start == 0 && stop == run.Text.Length && ComplexField(run, context, state.Deletion is not null && state.Insertion is null) is { } complex)
+        {
+            state.FormatOffset += stop - start;
+            return complex;
+        }
+        if (state.Format is not { } format) return [Run(run, run.Text[start..stop], context, state, null)];
+        return [.. FormatPieces(format, state, stop - start).Select(piece => Run(run, run.Text.Substring(start + piece.From, piece.Length), context, state, piece.Previous ?? run))];
+    }
+
+    private static IEnumerable<(int From, int Length, TextRun? Previous)> FormatPieces(FormatChange format, State state, int length)
+    {
+        var from = 0;
+        while (from < length)
+        {
+            var (previous, left) = PreviousAt(format.PreviousRuns, state.FormatOffset);
+            var take = previous is null ? length - from : Math.Min(length - from, left);
+            yield return (from, take, previous);
+            from += take;
+            state.FormatOffset += take;
+        }
+    }
+
+    private static (TextRun? Run, int Left) PreviousAt(IReadOnlyList<TextRun> runs, int offset)
+    {
+        var end = 0;
+        foreach (var run in runs)
+        {
+            end += run.Text.Length;
+            if (offset < end) return (run, end - offset);
+        }
+        return (runs.Count == 0 ? null : runs[^1], int.MaxValue);
     }
 
     public IReadOnlyList<W.Run>? ComplexField(TextRun run, DocxWriteContext context, bool deleted)
@@ -247,15 +276,12 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
                 .Concat(paragraph.Content.Runs.Where(item => item.Field == TextFieldKind.VariableSet && item.FieldArgument is not null).Select(item => item.FieldArgument!)))
             .ToHashSet(StringComparer.Ordinal);
 
-    private OpenXmlElement Run(TextRun run, string text, DocxWriteContext context, State state)
+    private OpenXmlElement Run(TextRun run, string text, DocxWriteContext context, State state, TextRun? previous)
     {
         var element = new W.Run();
         var properties = characters.Elements(formatting.Run(run), context.Styles.IdOf(StyleFamily.Character, run.StyleName)).ToList();
-        if (state.Format is { } format && text.Length > 0)
-        {
-            var previous = format.PreviousRuns.Count == 0 ? run : format.PreviousRuns[Math.Min(state.FormatIndex++, format.PreviousRuns.Count - 1)];
-            properties.Add(revisions.FormatChange(format, previous, context));
-        }
+        if (state.Format is { } format && previous is not null && text.Length > 0)
+            properties.Add(revisions.FormatChange(format, previous.Text.Length == 0 ? run : previous, context));
 
         if (properties.Count > 0) element.Append(new W.RunProperties(properties));
         AppendText(element, text, deleted: state.Deletion is not null && state.Insertion is null);
@@ -382,7 +408,7 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
                         if (change.Edge == MarkEdge.Start)
                         {
                             state.Format = format;
-                            state.FormatIndex = 0;
+                            state.FormatOffset = 0;
                         }
                         else if (change.Edge == MarkEdge.End && state.Format == format) state.Format = null;
                         break;

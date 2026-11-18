@@ -38,8 +38,11 @@ public sealed class FolioRulers
         editor.Changed += (_, _) => Update();
         scroll.ScrollChanged += (_, _) => Update();
         canvas.LayoutUpdated += (_, _) => Update();
-        services.Layout.Changed += (_, _) => Update();
+        Horizontal.AttachedToVisualTree += (_, _) => services.Layout.Changed += OnLayoutChanged;
+        Horizontal.DetachedFromVisualTree += (_, _) => services.Layout.Changed -= OnLayoutChanged;
     }
+
+    private void OnLayoutChanged(object? sender, EventArgs e) => Update();
 
     public RulerStrip Horizontal { get; }
 

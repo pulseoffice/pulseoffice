@@ -199,3 +199,16 @@ internal sealed class MovedChangesPart : RangeMovePart
             address => move.Source.Contains(address) ? move.Moved(address) : null);
     }
 }
+
+internal sealed class MovedPrintRangesPart : RangeMovePart
+{
+    public override void Apply(RangeMoveEdit edit)
+    {
+        if (edit.CrossSheet) return;
+
+        var move = edit.Move;
+        var ranges = edit.Source.PrintRanges;
+        for (var index = 0; index < ranges.Count; index++)
+            if (move.Inside(ranges[index], move.Source)) ranges[index] = move.Moved(ranges[index]);
+    }
+}

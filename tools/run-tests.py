@@ -389,7 +389,10 @@ class TestRunner:
                                 cwd=assembly.folder, env=self.environment())
         if result.returncode != 0:
             sys.exit(f"cannot list the tests of {assembly.name}:\n{result.stdout}{result.stderr}")
-        return sorted(line.strip() for line in result.stdout.splitlines() if re.fullmatch(r"[\w.+`]+", line.strip()))
+        names = sorted(line.strip() for line in result.stdout.splitlines() if re.fullmatch(r"[\w.+`]+", line.strip()))
+        if self.options.classes:
+            names = [name for name in names if any(fragment in name for fragment in self.options.classes)]
+        return names
 
     def chunks(self, assembly):
         classes = self.classes(assembly)
@@ -398,7 +401,7 @@ class TestRunner:
         count = max(math.ceil(sum(estimate.values()) / self.options.chunk_seconds),
                     math.ceil(len(classes) / self.graph.chunk_size(assembly.project, self.options.classes_per_chunk)), 1)
         if count == 1:
-            return [Chunk(assembly, 1, [], sum(estimate.values()))]
+            return [Chunk(assembly, 1, classes if self.options.classes else [], sum(estimate.values()))]
         bins = [[] for _ in range(count)]
         loads = [0.0] * count
         for name in sorted(classes, key=lambda name: -estimate[name]):
@@ -528,13 +531,13 @@ class TestRunner:
         for assembly in assemblies:
             if not assembly.dll.exists():
                 sys.exit(f"{assembly.dll} is missing: build first")
-            if self.options.cache and assembly.name not in UNCACHEABLE:
+            if self.options.cache and not self.options.classes and assembly.name not in UNCACHEABLE:
                 fingerprints[assembly.name] = assembly.fingerprint()
                 if self.cache.green(assembly.name, fingerprints[assembly.name]):
                     print(f"{assembly.name:<48}     cached  (green with the same build)", flush=True)
                     continue
             pending.append(assembly)
-        chunks = [chunk for assembly in pending for chunk in self.chunks(assembly)]
+        chunks = [chunk for assembly in pending if self.classes(assembly) for chunk in self.chunks(assembly)]
         chunks.sort(key=lambda chunk: -chunk.estimate)
         print(f"{len(chunks)} chunk(s), up to {self.options.jobs} at a time within {self.budget.total_mb} MB, "
               f"each capped at 1.5 times its recorded peak", flush=True)
@@ -573,6 +576,9 @@ def main():
     parser.add_argument("--files", nargs="+", metavar="FILE", help="print the test projects affected by these files and exit")
     parser.add_argument("--sweeps", action="store_true",
                         help="with --changed or --files, keep the command sweeps even when SweepRule would skip them")
+    parser.add_argument("--classes", nargs="+", metavar="FRAGMENT", default=[],
+                        help="within the selected projects, run only the test classes whose full name contains one of "
+                             "these (for example Round158); never marks a project green in the result cache")
     parser.add_argument("--list", action="store_true", help="print the selected test projects and exit")
     options = parser.parse_args()
     runs = REPO / "artifacts" / "test-runs"
@@ -601,6 +607,10 @@ def main():
         projects = graph.tests
     if options.fragments:
         projects = [project for project in projects if any(fragment in project.stem for fragment in options.fragments)]
+    if options.classes:
+        projects = [project for project in projects if any(
+            any(fragment in source.read_text(errors="ignore") for fragment in options.classes)
+            for source in project.parent.rglob("*.cs") if "/obj/" not in source.as_posix() and "/bin/" not in source.as_posix())]
     if options.list:
         for project in projects:
             print(project.stem)

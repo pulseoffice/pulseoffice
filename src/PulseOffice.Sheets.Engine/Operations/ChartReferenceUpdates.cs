@@ -1,4 +1,5 @@
 using PulseOffice.Charts;
+using PulseOffice.Drawing.Shapes;
 using PulseOffice.Sheets.Addressing;
 
 namespace PulseOffice.Sheets.Engine.Operations;
@@ -36,11 +37,29 @@ internal abstract class ChartReferenceRewrite
 
     public PlacedObject Rewrite(PlacedObject placed, string ownerSheet)
     {
-        var content = placed.Content is ChartDefinition chart ? Rewrite(chart) : placed.Content;
+        var content = placed.Content switch
+        {
+            ChartDefinition chart => Rewrite(chart),
+            ShapeGroupObject group => Rewrite(group, ownerSheet),
+            _ => placed.Content,
+        };
         var link = Link(placed.Hyperlink, ownerSheet);
         return ReferenceEquals(content, placed.Content) && link == placed.Hyperlink
             ? placed
             : placed with { Content = content, Hyperlink = link };
+    }
+
+    private ShapeGroupObject Rewrite(ShapeGroupObject group, string ownerSheet)
+    {
+        var children = group.Children.Select(child => Rewrite(child, ownerSheet)).ToList();
+        return children.SequenceEqual(group.Children, ReferenceEqualityComparer.Instance) ? group : group with { Children = children };
+    }
+
+    private GroupChild Rewrite(GroupChild child, string ownerSheet)
+    {
+        var content = child.Content is ShapeGroupObject inner ? Rewrite(inner, ownerSheet) : child.Content;
+        var link = Link(child.Hyperlink, ownerSheet);
+        return ReferenceEquals(content, child.Content) && link == child.Hyperlink ? child : child with { Content = content, Hyperlink = link };
     }
 
     public string? Link(string? link, string ownerSheet)

@@ -56,7 +56,12 @@ public sealed class RevisionResolver(
             });
             var rowChanges = rows.Ids(document);
             var tracked = wanted.Where(rowChanges.Contains).ToList();
-            foreach (var id in tracked) rows.Resolve(document, history, document.Changes.Find(id)!, verdict);
+            foreach (var id in tracked)
+            {
+                var change = document.Changes.Find(id)!;
+                if (verdict == RevisionVerdict.Reinstate && change is Insertion or Deletion) rows.Reinstate(document, history, change, author.Sign());
+                else rows.Resolve(document, history, change, verdict);
+            }
             wanted = [.. wanted.Except(tracked).Where(id => document.Changes.Find(id) is not null)];
             if (verdict == RevisionVerdict.Accept)
             {

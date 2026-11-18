@@ -81,7 +81,6 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
         Children.Add(scroll);
         Children.Add(_rulers.Horizontal);
         Children.Add(_rulers.Vertical);
-        services.Rulers.Layout.Changed += (_, _) => ApplyScrollBars();
         ApplyScrollBars();
         _ime = new InlineImeClient(this);
 
@@ -198,6 +197,8 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
     {
         base.OnAttachedToVisualTree(e);
         _services.Context.Attach(_target);
+        _services.Rulers.Layout.Changed += OnLayoutChanged;
+        ApplyScrollBars();
         Announce();
         Avalonia.Threading.Dispatcher.UIThread.Post(FocusOnArrival, Avalonia.Threading.DispatcherPriority.Loaded);
     }
@@ -210,8 +211,11 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _services.Context.Detach(_target);
+        _services.Rulers.Layout.Changed -= OnLayoutChanged;
         base.OnDetachedFromVisualTree(e);
     }
+
+    private void OnLayoutChanged(object? sender, EventArgs e) => ApplyScrollBars();
 
     private void Keyboard(bool focused)
     {

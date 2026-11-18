@@ -14,6 +14,8 @@ internal sealed class FreeformDrawing(
     FreeformSketch sketch,
     IPathNormalizer normalizer)
 {
+    private bool _linked;
+
     public IDrawingToolState? Tools
     {
         get;
@@ -21,12 +23,26 @@ internal sealed class FreeformDrawing(
         {
             if (ReferenceEquals(field, value)) return;
 
-            if (field is not null) field.Changed -= ToolsChanged;
+            if (_linked && field is not null) field.Changed -= ToolsChanged;
 
             field = value;
 
-            if (field is not null) field.Changed += ToolsChanged;
+            if (_linked && field is not null) field.Changed += ToolsChanged;
         }
+    }
+
+    public void Link()
+    {
+        if (_linked) return;
+        _linked = true;
+        if (Tools is { } tools) tools.Changed += ToolsChanged;
+    }
+
+    public void Unlink()
+    {
+        if (!_linked) return;
+        _linked = false;
+        if (Tools is { } tools) tools.Changed -= ToolsChanged;
     }
 
     public FreeformSketch Sketch => sketch;

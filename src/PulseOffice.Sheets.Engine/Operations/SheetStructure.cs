@@ -42,7 +42,7 @@ public sealed class SheetStructure : ISheetStructure
     [
         new LayoutPart(), new BreaksPart(), new FrozenPanesPart(), new CellsPart(), new NeighbourFormatPart(), new FormulasPart(),
         new NamesPart(), new ObjectsPart(anchoring), new FormLinksPart(), new ChartLinksPart(), new RulesPart(), new ValidationsPart(), new ConditionsElsewherePart(),
-        new CommentsPart(), new PrintRangesPart(), new MergesPart(), new GroupsPart(), new FiltersPart(), new ExternalDataPart(),
+        new CommentsPart(), new PrintRangesPart(), new PrintTitlesPart(), new MergesPart(), new GroupsPart(), new FiltersPart(), new ExternalDataPart(),
         new QueryBindingsPart(), new PivotsPart(), new SparklinesPart(), new ScenariosPart(), new LabelsPart(), new TrackedChangesPart(),
     ];
 

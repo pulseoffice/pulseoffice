@@ -3,6 +3,7 @@ using PulseOffice.Drawing.Shapes;
 using PulseOffice.Sheets.Engine.Operations;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Input;
 using Avalonia.Media;
 using PulseOffice.Sheets.Addressing;
@@ -201,12 +202,27 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         {
             if (ReferenceEquals(Options.Spelling, value)) return;
 
-            if (Options.Spelling is { } previous) previous.Changed -= SpellingChanged;
+            var attached = this.IsAttachedToVisualTree();
+            if (attached && Options.Spelling is { } previous) previous.Changed -= SpellingChanged;
 
             Options.Spelling = value;
 
-            if (value is not null) value.Changed += SpellingChanged;
+            if (attached && value is not null) value.Changed += SpellingChanged;
         }
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (Options.Spelling is { } spelling) spelling.Changed += SpellingChanged;
+        _parts.Drawing.Link();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (Options.Spelling is { } spelling) spelling.Changed -= SpellingChanged;
+        _parts.Drawing.Unlink();
+        base.OnDetachedFromVisualTree(e);
     }
 
     private void SpellingChanged(object? sender, EventArgs e) => InvalidateVisual();
