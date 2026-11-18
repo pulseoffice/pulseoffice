@@ -30,11 +30,13 @@ public sealed class LedgerChartCommands(
     Dialogs.ISheetReferenceSources referenceSources,
     ITextCatalog texts,
     IChartSourceLayout? sourceLayout = null,
-    PulseOffice.Sheets.Formatting.ISpreadsheetLocale? locale = null) : LedgerCommandSet(context)
+    PulseOffice.Sheets.Formatting.ISpreadsheetLocale? locale = null,
+    IChartTableSources? tableSources = null) : LedgerCommandSet(context)
 {
     private readonly IChartSourceLayout _sourceLayout = sourceLayout ?? new ChartSourceLayout();
     private readonly PulseOffice.Sheets.Formatting.ISpreadsheetLocale _locale = locale ?? new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale();
     private readonly ChartSourceReferences _references = new();
+    private readonly IChartTableSources _tableSources = tableSources ?? new ChartTableSources();
 
     public IEnumerable<CommandDefinition> GetCommands() => ChartCommands();
 
@@ -208,7 +210,11 @@ public sealed class LedgerChartCommands(
             SeriesRanges = new PulseOffice.UI.Controls.Charts.ChartSeriesRangeEditing(
                 settings => _sourceLayout.Expand(chartSettings.Apply(chart, settings with { SeriesSources = null })),
                 text => SeriesReference(workbook, chart, text),
-                referenceSources.Picker(Dialogs.ReferenceShape.Range)),
+                referenceSources.Picker(Dialogs.ReferenceShape.Range),
+                new PulseOffice.UI.Controls.Charts.ChartSeriesTables(
+                    () => [.. _tableSources.Tables(workbook).Select(table => new PulseOffice.UI.Controls.Charts.ChartTableChoice(table.Name, table.Columns))],
+                    text => _tableSources.Describe(text) is { } described ? new PulseOffice.UI.Controls.Charts.ChartTableColumn(described.Table, described.Column) : null,
+                    _tableSources.Reference)),
         }, ct).ConfigureAwait(true);
 
         if (updated is null) return;
@@ -240,6 +246,8 @@ public sealed class LedgerChartCommands(
     private string? SeriesReference(Workbook workbook, ChartDefinition chart, string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
+        if (_tableSources.Describe(text) is { } table)
+            return workbook.DatabaseRanges.Find(table.Table) is not null ? text.Trim().TrimStart('=') : null;
         var split = new SheetReferenceText().Split(text);
         var sheet = split.Sheet ?? (string.IsNullOrEmpty(chart.SourceSheet) ? workbook.Sheets[Context.SheetIndex].Name : chart.SourceSheet);
         return workbook.FindSheet(sheet) is { } found && CellRange.TryParseA1(split.Local, out var range)

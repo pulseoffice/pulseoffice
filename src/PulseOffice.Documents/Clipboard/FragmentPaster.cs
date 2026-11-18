@@ -17,20 +17,23 @@ public sealed class StyleMerger : IStyleMerger
 {
     public void Merge(EditRecorder recorder, StyleSheet target, StyleSheet source)
     {
-        Merge(recorder, target.Paragraph, source.Paragraph);
-        Merge(recorder, target.Character, source.Character);
+        var added = new List<DocumentStyle>();
+        added.AddRange(Merge(recorder, target.Paragraph, source.Paragraph));
+        added.AddRange(Merge(recorder, target.Character, source.Character));
         Merge(recorder, target.List, source.List);
         Merge(recorder, target.Page, source.Page);
         Merge(recorder, target.Frame, source.Frame);
         Merge(recorder, target.Table, source.Table);
+        target.DropDanglingLinks(added);
     }
 
-    private void Merge<TStyle>(EditRecorder recorder, StyleCollection<TStyle> target, StyleCollection<TStyle> source) where TStyle : DocumentStyle
+    private List<TStyle> Merge<TStyle>(EditRecorder recorder, StyleCollection<TStyle> target, StyleCollection<TStyle> source) where TStyle : DocumentStyle
     {
-        var missing = source.All.Where(style => !target.Contains(style.Name)).ToList();
-        if (missing.Count == 0) return;
+        var missing = source.All.Where(style => !target.Contains(style.Name)).Select(style => (TStyle)style.Clone()).ToList();
+        if (missing.Count == 0) return missing;
         recorder.Touch(target, () => target.All, target.ReplaceAll);
-        foreach (var style in missing) target.Add((TStyle)style.Clone());
+        foreach (var style in missing) target.Add(style);
+        return missing;
     }
 }
 

@@ -264,12 +264,13 @@ public partial class App : Application
         var theme = services.GetRequiredService<IThemeService>();
         var settings = services.GetRequiredService<ISettingsService>();
 
-        theme.ThemeChanged += (_, _) => Palette.Apply(this, theme.IsDark);
+        theme.ThemeChanged += (_, _) => Palette.Apply(this, theme.Variant);
 
         void Apply() => theme.Apply(settings.Get<string>(ShellSettingKeys.Theme) switch
         {
             "light" => ThemePreference.Light,
             "dark" => ThemePreference.Dark,
+            "highContrast" => ThemePreference.HighContrast,
 
             _ => ThemePreference.System,
         });
@@ -280,6 +281,6 @@ public partial class App : Application
         };
 
         Apply();
-        Palette.Apply(this, theme.IsDark);
+        Palette.Apply(this, theme.Variant);
     }
 }

@@ -20,6 +20,10 @@ public sealed record ChartData(IReadOnlyList<string> Categories, IReadOnlyList<C
 
     public IReadOnlyList<ChartHiddenColumn>? HiddenColumns { get; init; }
 
+    public IReadOnlyList<string>? MissingTables { get; init; }
+
+    public bool LostTables => MissingTables is { Count: > 0 };
+
     public ChartData WithCategoryLevels(IReadOnlyList<IReadOnlyList<string>>? levels) =>
         levels is { Count: > 0 } && levels.All(level => level.Count == Categories.Count)
             ? this with { CategoryLevels = levels }

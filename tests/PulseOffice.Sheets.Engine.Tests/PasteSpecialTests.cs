@@ -144,7 +144,7 @@ public class PasteSpecialTests
         Assert.Single(snapshot.Comments);
         Assert.Equal((0, 0, 2, 1), (snapshot.Validations[0].Row, snapshot.Validations[0].Column, snapshot.Validations[0].RowCount, snapshot.Validations[0].ColumnCount));
 
-        clipboard.Paste(snapshot, sheet, A("D1"), A("A1"), new PasteRequest());
+        clipboard.Paste(snapshot, sheet, A("D1"), A("A1"), new PasteRequest { Parts = PasteParts.All });
         Assert.False(sheet.Comments.ContainsKey(A("D1")));
         Assert.Single(sheet.Validations);
 

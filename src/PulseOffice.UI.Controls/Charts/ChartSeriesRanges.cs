@@ -11,7 +11,17 @@ namespace PulseOffice.UI.Controls.Charts;
 public sealed record ChartSeriesRangeEditing(
     Func<ChartSettings, IReadOnlyList<ChartSeriesSource>> Expand,
     Func<string, string?> Normalize,
-    PulseOffice.UI.Controls.References.IReferencePicker? Picker);
+    PulseOffice.UI.Controls.References.IReferencePicker? Picker,
+    ChartSeriesTables? Tables = null);
+
+public sealed record ChartTableChoice(string Name, IReadOnlyList<string> Columns);
+
+public sealed record ChartTableColumn(string Table, string? Column);
+
+public sealed record ChartSeriesTables(
+    Func<IReadOnlyList<ChartTableChoice>> Choices,
+    Func<string, ChartTableColumn?> Describe,
+    Func<string, string, string> Reference);
 
 public sealed class ChartSeriesRanges : StackPanel
 {
@@ -19,6 +29,7 @@ public sealed class ChartSeriesRanges : StackPanel
     private readonly ITextCatalog _texts;
     private readonly DesignTokens.Metrics _metrics;
     private readonly List<TextBox> _boxes = [];
+    private readonly Dictionary<TextBox, TextBlock> _captions = new();
     private IReadOnlyList<ChartSeriesSource> _sources = [];
     private bool _filling;
 
@@ -51,6 +62,7 @@ public sealed class ChartSeriesRanges : StackPanel
         _filling = true;
         Children.Clear();
         _boxes.Clear();
+        _captions.Clear();
 
         for (var index = 0; index < _sources.Count; index++)
         {
@@ -62,6 +74,12 @@ public sealed class ChartSeriesRanges : StackPanel
             Children.Add(new TextBlock { Text = name, FontSize = _metrics.FontSizeSmall, TextTrimming = TextTrimming.CharacterEllipsis }
                 .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary));
             Children.Add(Row(box));
+            if (_editing.Tables is not null)
+            {
+                var caption = Caption(box);
+                _captions[box] = caption;
+                Children.Add(caption);
+            }
         }
 
         _filling = false;
@@ -69,17 +87,85 @@ public sealed class ChartSeriesRanges : StackPanel
 
     private void Changed(TextBox box)
     {
+        if (_captions.TryGetValue(box, out var caption)) Describe(box, caption);
         if (_filling) return;
         PerSeries = true;
         box.Classes.Set("invalid", _editing.Normalize(Text(box)) is null);
         Edited?.Invoke(this, EventArgs.Empty);
     }
 
+    private TextBlock Caption(TextBox box)
+    {
+        var caption = new TextBlock { FontSize = _metrics.FontSizeSmall, TextTrimming = TextTrimming.CharacterEllipsis }
+            .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
+        Describe(box, caption);
+        return caption;
+    }
+
+    private void Describe(TextBox box, TextBlock caption)
+    {
+        var described = _editing.Tables?.Describe(Text(box));
+        caption.Text = described switch
+        {
+            null => string.Empty,
+            { Column: { } column } => _texts.Format("chart.seriesRange.tableColumn", described.Table, column),
+            _ => _texts.Format("chart.seriesRange.tableWhole", described.Table),
+        };
+        caption.IsVisible = described is not null;
+    }
+
+    private Button? TablePicker(TextBox box)
+    {
+        if (_editing.Tables is not { } tables) return null;
+        var button = new Button { Content = _texts["chart.seriesRange.table"] };
+        Avalonia.Automation.AutomationProperties.SetName(button, _texts["chart.seriesRange.tablePick"]);
+        var flyout = new MenuFlyout();
+        flyout.Opening += (_, _) =>
+        {
+            flyout.Items.Clear();
+            var choices = tables.Choices();
+            if (choices.Count == 0)
+                flyout.Items.Add(new MenuItem { Header = _texts["chart.seriesRange.noTables"], IsEnabled = false });
+            foreach (var table in choices)
+            {
+                var item = new MenuItem { Header = table.Name };
+                foreach (var column in table.Columns)
+                {
+                    var pick = new MenuItem { Header = column };
+                    pick.Click += (_, _) =>
+                    {
+                        box.Text = tables.Reference(table.Name, column);
+                        box.Focus();
+                    };
+                    item.Items.Add(pick);
+                }
+                item.IsEnabled = table.Columns.Count > 0;
+                flyout.Items.Add(item);
+            }
+        };
+        button.Flyout = flyout;
+        return button;
+    }
+
     private Control Row(TextBox box)
     {
-        if (_editing.Picker is not { } picker) return box;
+        var tablePicker = TablePicker(box);
+        if (_editing.Picker is not { } picker)
+        {
+            if (tablePicker is null) return box;
+            var plain = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = _metrics.SpacingSmall };
+            Grid.SetColumn(tablePicker, 1);
+            plain.Children.Add(box);
+            plain.Children.Add(tablePicker);
+            return plain;
+        }
 
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = _metrics.SpacingSmall };
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = _metrics.SpacingSmall };
+        if (tablePicker is not null)
+        {
+            Grid.SetColumn(tablePicker, 2);
+            row.Children.Add(tablePicker);
+        }
         var pick = new PulseOffice.UI.Controls.References.ReferencePickButton(picker, _texts, _metrics);
         pick.Click += async (_, _) =>
         {

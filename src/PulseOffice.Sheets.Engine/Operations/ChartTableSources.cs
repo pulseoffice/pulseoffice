@@ -16,7 +16,19 @@ public interface IChartTableSources
     ChartDefinition Flatten(ChartDefinition chart, Workbook workbook);
 
     ChartDefinition Rename(ChartDefinition chart, IReadOnlyList<TableRename> renames);
+
+    ChartTableReference? Describe(string? text);
+
+    string Reference(string table, string column);
+
+    IReadOnlyList<string> MissingTables(ChartDefinition chart, Workbook workbook);
+
+    IReadOnlyList<ChartTableColumns> Tables(Workbook workbook);
 }
+
+public sealed record ChartTableReference(string Table, string? Column);
+
+public sealed record ChartTableColumns(string Name, IReadOnlyList<string> Columns);
 
 public sealed class ChartTableSources(ITableReferenceResolution resolution, IChartSourceReferences references) : IChartTableSources
 {
@@ -60,6 +72,44 @@ public sealed class ChartTableSources(ITableReferenceResolution resolution, ICha
         var renamed = chart.SeriesSources!.Select(source =>
             new ChartSeriesSource(Renamed(source.Name, renames), Renamed(source.Values, renames), Renamed(source.Categories, renames))).ToList();
         return renamed.SequenceEqual(chart.SeriesSources!) ? chart : chart with { SeriesSources = renamed };
+    }
+
+    public ChartTableReference? Describe(string? text) =>
+        Table(text) is { } node ? new ChartTableReference(node.Table, node.FirstColumn) : null;
+
+    public string Reference(string table, string column)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(table);
+        ArgumentNullException.ThrowIfNull(column);
+        var escaped = new System.Text.StringBuilder(column.Length);
+        foreach (var character in column)
+        {
+            if (character is '[' or ']' or '#' or '\'') escaped.Append('\'');
+            escaped.Append(character);
+        }
+        return table + "[" + escaped + "]";
+    }
+
+    public IReadOnlyList<string> MissingTables(ChartDefinition chart, Workbook workbook)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(workbook);
+        if (!ReadsTables(chart)) return [];
+        return [.. chart.SeriesSources!
+            .SelectMany(source => new[] { source.Name, source.Values, source.Categories })
+            .Select(Table).OfType<TableReferenceNode>()
+            .Select(node => node.Table)
+            .Where(name => workbook.DatabaseRanges.Find(name) is null)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    public IReadOnlyList<ChartTableColumns> Tables(Workbook workbook)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+        return [.. workbook.DatabaseRanges.All
+            .Where(table => table.SheetIndex >= 0 && table.SheetIndex < workbook.Sheets.Count)
+            .OrderBy(table => table.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(table => new ChartTableColumns(table.Name, resolution.Columns(workbook.Sheets[table.SheetIndex], table)))];
     }
 
     private string? Renamed(string? text, IReadOnlyList<TableRename> renames)

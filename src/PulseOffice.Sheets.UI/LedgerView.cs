@@ -297,6 +297,10 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         {
             State = _objects.ObjectFacts(context.State, placed),
         });
+        var chartTables = new Engine.Operations.ChartTableLossWatch(_workbook);
+        chartTables.TablesLost += (_, lost) => _status.Report(
+            _texts.Format("status.chart.tableMissing", string.Join(", ", lost.Tables)), NotificationSeverity.Warning);
+        _history.Changed += (_, _) => chartTables.Check();
         _grid.EditRequested += (_, _) => _editing.BeginEdit(replaceContent: null);
         _grid.ChoicesAvailable = _editing.HasChoices;
         _grid.ChoicesRequested += (_, address) => _editing.ShowChoices(address);
@@ -353,6 +357,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
     {
         ShowStatus();
         if (_editing.IsIdle) OnSelectionChanged();
+        else _editing.FollowLanguage();
     }
 
     private void ShowStatus()

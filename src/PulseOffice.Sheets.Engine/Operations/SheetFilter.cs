@@ -117,6 +117,7 @@ public sealed class SheetFilterService(NumericText numbers, IFilterRowKey rowKey
                     StyleId = sheet.StyleIdAt(source),
                     ExplicitStyle = true,
                     Hyperlink = cell.Hyperlink,
+                    HyperlinkTip = cell.HyperlinkTip,
                 }));
             }
 

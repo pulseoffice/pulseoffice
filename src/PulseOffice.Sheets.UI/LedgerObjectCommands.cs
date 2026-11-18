@@ -16,7 +16,8 @@ public sealed class LedgerObjectCommands(
     ITextCatalog texts,
     IContentFlipping flipping,
     PulseOffice.UI.Controls.Links.IHyperlinkPrompt hyperlinks,
-    PulseOffice.UI.Controls.Links.ILinkFollower links) : LedgerCommandSet(context)
+    PulseOffice.UI.Controls.Links.ILinkFollower links,
+    ILedgerPlaceNavigation places) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -57,7 +58,7 @@ public sealed class LedgerObjectCommands(
             EnabledWhen = _ => Context.SelectedObject is { Hyperlink.Length: > 0 },
             Execute = (_, _) =>
             {
-                if (Context.SelectedObject is { Hyperlink: { Length: > 0 } link }) links.Follow(link, _ => false);
+                if (Context.SelectedObject is { Hyperlink: { Length: > 0 } link }) links.Follow(link, place => places.GoTo(Context, place));
                 return Task.CompletedTask;
             },
         },

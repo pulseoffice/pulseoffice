@@ -9,7 +9,8 @@ public interface ISheetConnectors
     bool Refresh(Worksheet sheet);
 
     PlacedObject? Connect(
-        Worksheet sheet, PlacedObject from, PlacedObject to, string id, ConnectorKind kind);
+        Worksheet sheet, PlacedObject from, PlacedObject to, string id, ConnectorKind kind,
+        ConnectorSite fromSite = ConnectorSite.Automatic, ConnectorSite toSite = ConnectorSite.Automatic);
 }
 
 public sealed class SheetConnectors : ISheetConnectors
@@ -26,7 +27,8 @@ public sealed class SheetConnectors : ISheetConnectors
     public SheetConnectors() : this(new SheetPlacement(), new ConnectorFramer(new ConnectorRouter())) { }
 
     public PlacedObject? Connect(
-        Worksheet sheet, PlacedObject from, PlacedObject to, string id, ConnectorKind kind)
+        Worksheet sheet, PlacedObject from, PlacedObject to, string id, ConnectorKind kind,
+        ConnectorSite fromSite = ConnectorSite.Automatic, ConnectorSite toSite = ConnectorSite.Automatic)
     {
         ArgumentNullException.ThrowIfNull(sheet);
         ArgumentNullException.ThrowIfNull(from);
@@ -38,8 +40,8 @@ public sealed class SheetConnectors : ISheetConnectors
         {
             Id = id,
             Shape = kind,
-            Start = new ConnectorEndpoint(from.Id),
-            End = new ConnectorEndpoint(to.Id),
+            Start = new ConnectorEndpoint(from.Id, fromSite),
+            End = new ConnectorEndpoint(to.Id, toSite),
         };
 
         var placed = new PlacedObject
@@ -86,14 +88,12 @@ public sealed class SheetConnectors : ISheetConnectors
         if (Find(sheet, connector.Start.ObjectId) is not { } from) return null;
         if (Find(sheet, connector.End.ObjectId) is not { } to) return null;
 
-        var origin = new CellAddress(
-            Math.Min(from.Anchor.Row, to.Anchor.Row),
-            Math.Min(from.Anchor.Column, to.Anchor.Column));
+        var origin = new CellAddress(0, 0);
 
         var fromBox = Box(sheet, origin, from);
         var toBox = Box(sheet, origin, to);
 
-        if (_framer.Frame(connector, fromBox, toBox) is not { } framed) return null;
+        if (_framer.Frame(connector, fromBox, toBox, 0, 0) is not { } framed) return null;
 
         var box = new PlacementBox(
             new Twip((int)Math.Round(framed.Left)), new Twip((int)Math.Round(framed.Top)),

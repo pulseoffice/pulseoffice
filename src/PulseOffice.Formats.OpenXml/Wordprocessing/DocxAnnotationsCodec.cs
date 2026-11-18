@@ -28,6 +28,8 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
                 context.OpenDeletion = null;
                 root.Append(new W.Footnote(writer.Write(note.Content, context)) { Id = context.Footnotes[note.Id] });
             }
+            if (context.Document.Notes.FootnoteSettings.ContinuationForward is { } forward)
+                root.Append(new W.Footnote(Notice(forward)) { Type = W.FootnoteEndnoteValues.ContinuationNotice, Id = NoticeId(root.Elements<W.Footnote>()) });
             part.Footnotes = root;
             context.Part = previous;
         }
@@ -46,10 +48,20 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
                 context.OpenDeletion = null;
                 root.Append(new W.Endnote(writer.Write(note.Content, context)) { Id = context.Endnotes[note.Id] });
             }
+            if (context.Document.Notes.EndnoteSettings.ContinuationForward is { } forward)
+                root.Append(new W.Endnote(Notice(forward)) { Type = W.FootnoteEndnoteValues.ContinuationNotice, Id = NoticeId(root.Elements<W.Endnote>()) });
             part.Endnotes = root;
             context.Part = previous;
         }
     }
+
+    private W.Paragraph Notice(string text) => new(new W.Run(new W.Text(text) { Space = SpaceProcessingModeValues.Preserve }));
+
+    private int NoticeId(IEnumerable<W.FootnoteEndnoteType> notes) => (int)Math.Max(0, notes.Max(note => note.Id?.Value ?? 0)) + 1;
+
+    private string? NoticeText(IEnumerable<W.FootnoteEndnoteType> notes) =>
+        notes.FirstOrDefault(note => note.Type?.Value == W.FootnoteEndnoteValues.ContinuationNotice) is { } notice
+            && string.Concat(notice.Descendants<W.Text>().Select(text => text.Text)) is { Length: > 0 } text ? text : null;
 
     public void ReadNotes(MainDocumentPart main, DocxReadContext context)
     {
@@ -57,6 +69,8 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
         if (main.FootnotesPart is { Footnotes: { } footnotes } footnotesPart)
         {
             context.Part = footnotesPart;
+            if (NoticeText(footnotes.Elements<W.Footnote>()) is { } forward)
+                context.Document.Notes.FootnoteSettings = context.Document.Notes.FootnoteSettings with { ContinuationForward = forward };
             ReadNotes(footnotes.Elements<W.Footnote>(), NoteKind.Footnote, context.Footnotes, context,
                 main.Document?.Descendants<W.FootnoteReference>().Select(reference => reference.Id?.Value) ?? []);
         }
@@ -64,6 +78,8 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
         if (main.EndnotesPart is { Endnotes: { } endnotes } endnotesPart)
         {
             context.Part = endnotesPart;
+            if (NoticeText(endnotes.Elements<W.Endnote>()) is { } forward)
+                context.Document.Notes.EndnoteSettings = context.Document.Notes.EndnoteSettings with { ContinuationForward = forward };
             ReadNotes(endnotes.Elements<W.Endnote>(), NoteKind.Endnote, context.Endnotes, context,
                 main.Document?.Descendants<W.EndnoteReference>().Select(reference => reference.Id?.Value) ?? []);
         }

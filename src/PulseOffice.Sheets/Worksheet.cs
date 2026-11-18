@@ -19,6 +19,8 @@ public sealed record Cell
 
     public string? Hyperlink { get => _details?.Hyperlink; init => _details = Detailed(Details with { Hyperlink = value }); }
 
+    public string? HyperlinkTip { get => _details?.HyperlinkTip; init => _details = Detailed(Details with { HyperlinkTip = value }); }
+
     public CellRange? ArrayFormulaRange { get => _details?.ArrayFormulaRange; init => _details = Detailed(Details with { ArrayFormulaRange = value }); }
 
     public bool IsArrayAnchor { get => _details?.IsArrayAnchor == true; init => _details = Detailed(Details with { IsArrayAnchor = value }); }
@@ -52,6 +54,8 @@ public sealed record Cell
         public string? StyleName { get; init; }
 
         public string? Hyperlink { get; init; }
+
+        public string? HyperlinkTip { get; init; }
 
         public CellRange? ArrayFormulaRange { get; init; }
 

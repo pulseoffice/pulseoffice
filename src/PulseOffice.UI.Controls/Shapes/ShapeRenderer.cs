@@ -36,6 +36,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly IDimensionLineGeometry _dimensions;
     private readonly IShapeListText _listText;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
+    private readonly ShapeTextColumns _columns = new();
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -156,21 +157,10 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawListText(DrawingContext context, ShapeObject shape, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var ink = _brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White);
-        var rotation = shapeStyle.Text.RotationDegrees + shapeRotation + shapeStyle.Text.Layout.FlowDegrees;
-        bounds = _flow.Box(bounds, shapeStyle.Text.Layout);
-        if (Math.Abs(rotation % 360) < 0.001)
-        {
+        var layout = shapeStyle.Text.Layout;
+        bounds = _flow.Box(bounds, layout);
+        using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, shapeStyle.Text.RotationDegrees, shapeRotation))))
             _listText.Draw(context, shape, bounds, ink, backdrop.Language);
-            return;
-        }
-        var centre = bounds.Center;
-        using (context.PushTransform(
-            Matrix.CreateTranslation(-centre.X, -centre.Y)
-            * Matrix.CreateRotation(rotation * Math.PI / 180)
-            * Matrix.CreateTranslation(centre.X, centre.Y)))
-        {
-            _listText.Draw(context, shape, bounds, ink, backdrop.Language);
-        }
     }
 
     private void PaintDimension(DrawingContext context, ShapeObject shape, DimensionLine dimension, Rect bounds, ShapeSurroundings backdrop)
@@ -205,6 +195,7 @@ public sealed class ShapeRenderer : IShapeRenderer
                 Wrap = true,
                 Inset = Twip.Zero,
                 RotationDegrees = 0,
+                Layout = PulseOffice.Text.Rich.TextLayout.Default,
             },
         };
         DrawText(context, label, null, labelStyle, new Rect(centre.X - width / 2, centre.Y - height / 2, width, height), backdrop, readable);
@@ -350,26 +341,24 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawText(DrawingContext context, string content, IReadOnlyList<ShapeTextRun>? runs, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var style = shapeStyle.Text;
-        var stacked = style.Layout.Flow == PulseOffice.Text.Rich.TextFlow.Stacked;
-        bounds = _flow.Box(bounds, style.Layout);
+        var layout = style.Layout;
+        var stacked = _flow.Stacks(layout);
+        bounds = _flow.Box(bounds, layout);
         if (stacked) content = _flow.Stacked(content);
-        var rotation = style.RotationDegrees + shapeRotation + style.Layout.FlowDegrees;
         var inset = style.Inset.ToPoints();
+        var columns = stacked ? 1 : Math.Max(1, layout.Columns);
+        var inner = new Rect(bounds.X + inset, bounds.Y + inset, Math.Max(1, bounds.Width - inset * 2), Math.Max(1, bounds.Height - inset * 2));
 
         var typeface = new Typeface(
             new FontFamily(style.Family),
             style.Italic ? FontStyle.Italic : FontStyle.Normal,
             style.Bold ? FontWeight.Bold : FontWeight.Normal);
+        var size = Legible(style.Size) ?? ShapeTextStyle.Default.Size;
+        var brush = new SolidColorBrush(_brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White));
 
-        var text = new FormattedText(
-            content,
-            System.Globalization.CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            typeface,
-            Legible(style.Size) ?? ShapeTextStyle.Default.Size,
-            new SolidColorBrush(_brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White)))
+        var text = new FormattedText(content, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, size, brush)
         {
-            MaxTextWidth = style.Wrap ? Math.Max(1, bounds.Width - inset * 2) : double.PositiveInfinity,
+            MaxTextWidth = columns > 1 ? _columns.Width(inner, columns, layout.ColumnSpacing) : style.Wrap ? inner.Width : double.PositiveInfinity,
             TextAlignment = style.Horizontal switch
             {
                 TextHorizontalPlacement.Left => TextAlignment.Left,
@@ -383,29 +372,24 @@ public sealed class ShapeRenderer : IShapeRenderer
             text.SetTextDecorations(TextDecorations.Underline);
         if (runs is { Count: > 0 } && !stacked) Format(text, runs, style);
 
-        var y = style.Vertical switch
+        using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, style.RotationDegrees, shapeRotation))))
         {
-            TextVerticalPlacement.Top => bounds.Y + inset,
-            TextVerticalPlacement.Bottom => bounds.Bottom - inset - text.Height,
-            _ => bounds.Y + (bounds.Height - text.Height) / 2,
-        };
+            if (columns > 1)
+            {
+                var line = new FormattedText("Ag", System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, size, brush).Height;
+                foreach (var column in _columns.Place(inner, columns, layout.ColumnSpacing, line, text.Height))
+                    using (context.PushClip(column.Clip))
+                        context.DrawText(text, column.Origin);
+                return;
+            }
 
-        var origin = new Point(bounds.X + inset, y);
-
-        if (Math.Abs(rotation % 360) < 0.001)
-        {
-            context.DrawText(text, origin);
-            return;
-        }
-
-        var centre = bounds.Center;
-
-        using (context.PushTransform(
-            Matrix.CreateTranslation(-centre.X, -centre.Y)
-            * Matrix.CreateRotation(rotation * Math.PI / 180)
-            * Matrix.CreateTranslation(centre.X, centre.Y)))
-        {
-            context.DrawText(text, origin);
+            var y = style.Vertical switch
+            {
+                TextVerticalPlacement.Top => inner.Y,
+                TextVerticalPlacement.Bottom => inner.Bottom - text.Height,
+                _ => bounds.Y + (bounds.Height - text.Height) / 2,
+            };
+            context.DrawText(text, new Point(inner.X, y));
         }
     }
 

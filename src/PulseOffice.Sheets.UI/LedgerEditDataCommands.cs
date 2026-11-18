@@ -46,7 +46,7 @@ public sealed class LedgerEditDataCommands(
             ct => clipboard.CutAsync(ct)),
 
         Async("ledger.clipboard.paste", "clipboard", "Ctrl+V",
-            ct => clipboard.PasteAsync(PasteParts.All, ct), () => clipboard.HasContent),
+            ct => clipboard.PasteAsync(PasteParts.Everything, ct), () => clipboard.HasContent),
 
         Async("ledger.clipboard.pasteValues", "clipboard", "Ctrl+Alt+Shift+V",
             ct => clipboard.PasteAsync(PasteParts.ValuesOnly, ct), () => clipboard.HasContent),

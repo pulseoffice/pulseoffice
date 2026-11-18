@@ -11,7 +11,7 @@ public interface ISheetClipboardService
 
     Task CopyAsync(CancellationToken ct = default);
     Task CutAsync(CancellationToken ct = default);
-    Task PasteAsync(PasteParts parts = PasteParts.All, CancellationToken ct = default);
+    Task PasteAsync(PasteParts parts = PasteParts.Everything, CancellationToken ct = default);
 
     Task PasteAsync(PasteRequest request, CancellationToken ct = default);
 }
@@ -24,7 +24,7 @@ public sealed class SheetClipboardService(IObjectExchange exchange, ILedgerExcha
 
     public Task CutAsync(CancellationToken ct = default) => exchange.CutAsync(ModuleKind.Sheets, ct);
 
-    public Task PasteAsync(PasteParts parts = PasteParts.All, CancellationToken ct = default) =>
+    public Task PasteAsync(PasteParts parts = PasteParts.Everything, CancellationToken ct = default) =>
         PasteAsync(new PasteRequest { Parts = parts }, ct);
 
     public async Task PasteAsync(PasteRequest request, CancellationToken ct = default)

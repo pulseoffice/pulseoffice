@@ -121,6 +121,7 @@ internal sealed class OdtStylesReader(
         foreach (var configuration in styles?.Elements(Text + "notes-configuration") ?? [])
         {
             var settings = Notes(configuration, context);
+            if ((string?)configuration.Attribute(Text + "footnotes-position") is { } position && position != "page") context.Losses.Add(OdtReadLosses.FootnotePosition);
             if (vocabulary.NoteClass.Value((string?)configuration.Attribute(Text + "note-class")) == NoteKind.Endnote)
                 context.Document.Notes.EndnoteSettings = settings;
             else context.Document.Notes.FootnoteSettings = settings;
@@ -383,6 +384,8 @@ internal sealed class OdtStylesReader(
         Restart = vocabulary.Restart.Value((string?)element.Attribute(Text + "start-numbering-at")),
         CitationStyleName = (string?)element.Attribute(Text + "citation-style-name") is { Length: > 0 } citation ? context.StyleNames.Resolve(citation) : null,
         ParagraphStyleName = (string?)element.Attribute(Text + "default-style-name") is { Length: > 0 } paragraph ? context.StyleNames.Resolve(paragraph) : null,
+        ContinuationForward = element.Element(Text + "note-continuation-notice-forward")?.Value is { Length: > 0 } forward ? forward : null,
+        ContinuationBackward = element.Element(Text + "note-continuation-notice-backward")?.Value is { Length: > 0 } backward ? backward : null,
     };
 
     private void Resolve(StyleSheet sheet, Dictionary<string, double> relative)

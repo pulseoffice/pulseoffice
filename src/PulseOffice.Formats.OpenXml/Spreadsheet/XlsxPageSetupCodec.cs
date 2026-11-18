@@ -100,6 +100,8 @@ internal sealed class XlsxPageSetupCodec
             PageOrder = setup.Order == PageOrder.AcrossThenDown ? PageOrderValues.OverThenDown : PageOrderValues.DownThenOver,
             Scale = (uint)Math.Clamp(Math.Round(setup.Scale * 100), 10, 400),
         };
+        if (setup.PrintComments == CommentPrinting.AtEnd) page.CellComments = CellCommentsValues.AtEnd;
+        else if (setup.PrintComments == CommentPrinting.AsDisplayed) page.CellComments = CellCommentsValues.AsDisplayed;
         if (_codes.FirstOrDefault(code => code.Paper == setup.Paper.Id) is { } paper) page.PaperSize = paper.Code;
         if (setup.FirstPageNumber is { } first)
         {
@@ -200,6 +202,10 @@ internal sealed class XlsxPageSetupCodec
                 : null,
             PrintGridLines = options?.GridLines?.Value == true,
             PrintHeadings = options?.Headings?.Value == true,
+            PrintComments = page?.CellComments?.Value is { } comments
+                ? comments == CellCommentsValues.AtEnd ? CommentPrinting.AtEnd
+                    : comments == CellCommentsValues.AsDisplayed ? CommentPrinting.AsDisplayed : CommentPrinting.None
+                : CommentPrinting.None,
             CenterHorizontally = options?.HorizontalCentered?.Value == true,
             CenterVertically = options?.VerticalCentered?.Value == true,
         };

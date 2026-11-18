@@ -132,7 +132,7 @@ internal sealed class GridPointerInput(
             return;
         }
 
-        ShowCommentUnder(point);
+        ShowTipUnder(point);
 
         if (Gesture is { Stage: GestureStage.BeforeCursor } leading)
         {
@@ -257,15 +257,17 @@ internal sealed class GridPointerInput(
         }
     }
 
-    private void ShowCommentUnder(Point point)
+    private void ShowTipUnder(Point point)
     {
-        var comment = viewport.CellAt(point) is { } address && viewport.Sheet?.Comments.GetValueOrDefault(address) is { } found
-            ? found
-            : null;
+        if (viewport.CellAt(point) is not { } address || viewport.Sheet is not { } sheet)
+        {
+            surface.ShowTip(null);
+            return;
+        }
 
-        var text = comment is null
-            ? null
-            : comment.Author is { Length: > 0 } author ? $"{author}: {comment.Text}" : comment.Text;
+        var text = sheet.Comments.GetValueOrDefault(address) is { } comment
+            ? comment.Author is { Length: > 0 } author ? $"{author}: {comment.Text}" : comment.Text
+            : sheet[address] is { Hyperlink: { Length: > 0 } link } cell ? cell.HyperlinkTip is { Length: > 0 } tip ? tip : link : null;
 
         surface.ShowTip(text);
     }

@@ -89,7 +89,8 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
             if (Frame is not { } frame) return new Rect(0, 0, 1, Math.Max(Bounds.Height, 1));
             var composition = Composition;
             var caret = _geometry.Caret(frame, _positions.Locate(composition.Text, composition.Caret));
-            return new Rect(caret.X - Origin.X, caret.Y - Origin.Y, Math.Max(caret.Width, 1), Math.Max(caret.Height, 4));
+            var placed = new Rect(caret.X, caret.Y, Math.Max(caret.Width, 1), Math.Max(caret.Height, 4)).TransformToAABB(frame.Placement);
+            return placed.Translate(new Vector(-Origin.X, -Origin.Y));
         }
     }
 
@@ -132,6 +133,7 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
         if (Frame is not { } frame) return;
 
         using var shift = context.PushTransform(Matrix.CreateTranslation(-Origin.X, -Origin.Y));
+        using var placement = context.PushTransform(frame.Placement);
         var composition = Composition;
         if (composition.IsActive)
         {

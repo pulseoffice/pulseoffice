@@ -204,6 +204,7 @@ public sealed class ShellComposition(IServiceProvider services)
         registry.RegisterRange(_services.GetRequiredService<LedgerTableInsertCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerObjectCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerObjectCommands>().GetDialogCommands());
+        registry.RegisterRange(_services.GetRequiredService<LedgerLinkCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerChangeCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerChangeCommands>().GetDialogCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerMacroCommands>().GetCommands());

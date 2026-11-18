@@ -43,11 +43,16 @@ public static class Palette
         public const string PageSample = "PulsePageSample";
     }
 
-    public static void Apply(Application application, bool dark)
+    public const string HighContrastFocus = "#FFFF00";
+
+    public static void Apply(Application application, bool dark) =>
+        Apply(application, dark ? PaletteVariant.Dark : PaletteVariant.Light);
+
+    public static void Apply(Application application, PaletteVariant variant)
     {
         ArgumentNullException.ThrowIfNull(application);
 
-        var colors = dark ? Dark : Light;
+        var colors = Table(variant);
 
         foreach (var (key, value) in colors)
             application.Resources[key] = new SolidColorBrush(Color.Parse(value));
@@ -60,7 +65,17 @@ public static class Palette
     }
 
     public static IReadOnlyDictionary<string, Color> Colors(bool dark) =>
-        (dark ? Dark : Light).ToDictionary(entry => entry.Key, entry => Color.Parse(entry.Color));
+        Colors(dark ? PaletteVariant.Dark : PaletteVariant.Light);
+
+    public static IReadOnlyDictionary<string, Color> Colors(PaletteVariant variant) =>
+        Table(variant).ToDictionary(entry => entry.Key, entry => Color.Parse(entry.Color));
+
+    private static (string Key, string Color)[] Table(PaletteVariant variant) => variant switch
+    {
+        PaletteVariant.Dark => Dark,
+        PaletteVariant.HighContrast => HighContrast,
+        _ => Light,
+    };
 
     public static IReadOnlyList<string> Backgrounds { get; } =
         [Keys.Canvas, Keys.Surface, Keys.SurfaceRaised, Keys.SurfaceSunken, Keys.SurfaceOverlay];
@@ -132,5 +147,36 @@ public static class Palette
         (Keys.PageInk, "#111827"),
         (Keys.PageGuide, "#6B7280"),
         (Keys.PageSample, "#BCC3CD"),
+    ];
+
+    private static readonly (string Key, string Color)[] HighContrast =
+    [
+        (Keys.Canvas, "#000000"),
+        (Keys.Surface, "#000000"),
+        (Keys.SurfaceRaised, "#0A0A0A"),
+        (Keys.SurfaceSunken, "#000000"),
+        (Keys.SurfaceOverlay, "#0A0A0A"),
+
+        (Keys.Border, "#BFBFBF"),
+        (Keys.BorderStrong, "#FFFFFF"),
+        (Keys.FieldBorder, "#FFFFFF"),
+
+        (Keys.TextPrimary, "#FFFFFF"),
+        (Keys.TextSecondary, "#E0E0E0"),
+        (Keys.TextDisabled, "#A6A6A6"),
+
+        (Keys.Hover, "#40FFFFFF"),
+        (Keys.Pressed, "#66FFFFFF"),
+        (Keys.Scrim, "#CC000000"),
+
+        (Keys.Info, "#8AB4FF"),
+        (Keys.Danger, "#FF8A8A"),
+        (Keys.Warning, "#FFD60A"),
+        (Keys.Success, "#5CF08A"),
+
+        (Keys.Page, "#000000"),
+        (Keys.PageInk, "#FFFFFF"),
+        (Keys.PageGuide, "#C8C8C8"),
+        (Keys.PageSample, "#333333"),
     ];
 }

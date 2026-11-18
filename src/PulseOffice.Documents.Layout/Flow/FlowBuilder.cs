@@ -134,7 +134,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var endnoteCount = 0;
         var footnoteSettings = document.Notes.FootnoteSettings;
         var endnoteSettings = document.Notes.EndnoteSettings;
-        foreach (var paragraph in tree.Paragraphs(document.Body))
+        foreach (var paragraph in NoteOrder(document))
         {
             if ((footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
                 && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1)
@@ -155,6 +155,17 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
             }
         }
         return new NoteNumbers(citations, endnotes);
+    }
+
+    private IEnumerable<ParagraphBlock> NoteOrder(TextDocument document)
+    {
+        foreach (var paragraph in tree.Paragraphs(document.Body))
+        {
+            yield return paragraph;
+            foreach (var item in document.Objects.AnchoredTo(paragraph.Id))
+                if (item.Content.Story is { } story)
+                    foreach (var inner in tree.Paragraphs(story)) yield return inner;
+        }
     }
 
     public IReadOnlyList<FlowItem> Notes(string noteId, FlowContext context)

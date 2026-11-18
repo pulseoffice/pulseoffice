@@ -159,6 +159,10 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
         if (workbook.Consolidation is { Sources.Count: > 0 } consolidation && consolidation.Target != Sheets.Addressing.CellAddress.First)
             losses.Add(Diagnostic.Info("XLSX237", "The remembered consolidation settings name a destination cell: XLSX keeps the settings on the destination sheet but not the cell, so the dialog proposes the top-left cell when the file is opened again. ODS keeps it."));
 
+        var notes = workbook.Sheets.Sum(sheet => sheet.Comments.Count);
+        if (notes > 0)
+            losses.Add(Diagnostic.Info("XLSX243", $"{notes} cell comments keep their creation date only in ODS: Excel notes have no date, so XLSX keeps text, author and visibility and the date becomes the time the file is opened again.").With(notes));
+
         if (workbook.Macros.All.Count > 0)
             losses.Add(Diagnostic.Warning("XLSX011", $"{workbook.Macros.All.Count} macros cannot be stored in XLSX: the format accepts only VBA, and only in .xlsm.").With(workbook.Macros.All.Count));
 

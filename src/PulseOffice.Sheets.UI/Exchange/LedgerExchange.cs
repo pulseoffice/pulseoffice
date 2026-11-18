@@ -87,7 +87,7 @@ public sealed class LedgerExchange(LedgerExchangeServices services) : ILedgerExc
         return modes;
     }
 
-    public bool Receive(ExchangePackage package, ExchangePasteMode mode) => Receive(package, mode, PasteRequest.All);
+    public bool Receive(ExchangePackage package, ExchangePasteMode mode) => Receive(package, mode, new PasteRequest { Parts = PasteParts.Everything });
 
     public bool Receive(ExchangePackage package, ExchangePasteMode mode, PasteRequest request)
     {

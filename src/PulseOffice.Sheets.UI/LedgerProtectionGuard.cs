@@ -28,7 +28,8 @@ public sealed class LedgerProtectionGuard(
         if (!sheet.Protection.IsEnabled) return null;
         var after = ProtectedState.Of(sheet);
         if (!after.Objects.SequenceEqual(before.Objects, ReferenceEqualityComparer.Instance)
-            || !after.Sparklines.SequenceEqual(before.Sparklines, ReferenceEqualityComparer.Instance)) return "status.protection.objects";
+            || !after.Sparklines.SequenceEqual(before.Sparklines, ReferenceEqualityComparer.Instance)
+            || AddsComments(before.Comments, after.Comments)) return "status.protection.objects";
         if (!after.Merges.SequenceEqual(before.Merges) || !after.RowBreaks.SequenceEqual(before.RowBreaks) || !after.ColumnBreaks.SequenceEqual(before.ColumnBreaks))
             return "status.protection.format";
         foreach (var address in before.Cells.Keys.Union(after.Cells.Keys))
@@ -39,6 +40,18 @@ public sealed class LedgerProtectionGuard(
             if (workbook.Styles.Get(old?.StyleId ?? sheet.StyleIdAt(address)).Locked) return "status.protection.locked";
         }
         return null;
+    }
+
+    private static bool AddsComments(IReadOnlyList<CellComment> before, IReadOnlyList<CellComment> after)
+    {
+        var remaining = new Dictionary<CellComment, int>(ReferenceEqualityComparer.Instance);
+        foreach (var comment in before) remaining[comment] = remaining.GetValueOrDefault(comment) + 1;
+        foreach (var comment in after)
+        {
+            if (!remaining.TryGetValue(comment, out var count) || count == 0) return true;
+            remaining[comment] = count - 1;
+        }
+        return false;
     }
 
     private void Refuse(PulseOffice.Document.Commands.UndoStack history, object? statePoint, PulseOffice.Document.Commands.IHistoryReversal move, string key)
@@ -67,7 +80,8 @@ public sealed class LedgerProtectionGuard(
         IReadOnlyList<CellRange> Merges,
         IReadOnlyList<int> RowBreaks,
         IReadOnlyList<int> ColumnBreaks,
-        IReadOnlyList<SparklineGroup> Sparklines)
+        IReadOnlyList<SparklineGroup> Sparklines,
+        IReadOnlyList<CellComment> Comments)
     {
         public static ProtectedState Of(Worksheet sheet) => new(
             sheet.NonEmptyCells().ToDictionary(pair => pair.Key, pair => pair.Value),
@@ -75,6 +89,7 @@ public sealed class LedgerProtectionGuard(
             [.. sheet.Merges.All],
             [.. sheet.RowBreaks],
             [.. sheet.ColumnBreaks],
-            [.. sheet.Sparklines.Groups]);
+            [.. sheet.Sparklines.Groups],
+            [.. sheet.Comments.Values]);
     }
 }

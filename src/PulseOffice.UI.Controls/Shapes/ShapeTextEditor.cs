@@ -42,6 +42,7 @@ public sealed class ShapeTextEditor : Decorator
     private bool _committing;
     private PendingShapeFormat? _pending;
     private readonly ICaretWord _words;
+    private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
 
     private readonly PulseOffice.UI.Controls.Text.ITextEditingFocus _focus;
 
@@ -206,11 +207,14 @@ public sealed class ShapeTextEditor : Decorator
     public void Place(ShapeTextPlacement placement)
     {
         ArgumentNullException.ThrowIfNull(placement);
-        Canvas.SetLeft(this, placement.Bounds.X);
-        Canvas.SetTop(this, placement.Bounds.Y);
-        Width = Math.Max(placement.Bounds.Width, 1);
-        Height = Math.Max(placement.Bounds.Height, 1);
-        RenderTransform = Math.Abs(placement.RotationDegrees) < 0.001 ? null : new RotateTransform(placement.RotationDegrees);
+        var text = _base?.Style.Text ?? ShapeTextStyle.Default;
+        var bounds = _flow.Box(placement.Bounds, text.Layout);
+        var degrees = _flow.Degrees(text.Layout, text.RotationDegrees, placement.RotationDegrees);
+        Canvas.SetLeft(this, bounds.X);
+        Canvas.SetTop(this, bounds.Y);
+        Width = Math.Max(bounds.Width, 1);
+        Height = Math.Max(bounds.Height, 1);
+        RenderTransform = Math.Abs(degrees % 360) < 0.001 ? null : new RotateTransform(degrees);
         if (_base is { } shape) Typeset(shape, placement.PixelsPerPoint);
         _scale = placement.PixelsPerPoint;
     }

@@ -32,6 +32,7 @@ internal sealed class LedgerCellEditing
     private int _editingSheet;
     private bool _suggesting;
     private int _typedLength;
+    private string? _shownLanguage;
 
     public LedgerCellEditing(
         Workbook workbook, CalculationEngine engine, SheetGridView grid, SheetSelection selection, Canvas overlay,
@@ -126,6 +127,7 @@ internal sealed class LedgerCellEditing
             : _selection.Range.ToString();
 
         FormulaBox.Text = _writer.EditableText(cell, sheet, _selection.Active);
+        _shownLanguage = _writer.Language;
         _updatingFromSelection = false;
         AnnounceCell(sheet, cell);
     }
@@ -169,6 +171,7 @@ internal sealed class LedgerCellEditing
             ?? _writer.EditableText(cell, sheet, _selection.Active);
         _suggesting = false;
         _typedLength = CellEditor.Text?.Length ?? 0;
+        _shownLanguage = _writer.Language;
 
         _editingAddress = _selection.Active;
         _editingSheet = _grid.SheetIndex;
@@ -178,6 +181,30 @@ internal sealed class LedgerCellEditing
         CellEditor.Focus();
         CellEditor.CaretIndex = CellEditor.Text?.Length ?? 0;
         MirrorEditor();
+    }
+
+    public void FollowLanguage()
+    {
+        var language = _writer.Language;
+        if (_shownLanguage is not { } from || from == language) return;
+        _shownLanguage = language;
+
+        if (IsEditing)
+        {
+            _suggesting = true;
+            CellEditor.Text = _writer.Translated(CellEditor.Text ?? string.Empty, from);
+            _suggesting = false;
+            _typedLength = CellEditor.Text?.Length ?? 0;
+            CellEditor.CaretIndex = CellEditor.Text?.Length ?? 0;
+            MirrorEditor();
+        }
+        else if (_formulaTarget is not null)
+        {
+            _updatingFromSelection = true;
+            FormulaBox.Text = _writer.Translated(FormulaBox.Text ?? string.Empty, from);
+            _updatingFromSelection = false;
+            FormulaBox.CaretIndex = FormulaBox.Text?.Length ?? 0;
+        }
     }
 
     public void CommitEditor()

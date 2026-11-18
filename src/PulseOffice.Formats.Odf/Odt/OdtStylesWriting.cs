@@ -294,5 +294,7 @@ internal sealed class OdtStylesWriter(
             new XAttribute(Text + "start-numbering-at", vocabulary.Restart.Token(settings.Restart)),
             settings.CitationStyleName is { } citation ? new XAttribute(Text + "citation-style-name", names.Encode(citation)) : null,
             settings.ParagraphStyleName is { } paragraph ? new XAttribute(Text + "default-style-name", names.Encode(paragraph)) : null,
-            kind == NoteKind.Footnote ? new XAttribute(Text + "footnotes-position", "page") : null);
+            kind == NoteKind.Footnote ? new XAttribute(Text + "footnotes-position", "page") : null,
+            settings.ContinuationForward is { } forward ? new XElement(Text + "note-continuation-notice-forward", forward) : null,
+            settings.ContinuationBackward is { } backward ? new XElement(Text + "note-continuation-notice-backward", backward) : null);
 }

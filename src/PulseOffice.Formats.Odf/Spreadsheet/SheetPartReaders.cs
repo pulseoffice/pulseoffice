@@ -390,9 +390,11 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
         var inheritedId = styleName is null ? 0 : StyleIdOf(styleName, context);
         var styleId = formula is null ? WithImpliedFormat(context.Workbook, inheritedId, valueType, element) : inheritedId;
 
-        var hyperlink = element.Descendants(Namespaces.Text + "a")
-            .Select(anchor => anchor.Attribute(Namespaces.Xlink + "href")?.Value)
-            .FirstOrDefault(href => href is { Length: > 0 }) is { } href ? _links.FromOdf(href)
+        var anchor = element.Descendants(Namespaces.Text + "a")
+            .Where(candidate => !candidate.Ancestors(Namespaces.Office + "annotation").Any())
+            .FirstOrDefault(candidate => candidate.Attribute(Namespaces.Xlink + "href")?.Value is { Length: > 0 });
+        var tip = anchor?.Attribute(Namespaces.Office + "title")?.Value is { Length: > 0 } title ? title : null;
+        var hyperlink = anchor?.Attribute(Namespaces.Xlink + "href")?.Value is { } href ? _links.FromOdf(href)
             : element.Attribute(Namespaces.Table + "style-name")?.Value is { } ownStyleName && context.StyleLinks.TryGetValue(ownStyleName, out var styleHref) ? _links.FromOdf(styleHref) : null;
 
         var ownStyle = element.Attribute(Namespaces.Table + "style-name") is not null;
@@ -412,6 +414,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
             StyleName = namedStyle?.Name,
             Formula = _constants.IsConstant(value, internalFormula) ? null : internalFormula,
             Hyperlink = hyperlink,
+            HyperlinkTip = hyperlink is null ? null : tip,
             ImplicitIntersection = internalFormula is not null && !_dynamicArrays.IsMarked(element),
         };
     }

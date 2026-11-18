@@ -62,7 +62,8 @@ public sealed class StartView : UserControl
         FillRecent();
     }
 
-    private bool Dark => ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
+    private bool Dark => ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark
+        || ActualThemeVariant?.InheritVariant == Avalonia.Styling.ThemeVariant.Dark;
 
     private IBrush TileBackground(Color accent) => new SolidColorBrush(accent, Dark ? 0.24 : 0.12);
 

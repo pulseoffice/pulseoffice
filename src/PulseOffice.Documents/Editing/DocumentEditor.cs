@@ -53,6 +53,8 @@ public interface IDocumentEditor
 
     DocumentEdit RemoveObject(TextDocument document, UndoStack history, string objectId);
 
+    DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId);
+
     DocumentEdit ChangeObject(TextDocument document, UndoStack history, string objectId, Action<AnchoredObject> change, DocumentPosition? markAt = null);
 
     DocumentEdit Paste(TextDocument document, UndoStack history, DocumentPosition at, Clipboard.DocumentFragment fragment);
@@ -176,9 +178,24 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
     public DocumentEdit ApplyParagraphStyle(TextDocument document, UndoStack history, DocumentRange range, string styleName)
     {
         if (!document.Styles.Paragraph.Contains(styleName)) throw new KeyNotFoundException($"Paragraph style '{styleName}' not found.");
-        if (linked.CharacterStyle(document, range, styleName) is { } character) return ApplyCharacterStyle(document, history, range, character);
+        if (linked.CharacterStyle(document, range, styleName) is { } character) return ApplyLinkedCharacterStyle(document, history, range, styleName, character);
         return EachParagraph(document, history, range, "paragraph-style",
             (state, _, _) => state with { Content = state.Content with { StyleName = styleName, OutlineLevel = null } });
+    }
+
+    private DocumentEdit ApplyLinkedCharacterStyle(TextDocument document, UndoStack history, DocumentRange range, string paragraphStyle, LinkedCharacterStyle character)
+    {
+        if (character.Created is not { } created) return ApplyCharacterStyle(document, history, range, character.Name);
+        var recorder = new EditRecorder(document, "character-style");
+        var sheet = document.Styles;
+        recorder.Touch(sheet.Character, () => sheet.Character.All, sheet.Character.ReplaceAll);
+        recorder.Touch(sheet.Paragraph, () => sheet.Paragraph.All, sheet.Paragraph.ReplaceAll);
+        sheet.Character.Replace((CharacterStyle)created.Clone());
+        var paragraph = (ParagraphStyle)sheet.Paragraph.Find(paragraphStyle)!.Clone();
+        paragraph.LinkedStyleName = created.Name;
+        sheet.Paragraph.Replace(paragraph);
+        return EachParagraph(document, history, range, recorder,
+            (state, start, end) => text.Map(state, start, end, run => run with { StyleName = created.Name }));
     }
 
     public DocumentEdit ApplyCharacterStyle(TextDocument document, UndoStack history, DocumentRange range, string? styleName)
@@ -344,6 +361,20 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
         return recorder.Commit(history);
     }
 
+    public DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId)
+    {
+        var recorder = new EditRecorder(document, "remove-note");
+        if (document.Notes.Find(noteId) is null) return recorder.Commit(history);
+        recorder.Touch(document.Notes, () => document.Notes.All, document.Notes.Replace);
+        foreach (var paragraph in stories.Paragraphs(document).Where(paragraph => paragraph.Marks.OfType<NoteMark>().Any(mark => mark.NoteId == noteId)).ToList())
+        {
+            recorder.Touch(paragraph);
+            paragraph.State = paragraph.State with { Marks = [.. paragraph.Marks.Where(mark => mark is not NoteMark note || note.NoteId != noteId)] };
+        }
+        document.Notes.Remove(noteId);
+        return recorder.Commit(history);
+    }
+
     public DocumentEdit AddComment(TextDocument document, UndoStack history, DocumentRange range, string author, DateTimeOffset date, string value, string? parentId = null)
     {
         var comment = new Comment(document.NextId("c"), author, date,
@@ -406,13 +437,16 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
     }
 
     private DocumentEdit EachParagraph(TextDocument document, UndoStack history, DocumentRange range, string description,
+        Func<ParagraphState, int, int, ParagraphState> change) =>
+        EachParagraph(document, history, range, new EditRecorder(document, description), change);
+
+    private DocumentEdit EachParagraph(TextDocument document, UndoStack history, DocumentRange range, EditRecorder recorder,
         Func<ParagraphState, int, int, ParagraphState> change)
     {
         var start = trails.Point(document, range.Start);
         var end = trails.Point(document, range.End);
         if (!ReferenceEquals(start.Trail.Story, end.Trail.Story)) throw new InvalidOperationException("A formatting range cannot span different stories.");
         if (start.CompareTo(end) > 0) throw new InvalidOperationException("The formatting range is not in document order.");
-        var recorder = new EditRecorder(document, description);
         var first = start.Trail.Paragraph;
         var last = end.Trail.Paragraph;
         var paragraphs = tree.Paragraphs(start.Trail.Story)

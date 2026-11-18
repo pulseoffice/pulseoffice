@@ -184,7 +184,7 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
                 PasteCell(sheet, target, origin, request, arithmetic, row, column, _uncopiedBlank, rowDelta, columnDelta, visited, history);
 
         if (request.Parts.HasFlag(PasteParts.Styles)) PasteMerges(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
-        if (request.Parts.HasFlag(PasteParts.Comments)) PasteComments(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
+        if (request.Parts.HasFlag(PasteParts.Comments)) PasteComments(snapshot, sheet, target, request, history);
         if (request.Parts.HasFlag(PasteParts.Validation)) PasteValidations(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
     }
 
@@ -299,8 +299,11 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         ? new CellAddress(target.Row + offset.Column, target.Column + offset.Row)
         : new CellAddress(target.Row + offset.Row, target.Column + offset.Column);
 
-    private void PasteComments(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, bool transpose, string label, UndoStack? history)
+    private void PasteComments(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, PasteRequest request, UndoStack? history)
     {
+        var transpose = request.Transpose;
+        var label = request.HistoryLabel;
+        if (!request.SkipBlanks) ClearUncopiedComments(snapshot, sheet, target, transpose, label, history);
         foreach (var (row, column, comment) in snapshot.Comments)
         {
             var destination = transpose
@@ -320,6 +323,29 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
                     else sheet.Comments.Remove(address);
                 }));
         }
+    }
+
+    private void ClearUncopiedComments(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, bool transpose, string label, UndoStack? history)
+    {
+        var rows = transpose ? snapshot.ColumnCount : snapshot.RowCount;
+        var columns = transpose ? snapshot.RowCount : snapshot.ColumnCount;
+        var copied = snapshot.Comments
+            .Select(entry => transpose
+                ? new CellAddress(target.Row + entry.Column, target.Column + entry.Row)
+                : new CellAddress(target.Row + entry.Row, target.Column + entry.Column))
+            .ToHashSet();
+        var cleared = sheet.Comments
+            .Where(pair => pair.Key.Row >= target.Row && pair.Key.Row < target.Row + rows
+                && pair.Key.Column >= target.Column && pair.Key.Column < target.Column + columns
+                && !copied.Contains(pair.Key))
+            .ToList();
+        if (cleared.Count == 0) return;
+
+        foreach (var (address, _) in cleared) sheet.Comments.Remove(address);
+        history?.Push(new DelegateAction(
+            label,
+            redo: () => { foreach (var (address, _) in cleared) sheet.Comments.Remove(address); },
+            undo: () => { foreach (var (address, comment) in cleared) sheet.Comments[address] = comment; }));
     }
 
     private void PasteValidations(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, bool transpose, string label, UndoStack? history)

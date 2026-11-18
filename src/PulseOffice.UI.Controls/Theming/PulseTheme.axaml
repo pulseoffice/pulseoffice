@@ -9,7 +9,7 @@
   <Style Selector=":is(Button)">
     <Setter Property="FocusAdorner">
       <FocusAdornerTemplate>
-        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseAccent}" CornerRadius="4" />
+        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseFocusRing}" CornerRadius="4" />
       </FocusAdornerTemplate>
     </Setter>
   </Style>
@@ -17,7 +17,7 @@
   <Style Selector="MenuItem, CheckBox, RadioButton, ToggleSwitch, ComboBox, Slider, :is(spectrum|SpectrumSurface)">
     <Setter Property="FocusAdorner">
       <FocusAdornerTemplate>
-        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseAccent}" CornerRadius="4" />
+        <Border BorderThickness="2" BorderBrush="{DynamicResource PulseFocusRing}" CornerRadius="4" />
       </FocusAdornerTemplate>
     </Setter>
   </Style>

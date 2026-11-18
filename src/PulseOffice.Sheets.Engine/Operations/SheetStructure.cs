@@ -241,7 +241,7 @@ internal sealed class CellsPart : StructurePart
                 edit.Sheet[address] = edit.Sheet[address] with { ArrayFormulaRange = null, IsArrayAnchor = false };
             edit.Sheet.SetOwnStyle(address, null);
             if (edit.Sheet[address] is { Hyperlink: not null } or { StyleName: not null })
-                edit.Sheet[address] = edit.Sheet[address] with { Hyperlink = null, StyleName = null };
+                edit.Sheet[address] = edit.Sheet[address] with { Hyperlink = null, HyperlinkTip = null, StyleName = null };
         }
 
         foreach (var (original, address, cell) in moved)
@@ -256,7 +256,7 @@ internal sealed class CellsPart : StructurePart
 
             edit.Sheet.SetOwnStyle(address.Value, cell.HasStyle ? cell.StyleId : null);
             if (cell.Hyperlink is not null || cell.StyleName is not null)
-                edit.Sheet[address.Value] = edit.Sheet[address.Value] with { Hyperlink = cell.Hyperlink, StyleName = cell.StyleName };
+                edit.Sheet[address.Value] = edit.Sheet[address.Value] with { Hyperlink = cell.Hyperlink, HyperlinkTip = cell.HyperlinkTip, StyleName = cell.StyleName };
         }
     }
 }

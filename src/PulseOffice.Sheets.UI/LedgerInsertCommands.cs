@@ -125,7 +125,7 @@ public sealed class LedgerInsertCommands(
         var textChanged = !string.Equals(choice.Text, request.Text, StringComparison.Ordinal);
 
         sheet[address] = choice.Remove
-            ? cell with { Hyperlink = null }
+            ? cell with { Hyperlink = null, HyperlinkTip = null }
             : textChanged
                 ? cell with { Value = CellValue.Text(choice.Text), Formula = null, Hyperlink = choice.Address }
                 : cell with { Hyperlink = choice.Address };

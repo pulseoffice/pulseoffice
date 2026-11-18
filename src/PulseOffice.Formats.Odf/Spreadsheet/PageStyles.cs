@@ -116,7 +116,8 @@ internal sealed class OdfPageStyleMapper
             new XAttribute(Namespaces.Fo + "margin-right", Measure(setup.Margins.Right)),
             new XAttribute(Namespaces.Style + "print-page-order", _orders.Token(setup.Order)),
             new XAttribute(Namespaces.Style + "print", Print(setup)),
-            new XAttribute(Namespaces.Style + "table-centering", Centering(setup)));
+            new XAttribute(Namespaces.Style + "table-centering", Centering(setup)),
+            setup.PrintComments == CommentPrinting.AsDisplayed ? new XAttribute(_commentsAsDisplayed, "true") : null);
 
         if (setup.FitToWidthPages is { } across) properties.Add(new XAttribute(Namespaces.Style + "scale-to-X", Integer(across)));
         if (setup.FitToHeightPages is { } down) properties.Add(new XAttribute(Namespaces.Style + "scale-to-Y", Integer(down)));
@@ -221,6 +222,8 @@ internal sealed class OdfPageStyleMapper
             Order = _orders.Value((string?)properties?.Attribute(Namespaces.Style + "print-page-order")),
             PrintGridLines = print.Contains("grid"),
             PrintHeadings = print.Contains("headers"),
+            PrintComments = !print.Contains("annotations") ? CommentPrinting.None
+                : (string?)properties?.Attribute(_commentsAsDisplayed) == "true" ? CommentPrinting.AsDisplayed : CommentPrinting.AtEnd,
             CenterHorizontally = centering is "horizontal" or "both",
             CenterVertically = centering is "vertical" or "both",
         };
@@ -253,6 +256,8 @@ internal sealed class OdfPageStyleMapper
             ? Math.Clamp(percent, MinimumScalePercent, MaximumScalePercent) / 100
             : 1.0;
 
+    private readonly XName _commentsAsDisplayed = XNamespace.Get("urn:pulseoffice:spreadsheet") + "comments-as-displayed";
+
     private const double MinimumScalePercent = 10;
     private const double MaximumScalePercent = 400;
 
@@ -264,6 +269,7 @@ internal sealed class OdfPageStyleMapper
         var parts = new List<string> { "charts", "drawings", "objects", "zero-values" };
         if (setup.PrintGridLines) parts.Insert(0, "grid");
         if (setup.PrintHeadings) parts.Insert(0, "headers");
+        if (setup.PrintComments != CommentPrinting.None) parts.Insert(0, "annotations");
         return string.Join(' ', parts);
     }
 

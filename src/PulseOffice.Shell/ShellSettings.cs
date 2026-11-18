@@ -55,7 +55,7 @@ public sealed class ShellSettings : ISettingsProvider
             Kind = SettingKind.Choice,
             DefaultValue = "system",
             Category = "appearance",
-            Choices = [new("system"), new("light"), new("dark")],
+            Choices = [new("system"), new("light"), new("dark"), new("highContrast")],
         },
 
         new()

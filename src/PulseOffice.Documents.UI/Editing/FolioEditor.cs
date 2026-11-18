@@ -418,6 +418,8 @@ public sealed class FolioEditor : IDisposable
     {
         if (HasSelection) return !Shielded(Selection) && Erase();
         var caret = Caret;
+        if (Paragraph(caret.ParagraphId).Marks.OfType<PulseOffice.Documents.Marks.NoteMark>().LastOrDefault(mark => mark.Offset == caret.Offset) is { } note)
+            return !Shielded(DocumentRange.At(caret)) && _services.Editor.RemoveNote(Document, History, note.NoteId) is not null;
         if (caret.Offset > 0)
         {
             var text = Paragraph(caret.ParagraphId).Text;

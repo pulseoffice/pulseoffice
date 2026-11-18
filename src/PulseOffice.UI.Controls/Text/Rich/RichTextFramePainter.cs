@@ -29,17 +29,7 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
         ArgumentNullException.ThrowIfNull(text);
 
         var composed = composer.Compose(text, scene.Bounds, scene.Theme, scene.Fields, scene.Scale);
-        var rotation = text.Frame.RotationDegrees + text.Frame.Layout.FlowDegrees;
-        if (Math.Abs(rotation % 360) < 0.001)
-        {
-            PaintLines(scene, composed);
-            return;
-        }
-        var centre = scene.Bounds.Center;
-        using (scene.Context.PushTransform(
-            Matrix.CreateTranslation(-centre.X, -centre.Y)
-            * Matrix.CreateRotation(rotation * Math.PI / 180)
-            * Matrix.CreateTranslation(centre.X, centre.Y)))
+        using (scene.Context.PushTransform(composed.Placement))
             PaintLines(scene, composed);
     }
 

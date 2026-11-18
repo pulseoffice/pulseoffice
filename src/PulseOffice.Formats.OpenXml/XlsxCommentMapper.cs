@@ -41,10 +41,11 @@ public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
             if (comment.Reference?.Value is not { } reference || !CellAddress.TryParseA1(reference, out var address)) continue;
 
             var index = comment.AuthorId?.Value ?? 0;
+            var author = index < (uint)authors.Count && !string.IsNullOrWhiteSpace(authors[(int)index]) ? authors[(int)index] : null;
             sheet.Comments[address] = new CellComment
             {
-                Text = Text(comment.CommentText),
-                Author = index < (uint)authors.Count && !string.IsNullOrWhiteSpace(authors[(int)index]) ? authors[(int)index] : null,
+                Text = WithoutAuthorHeading(Text(comment.CommentText), author),
+                Author = author,
                 IsAlwaysVisible = visible.Contains(address),
             };
         }
@@ -68,6 +69,15 @@ public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
         }
 
         return result;
+    }
+
+    private string WithoutAuthorHeading(string text, string? author)
+    {
+        if (author is null) return text;
+        var heading = author + ":";
+        if (!text.StartsWith(heading, StringComparison.Ordinal)) return text;
+        var rest = text[heading.Length..];
+        return rest.StartsWith('\n') ? rest[1..] : rest.StartsWith("\r\n", StringComparison.Ordinal) ? rest[2..] : text;
     }
 
     private string Text(CommentText? text) =>

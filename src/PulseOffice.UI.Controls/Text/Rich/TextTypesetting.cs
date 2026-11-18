@@ -229,7 +229,7 @@ public sealed class TextBlockTypesetter(
     }
 
     public IReadOnlyList<TypesetLine> Typeset(
-        IReadOnlyList<TextParagraph> paragraphs, TextFrameArea area, TextFields fields, double fontFactor, bool wrap = true)
+        IReadOnlyList<TextParagraph> paragraphs, TextFrameArea area, TextFields fields, double fontFactor, bool wrap = true, bool stacked = false)
     {
         var typesetter = new ParagraphTypesetter(theme, area.Scale * fontFactor);
         var styler = new RunStyler(theme, typesetter);
@@ -253,7 +253,9 @@ public sealed class TextBlockTypesetter(
             var styled = new StyledParagraph(content, inline.Length, runs, paragraph, typesetter, styler, runText, fields);
 
             var width = Math.Max(1, area.Inner.Width - (mirrored ? startMargin : endMargin));
-            var segments = content.Contains('\t')
+            var segments = stacked
+                ? Stacked(styled, margin)
+                : content.Contains('\t')
                 ? Tabbed(styled, width, margin, hanging ? margin : margin + Math.Max(0, indent), wrap, paragraph.TabStops, area)
                 : !wrap
                     ? Unwrapped(styled, width, margin + (hanging ? 0 : Math.Max(0, indent)), _aligns.Physical(paragraph.Align, paragraph.Direction))
@@ -369,6 +371,30 @@ public sealed class TextBlockTypesetter(
                 height = Math.Max(height, formatted.Height);
             }
             y += height;
+        }
+        return segments;
+    }
+
+    private IReadOnlyList<TypesetSegment> Stacked(StyledParagraph styled, double margin)
+    {
+        var content = styled.Content;
+        if (content.Length == 0) return [new TypesetSegment(styled.Build(0, 0, double.PositiveInfinity), margin, 0, 0, 0)];
+
+        var starts = System.Globalization.StringInfo.ParseCombiningCharacters(content);
+        var pieces = new List<(FormattedText Text, int Start, int End)>(starts.Length);
+        for (var index = 0; index < starts.Length; index++)
+        {
+            var end = index + 1 < starts.Length ? starts[index + 1] : content.Length;
+            pieces.Add((styled.Build(starts[index], end, double.PositiveInfinity), starts[index], end));
+        }
+
+        var widest = pieces.Max(piece => piece.Text.WidthIncludingTrailingWhitespace);
+        var segments = new List<TypesetSegment>(pieces.Count);
+        var y = 0.0;
+        foreach (var (text, start, end) in pieces)
+        {
+            segments.Add(new TypesetSegment(text, margin + (widest - text.WidthIncludingTrailingWhitespace) / 2, y, start, end));
+            y += text.Height;
         }
         return segments;
     }

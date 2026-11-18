@@ -8,7 +8,11 @@ public sealed record ComposedTextFrame(TextFrameArea Area, IReadOnlyList<Typeset
 {
     public IReadOnlyList<double>? Shifts { get; init; }
 
-    public double Left(int line) => Area.Inner.X + (Shifts is { } shifts && line < shifts.Count ? shifts[line] : 0);
+    public Matrix Placement { get; init; } = Matrix.Identity;
+
+    public double Shift(int line) => Shifts is { } shifts && line < shifts.Count ? shifts[line] : 0;
+
+    public double Left(int line) => Area.Inner.X + Shift(line);
 
     public Point Origin(int line, TypesetSegment segment) => new(Left(line) + segment.X, Tops[line] + segment.Y);
 
@@ -29,6 +33,7 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
     private readonly TextFramePlacement _placement = new();
     private readonly TextFlowFrame _flow = new();
     private readonly TextColumns _columns = new();
+    private readonly TextStacks _stacks = new();
 
     public ComposedTextFrame Compose(RichText text, Rect bounds, ITextTheme theme, TextFields fields, double scale)
     {
@@ -36,22 +41,28 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
 
         var frame = text.Frame;
         var layout = frame.Layout;
+        var stacked = _flow.Stacks(layout);
         var outer = _geometry.Area(_flow.Box(bounds, layout), frame, scale);
-        var columns = Math.Max(1, layout.Columns);
+        var columns = stacked ? 1 : Math.Max(1, layout.Columns);
         var spacing = columns > 1 ? Math.Min(outer.Points(layout.ColumnSpacing), outer.Inner.Width / 2) : 0;
         var area = columns > 1
             ? outer with { Inner = outer.Inner.WithWidth(Math.Max(1, (outer.Inner.Width - spacing * (columns - 1)) / columns)) }
             : outer;
         var block = new TextBlockTypesetter(theme, labels, _runText);
         var paragraphs = text.Paragraphs.Count > 0 ? text.Paragraphs : [new TextParagraph(string.Empty)];
+        var placement = _flow.Turn(bounds, _flow.Degrees(layout, frame.RotationDegrees, 0));
 
-        var lines = block.Typeset(paragraphs, area, fields, 1.0, frame.WordWrap);
+        var lines = block.Typeset(paragraphs, area, fields, 1.0, frame.WordWrap, stacked);
+        if (stacked) return _stacks.Arrange(area, lines, frame.Anchor) with { Placement = placement };
+
         var height = block.Height(lines);
         if (frame.Autofit == TextAutofit.ShrinkText && height > area.Inner.Height)
             (lines, height) = Shrink(block, paragraphs, area, fields, frame.WordWrap);
 
-        if (columns == 1) return new ComposedTextFrame(area, lines, _placement.Tops(lines, area, frame.Anchor, height));
-        return _columns.Distribute(area, lines, _placement.Tops(lines, area, TextAnchor.Top, height), columns, area.Inner.Width + spacing);
+        var composed = columns == 1
+            ? new ComposedTextFrame(area, lines, _placement.Tops(lines, area, frame.Anchor, height))
+            : _columns.Distribute(area, lines, _placement.Tops(lines, area, TextAnchor.Top, height), columns, area.Inner.Width + spacing);
+        return composed with { Placement = placement };
     }
 
     private (IReadOnlyList<TypesetLine> Lines, double Height) Shrink(
@@ -92,6 +103,36 @@ public sealed class TextColumns
         }
         return new ComposedTextFrame(area, lines, placed) { Shifts = shifts };
     }
+}
+
+public sealed class TextStacks
+{
+    private const double GapPoints = 4;
+
+    public ComposedTextFrame Arrange(TextFrameArea area, IReadOnlyList<TypesetLine> lines, TextAnchor anchor)
+    {
+        var tallest = lines.Count == 0 ? 0 : lines.Max(line => line.Before + line.Height);
+        var free = Math.Max(0, area.Inner.Height - tallest);
+        var top = area.Inner.Y + anchor switch
+        {
+            TextAnchor.Middle or TextAnchor.Justified => free / 2,
+            TextAnchor.Bottom => free,
+            _ => 0,
+        };
+        var tops = new List<double>(lines.Count);
+        var shifts = new List<double>(lines.Count);
+        var shift = 0.0;
+        foreach (var line in lines)
+        {
+            tops.Add(top + line.Before);
+            shifts.Add(shift);
+            shift += Width(line) + area.Points(GapPoints);
+        }
+        return new ComposedTextFrame(area, lines, tops) { Shifts = shifts };
+    }
+
+    public double Width(TypesetLine line) =>
+        line.Segments.Count == 0 ? 0 : line.Segments.Max(segment => segment.X + segment.Text.WidthIncludingTrailingWhitespace);
 }
 
 public interface ITextCaretGeometry
@@ -153,10 +194,13 @@ public sealed class TextCaretGeometry : ITextCaretGeometry
     {
         ArgumentNullException.ThrowIfNull(frame);
         if (frame.Lines.Count == 0) return new TextPosition(0, 0);
+        if (!frame.Placement.IsIdentity && frame.Placement.TryInvert(out var inverse)) point = inverse.Transform(point);
 
-        var line = 0;
+        var column = Column(frame, point.X - frame.Area.Inner.X);
+        var line = -1;
         for (var index = 0; index < frame.Lines.Count; index++)
-            if (point.Y >= frame.Tops[index] - frame.Lines[index].Before) line = index;
+            if (Math.Abs(frame.Shift(index) - column) < 0.01 && (line < 0 || point.Y >= frame.Tops[index] - frame.Lines[index].Before)) line = index;
+        if (line < 0) line = 0;
 
         var typeset = frame.Lines[line];
         var (best, bestRow, bestColumn) = (typeset.Offset, double.MaxValue, double.MaxValue);
@@ -164,11 +208,20 @@ public sealed class TextCaretGeometry : ITextCaretGeometry
         {
             var caret = CaretAt(frame, line, content);
             var row = point.Y < caret.Top ? caret.Top - point.Y : point.Y > caret.Bottom ? point.Y - caret.Bottom : 0;
-            var column = Math.Abs(point.X - caret.X);
-            if (row < bestRow - 0.01 || (Math.Abs(row - bestRow) <= 0.01 && column < bestColumn))
-                (best, bestRow, bestColumn) = (content, row, column);
+            var across = Math.Abs(point.X - caret.X);
+            if (row < bestRow - 0.01 || (Math.Abs(row - bestRow) <= 0.01 && across < bestColumn))
+                (best, bestRow, bestColumn) = (content, row, across);
         }
         return new TextPosition(line, best - typeset.Offset);
+    }
+
+    private double Column(ComposedTextFrame frame, double x)
+    {
+        var shifts = Enumerable.Range(0, frame.Lines.Count).Select(frame.Shift).Distinct().Order().ToList();
+        var chosen = shifts[0];
+        foreach (var shift in shifts)
+            if (x >= shift) chosen = shift;
+        return chosen;
     }
 
     public IReadOnlyList<CaretRow> Rows(ComposedTextFrame frame, Func<TextPosition, int> index)

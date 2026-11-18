@@ -36,7 +36,7 @@ public sealed class LedgerObjectLinkTests
         var context = Context(workbook, history);
         var prompt = new AnsweringPrompt(new LinkChoice(LinkKind.Web, "https://example.com/", string.Empty));
         var commands = new LedgerObjectCommands(context, Fake<PulseOffice.UI.Controls.Services.IDialogService>(),
-            new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English), Fake<IContentFlipping>(), prompt, Fake<ILinkFollower>()).GetDialogCommands().ToList();
+            new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English), Fake<IContentFlipping>(), prompt, Fake<ILinkFollower>(), new LedgerPlaceNavigation(new NameBoxResolver())).GetDialogCommands().ToList();
 
         await commands.Single(command => command.Id.Value == "ledger.object.hyperlink").Execute(null!, CancellationToken.None);
 

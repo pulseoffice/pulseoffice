@@ -19,7 +19,7 @@ public sealed class LedgerPasteCommands(
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Paste("ledger.clipboard.pasteTransposed", null,
-            new PasteRequest { Transpose = true }),
+            new PasteRequest { Parts = PasteParts.Everything, Transpose = true }),
 
         Paste("ledger.clipboard.pasteFormulas", null,
             new PasteRequest { Parts = PasteParts.Formulas | PasteParts.Values }),

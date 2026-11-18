@@ -14,6 +14,13 @@ public enum PageOrder
     AcrossThenDown,
 }
 
+public enum CommentPrinting
+{
+    None,
+    AtEnd,
+    AsDisplayed,
+}
+
 public sealed record HeaderFooter(string Left = "", string Center = "", string Right = "")
 {
     public static readonly HeaderFooter Empty = new();
@@ -77,6 +84,8 @@ public sealed record PageSetup
     public bool PrintGridLines { get; init; }
 
     public bool PrintHeadings { get; init; }
+
+    public CommentPrinting PrintComments { get; init; }
 
     public bool CenterHorizontally { get; init; }
 

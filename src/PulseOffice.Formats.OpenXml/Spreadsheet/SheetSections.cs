@@ -467,9 +467,9 @@ internal sealed class HyperlinksSection : WorksheetSection
         {
             var link = cell.Hyperlink!;
             if (_links.IsInternal(link))
-                hyperlinks.AppendChild(new Hyperlink { Reference = address.ToA1(), Location = _links.ToLocation(link), Display = Shown(cell, link) });
+                hyperlinks.AppendChild(new Hyperlink { Reference = address.ToA1(), Location = _links.ToLocation(link), Display = Shown(cell, link), Tooltip = cell.HyperlinkTip });
             else if (_links.External(link) is { } uri)
-                hyperlinks.AppendChild(new Hyperlink { Reference = address.ToA1(), Id = part.AddHyperlinkRelationship(uri, true).Id, Display = Shown(cell, link) });
+                hyperlinks.AppendChild(new Hyperlink { Reference = address.ToA1(), Id = part.AddHyperlinkRelationship(uri, true).Id, Display = Shown(cell, link), Tooltip = cell.HyperlinkTip });
         }
         Append(part, hyperlinks);
     }
@@ -797,16 +797,20 @@ internal sealed class HyperlinksReader : IXlsxSheetPartReader
 
         foreach (var hyperlink in hyperlinks.Elements<Hyperlink>())
         {
-            if (hyperlink.Reference?.Value is not { } reference || !CellAddress.TryParseA1(reference.Split(':')[0], out var address)) continue;
+            if (hyperlink.Reference?.Value is not { } reference || !CellRange.TryParseA1(reference, out var area)) continue;
 
             var target = hyperlink.Id?.Value is { } id
                 ? _targets.Of(part, id)
                 : hyperlink.Location?.Value is { } location ? _links.FromLocation(location) : null;
             if (target is null) continue;
 
-            sheet[address] = sheet[address] with { Hyperlink = target };
+            IEnumerable<CellAddress> cells = area.CellCount <= MaximumLinkedCells ? area.Cells() : [area.Start];
+            var tip = hyperlink.Tooltip?.Value is { Length: > 0 } tooltip ? tooltip : null;
+            foreach (var address in cells) sheet[address] = sheet[address] with { Hyperlink = target, HyperlinkTip = tip };
         }
     }
+
+    private const int MaximumLinkedCells = 10_000;
 }
 
 internal sealed class SheetPartReader(Action<WorksheetPart, Sheet, XlsxReadContext> read) : IXlsxSheetPartReader

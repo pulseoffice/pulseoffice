@@ -62,6 +62,8 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
             if (ReferenceEquals(structured, rules[index])) continue;
             root.Add(new XElement(_pulse + "rule",
                 new XAttribute("range", structured.RangeText),
+                new XAttribute("priority", structured.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new XAttribute("ordinal", RuleOrdinal(sheet.ConditionalRules, index).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 Pair("flat", rules[index].Formula, "formula", structured.Formula),
                 structured.Thresholds.Select((threshold, position) => new XElement(_pulse + "threshold",
                     Pair("flat", rules[index].Thresholds[position].Formula, "formula", threshold.Formula)))));
@@ -73,6 +75,7 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
             if (ReferenceEquals(structured, validations[index])) continue;
             root.Add(new XElement(_pulse + "validation",
                 new XAttribute("range", structured.Range.ToString()),
+                new XAttribute("ordinal", index.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 Pair("flat", validations[index].FirstFormula, "formula", structured.FirstFormula),
                 Pair("secondFlat", validations[index].SecondFormula, "second", structured.SecondFormula)));
         }
@@ -97,46 +100,102 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
     private void RestoreRules(XElement root, Sheet sheet)
     {
         var used = new HashSet<int>();
-        foreach (var entry in root.Descendants(_pulse + "rule"))
+        var entries = root.Descendants(_pulse + "rule").ToList();
+        var pending = new List<XElement>();
+        foreach (var entry in entries)
         {
-            var thresholds = entry.Elements(_pulse + "threshold").ToList();
+            var index = RuleById(sheet.ConditionalRules, entry);
+            if (index >= 0 && !used.Contains(index) && RuleMatches(sheet.ConditionalRules[index], entry)) Apply(sheet, index, entry, used);
+            else pending.Add(entry);
+        }
+
+        foreach (var entry in pending)
             for (var index = 0; index < sheet.ConditionalRules.Count; index++)
             {
-                var rule = sheet.ConditionalRules[index];
-                if (used.Contains(index) || rule.RangeText != (string?)entry.Attribute("range")) continue;
-                if (!Same(rule.Formula, (string?)entry.Attribute("flat")) || rule.Thresholds.Count != thresholds.Count) continue;
-                if (!rule.Thresholds.Select((threshold, position) => Same(threshold.Formula, (string?)thresholds[position].Attribute("flat"))).All(same => same)) continue;
-
-                used.Add(index);
-                sheet.ConditionalRules[index] = rule with
-                {
-                    Formula = (string?)entry.Attribute("formula") ?? rule.Formula,
-                    Thresholds = [.. rule.Thresholds.Select((threshold, position) =>
-                        (string?)thresholds[position].Attribute("formula") is { } formula ? threshold with { Formula = formula } : threshold)],
-                };
+                if (used.Contains(index) || !RuleMatches(sheet.ConditionalRules[index], entry)) continue;
+                Apply(sheet, index, entry, used);
                 break;
             }
+    }
+
+    private void Apply(Sheet sheet, int index, XElement entry, HashSet<int> used)
+    {
+        used.Add(index);
+        var rule = sheet.ConditionalRules[index];
+        var thresholds = entry.Elements(_pulse + "threshold").ToList();
+        sheet.ConditionalRules[index] = rule with
+        {
+            Formula = (string?)entry.Attribute("formula") ?? rule.Formula,
+            Thresholds = [.. rule.Thresholds.Select((threshold, position) =>
+                (string?)thresholds[position].Attribute("formula") is { } formula ? threshold with { Formula = formula } : threshold)],
+        };
+    }
+
+    private bool RuleMatches(ConditionalRule rule, XElement entry)
+    {
+        var thresholds = entry.Elements(_pulse + "threshold").ToList();
+        if (rule.RangeText != (string?)entry.Attribute("range")) return false;
+        if (!Same(rule.Formula, (string?)entry.Attribute("flat")) || rule.Thresholds.Count != thresholds.Count) return false;
+        return rule.Thresholds.Select((threshold, position) => Same(threshold.Formula, (string?)thresholds[position].Attribute("flat"))).All(same => same);
+    }
+
+    private int RuleById(IList<ConditionalRule> rules, XElement entry)
+    {
+        if (!int.TryParse((string?)entry.Attribute("priority"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var priority)) return -1;
+        if (!int.TryParse((string?)entry.Attribute("ordinal"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var ordinal)) return -1;
+        var range = (string?)entry.Attribute("range");
+        var seen = 0;
+        for (var index = 0; index < rules.Count; index++)
+        {
+            if (rules[index].RangeText != range || rules[index].Priority != priority) continue;
+            if (seen++ == ordinal) return index;
         }
+        return -1;
+    }
+
+    private int RuleOrdinal(IList<ConditionalRule> rules, int position)
+    {
+        var rule = rules[position];
+        var ordinal = 0;
+        for (var index = 0; index < position; index++)
+            if (rules[index].RangeText == rule.RangeText && rules[index].Priority == rule.Priority) ordinal++;
+        return ordinal;
     }
 
     private void RestoreValidations(XElement root, Sheet sheet)
     {
         var used = new HashSet<int>();
+        var pending = new List<XElement>();
         foreach (var entry in root.Descendants(_pulse + "validation"))
+        {
+            var index = int.TryParse((string?)entry.Attribute("ordinal"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var ordinal) ? ordinal : -1;
+            if (index >= 0 && index < sheet.Validations.Count && !used.Contains(index) && ValidationMatches(sheet.Validations[index], entry)) Apply(sheet.Validations, index, entry, used);
+            else pending.Add(entry);
+        }
+
+        foreach (var entry in pending)
             for (var index = 0; index < sheet.Validations.Count; index++)
             {
-                var validation = sheet.Validations[index];
-                if (used.Contains(index) || validation.Range.ToString() != (string?)entry.Attribute("range")) continue;
-                if (!Same(validation.FirstFormula, (string?)entry.Attribute("flat")) || !Same(validation.SecondFormula, (string?)entry.Attribute("secondFlat"))) continue;
-
-                used.Add(index);
-                sheet.Validations[index] = validation with
-                {
-                    FirstFormula = (string?)entry.Attribute("formula") ?? validation.FirstFormula,
-                    SecondFormula = (string?)entry.Attribute("second") ?? validation.SecondFormula,
-                };
+                if (used.Contains(index) || !ValidationMatches(sheet.Validations[index], entry)) continue;
+                Apply(sheet.Validations, index, entry, used);
                 break;
             }
+    }
+
+    private bool ValidationMatches(Rule validation, XElement entry) =>
+        validation.Range.ToString() == (string?)entry.Attribute("range")
+        && Same(validation.FirstFormula, (string?)entry.Attribute("flat"))
+        && Same(validation.SecondFormula, (string?)entry.Attribute("secondFlat"));
+
+    private void Apply(IList<Rule> validations, int index, XElement entry, HashSet<int> used)
+    {
+        used.Add(index);
+        var validation = validations[index];
+        validations[index] = validation with
+        {
+            FirstFormula = (string?)entry.Attribute("formula") ?? validation.FirstFormula,
+            SecondFormula = (string?)entry.Attribute("second") ?? validation.SecondFormula,
+        };
     }
 
     private IEnumerable<XAttribute> Pair(string flatName, string? flat, string formulaName, string? formula)

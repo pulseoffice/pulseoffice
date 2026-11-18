@@ -69,11 +69,11 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
                     new XAttribute(Namespaces.Calcext + "value-type", "error"), Paragraph(value.ErrorText));
                 break;
         }
-        if (cell.Hyperlink is { Length: > 0 } link) Link(element, link);
+        if (cell.Hyperlink is { Length: > 0 } link) Link(element, link, cell.HyperlinkTip);
         return element;
     }
 
-    private void Link(XElement cell, string link)
+    private void Link(XElement cell, string link, string? tip)
     {
         var paragraph = cell.Element(Namespaces.Text + "p");
         if (paragraph is null)
@@ -83,6 +83,7 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
         }
         var anchor = new XElement(Namespaces.Text + "a",
             new XAttribute(Namespaces.Xlink + "href", _links.ToOdf(link)), new XAttribute(Namespaces.Xlink + "type", "simple"),
+            tip is { Length: > 0 } ? new XAttribute(Namespaces.Office + "title", tip) : null,
             paragraph.Nodes().ToList());
         paragraph.RemoveNodes();
         paragraph.Add(anchor);

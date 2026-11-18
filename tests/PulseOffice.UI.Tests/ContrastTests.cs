@@ -43,7 +43,7 @@ public sealed class ContrastTests
         var shades = new ReadableAccentPalette(_contrast);
         foreach (var hex in Enum.GetValues<ModuleKind>().Select(kind => kind == ModuleKind.Shell ? DesignTokens.ShellAccent : ModuleIdentity.For(kind).AccentHex))
         {
-            var (fill, text) = shades.For(Color.Parse(hex), dark);
+            var (fill, text) = shades.For(Color.Parse(hex), dark ? PaletteVariant.Dark : PaletteVariant.Light);
             AssertOnEveryBackground(dark, text, NormalText, $"testo d'accento {hex}");
             AssertOnEveryBackground(dark, fill, Component, $"fondo d'accento {hex}");
             Assert.True(_contrast.Ratio(Colors.White, fill) >= NormalText, $"bianco su {hex}: {_contrast.Ratio(Colors.White, fill):0.00}");

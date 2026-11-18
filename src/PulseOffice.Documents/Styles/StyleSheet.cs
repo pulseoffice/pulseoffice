@@ -169,6 +169,29 @@ public sealed class StyleSheet
 
     public const string OutlineStyleName = "Outline";
 
+    public void DropDanglingLinks(IEnumerable<DocumentStyle> added)
+    {
+        foreach (var style in added)
+        {
+            switch (style)
+            {
+                case ParagraphStyle paragraph when paragraph.LinkedStyleName is { } partner && !LinksBack(Character.Find(partner), paragraph.Name):
+                    paragraph.LinkedStyleName = null;
+                    break;
+                case CharacterStyle character when character.LinkedStyleName is { } partner && !LinksBack(Paragraph.Find(partner), character.Name):
+                    character.LinkedStyleName = null;
+                    break;
+            }
+        }
+    }
+
+    private bool LinksBack(DocumentStyle? partner, string name) => partner switch
+    {
+        ParagraphStyle paragraph => paragraph.LinkedStyleName is null || paragraph.LinkedStyleName == name,
+        CharacterStyle character => character.LinkedStyleName is null || character.LinkedStyleName == name,
+        _ => false,
+    };
+
     public StyleSheet Clone()
     {
         var copy = new StyleSheet { DefaultCharacter = DefaultCharacter, DefaultParagraph = DefaultParagraph, DefaultTabInterval = DefaultTabInterval, TabsRelativeToIndent = TabsRelativeToIndent, Outline = (ListStyle)Outline.Clone() };

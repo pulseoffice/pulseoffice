@@ -39,6 +39,10 @@ public sealed record NoteSettings
     public string? CitationStyleName { get; init; }
 
     public string? ParagraphStyleName { get; init; }
+
+    public string? ContinuationForward { get; init; }
+
+    public string? ContinuationBackward { get; init; }
 }
 
 public sealed class NoteCollection

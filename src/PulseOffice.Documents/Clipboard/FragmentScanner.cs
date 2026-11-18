@@ -58,11 +58,13 @@ public sealed class StyleClosure(IFragmentScanner scanner) : IStyleClosure
                 Add(references.ParagraphStyles, style.NextStyleName);
                 Add(references.ListStyles, style.ListStyleName);
                 Add(references.PageStyles, style.Paragraph.PageStyleName);
+                Add(references.CharacterStyles, style.LinkedStyleName);
                 changed = true;
             }
             foreach (var style in Pending(source.Character, result.Character, references.CharacterStyles))
             {
                 Add(references.CharacterStyles, style.ParentName);
+                Add(references.ParagraphStyles, style.LinkedStyleName);
                 changed = true;
             }
             foreach (var style in Pending(source.List, result.List, references.ListStyles))

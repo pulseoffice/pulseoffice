@@ -81,6 +81,8 @@ internal static class LedgerToolsComposition
         services.AddSingleton<LedgerTableInsertCommands>();
         services.AddSingleton<ILedgerTableLooks, LedgerTableLooks>();
         services.AddSingleton<LedgerObjectCommands>();
+        services.AddSingleton<ILedgerPlaceNavigation, LedgerPlaceNavigation>();
+        services.AddSingleton<LedgerLinkCommands>();
         services.AddSingleton<LedgerChangeCommands>();
         services.AddSingleton<ILedgerChangeResolution, LedgerChangeResolution>();
         services.AddSingleton<LedgerReviewSource>();

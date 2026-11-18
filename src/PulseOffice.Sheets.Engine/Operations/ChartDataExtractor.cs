@@ -66,7 +66,11 @@ public sealed class ChartDataExtractor(IChartSeriesNames names, IChartCellText c
         ArgumentNullException.ThrowIfNull(workbook);
         ArgumentNullException.ThrowIfNull(definition);
 
-        if (definition.HasSeriesSources) return _sources.Read(workbook, _tables.Flatten(definition, workbook), visibleOnly);
+        if (definition.HasSeriesSources)
+        {
+            var data = _sources.Read(workbook, _tables.Flatten(definition, workbook), visibleOnly);
+            return _tables.MissingTables(definition, workbook) is { Count: > 0 } missing ? data with { MissingTables = missing } : data;
+        }
         if (definition.InlineData is { } inline && string.IsNullOrEmpty(definition.SourceSheet)) return inline;
         if (workbook.FindSheet(definition.SourceSheet) is not { } sheet) return ChartData.Empty;
         if (!CellRange.TryParseA1(definition.SourceRange, out var whole)) return ChartData.Empty;

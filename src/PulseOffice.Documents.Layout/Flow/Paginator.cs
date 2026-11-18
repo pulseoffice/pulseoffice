@@ -872,6 +872,8 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
             var content = FrameContent(item.Id, rect);
             _objects.Add(new ObjectBox(item.Id, rect, layer) { Content = content, RotationDegrees = item.RotationDegrees, FlipHorizontal = item.FlipHorizontal, FlipVertical = item.FlipVertical });
             foreach (var line in content.OfType<LineBox>().Concat(content.OfType<TableBox>().SelectMany(table => table.Lines))) InlineObjects(line);
+            if (_request.Frame(item.Id) is { } frame)
+                foreach (var note in frame.Atoms.SelectMany(atom => atom.Notes).Distinct()) Reserve(note, _y);
             var turned = RotatedRect.Around(rect, item.RotationDegrees);
             if (layer == ObjectLayer.Wrapped) _obstacles.Add(Obstacle(item, rect, turned));
         }

@@ -5,6 +5,8 @@ public sealed record FramedConnector(ShapeOutline Path, double Left, double Top,
 public interface IConnectorFramer
 {
     FramedConnector? Frame(ConnectorObject connector, ConnectorBox from, ConnectorBox to);
+
+    FramedConnector? Frame(ConnectorObject connector, ConnectorBox from, ConnectorBox to, double minimumLeft, double minimumTop);
 }
 
 public sealed class ConnectorFramer(IConnectorRouter router) : IConnectorFramer
@@ -13,7 +15,10 @@ public sealed class ConnectorFramer(IConnectorRouter router) : IConnectorFramer
 
     public ConnectorFramer() : this(new ConnectorRouter()) { }
 
-    public FramedConnector? Frame(ConnectorObject connector, ConnectorBox from, ConnectorBox to)
+    public FramedConnector? Frame(ConnectorObject connector, ConnectorBox from, ConnectorBox to) =>
+        Frame(connector, from, to, double.NegativeInfinity, double.NegativeInfinity);
+
+    public FramedConnector? Frame(ConnectorObject connector, ConnectorBox from, ConnectorBox to, double minimumLeft, double minimumTop)
     {
         ArgumentNullException.ThrowIfNull(connector);
 
@@ -21,8 +26,8 @@ public sealed class ConnectorFramer(IConnectorRouter router) : IConnectorFramer
         var points = new SegmentPoints().Of(outline).ToList();
         if (points.Count == 0) return null;
 
-        var left = Math.Floor(points.Min(point => point.X) - Margin);
-        var top = Math.Floor(points.Min(point => point.Y) - Margin);
+        var left = Math.Max(minimumLeft, Math.Floor(points.Min(point => point.X) - Margin));
+        var top = Math.Max(minimumTop, Math.Floor(points.Min(point => point.Y) - Margin));
         var width = Math.Max(1, Math.Ceiling(points.Max(point => point.X) - left + Margin));
         var height = Math.Max(1, Math.Ceiling(points.Max(point => point.Y) - top + Margin));
 

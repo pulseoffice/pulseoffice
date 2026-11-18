@@ -127,11 +127,14 @@ public sealed class FolioStyleDialogs(
         var scope = new ParagraphDialogScope(effective, [.. sheet.Page.All.Select(page => page.Name)]);
         var others = sheet.Paragraph.All.Where(other => other.Name != style.Name).Select(other => other.Name).ToList();
         var parents = lineage.PossibleParents(sheet.Paragraph, style.Name).ToList();
+        var partners = sheet.Character.All.Select(other => other.Name).ToList();
+        var linkedIndex = style.LinkedStyleName is { } linked && partners.IndexOf(linked) is >= 0 and var at ? at + 2 : 0;
         var organizer = new FormTab(texts["folio.styles.tab.organizer"], texts["folio.styles.organizer.explanation"],
         [
             new TextField("display", texts["folio.styles.name"], names.Title(style)),
             new ChoiceField("parent", texts["folio.styles.parent"], [texts["folio.styles.none"], .. parents.Select(names.Title)], style.ParentName is { } parent ? parents.IndexOf(parent) + 1 : 0),
             new ChoiceField("next", texts["folio.styles.next"], [texts["folio.styles.same"], .. others.Select(names.Title)], style.NextStyleName is { } next ? others.IndexOf(next) + 1 : 0),
+            new ChoiceField("link", texts["folio.styles.link"], [texts["folio.styles.none"], texts["folio.styles.link.new"], .. partners.Select(names.Title)], linkedIndex),
             new NumberField("outline", texts["folio.styles.outline"], style.OutlineLevel ?? 0, 0, 10) { Integer = true },
         ])
         {
@@ -147,28 +150,48 @@ public sealed class FolioStyleDialogs(
         var nextIndex = values.Choice("next", others.Count + 1);
         var outline = (int)Math.Round(values.Number("outline", 0));
         var display = values.Text("display").Trim();
-        Commit(editor, () => styles.Change(editor.Document, editor.History, sheet.Paragraph, style.Name, edited =>
+        var linkChoice = values.Choice("link", partners.Count + 2);
+        StyleLink link = linkChoice switch
+        {
+            0 => new StyleLink.None(),
+            1 => new StyleLink.ToNew(),
+            _ => new StyleLink.ToExisting(partners[linkChoice - 2]),
+        };
+        Commit(editor, () =>
+        {
+            using var step = editor.History.BeginTransaction("style-edit");
+            ChangeParagraph(editor, style, paragraphChange, characterChange, parentIndex == 0 ? null : parents[parentIndex - 1],
+                nextIndex == 0 ? null : others[nextIndex - 1], outline, display);
+            if (linkChoice != linkedIndex) styles.Link(editor.Document, editor.History, style.Name, link);
+        });
+    }
+
+    private void ChangeParagraph(FolioEditor editor, ParagraphStyle style, ParagraphProperties paragraphChange, CharacterChange characterChange,
+        string? parent, string? next, int outline, string display) =>
+        styles.Change(editor.Document, editor.History, editor.Document.Styles.Paragraph, style.Name, edited =>
         {
             edited.Paragraph = paragraphChange.Over(edited.Paragraph);
             edited.Character = characterChange.Apply(edited.Character);
-            edited.ParentName = parentIndex == 0 ? null : parents[parentIndex - 1];
-            edited.NextStyleName = nextIndex == 0 ? null : others[nextIndex - 1];
+            edited.ParentName = parent;
+            edited.NextStyleName = next;
             edited.OutlineLevel = outline == 0 ? null : outline;
             if (display.Length > 0 && display != names.Title(style)) edited.DisplayName = display;
-        }, "style-edit"));
-    }
+        }, "style-edit");
 
     private async Task CharacterAsync(FolioEditor editor, CharacterStyle style, CancellationToken ct)
     {
         var sheet = editor.Document.Styles;
         var run = resolver.EffectiveRun(sheet, new TextParagraph(string.Empty), new TextRun(string.Empty) { StyleName = style.Name });
         var parents = lineage.PossibleParents(sheet.Character, style.Name).ToList();
+        var partners = sheet.Paragraph.All.Where(other => other.Name != DefaultStyleNames.Standard).Select(other => other.Name).ToList();
+        var linkedIndex = style.LinkedStyleName is { } linked && partners.IndexOf(linked) is >= 0 and var at ? at + 1 : 0;
         var tabs = new List<FormTab>
         {
             new(texts["folio.styles.tab.organizer"], texts["folio.styles.organizer.explanation"],
             [
                 new TextField("display", texts["folio.styles.name"], names.Title(style)),
                 new ChoiceField("parent", texts["folio.styles.parent"], [texts["folio.styles.none"], .. parents.Select(names.Title)], style.ParentName is { } parent ? parents.IndexOf(parent) + 1 : 0),
+                new ChoiceField("link", texts["folio.styles.link.paragraph"], [texts["folio.styles.none"], .. partners.Select(names.Title)], linkedIndex),
             ]),
         };
         tabs.AddRange(characters.Tabs(run));
@@ -176,12 +199,20 @@ public sealed class FolioStyleDialogs(
         var change = characters.Read(run, values);
         var parentIndex = values.Choice("parent", parents.Count + 1);
         var display = values.Text("display").Trim();
-        Commit(editor, () => styles.Change(editor.Document, editor.History, sheet.Character, style.Name, edited =>
+        var linkChoice = values.Choice("link", partners.Count + 1);
+        Commit(editor, () =>
         {
-            edited.Character = change.Apply(edited.Character);
-            edited.ParentName = parentIndex == 0 ? null : parents[parentIndex - 1];
-            if (display.Length > 0 && display != names.Title(style)) edited.DisplayName = display;
-        }, "style-edit"));
+            using var step = editor.History.BeginTransaction("style-edit");
+            styles.Change(editor.Document, editor.History, sheet.Character, style.Name, edited =>
+            {
+                edited.Character = change.Apply(edited.Character);
+                edited.ParentName = parentIndex == 0 ? null : parents[parentIndex - 1];
+                if (display.Length > 0 && display != names.Title(style)) edited.DisplayName = display;
+            }, "style-edit");
+            if (linkChoice == linkedIndex) return;
+            if (linkChoice > 0) styles.Link(editor.Document, editor.History, partners[linkChoice - 1], new StyleLink.ToExisting(style.Name));
+            else if (style.LinkedStyleName is { } previous) styles.Link(editor.Document, editor.History, previous, new StyleLink.None());
+        });
     }
 
     private void Commit(FolioEditor editor, Action change)

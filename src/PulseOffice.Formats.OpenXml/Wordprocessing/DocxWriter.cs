@@ -18,6 +18,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     private readonly DocxSectionStarts _starts = new();
 
+    private readonly DocxNoteSettingsCodec _noteSettings = new();
+
     private readonly DocxMirroredMargins _mirrored = new();
 
     private readonly DocxBlockCarriers _carriers = new();
@@ -150,6 +152,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Info("DOCX041", "Word drop caps count letters: a drop cap set to the whole first word becomes the word's current letter count in DOCX.")),
         new(document => _unusedHeaders.HiddenEvenShownByDocumentSetting(document),
             Diagnostic.Info("DOCX045", "Word turns different even-page headers on for the whole document: hidden even-page headers and footers of page styles that do not show them are not written to DOCX when another page style shows its own. ODT keeps them.")),
+        new(document => !_noteSettings.Expressible(document),
+            Diagnostic.Info("DOCX271", "Word numbers notes only with 1, a, A, i or I and never restarts endnotes on each page: other note number formats are written as 1, 2, 3 and endnotes restarting on each page are numbered continuously in DOCX. Word has no notice at the top of a continued note: the backward continuation notice is lost in DOCX. ODT keeps them.")),
         new(document => !document.Notes.ContinuousEndnotes && document.Notes.OfKind(PulseOffice.Documents.Annotations.NoteKind.Endnote).Any(),
             Diagnostic.Info("DOCX115", "Word places endnotes right after the text: endnotes collected on their own pages are written to continue after the last paragraph in DOCX. ODT keeps the setting.")),
         new(document => document.Changes.All.OfType<PulseOffice.Documents.Annotations.Deletion>()
@@ -511,6 +515,8 @@ public sealed class DocxWriter : ITextDocumentWriter
             ? _values.Color(fill)
             : null;
 
+    private readonly DocxNoteSettingsCodec _noteSettings = new();
+
     private W.Settings Settings(TextDocument document)
     {
         var settings = new W.Settings();
@@ -524,6 +530,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         if (new DocxProtectionCodec().Write(document) is { } protection) settings.Append(protection);
         settings.Append(new W.DefaultTabStop { Val = (short)Math.Clamp(Math.Round(document.Styles.DefaultTabInterval * 20), 0, short.MaxValue) });
         if (document.Styles.Page.All.Any(style => style.EvenPagesDifferent)) settings.Append(new W.EvenAndOddHeaders());
+        settings.Append(_noteSettings.Write(document));
         settings.Append(new W.Compatibility(new W.CompatibilitySetting
         {
             Name = W.CompatSettingNameValues.CompatibilityMode,

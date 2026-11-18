@@ -4,13 +4,17 @@ using PulseOffice.Foundation.Modules;
 
 namespace PulseOffice.UI.Theming;
 
-public enum ThemePreference { System, Light, Dark }
+public enum ThemePreference { System, Light, Dark, HighContrast }
+
+public enum PaletteVariant { Light, Dark, HighContrast }
 
 public interface IThemeService
 {
     ThemePreference Preference { get; }
 
     bool IsDark { get; }
+
+    PaletteVariant Variant { get; }
 
     void Apply(ThemePreference preference);
 
@@ -20,6 +24,7 @@ public interface IThemeService
 public sealed class ThemeService : IThemeService, IDisposable
 {
     private readonly Application _application;
+    private readonly ThemeVariant _highContrast = new("HighContrast", ThemeVariant.Dark);
 
     public ThemeService(Application application)
     {
@@ -33,7 +38,12 @@ public sealed class ThemeService : IThemeService, IDisposable
 
     public ThemePreference Preference { get; private set; } = ThemePreference.System;
 
-    public bool IsDark => _application.ActualThemeVariant == ThemeVariant.Dark;
+    public bool IsDark => _application.ActualThemeVariant is { } variant
+        && (variant == ThemeVariant.Dark || variant.InheritVariant == ThemeVariant.Dark);
+
+    public PaletteVariant Variant => _application.ActualThemeVariant == _highContrast
+        ? PaletteVariant.HighContrast
+        : IsDark ? PaletteVariant.Dark : PaletteVariant.Light;
 
     public event EventHandler? ThemeChanged;
 
@@ -45,6 +55,7 @@ public sealed class ThemeService : IThemeService, IDisposable
         {
             ThemePreference.Light => ThemeVariant.Light,
             ThemePreference.Dark => ThemeVariant.Dark,
+            ThemePreference.HighContrast => _highContrast,
             _ => ThemeVariant.Default,
         };
 
@@ -64,6 +75,7 @@ public sealed class AccentService : IAccentService
     public const string AccentKey = "PulseAccent";
     public const string AccentTextKey = "PulseAccentText";
     public const string AccentSubtleKey = "PulseAccentSubtle";
+    public const string FocusRingKey = "PulseFocusRing";
 
     private readonly Application _application;
     private readonly IThemeService _theme;
@@ -107,25 +119,29 @@ public sealed class AccentService : IAccentService
 
     public event EventHandler? AccentChanged;
 
-    private (ModuleKind Module, bool Dark)? _applied;
+    private (ModuleKind Module, PaletteVariant Variant)? _applied;
 
     public void SetActiveModule(ModuleKind module)
     {
         ActiveModule = module;
-        if (_applied == (module, _theme.IsDark)) return;
-        _applied = (module, _theme.IsDark);
+        var variant = _theme.Variant;
+        if (_applied == (module, variant)) return;
+        _applied = (module, variant);
 
         var hex = module == ModuleKind.Shell
             ? DesignTokens.ShellAccent
             : ModuleIdentity.For(module).AccentHex;
 
         var brand = Avalonia.Media.Color.Parse(hex);
-        var (accent, text) = _shades.For(brand, _theme.IsDark);
+        var (accent, text) = _shades.For(brand, variant);
         _application.Resources[AccentKey] = new Avalonia.Media.SolidColorBrush(accent);
         _application.Resources[AccentTextKey] = new Avalonia.Media.SolidColorBrush(text);
 
         _application.Resources[AccentSubtleKey] =
             new Avalonia.Media.SolidColorBrush(accent, DesignTokens.SubtleAccentOpacity);
+
+        _application.Resources[FocusRingKey] = new Avalonia.Media.SolidColorBrush(
+            variant == PaletteVariant.HighContrast ? Avalonia.Media.Color.Parse(Palette.HighContrastFocus) : accent);
 
         ApplySystemAccent(accent);
 

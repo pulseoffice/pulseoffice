@@ -57,19 +57,22 @@ public readonly record struct AccentShades(Color Fill, Color Text);
 
 public interface IAccentPalette
 {
-    AccentShades For(Color brand, bool dark);
+    AccentShades For(Color brand, PaletteVariant variant);
 }
 
 public sealed class ReadableAccentPalette(IColorContrast contrast) : IAccentPalette
 {
     public const double TextContrast = 4.5;
 
-    public AccentShades For(Color brand, bool dark)
+    public const double HighContrastText = 7.0;
+
+    public AccentShades For(Color brand, PaletteVariant variant)
     {
-        var backgrounds = Palette.Colors(dark);
+        var backgrounds = Palette.Colors(variant);
         var surfaces = Palette.Backgrounds.Select(key => backgrounds[key]).ToList();
+        var level = variant == PaletteVariant.HighContrast ? HighContrastText : TextContrast;
         return new AccentShades(
             contrast.Readable(brand, [Colors.White], TextContrast),
-            contrast.Readable(brand, surfaces, TextContrast));
+            contrast.Readable(brand, surfaces, level));
     }
 }

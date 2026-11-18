@@ -93,6 +93,12 @@ public sealed class ChartRenderer
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(data);
 
+        if (data.LostTables)
+        {
+            DrawMissingTables(scene.Text, context, scene.Text.Ink.Text, bounds, data.MissingTables!);
+            return;
+        }
+
         if (data.IsEmpty)
         {
             DrawEmpty(scene.Text, context, scene.Text.Ink.Text, bounds);
@@ -237,6 +243,15 @@ public sealed class ChartRenderer
         var minimum = Math.Min(data.Minimum, 0);
         var maximum = Math.Max(data.Maximum, 0);
         return horizontal ? PlotScale.Nice(minimum, maximum, plot.X, plot.Right) : PlotScale.Nice(minimum, maximum, plot.Bottom, plot.Y);
+    }
+
+    private void DrawMissingTables(ChartText text, DrawingContext context, IBrush foreground, Rect bounds, IReadOnlyList<string> tables)
+    {
+        var frame = bounds.Deflate(Math.Min(bounds.Width, bounds.Height) * 0.1);
+        if (frame.Width > 0 && frame.Height > 0)
+            context.DrawRectangle(null, new Pen(text.Ink.Stroke, 1) { DashStyle = new DashStyle([4, 3], 0) }, frame);
+        if (_texts is null) return;
+        text.Centred(context, text.Layout(_texts.Format("chart.tableMissing", string.Join(", ", tables)), foreground, 12), bounds.Center);
     }
 
     private void DrawEmpty(ChartText text, DrawingContext context, IBrush foreground, Rect bounds)

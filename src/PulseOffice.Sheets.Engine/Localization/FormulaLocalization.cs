@@ -8,6 +8,8 @@ public interface IFormulaLocalization
 
     string ToDisplay(string canonical, string language);
 
+    string Translate(string typed, string fromLanguage, string toLanguage);
+
     FormulaPunctuation Punctuation(string language);
 
     string FunctionName(string canonicalName, string language);
@@ -49,6 +51,16 @@ public sealed class FormulaLocalization(
         if (!canonical.StartsWith('=')) return canonical;
         var local = Language(language);
         return translator.ToLocal(canonical, punctuation.For(local), name => local == "en" ? name : vocabulary.ToLanguage(name, local), name => LocalLogical(name, local));
+    }
+
+    public string Translate(string typed, string fromLanguage, string toLanguage)
+    {
+        ArgumentNullException.ThrowIfNull(typed);
+        var from = Language(fromLanguage);
+        var to = Language(toLanguage);
+        if (!typed.StartsWith('=') || from == to) return typed;
+        var canonical = translator.ToCanonical(typed, punctuation.For(from), name => vocabulary.ToCanonical(name, from).ToUpperInvariant(), name => CanonicalLogical(name, from));
+        return ToDisplay(canonical, to);
     }
 
     private string CanonicalLogical(string name, string language)

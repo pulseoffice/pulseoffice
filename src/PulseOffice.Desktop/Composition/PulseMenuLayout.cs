@@ -388,6 +388,7 @@ public static class PulseMenuLayout
         ("ledger.insert.rightToLeftMark", "insert/marks/direction"),
 
         ("ledger.insert.hyperlink", "insert/link"),
+        ("ledger.cell.hyperlink.open", "insert/link"),
         ("ledger.comment.edit", "insert/link"),
         ("ledger.comment.", "insert/link"),
         ("ledger.formula.wizard", "insert/link"),

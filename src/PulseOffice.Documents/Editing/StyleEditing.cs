@@ -24,6 +24,8 @@ public interface IStyleEditing
 
     DocumentEdit Load(TextDocument document, UndoStack history, StyleSheet source, bool overwrite);
 
+    DocumentEdit Link(TextDocument document, UndoStack history, string paragraphStyle, StyleLink link);
+
     PageStyle PageCopy(TextDocument document, PageStyle source, string name);
 }
 
@@ -187,13 +189,64 @@ public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper 
     {
         var recorder = new EditRecorder(document, "style-load");
         source = remapper.Remap(document, new DocumentFragment(new BlockContainer(), source, [], [], [])).Styles;
-        Load(recorder, document.Styles.Paragraph, source.Paragraph, overwrite);
-        Load(recorder, document.Styles.Character, source.Character, overwrite);
+        var added = new List<DocumentStyle>();
+        added.AddRange(Load(recorder, document.Styles.Paragraph, source.Paragraph, overwrite));
+        added.AddRange(Load(recorder, document.Styles.Character, source.Character, overwrite));
         Load(recorder, document.Styles.List, source.List, overwrite);
         Load(recorder, document.Styles.Page, source.Page, overwrite);
         Load(recorder, document.Styles.Frame, source.Frame, overwrite);
         Load(recorder, document.Styles.Table, source.Table, overwrite);
+        document.Styles.DropDanglingLinks(added);
         return recorder.Commit(history);
+    }
+
+    public DocumentEdit Link(TextDocument document, UndoStack history, string paragraphStyle, StyleLink link)
+    {
+        var recorder = new EditRecorder(document, "style-link");
+        var sheet = document.Styles;
+        if (sheet.Paragraph.Find(paragraphStyle) is not { } paragraph) return recorder.Commit(history);
+        var partner = link switch
+        {
+            StyleLink.ToExisting existing when sheet.Character.Contains(existing.CharacterStyle) => existing.CharacterStyle,
+            StyleLink.ToNew => FreeCharacterName(sheet, paragraphStyle + LinkedStyleSelection.PartnerSuffix),
+            _ => null,
+        };
+        if (partner == paragraph.LinkedStyleName && (partner is null || sheet.Character.Find(partner)!.LinkedStyleName == paragraphStyle)) return recorder.Commit(history);
+        recorder.Touch(sheet.Character, () => sheet.Character.All, sheet.Character.ReplaceAll);
+        recorder.Touch(sheet.Paragraph, () => sheet.Paragraph.All, sheet.Paragraph.ReplaceAll);
+        if (link is StyleLink.ToNew && partner is not null)
+            sheet.Character.Replace(new CharacterStyle(partner) { Character = paragraph.Character, LinkedStyleName = paragraphStyle });
+        sheet.Paragraph.ReplaceAll([.. sheet.Paragraph.All.Select(style =>
+            style.Name == paragraphStyle ? Linked(style, partner)
+            : partner is not null && style.LinkedStyleName == partner ? Linked(style, null)
+            : style)]);
+        sheet.Character.ReplaceAll([.. sheet.Character.All.Select(style =>
+            style.Name == partner ? Linked(style, paragraphStyle)
+            : style.LinkedStyleName == paragraphStyle ? Linked(style, null)
+            : style)]);
+        return recorder.Commit(history);
+    }
+
+    private TStyle Linked<TStyle>(TStyle style, string? partner) where TStyle : DocumentStyle
+    {
+        var copy = (TStyle)style.Clone();
+        switch (copy)
+        {
+            case ParagraphStyle paragraph:
+                paragraph.LinkedStyleName = partner;
+                break;
+            case CharacterStyle character:
+                character.LinkedStyleName = partner;
+                break;
+        }
+        return copy;
+    }
+
+    private string FreeCharacterName(StyleSheet sheet, string wanted)
+    {
+        var name = wanted;
+        for (var index = 2; sheet.Character.Contains(name) || sheet.Paragraph.Contains(name); index++) name = $"{wanted} {index}";
+        return name;
     }
 
     public PageStyle PageCopy(TextDocument document, PageStyle source, string name)
@@ -209,12 +262,13 @@ public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper 
         return created;
     }
 
-    private void Load<TStyle>(EditRecorder recorder, StyleCollection<TStyle> target, StyleCollection<TStyle> source, bool overwrite) where TStyle : DocumentStyle
+    private List<TStyle> Load<TStyle>(EditRecorder recorder, StyleCollection<TStyle> target, StyleCollection<TStyle> source, bool overwrite) where TStyle : DocumentStyle
     {
-        var chosen = source.All.Where(style => overwrite || !target.Contains(style.Name)).ToList();
-        if (chosen.Count == 0) return;
+        var chosen = source.All.Where(style => overwrite || !target.Contains(style.Name)).Select(style => (TStyle)style.Clone()).ToList();
+        if (chosen.Count == 0) return chosen;
         recorder.Touch(target, () => target.All, target.ReplaceAll);
-        foreach (var style in chosen) target.Replace((TStyle)style.Clone());
+        foreach (var style in chosen) target.Replace(style);
+        return chosen;
     }
 
     private void Remove<TStyle>(EditRecorder recorder, StyleCollection<TStyle> styles, string name) where TStyle : DocumentStyle

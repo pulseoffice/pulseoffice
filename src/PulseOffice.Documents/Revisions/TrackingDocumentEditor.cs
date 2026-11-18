@@ -29,8 +29,8 @@ public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITracked
     }
 
     public DocumentEdit ApplyParagraphStyle(TextDocument document, UndoStack history, DocumentRange range, string styleName) =>
-        linked.CharacterStyle(document, range, styleName) is { } character
-            ? ApplyCharacterStyle(document, history, range, character)
+        linked.CharacterStyle(document, range, styleName) is not null
+            ? Characters(document, history, range, () => inner.ApplyParagraphStyle(document, history, range, styleName))
             : Paragraphs(document, history, range, () => inner.ApplyParagraphStyle(document, history, range, styleName));
 
     public DocumentEdit ApplyCharacterStyle(TextDocument document, UndoStack history, DocumentRange range, string? styleName) =>
@@ -91,6 +91,9 @@ public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITracked
 
     public DocumentEdit RemoveObject(TextDocument document, UndoStack history, string objectId) =>
         inner.RemoveObject(document, history, objectId);
+
+    public DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId) =>
+        inner.RemoveNote(document, history, noteId);
 
     public DocumentEdit ChangeObject(TextDocument document, UndoStack history, string objectId, Action<AnchoredObject> change, DocumentPosition? markAt = null) =>
         inner.ChangeObject(document, history, objectId, change, markAt);

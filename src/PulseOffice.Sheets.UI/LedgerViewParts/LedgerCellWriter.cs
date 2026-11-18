@@ -33,6 +33,11 @@ internal sealed class LedgerCellWriter(
 
     private string FormulaLanguage => texts.Language.ToCode();
 
+    public string Language => FormulaLanguage;
+
+    public string Translated(string text, string fromLanguage) =>
+        Formulas?.Translate(text, fromLanguage, FormulaLanguage) ?? text;
+
     public string EditableText(Cell cell, Worksheet sheet, CellAddress address) => cell.HasFormula
         ? Formulas?.ToDisplay(cell.Formula!, FormulaLanguage) ?? cell.Formula!
         : EditTexts.Value(cell.Value, workbook.NumberFormats.CodeOf(workbook.Styles.Get(sheet.StyleIdAt(address)).NumberFormatId));
