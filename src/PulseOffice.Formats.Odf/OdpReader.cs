@@ -21,6 +21,7 @@ public sealed class OdpReader : IPresentationReader
     private readonly OdpMissingObjects _missingObjects = new();
     private readonly OdpUnsupportedClickActions _unsupportedClickActions = new();
     private readonly OdpTableCellSpans _tableCellSpans = new();
+    private readonly OdpShapeTextLayout _shapeTextLayout = new();
     private readonly OdfLiteralEnhancedPath _literal = new(new PulseOffice.Drawing.Shapes.ShapePresets());
     private readonly OdpStyleSheetBuilder _styles;
     private readonly OdpMasterReader _master;
@@ -52,6 +53,7 @@ public sealed class OdpReader : IPresentationReader
                 new FormControlReader(new OdfFormControlMapper()),
                 new CustomShapeReader(shapes, altText, freeText),
                 new PrimitiveShapeReader(shapes, altText),
+                new ConnectorReader(shapes, altText),
                 new SceneReader(shapes, altText),
                 new ImageReader(shapes, altText),
                 new OleReader(shapes, altText),
@@ -60,6 +62,7 @@ public sealed class OdpReader : IPresentationReader
                 new TableReader(shapes, altText),
                 new ObjectInteractionReader(new OdfInteractionMapper()),
                 new OdpHiddenShapes(new OdpElementVisibility()),
+                new ConnectorGlueReader(new SlideConnectorGlue()),
                 new GroupReader(),
                 new AnimationReader(new OdfAnimationMapper()),
                 new NotesReader(paragraphText),
@@ -202,6 +205,7 @@ public sealed class OdpReader : IPresentationReader
             if (_missingObjects.Present(body, package.OpenEntry)) losses.Add(_missingObjects.Loss);
             if (_unsupportedClickActions.Present(body)) losses.Add(_unsupportedClickActions.Loss);
             if (_tableCellSpans.Present(body)) losses.Add(_tableCellSpans.Loss);
+            if (_shapeTextLayout.Present(content)) losses.Add(_shapeTextLayout.Loss);
             if (body?.Descendants(Draw + "custom-shape").Any(_literal.Approximated) == true)
                 losses.Add(Diagnostic.Warning("ODP183", "Shapes whose geometry formulas cannot be evaluated, because their equations or path are malformed, are imported as rectangles."));
             if (content.Descendants(TextNs + "list-level-style-image").Concat(styles?.Descendants(TextNs + "list-level-style-image") ?? []).Any(image => image.Element(Office + "binary-data") is null))

@@ -57,6 +57,25 @@ public sealed class TableReferenceSyntax
         return builder.Append(']').ToString();
     }
 
+    public string Display(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        TableReferenceNode node;
+        try
+        {
+            node = Parse(text, 0);
+        }
+        catch (FormulaSyntaxException)
+        {
+            return text;
+        }
+        if (node.Area != TableArea.ThisRow || node.FirstColumn is not { } column
+            || (node.LastColumn is { } last && !string.Equals(column, last, StringComparison.OrdinalIgnoreCase))) return text;
+        var escaped = Escaped(column);
+        var plain = escaped.All(c => char.IsLetterOrDigit(c) || c is '_' or '.');
+        return $"{node.Table}[@{(plain ? escaped : $"[{escaped}]")}]";
+    }
+
     public int End(string text, int open)
     {
         ArgumentNullException.ThrowIfNull(text);

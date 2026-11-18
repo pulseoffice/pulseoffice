@@ -220,7 +220,8 @@ internal sealed class ConnectorObjectWriter(OdfDeckShapeMapper shapes, OdfAltTex
     {
         var style = session.NextStyle("gr");
         session.AddStyle(session.ShapeStyles.Build(style, connector.Style));
-        return shapes.BuildPath(element, connector.Path, style);
+        var slide = session.Deck.Slides.FirstOrDefault(candidate => candidate.Elements.Any(placed => placed.Id == element.Id));
+        return shapes.BuildConnector(element, connector, style, id => id != element.Id && slide?.Elements.Any(placed => placed.Id == id) == true);
     }
 }
 

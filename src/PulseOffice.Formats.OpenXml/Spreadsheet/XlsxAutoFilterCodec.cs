@@ -28,7 +28,7 @@ internal sealed class XlsxAutoFilterCodec
 
     private readonly XlsxSortStateCodec _sorts = new();
 
-    private readonly XlsxDynamicFilterReader _dynamic = new();
+    private readonly XlsxDynamicFilterCodec _dynamic = new();
 
     public AutoFilter? Build(Workbook workbook, Sheet sheet, XlsxConditionalMapper formats)
     {
@@ -69,6 +69,8 @@ internal sealed class XlsxAutoFilterCodec
                     Percent = top.Percent ? true : null,
                     Val = top.Count,
                 });
+            else if (column.Period is { } period)
+                element.Append(_dynamic.Build(period, DateTime.Today));
             else if (column.Conditions is { Count: > 0 } conditions)
             {
                 var custom = new CustomFilters(conditions.Select(Custom));

@@ -35,5 +35,6 @@ public sealed class DataIcons() : DictionaryIconCatalog(Shapes)
         ("ledger.data.form", "M5 3h14v18H5z M8 8h8 M8 12h8 M8 16h4"),
         ("ledger.insert.table", "M4 5h16v14H4z M4 10h16 M4 15h16 M10 5v14 M15 5v14"),
         ("ledger.database.define", "M12 3c4 0 7 1.3 7 3s-3 3-7 3-7-1.3-7-3 3-3 7-3z M5 6v12c0 1.7 3 3 7 3s7-1.3 7-3V6 M9 13h6"),
+        ("ledger.database.rename", "M4 5h16v14H4z M4 10h16 M10 5v14 M13 17l6-6 2 2-6 6h-2z"),
     ];
 }

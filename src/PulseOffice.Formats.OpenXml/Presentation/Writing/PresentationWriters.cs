@@ -263,9 +263,6 @@ internal sealed class PptxFidelityRules
                 or PulseOffice.Drawing.Scenes.Scene3DObject)),
             Diagnostic.Warning("PPTX004", "Form controls are not written to PPTX by design: PPTX form controls are ActiveX (Windows-only, disabled by default in Microsoft 365), unsupported across PulseOffice. Shapes, images, charts, tables, freeform, connectors and embedded packages (OLE) round-trip; form controls round-trip in ODP.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
-            deck => Objects(deck).Any(o => o.Content is PulseOffice.Drawing.Shapes.ConnectorObject),
-            Diagnostic.Info("PPTX012", "Connectors are written as custom geometry; their live endpoint anchoring is not preserved and they re-read as freeform shapes.")),
-        new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => Objects(deck).Any(o => o.Content is PulseOffice.Drawing.Assets.RasterImageObject image
                 && image.Filter is not (PulseOffice.Drawing.Assets.ImageFilter.None or PulseOffice.Drawing.Assets.ImageFilter.Grayscale)),
             Diagnostic.Info("PPTX010", "Image filters other than grayscale have no cross-format native representation and are shown on screen only; grayscale and crop round-trip.")),

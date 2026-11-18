@@ -39,12 +39,15 @@ internal sealed class PptxSlideWriter(
 
     private readonly PptxDiagramTexts _diagramTexts = new();
 
+    private readonly PptxConnectorGlue _glue = new(new OoxmlConnectionSites());
+
     public SlidePart Write(PptxWriteSession session, SlideLayoutPart layout, Slide slide)
     {
         var part = session.Part.AddNewPart<SlidePart>();
         var tree = trees.Empty();
         var shapes = new Dictionary<string, uint>(StringComparer.Ordinal);
         uint shapeId = 2;
+        var glued = new List<(P.ConnectionShape Shape, ObjectElement Placed, PulseOffice.Drawing.Shapes.ConnectorObject Connector)>();
 
         var diagrams = slide.IntactDiagrams().ToList();
         var edited = slide.TextEditedDiagrams().ToList();
@@ -105,6 +108,7 @@ internal sealed class PptxSlideWriter(
                         var id = shapeId++;
                         if (objects.FirstOrDefault(writer => writer.CanWrite(piece.Content))?.Write(piece, id, part) is not { } written) continue;
                         if (piece.Content is PulseOffice.Drawing.Shapes.ShapeObject linked) _shapeRuns.Write(written, linked, new PptxSlideRunLinks(part, session));
+                        if (piece.Content is PulseOffice.Drawing.Shapes.ConnectorObject connector && written is P.ConnectionShape connection) glued.Add((connection, piece, connector));
                         if (shapes.TryAdd(objectElement.Id, id) && slide.Interaction(objectElement.Id) is { } action
                             && written.Descendants<P.NonVisualDrawingProperties>().FirstOrDefault() is { } drawing)
                             interactions.Apply(drawing, action, part, session);
@@ -116,6 +120,7 @@ internal sealed class PptxSlideWriter(
             }
         }
 
+        foreach (var (connection, placed, connector) in glued) _glue.Write(connection, placed, connector, slide, shapes);
         foreach (var chrome in _headerFooter.Shapes(session.Deck.HeaderFooter, slide, session.Deck.IndexOf(slide) + 1, session.Deck.Size, shapeId, session.Deck.TextLanguage))
             tree.Append(chrome);
         nodes.Declare(slide.Groups);

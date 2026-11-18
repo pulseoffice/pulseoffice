@@ -42,7 +42,20 @@ internal sealed class OoxmlAttributeSanitizer
                 property.SetValue(element, null);
     }
 
-    private bool Repaired(OpenXmlSimpleType value)
+    private bool Repaired(OpenXmlSimpleType value) => value is EnumValue<DocumentFormat.OpenXml.Wordprocessing.OnOffOnlyValues> ? RepairedSwitch(value) : RepairedPercent(value);
+
+    private bool RepairedSwitch(OpenXmlSimpleType value)
+    {
+        value.InnerText = value.InnerText?.Trim().ToLowerInvariant() switch
+        {
+            "0" or "false" => "off",
+            "1" or "true" => "on",
+            var other => other,
+        };
+        return value.HasValue;
+    }
+
+    private bool RepairedPercent(OpenXmlSimpleType value)
     {
         if (value.InnerText is not { Length: > 1 } text || !text.EndsWith('%')
             || !double.TryParse(text[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)

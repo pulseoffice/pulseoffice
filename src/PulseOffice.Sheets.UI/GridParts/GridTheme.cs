@@ -17,6 +17,8 @@ internal interface IGridTheme
     FormControlPalette FormPalette();
 
     PulseOffice.UI.Controls.Objects.PackagedPalette PackagedPalette();
+
+    PulseOffice.UI.Controls.Charts.ChartInk ChartInk();
 }
 
 internal sealed class ResourceGridTheme(Control owner) : IGridTheme
@@ -42,4 +44,8 @@ internal sealed class ResourceGridTheme(Control owner) : IGridTheme
         Brush(Palette.Keys.Border, Brushes.Gray),
         Brush(Palette.Keys.TextPrimary, Brushes.Black),
         Accent);
+
+    public PulseOffice.UI.Controls.Charts.ChartInk ChartInk() => new(
+        Brush(Palette.Keys.TextPrimary, Brushes.Black),
+        Brush(Palette.Keys.Surface, Brushes.White));
 }

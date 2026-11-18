@@ -464,6 +464,7 @@ public static class PulseRibbonLayout
         ("ledger.data.pivotCreate", "insert/tables"),
         ("ledger.data.pivotRefresh", "insert/tables"),
         ("ledger.database.define", "insert/tables"),
+        ("ledger.database.rename", "insert/tables"),
         ("ledger.data.form", "insert/tables"),
 
         ("ledger.chart.gallery", "insert/charts"),

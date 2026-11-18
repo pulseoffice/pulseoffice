@@ -6,7 +6,7 @@ using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Sheets.UI.DataDialogs;
 
-public sealed record DuplicateRemovalChoice(bool HasHeader, IReadOnlyList<int> KeyColumns);
+public sealed record DuplicateRemovalChoice(bool HasHeader, IReadOnlyList<int> KeyColumns, bool CaseSensitive = false);
 
 public interface IDuplicateRemovalPrompt
 {
@@ -29,6 +29,7 @@ public sealed class DuplicateRemovalPrompt(IDialogService dialogs, IHeaderRowDet
             [
                 new CheckField("header", texts["tools.hasHeader"], headers.LooksLikeHeader(sheet, range)),
                 new ChecklistField("columns", texts["duplicates.columns"], labels, labels),
+                new CheckField("case", texts["duplicates.caseSensitive"], false),
             ], texts),
             new DialogOptions { TitleKey = "dialog.removeDuplicates.title", PreferredWidth = 420 }, ct)
             .ConfigureAwait(true);
@@ -42,7 +43,8 @@ public sealed class DuplicateRemovalPrompt(IDialogService dialogs, IHeaderRowDet
             .Select(entry => entry.column)
             .ToList();
 
-        return new DuplicateRemovalChoice(answers.GetValueOrDefault("header") is true, columns);
+        return new DuplicateRemovalChoice(
+            answers.GetValueOrDefault("header") is true, columns, answers.GetValueOrDefault("case") is true);
     }
 
     private string Label(Worksheet sheet, int row, int column)

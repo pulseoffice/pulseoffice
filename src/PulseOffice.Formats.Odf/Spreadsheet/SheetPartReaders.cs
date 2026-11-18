@@ -668,6 +668,8 @@ internal sealed class OdsTableReader(TableRows rows, TableCells cells, OdsCellRe
 
 internal sealed class OdsNamedExpressionReader
 {
+    private readonly OdfTableFormulas _tableFormulas = new();
+
     public void Read(XDocument content, Workbook workbook)
     {
         foreach (var container in content.Descendants(Namespaces.Table + "named-expressions"))
@@ -685,6 +687,12 @@ internal sealed class OdsNamedExpressionReader
         {
             if (element.Attribute(Namespaces.Table + "name")?.Value is not { Length: > 0 } name) continue;
             if (name.StartsWith("_xlnm.", StringComparison.Ordinal)) continue;
+
+            if (_tableFormulas.Read(element) is { } structured)
+            {
+                workbook.DefineName(new DefinedName(name, structured.TrimStart('='), scope));
+                continue;
+            }
 
             if (element.Name == Namespaces.Table + "named-range")
             {

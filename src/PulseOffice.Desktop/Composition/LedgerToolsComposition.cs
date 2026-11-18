@@ -151,6 +151,7 @@ internal static class LedgerToolsComposition
         services.AddSingleton<IChartSourceLayout, ChartSourceLayout>();
         services.AddSingleton<IChartSourceReferences, ChartSourceReferences>();
         services.AddSingleton<IDefinedNameRules, DefinedNameRules>();
+        services.AddSingleton<ITableRenaming, TableRenaming>();
         services.AddSingleton<PulseOffice.Document.Embedding.ITableStructure, PulseOffice.Document.Embedding.TableStructure>();
         services.AddSingleton<IGoalSeek, GoalSeek>();
         services.AddSingleton<ISolver, Solver>();

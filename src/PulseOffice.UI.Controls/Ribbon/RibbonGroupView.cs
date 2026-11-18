@@ -74,7 +74,8 @@ public sealed class RibbonGroupView : ContentControl
         {
             if (visual is RibbonSlot slot)
             {
-                if (slot.IsEffectivelyVisible && slot.IsEffectivelyEnabled) yield return slot.KeyTip();
+                if (slot.IsEffectivelyVisible && slot.IsEffectivelyEnabled)
+                    foreach (var target in slot.KeyTips()) yield return target;
             }
             else if (visual is Button more && more.IsEffectivelyVisible && more.FindAncestorOfType<RibbonSlot>() is null)
                 yield return Opener(more);

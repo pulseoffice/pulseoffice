@@ -462,7 +462,9 @@ public sealed class Evaluator(IFunctionRegistry functions, ISpecialFormRegistry 
         public override EvalValue VisitName(NameNode node) => evaluator.EvaluateName(node, scope, ctx, depth);
 
         public override EvalValue VisitTableReference(TableReferenceNode node) =>
-            ctx.ResolveTableReference(node) is { } resolved ? resolved.Accept(this) : EvalValue.Error(CellError.Reference);
+            ctx.ResolveTableReference(node) is { } resolved
+                ? resolved.Accept(this)
+                : EvalValue.Error(node.Area.HasFlag(TableArea.ThisRow) ? CellError.Value : CellError.Reference);
 
         public override EvalValue VisitUnary(UnaryNode node) => evaluator.EvaluateUnary(node, scope, ctx, depth);
 

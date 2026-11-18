@@ -52,10 +52,15 @@ public sealed class DeckConnectors(IConnectorFramer framer) : IDeckConnectors
     private ObjectElement? Reroute(Slide slide, ObjectElement placed)
     {
         if (placed.Content is not ConnectorObject connector) return null;
-        if (Find(slide, connector.Start.ObjectId) is not { } from) return null;
-        if (Find(slide, connector.End.ObjectId) is not { } to) return null;
+        var from = Find(slide, connector.Start.ObjectId);
+        var to = Find(slide, connector.End.ObjectId);
+        if (from is null && to is null) return null;
+        var ends = _ends.Of(connector.Path).ToList();
+        if ((from is null || to is null) && ends.Count == 0) return null;
 
-        if (framer.Frame(connector, Box(from), Box(to)) is not { } framed) return null;
+        var fromBox = from is not null ? Box(from) : Point(placed, ends[0]);
+        var toBox = to is not null ? Box(to) : Point(placed, ends[^1]);
+        if (framer.Frame(connector, fromBox, toBox) is not { } framed) return null;
 
         var bounds = new DocumentRect(
             new Twip((int)Math.Round(framed.Left)), new Twip((int)Math.Round(framed.Top)),
@@ -64,10 +69,16 @@ public sealed class DeckConnectors(IConnectorFramer framer) : IDeckConnectors
         return placed with { Bounds = bounds, Content = connector with { Path = framed.Path } };
     }
 
-    private ConnectorBox Box(ObjectElement element) => new(
+    private readonly SegmentEnds _ends = new();
+
+    private ConnectorBox Point(SlideElement placed, ShapePoint end) => new(
+        Math.Round(placed.Bounds.Left.Value + end.X * placed.Bounds.Width.Value),
+        Math.Round(placed.Bounds.Top.Value + end.Y * placed.Bounds.Height.Value), 0, 0);
+
+    private ConnectorBox Box(SlideElement element) => new(
         element.Bounds.Left.Value, element.Bounds.Top.Value,
         element.Bounds.Width.Value, element.Bounds.Height.Value);
 
-    private ObjectElement? Find(Slide slide, string? id) =>
-        id is null ? null : slide.Elements.OfType<ObjectElement>().FirstOrDefault(e => e.Id == id);
+    private SlideElement? Find(Slide slide, string? id) =>
+        id is null ? null : slide.Elements.FirstOrDefault(e => e.Id == id && e is not ObjectElement { Content: ConnectorObject });
 }

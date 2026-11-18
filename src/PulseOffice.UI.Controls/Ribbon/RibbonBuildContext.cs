@@ -107,9 +107,27 @@ public sealed class RibbonBuildContext(RibbonServices services, DesignTokens.Met
         Dismissal.PassThrough(flyout);
 
         flyout.Opening += (_, _) => flyout.Content = Surface(content());
+        flyout.Opened += (_, _) =>
+        {
+            _open.Remove(flyout);
+            _open.Add(flyout);
+            PopoverOpened?.Invoke(this, flyout);
+        };
+        flyout.Closed += (_, _) =>
+        {
+            if (_open.Remove(flyout)) PopoverClosed?.Invoke(this, flyout);
+        };
 
         return flyout;
     }
+
+    private readonly List<Flyout> _open = [];
+
+    public event EventHandler<Flyout>? PopoverOpened;
+
+    public event EventHandler<Flyout>? PopoverClosed;
+
+    public Flyout? OpenPopover => _open.Count == 0 ? null : _open[^1];
 
     public Border Surface(Control content)
     {

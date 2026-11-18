@@ -170,8 +170,10 @@ public sealed class DirectFormatting : IDirectFormatting
     {
         Field = run.Field,
         FieldArgument = run.FieldArgument,
+        FieldDetail = run.FieldDetail,
         StyleName = run.StyleName,
         Hyperlink = run.Hyperlink,
+        Ruby = run.Ruby,
     };
 
     public TextParagraph Clear(TextParagraph paragraph) => new TextParagraph(paragraph.Text)

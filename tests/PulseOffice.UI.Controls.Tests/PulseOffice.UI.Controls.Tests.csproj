@@ -21,5 +21,6 @@
   <ItemGroup>
     <Compile Include="../Shared/UiThreadSession.cs" Link="Shared/UiThreadSession.cs" />
     <Compile Include="../Shared/DialogKeyboardWalk.cs" Link="Shared/DialogKeyboardWalk.cs" />
+    <Compile Include="../Shared/TestFontPickers.cs" Link="Shared/TestFontPickers.cs" />
   </ItemGroup>
 </Project>

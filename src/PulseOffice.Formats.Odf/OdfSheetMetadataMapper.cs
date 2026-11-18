@@ -21,6 +21,7 @@ public sealed class OdfSheetMetadataMapper
     private readonly TableRows _rows = new();
     private readonly TableCells _cells = new();
     private readonly OdfQualifiedRanges _ranges = new();
+    private readonly OdfTableFormulas _tableFormulas = new();
     private readonly TokenMap<ValidationAlert> _alerts = new(ValidationAlert.Stop, "stop",
         (ValidationAlert.Warning, "warning"), (ValidationAlert.Information, "information"));
 
@@ -33,9 +34,16 @@ public sealed class OdfSheetMetadataMapper
 
         return new XElement(Namespaces.Table + "content-validations", rules.Select((rule, index) =>
         {
-            var (sheet, validation) = rule;
+            var (sheet, structured) = rule;
+            var at = new SheetCell(workbook.IndexOf(sheet), structured.Range.Start);
+            var validation = structured with
+            {
+                FirstFormula = _tableFormulas.FlattenText(structured.FirstFormula, workbook, at),
+                SecondFormula = _tableFormulas.FlattenText(structured.SecondFormula, workbook, at),
+            };
             var element = new XElement(Namespaces.Table + "content-validation",
-                new XAttribute(Namespaces.Table + "name", NameOf(sheet, index)));
+                new XAttribute(Namespaces.Table + "name", NameOf(sheet, index)),
+                _tableFormulas.Kept(structured.FirstFormula, validation.FirstFormula, structured.SecondFormula, validation.SecondFormula));
 
             if (_syntax.Write(validation) is { } condition)
             {
@@ -118,6 +126,11 @@ public sealed class OdfSheetMetadataMapper
                 var element = declared[name];
                 var rectangles = area.Rectangles();
                 var parsed = Parse(element, rectangles[0]);
+                parsed = parsed with
+                {
+                    FirstFormula = _tableFormulas.Read(element) ?? parsed.FirstFormula,
+                    SecondFormula = _tableFormulas.ReadSecond(element) ?? parsed.SecondFormula,
+                };
                 var anchor = _ranges.Read(element.Attribute(Namespaces.Table + "base-cell-address")?.Value)?.Range.Start ?? rectangles[0].Start;
                 var anchored = parsed with { Range = new CellRange(anchor, anchor) };
                 foreach (var rectangle in rectangles)

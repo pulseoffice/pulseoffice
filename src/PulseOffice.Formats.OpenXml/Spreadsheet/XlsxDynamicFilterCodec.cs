@@ -7,7 +7,7 @@ using Sheet = PulseOffice.Sheets.Worksheet;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed class XlsxDynamicFilterReader
+internal sealed class XlsxDynamicFilterCodec
 {
     private const double FirstSerial = -657435;
     private const double LastSerial = 2958465;
@@ -22,9 +22,36 @@ internal sealed class XlsxDynamicFilterReader
         (DynamicFilterValues.Quarter3, [7, 8, 9]), (DynamicFilterValues.Quarter4, [10, 11, 12]),
     ];
 
+    private readonly (DynamicFilterValues Type, RelativeDatePeriod Period)[] _relative =
+    [
+        (DynamicFilterValues.Today, RelativeDatePeriod.Today), (DynamicFilterValues.Yesterday, RelativeDatePeriod.Yesterday),
+        (DynamicFilterValues.Tomorrow, RelativeDatePeriod.Tomorrow), (DynamicFilterValues.ThisWeek, RelativeDatePeriod.ThisWeek),
+        (DynamicFilterValues.LastWeek, RelativeDatePeriod.LastWeek), (DynamicFilterValues.NextWeek, RelativeDatePeriod.NextWeek),
+        (DynamicFilterValues.ThisMonth, RelativeDatePeriod.ThisMonth), (DynamicFilterValues.LastMonth, RelativeDatePeriod.LastMonth),
+        (DynamicFilterValues.NextMonth, RelativeDatePeriod.NextMonth), (DynamicFilterValues.ThisQuarter, RelativeDatePeriod.ThisQuarter),
+        (DynamicFilterValues.LastQuarter, RelativeDatePeriod.LastQuarter), (DynamicFilterValues.NextQuarter, RelativeDatePeriod.NextQuarter),
+        (DynamicFilterValues.ThisYear, RelativeDatePeriod.ThisYear), (DynamicFilterValues.LastYear, RelativeDatePeriod.LastYear),
+        (DynamicFilterValues.NextYear, RelativeDatePeriod.NextYear), (DynamicFilterValues.YearToDate, RelativeDatePeriod.YearToDate),
+    ];
+
+    private readonly RelativeDatePeriods _periods = new();
+
+    public DynamicFilter Build(RelativeDatePeriod period, DateTime today)
+    {
+        var bounds = _periods.Bounds(period, today);
+        return new DynamicFilter
+        {
+            Type = _relative.First(entry => entry.Period == period).Type,
+            Val = bounds.Start.ToOADate(),
+            MaxVal = bounds.End.ToOADate(),
+        };
+    }
+
     public ColumnFilter Apply(ColumnFilter filter, DynamicFilter dynamic, Sheet? sheet, CellRange range)
     {
         var type = dynamic.Type?.Value;
+        foreach (var (known, period) in _relative)
+            if (known == type) return filter with { Period = period };
         if (Periods.FirstOrDefault(period => period.Type == type).Months is { } months)
             return filter with { AllowedValues = Matching(sheet, range, filter.ColumnOffset, months), IncludeBlanks = false };
         if (dynamic.Val?.Value is not { } value || !double.IsFinite(value)) return filter;

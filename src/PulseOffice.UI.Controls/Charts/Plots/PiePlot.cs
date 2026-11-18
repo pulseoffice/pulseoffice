@@ -68,7 +68,7 @@ public sealed class PiePlot : ChartPlotBase
 
             if (sweep >= Math.PI * 2 - 1e-9)
             {
-                frame.Context.DrawEllipse(SliceBrush(index), new Pen(Brushes.White, 1), middle, radius, radius);
+                frame.Context.DrawEllipse(SliceBrush(index), new Pen(frame.Marks.Separator, 1), middle, radius, radius);
                 start += sweep;
                 continue;
             }
@@ -88,13 +88,13 @@ public sealed class PiePlot : ChartPlotBase
             }
 
             frame.Context.DrawGeometry(
-                SliceBrush(index), new Pen(Brushes.White, 1), geometry);
+                SliceBrush(index), new Pen(frame.Marks.Separator, 1), geometry);
 
             start += sweep;
         }
 
         if (frame.Definition.Type is ChartType.Doughnut)
-            frame.Context.DrawEllipse(Brushes.White, null, centre, radius * 0.5, radius * 0.5);
+            frame.Context.DrawEllipse(frame.Marks.Separator, null, centre, radius * 0.5, radius * 0.5);
     }
 
 }

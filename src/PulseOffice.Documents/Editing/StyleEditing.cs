@@ -1,4 +1,6 @@
 using PulseOffice.Document.Commands;
+using PulseOffice.Documents.Blocks;
+using PulseOffice.Documents.Clipboard;
 using PulseOffice.Documents.Styles;
 
 namespace PulseOffice.Documents.Editing;
@@ -23,7 +25,7 @@ public interface IStyleEditing
     DocumentEdit Load(TextDocument document, UndoStack history, StyleSheet source, bool overwrite);
 }
 
-public sealed class StyleEditing(IStyleReferences references) : IStyleEditing
+public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper remapper) : IStyleEditing
 {
     public bool Change<TStyle>(TextDocument document, UndoStack history, StyleCollection<TStyle> styles, string name, Action<TStyle> change, string description)
         where TStyle : DocumentStyle
@@ -180,6 +182,7 @@ public sealed class StyleEditing(IStyleReferences references) : IStyleEditing
     public DocumentEdit Load(TextDocument document, UndoStack history, StyleSheet source, bool overwrite)
     {
         var recorder = new EditRecorder(document, "style-load");
+        source = remapper.Remap(document, new DocumentFragment(new BlockContainer(), source, [], [], [])).Styles;
         Load(recorder, document.Styles.Paragraph, source.Paragraph, overwrite);
         Load(recorder, document.Styles.Character, source.Character, overwrite);
         Load(recorder, document.Styles.List, source.List, overwrite);

@@ -57,6 +57,7 @@ public sealed class ColorSplitSlot : RibbonSlot
         Flyout? flyout = null;
         flyout = Context.Popover(Palette);
         _arrow.Click += (_, _) => Context.Dismissal.Toggle(flyout!, _main);
+        Opener = _arrow;
 
         ToolTip.SetTip(_arrow, Item.Title);
         Avalonia.Automation.AutomationProperties.SetName(_arrow, Item.Title);

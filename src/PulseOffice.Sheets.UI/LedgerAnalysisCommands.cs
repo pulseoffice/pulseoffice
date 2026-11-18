@@ -359,6 +359,12 @@ public sealed class LedgerAnalysisCommands(
         var outcome = planner.Build(rows,
             (range, name, comment) => scenarios.Capture(engine, sheetIndex, range, name, comment));
 
+        if (outcome.Apply is { } shown && !guard.CanWrite(workbook, sheet, shown.Range))
+        {
+            status.Report(texts["status.protection.locked"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            return;
+        }
+
         List<Scenario> before = [.. sheet.Scenarios];
         List<Scenario> after = [.. outcome.Scenarios];
 

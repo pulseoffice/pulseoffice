@@ -260,6 +260,8 @@ internal sealed class OdsNamedExpressionWriter
 
     private readonly OdfFormulaSyntax _syntax = new();
 
+    private readonly OdfTableFormulas _tableFormulas = new();
+
     public XElement? Build(Workbook workbook) => Build(workbook, null);
 
     public XElement? Build(Workbook workbook, string? scope)
@@ -274,14 +276,17 @@ internal sealed class OdsNamedExpressionWriter
 
         return new XElement(Namespaces.Table + "named-expressions", names.Select(name =>
         {
-            var expression = name.Expression.Trim().TrimStart('=');
+            var (flattened, structured) = _tableFormulas.Write("=" + name.Expression.Trim().TrimStart('='), workbook, new SheetCell(0, CellAddress.First));
+            var expression = flattened.TrimStart('=');
 
             return _reference.IsMatch(expression)
                 ? new XElement(Namespaces.Table + "named-range",
+                    structured,
                     new XAttribute(Namespaces.Table + "name", name.Name),
                     new XAttribute(Namespaces.Table + "base-cell-address", Address(baseSheet, "$A$1")),
                     new XAttribute(Namespaces.Table + "cell-range-address", Address(baseSheet, expression)))
                 : new XElement(Namespaces.Table + "named-expression",
+                    structured,
                     new XAttribute(Namespaces.Table + "name", name.Name),
                     new XAttribute(Namespaces.Table + "base-cell-address", Address(baseSheet, "$A$1")),
                     new XAttribute(Namespaces.Table + "expression", _syntax.ToOdf("=" + expression)));

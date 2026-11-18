@@ -156,6 +156,9 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
 
         _documentTabs = new DocumentTabsView(workspace, texts);
         _documentTabs.CloseRequested += (_, document) => _ = CloseAsync(_guard(), document);
+        _ribbon.KeyTipRegions.Add(new PulseOffice.UI.Controls.Ribbon.MenuKeyTipRegion(_titleBar.MenuHost, _ribbon.KeyTipCollector));
+        _ribbon.KeyTipRegions.Add(_documentTabs);
+        _ribbon.KeyTipRegions.Add(new PulseOffice.UI.Controls.Ribbon.ButtonKeyTipRegion(_statusBar, _ribbon.KeyTipCollector));
         _workspaceHost = new Panel();
         _sidePanel = sidePanel;
         _workspaceHost.Themed(Panel.BackgroundProperty, Palette.Keys.Surface);

@@ -9,6 +9,14 @@ the round that fixes it is joined and the join run is green.
 - Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
   reference suite have not opened such a file here. (194)
 - The built-in media player has not run live on any system (Windows and macOS cannot be tested here). (193)
+- Vertical and stacked text, text rotated inside a shape and text columns are not in the shape text model: they are
+  declared on import (PPTX226, ODP217), not carried. (213)
+- Connector glue: automatic ends are written to PPTX as the site they face and re-read as fixed sites on rectangular
+  targets; connectors inside groups are written and read without glue; PowerPoint and the reference suite have not
+  opened the new `p:cxnSp` custom-geometry and `draw:connector` output here. (213)
+- Ledger connectors lose their chosen sites: XLSX always writes indices 2 and 0 and reads none, ODS writes no glue
+  points. (213)
+- ODP shrink-on-overflow also writes `style:shrink-to-fit` on graphic properties, which ODF defines only for cells. (213)
 
 ## Charts
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
@@ -24,7 +32,14 @@ the round that fixes it is joined and the join run is green.
 ## Folio
 - DOCX still loses line number restarts that no body section can carry: on the first paragraph (other than the start
   value), inside tables, frames, notes and comments, on a paragraph that defers a page style change, and any restart
-  when numbering restarts on every page (DOCX248). Not yet opened in Word. (204, 209)
+  when numbering restarts on every page (DOCX248). Not yet opened in Word. (204, 209, reviewed again in 212: the remaining cases have no Word
+  section form)
+- A paragraph cannot switch off the list its paragraph style carries: DOCX `w:numId w:val="0"` and ODF
+  `style:list-style-name=""` are read as "inherit", so such paragraphs come out numbered (medium). The model needs an
+  explicit "no list" value through the resolver, layout and both codecs. (212)
+- DOCX linked paragraph and character styles (`w:link`) are not modelled: the pair is read as two unrelated styles and
+  written without the link. (212)
+- A new page style made from an existing one copies its settings but not its header and footer text. (212)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 
@@ -33,25 +48,21 @@ the round that fixes it is joined and the join run is green.
 
 ## Ledger
 
-- Round 206 (data tools 2), open: a scenario captured over whole columns keeps only the cells inside the used area,
-  so cells beyond it that are filled later are not cleared when the scenario is shown; applying a scenario on a
-  protected sheet relies on the command effect guard instead of a check at the source; dynamic XLSX filters for
-  relative periods written without `val`/`maxVal` by other producers are still dropped; the remove duplicates dialog
-  has no case-sensitivity option (`DuplicateRemovalRequest.CaseSensitive` is never set).
-- Structured table references (207): no command renames a table (`TableRenaming` exists in the engine only);
-  `[#This Row]` outside the data rows gives #REF! where the other applications give #VALUE!; table references in
-  conditional formats, validations, defined names and chart sources are not kept structured (ODS) nor rewritten on
-  renames; the formula bar accepts but does not show the `[@Column]` short form (it shows `[[#This Row],[Column]]`);
-  header renames are not followed in manual calculation mode until the next edit of that header row.
+- Round 210 (Ledger queue), open: chart series sources holding table references are not kept structured nor renamed;
+  XLSX writes table references in conditional formats and validations as they are, which Excel does not accept there
+  (they need flattening plus an extension that keeps the structured form); colour-scale and data-bar threshold
+  formulas are not kept structured in ODS; relative-period filters have no entry in the AutoFilter menu (they come only
+  from files), and other ODF readers see the bounds of the day the file was saved; `CalculationEngine.cs` is still
+  over 800 lines (1028).
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
   the ribbon, dialogs or panels, nor over the new polite live region of the status bar. (201, 203)
-- Ribbon key tips cover tabs and the commands shown on the chosen tab; they do not reach a third level (the items of an
-  open gallery, menu or collapsed-group popover), the title-bar menus, the document tabs or the status bar. On Windows
-  and Linux the in-window menu bar is closed when the tips open, because Avalonia's access-key handler opens it on the
-  same Alt release; check live that the two never flicker together. (208)
-- Chart plot marks that are not text (axis lines, grid, meter needle, box-plot whiskers) keep fixed grey and black; the
-  Ledger grid draws charts on a fixed white paper with black ink. (208)
-- The keyboard walk of the shape style dialog was not written (it needs the full font picker services); the other
-  dialog walks of round 208 were written without running them. (208)
+- Key tips: on Windows and Linux the in-window menu bar is closed when the tips open, because Avalonia's access-key
+  handler opens it on the same Alt release; check live that the two never flicker together. Third-level tips cover the
+  ribbon's own popovers (menus, galleries, split-button lists, collapsed and overflow groups) but not combo box
+  drop-downs, the font family list, the submenus of the title-bar menus, or a popover opened outside the ribbon; badges
+  outside the ribbon sit in the adorner layer, which was not checked live inside separate popup windows. (208, 211)
+- Chart marks drawn in series-derived colours (trend lines, error bars, the Pareto line, rising and falling waterfall
+  bars) keep their fixed hues; their contrast on dark paper was not measured. (211)
+- The keyboard walks of rounds 208 and 211 (shape style dialog included) were written without running them. (208, 211)

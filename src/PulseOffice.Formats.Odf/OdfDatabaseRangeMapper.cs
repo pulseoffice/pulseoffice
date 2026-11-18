@@ -96,6 +96,7 @@ internal sealed class OdfDatabaseRangeMapper
     private readonly FilterTreeColumns _columns = new();
     private readonly FilterColumnDates _dates = new();
     private readonly OdfSortCodec _sorts = new();
+    private readonly OdfRelativePeriodCodec _periods = new();
 
     public XElement? Build(Workbook workbook)
     {
@@ -177,6 +178,9 @@ internal sealed class OdfDatabaseRangeMapper
                 new XAttribute(Namespaces.Table + "value", top.Count.ToString("R", System.Globalization.CultureInfo.InvariantCulture)),
                 new XAttribute(Namespaces.Table + "operator", _top.ToOdf(top)),
                 new XAttribute(Namespaces.Table + "data-type", "number"));
+
+        if (filter.Period is { } period)
+            foreach (var bound in _periods.Write(filter.ColumnOffset, period, DateTime.Today)) yield return bound;
 
         var criteria = filter.Conditions.Select(condition => Condition(filter.ColumnOffset, condition)).ToList();
         if (criteria.Count > 1 && filter.Join == CriteriaJoin.Or)
@@ -295,7 +299,9 @@ internal sealed class OdfDatabaseRangeMapper
                 var items = condition.Elements(Namespaces.Table + "filter-set-item").Select(item => (string?)item.Attribute(Namespaces.Table + "value") ?? string.Empty).ToList();
                 var op = (string?)condition.Attribute(Namespaces.Table + "operator");
                 var value = (string?)condition.Attribute(Namespaces.Table + "value") ?? string.Empty;
-                if (_colors.FromOdf((string?)condition.Attribute(Namespaces.Loext + "data-type"), value) is { } color)
+                if (_periods.Read(condition) is { } period)
+                    filter = filter with { Period = period };
+                else if (_colors.FromOdf((string?)condition.Attribute(Namespaces.Loext + "data-type"), value) is { } color)
                     filter = filter with { Color = color };
                 else if (_top.FromOdf(op, value) is { } top)
                     filter = filter with { Top = top };

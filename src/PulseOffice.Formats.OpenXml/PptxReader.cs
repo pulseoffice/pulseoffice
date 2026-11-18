@@ -9,7 +9,7 @@ public sealed class PptxReader : IPresentationReader
 {
     private readonly OoxmlAttributeSanitizer _sanitizer = new();
     private readonly OoxmlReadFailures _failures = new();
-    private readonly IReadOnlyList<IPptxReadLoss> _readLosses = [new PptxEquations(), new PptxUnknownPresets(new UnknownPresetShapes(new PulseOffice.Drawing.Shapes.ShapePresets())), new PptxUnsupportedClickActions(), new PptxCommentThreads(), new PptxMixedTableRuns()];
+    private readonly IReadOnlyList<IPptxReadLoss> _readLosses = [new PptxEquations(), new PptxUnknownPresets(new UnknownPresetShapes(new PulseOffice.Drawing.Shapes.ShapePresets())), new PptxUnsupportedClickActions(), new PptxCommentThreads(), new PptxMixedTableRuns(), new PptxShapeTextLayout()];
     private readonly PptxThemeReader _theme;
     private readonly PptxMasterReader _master;
     private readonly SlideListReader _slides;
@@ -75,6 +75,7 @@ public sealed class PptxReader : IPresentationReader
                 new ObjectInteractionReader(new PptxInteractionMapper()),
                 new PptxHiddenElementReader(new PptxElementVisibility()),
                 new PptxSoundReader(new PptxSounds(new SoundTypes()), new PptxTransitionMapper()),
+                new PptxConnectorGlueReader(new SlideConnectorGlue(), new OoxmlConnectionSites()),
                 new PptxGroupReader(),
                 new PptxAnimationReader(new PptxAnimationMapper(), new PptxSounds(new SoundTypes())),
                 new PptxCommentReader(new PptxCommentMapper(new PulseOffice.Formats.Packaging.XmlCharacterFilter(), new DrawingML.DrawingPlainText())),

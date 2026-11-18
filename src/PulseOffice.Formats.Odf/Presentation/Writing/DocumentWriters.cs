@@ -293,8 +293,6 @@ internal sealed class OdpFidelityRules
             Diagnostic.Info("ODP191", "Chart types that ODF does not define, such as waterfall, statistical and other special charts, keep their type in a PulseOffice extension: other applications show them as the nearest standard chart, usually columns.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(deck => Objects(deck).Select(o => o.Content).OfType<PulseOffice.Charts.ChartDefinition>().Any(_chartExtensions.Needs),
             Diagnostic.Info("ODP287", OdfChartExtensions.Loss)),
-        new FidelityRule<PulseOffice.Presentations.Presentation>(deck => Objects(deck).Any(o => o.Content is PulseOffice.Drawing.Shapes.ConnectorObject),
-            Diagnostic.Info("ODP017", "Connectors are written as draw:path; their live endpoint anchoring is not preserved and they re-read as freeform shapes.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(deck => deck.Slides.SelectMany(slide => slide.Elements).OfType<ObjectElement>().Any(element => element.Content is PulseOffice.Drawing.Shapes.ShapeObject { Style.Extrusion.Kind: PulseOffice.Drawing.Shapes.ExtrusionKind.Lathe }),
             Diagnostic.Info("ODP018", "3D rotation objects are written as extruded shapes; the rotation body is not preserved.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(deck => deck.Slides.SelectMany(slide => slide.Elements).OfType<TextElement>()

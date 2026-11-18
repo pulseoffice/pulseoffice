@@ -10,11 +10,12 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Shell;
 
-public sealed class DocumentTabsView : ContentControl
+public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.Ribbon.IKeyTipRegion
 {
     private readonly IDocumentWorkspace _workspace;
     private readonly DesignTokens.Metrics _metrics;
     private readonly StackPanel _tabs;
+    private readonly List<(Control Tab, OpenDocument Document)> _shown = [];
 
     private readonly ITextCatalog _texts;
 
@@ -51,9 +52,27 @@ public sealed class DocumentTabsView : ContentControl
     public void Refresh()
     {
         _tabs.Children.Clear();
+        _shown.Clear();
 
         foreach (var document in _workspace.Documents)
-            _tabs.Children.Add(BuildTab(document));
+        {
+            var tab = BuildTab(document);
+            _shown.Add((tab, document));
+            _tabs.Children.Add(tab);
+        }
+    }
+
+    public IReadOnlyList<PulseOffice.UI.Controls.Ribbon.KeyTipTarget> KeyTipTargets()
+    {
+        if (!IsEffectivelyVisible || _shown.Count < 2) return [];
+        return [.. _shown
+            .Where(entry => entry.Tab.IsEffectivelyVisible)
+            .Select(entry =>
+            {
+                var document = entry.Document;
+                return new PulseOffice.UI.Controls.Ribbon.KeyTipTarget(LabelOf(document), entry.Tab, new Rect(entry.Tab.Bounds.Size),
+                    () => _workspace.Activate(document));
+            })];
     }
 
     private string LabelOf(OpenDocument document)

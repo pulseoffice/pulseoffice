@@ -37,7 +37,7 @@ public sealed class RadarPlot : ChartPlotBase
 
         var scale = PlotScale.Nice(Math.Min(0, values.Min()), Math.Max(0, values.Max()), 0, radius);
 
-        var web = new Pen(new SolidColorBrush(Colors.Gray, 0.35));
+        var web = new Pen(frame.Marks.Grid);
 
         for (var ring = 1; ring <= 4; ring++)
         {
@@ -91,7 +91,7 @@ public sealed class RadarPlot : ChartPlotBase
                 frame.Plot.Bottom, frame.Plot.Y))
             .ToList();
 
-        var web = new Pen(new SolidColorBrush(Colors.Gray, 0.4));
+        var web = new Pen(frame.Marks.Grid);
 
         for (var axis = 0; axis < axes; axis++)
             frame.Context.DrawLine(web,

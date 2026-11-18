@@ -47,7 +47,7 @@ public sealed class MeterPlot : ChartPlotBase
         var centre = new Point(frame.Plot.Center.X, frame.Plot.Bottom - frame.Plot.Height * 0.15);
         var radius = Math.Min(frame.Plot.Width / 2, frame.Plot.Height) * 0.8;
 
-        var background = new Pen(new SolidColorBrush(Colors.Gray, 0.25), radius * 0.28)
+        var background = new Pen(frame.Marks.Track, radius * 0.28)
         {
             LineCap = PenLineCap.Round,
         };
@@ -80,7 +80,7 @@ public sealed class MeterPlot : ChartPlotBase
         var height = Math.Min(frame.Plot.Height * 0.35, 30);
 
         frame.Context.FillRectangle(
-            new SolidColorBrush(Colors.Gray, 0.2),
+            frame.Marks.Track,
             new Rect(frame.Plot.X, middle - height / 2, frame.Plot.Width, height));
 
         frame.Context.FillRectangle(
@@ -88,7 +88,7 @@ public sealed class MeterPlot : ChartPlotBase
             new Rect(frame.Plot.X, middle - height / 4, scale.Position(value) - frame.Plot.X, height / 2));
 
         frame.Context.DrawLine(
-            new Pen(Brushes.Black, 2),
+            new Pen(frame.Marks.Strong, 2),
             new Point(scale.Position(target), middle - height / 2),
             new Point(scale.Position(target), middle + height / 2));
     }

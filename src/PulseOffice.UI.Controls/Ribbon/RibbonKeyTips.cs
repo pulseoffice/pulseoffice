@@ -2,22 +2,35 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
 namespace PulseOffice.UI.Controls.Ribbon;
 
-public enum KeyTipLevel { Hidden, Tabs, Commands }
+public enum KeyTipLevel { Hidden, Tabs, Commands, Items }
 
 public sealed record KeyTipTarget(string Title, Visual Anchor, Rect Area, Action Activate, bool OpensLevel = false);
+
+public sealed record KeyTipItems(object Owner, IReadOnlyList<KeyTipTarget> Targets);
 
 public interface IKeyTipSource
 {
     IReadOnlyList<KeyTipTarget> Tabs();
 
     IReadOnlyList<KeyTipTarget> Commands();
+
+    KeyTipItems? Items();
+
+    void CloseItems();
+}
+
+public interface IKeyTipRegion
+{
+    IReadOnlyList<KeyTipTarget> KeyTipTargets();
 }
 
 public sealed class RibbonKeyTips
@@ -26,8 +39,10 @@ public sealed class RibbonKeyTips
     private readonly IKeyTipSource _source;
     private readonly IKeyTipAssigner _assigner;
     private readonly DesignTokens.Metrics _metrics;
-    private readonly List<(string Tip, KeyTipTarget Target, Border Badge)> _shown = [];
+    private readonly List<(string Tip, KeyTipTarget Target, Border Badge, Panel Layer)> _shown = [];
     private string _typed = string.Empty;
+    private object? _itemsOwner;
+    private bool _stepping;
 
     public RibbonKeyTips(Canvas layer, IKeyTipSource source, IKeyTipAssigner assigner, DesignTokens.Metrics metrics)
     {
@@ -79,14 +94,34 @@ public sealed class RibbonKeyTips
             Filter(string.Empty);
             return;
         }
+        if (Level == KeyTipLevel.Items)
+        {
+            _stepping = true;
+            try
+            {
+                _source.CloseItems();
+            }
+            finally
+            {
+                _stepping = false;
+            }
+            if (!ShowItems(null)) ShowCommands();
+            return;
+        }
         if (Level == KeyTipLevel.Commands) ShowTabs();
         else Close();
+    }
+
+    public void ItemsClosed()
+    {
+        if (Level == KeyTipLevel.Items && !_stepping) Close();
     }
 
     public void Close()
     {
         if (Level == KeyTipLevel.Hidden) return;
         Clear();
+        _itemsOwner = null;
         Level = KeyTipLevel.Hidden;
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -117,14 +152,47 @@ public sealed class RibbonKeyTips
             return;
         }
 
-        Close();
+        if (Level == KeyTipLevel.Tabs)
+        {
+            Close();
+            target.Activate();
+            return;
+        }
+
+        var level = Level;
+        var before = level == KeyTipLevel.Items ? _itemsOwner : null;
         target.Activate();
+        if (Level == KeyTipLevel.Hidden) return;
+        if (ShowItems(before)) return;
+        if (level == KeyTipLevel.Items) CloseAllItems();
+        Close();
+    }
+
+    private bool ShowItems(object? previous)
+    {
+        if (_source.Items() is not { Targets.Count: > 0 } items || ReferenceEquals(items.Owner, previous)) return false;
+        _itemsOwner = items.Owner;
+        Present(KeyTipLevel.Items, items.Targets);
+        return _shown.Count > 0;
+    }
+
+    private void CloseAllItems()
+    {
+        _stepping = true;
+        try
+        {
+            for (var guard = 0; guard < 8 && _source.Items() is not null; guard++) _source.CloseItems();
+        }
+        finally
+        {
+            _stepping = false;
+        }
     }
 
     private void Filter(string typed)
     {
         _typed = typed;
-        foreach (var (tip, _, badge) in _shown) badge.IsVisible = tip.StartsWith(typed, StringComparison.Ordinal);
+        foreach (var (tip, _, badge, _) in _shown) badge.IsVisible = tip.StartsWith(typed, StringComparison.Ordinal);
     }
 
     private void Present(KeyTipLevel level, IReadOnlyList<KeyTipTarget> targets)
@@ -137,15 +205,16 @@ public sealed class RibbonKeyTips
         {
             if (tips[index].Length == 0) continue;
             var badge = Badge(tips[index], targets[index].Title);
-            _shown.Add((tips[index], targets[index], badge));
-            _layer.Children.Add(badge);
-            Place(badge, targets[index]);
+            var layer = Place(badge, targets[index]);
+            _shown.Add((tips[index], targets[index], badge, layer));
         }
     }
 
     private void Clear()
     {
         _typed = string.Empty;
+        foreach (var (_, _, badge, layer) in _shown)
+            if (!ReferenceEquals(layer, _layer)) layer.Children.Remove(badge);
         _shown.Clear();
         _layer.Children.Clear();
     }
@@ -174,7 +243,28 @@ public sealed class RibbonKeyTips
         return badge;
     }
 
-    private void Place(Border badge, KeyTipTarget target)
+    private Panel Place(Border badge, KeyTipTarget target)
+    {
+        if (!InRibbon(target.Anchor) && AdornerLayer.GetAdornerLayer(target.Anchor) is { } adorners)
+        {
+            badge.IsHitTestVisible = false;
+            badge.Measure(Size.Infinity);
+            badge.HorizontalAlignment = HorizontalAlignment.Center;
+            badge.VerticalAlignment = VerticalAlignment.Bottom;
+            badge.Margin = new Thickness(0, 0, 0, -badge.DesiredSize.Height / 2);
+            AdornerLayer.SetAdornedElement(badge, target.Anchor);
+            adorners.Children.Add(badge);
+            return adorners;
+        }
+
+        _layer.Children.Add(badge);
+        PlaceOnLayer(badge, target);
+        return _layer;
+    }
+
+    private bool InRibbon(Visual anchor) => _layer.GetVisualParent() is { } ribbon && (ReferenceEquals(ribbon, anchor) || ribbon.IsVisualAncestorOf(anchor));
+
+    private void PlaceOnLayer(Border badge, KeyTipTarget target)
     {
         badge.Measure(Size.Infinity);
         var size = badge.DesiredSize;

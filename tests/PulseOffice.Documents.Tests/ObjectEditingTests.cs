@@ -18,7 +18,7 @@ public sealed class ObjectEditingTests
     public ObjectEditingTests()
     {
         _arrangement = new ObjectArrangement(_f.Stories, _f.Text);
-        _captions = new Captions(_f.Stories, _f.Tree, new StyleEditing(new StyleReferences(_f.Stories, _f.Tree)), _f.Sequences);
+        _captions = new Captions(_f.Stories, _f.Tree, new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree)), _f.Sequences);
     }
 
     private AnchoredObject Picture(string id, ObjectAnchor anchor) =>

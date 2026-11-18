@@ -41,12 +41,12 @@ public sealed class Round205FilterTests
     }
 
     [Fact]
-    public void A_date_period_dynamic_filter_is_read_as_its_stored_bounds()
+    public void A_date_period_dynamic_filter_stays_relative_to_today_despite_its_stored_bounds()
     {
         using var stream = WithDynamicFilter(new DynamicFilter { Type = DynamicFilterValues.ThisMonth, Val = 2, MaxVal = 6 });
 
         var read = new XlsxReader().Read(stream).Value!.Sheets[0];
 
-        Assert.Equal([1, 3], new SheetFilterService().RowsToHide(read, read.AutoFilter.Range!.Value, read.AutoFilter.Filters).Order());
+        Assert.Equal(RelativeDatePeriod.ThisMonth, Assert.Single(read.AutoFilter.Filters).Period);
     }
 }

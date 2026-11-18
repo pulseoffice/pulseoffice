@@ -58,7 +58,7 @@ public sealed class HierarchyPlot : ChartPlotBase
             if (index == values.Count - 1) slice = remaining;
 
             frame.Context.DrawRectangle(
-                Brush(frame.Data, values[index].Index, 0.85), new Pen(Brushes.White, 1), slice.Deflate(1));
+                Brush(frame.Data, values[index].Index, 0.85), new Pen(frame.Marks.Separator, 1), slice.Deflate(1));
 
             var source = values[index].Index;
             if (source < frame.Data.Categories.Count && slice.Width > 40 && slice.Height > 18)
@@ -114,7 +114,7 @@ public sealed class HierarchyPlot : ChartPlotBase
             {
                 var ring = new EllipseGeometry(new Rect(centre.X - radius, centre.Y - radius, radius * 2, radius * 2));
                 var hole = new EllipseGeometry(new Rect(centre.X - inner, centre.Y - inner, inner * 2, inner * 2));
-                frame.Context.DrawGeometry(brush, new Pen(Brushes.White, 1),
+                frame.Context.DrawGeometry(brush, new Pen(frame.Marks.Separator, 1),
                     new CombinedGeometry(GeometryCombineMode.Exclude, ring, hole));
                 start += sweep;
                 continue;
@@ -138,7 +138,7 @@ public sealed class HierarchyPlot : ChartPlotBase
                 sink.EndFigure(true);
             }
 
-            frame.Context.DrawGeometry(brush, new Pen(Brushes.White, 1), geometry);
+            frame.Context.DrawGeometry(brush, new Pen(frame.Marks.Separator, 1), geometry);
 
             start += sweep;
         }

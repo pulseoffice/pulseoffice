@@ -29,7 +29,7 @@ public sealed class TableFeatureTests
         _grid = new TableGrid(_fixture.Tree);
         _selections = new TableSelections(_tables, _grid, new TableSpans());
         _cells = new TableCellEditing(_grid, new TableCellFactory());
-        _formatting = new TableFormatting(_grid, new StyleEditing(new StyleReferences(_fixture.Stories, _fixture.Tree)), _fixture.Tree);
+        _formatting = new TableFormatting(_grid, new StyleEditing(new StyleReferences(_fixture.Stories, _fixture.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_fixture.Stories, _fixture.Tree)), _fixture.Tree);
         _sorting = new TableSorting(_grid, new TableSorter());
         _formulas = new TableFormulaEditing(new TableFormulaParser(), _grid, _fixture.Tree, [new CanonicalFormulaSyntax(), new WriterFormulaSyntax()]);
         _conversion = new TableConversion(_fixture.Stories, _fixture.Text, new TableCellFactory(), _fixture.Deletion, new TableSpanCutting());

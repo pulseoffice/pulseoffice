@@ -68,7 +68,7 @@ public sealed class TextThemeTests
         var palette = new PulseOffice.Document.Themes.ThemePalettes().Find("warm")!;
         var font = _f.Document.Styles.DefaultCharacter.Font;
 
-        var changed = new PulseOffice.Documents.Styles.TextThemeApplier(new StyleEditing(new StyleReferences(_f.Stories, _f.Tree))).Apply(_f.Document, _f.History, palette);
+        var changed = new PulseOffice.Documents.Styles.TextThemeApplier(new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree))).Apply(_f.Document, _f.History, palette);
 
         Assert.True(changed > 1);
         Assert.Equal("Georgia", _f.Document.Styles.DefaultCharacter.Font);

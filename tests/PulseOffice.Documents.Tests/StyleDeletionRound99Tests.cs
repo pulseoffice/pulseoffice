@@ -13,7 +13,7 @@ public sealed class StyleDeletionRound99Tests
 
     public StyleDeletionRound99Tests()
     {
-        _styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree));
+        _styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree));
     }
 
     [Fact]

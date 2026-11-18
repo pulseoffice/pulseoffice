@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
@@ -39,6 +40,8 @@ public sealed class DialogKeyboardWalk
 
     public bool IsOpen => _host.IsDialogOpen;
 
+    public IDialogService Dialogs => _host;
+
     public IInputElement? Focused => _window.FocusManager?.GetFocusedElement();
 
     public Task<object?> Open(Control content, string titleKey)
@@ -66,8 +69,11 @@ public sealed class DialogKeyboardWalk
             stops.Add(focused);
             if (ReferenceEquals(focused, start)) return stops;
         }
-        throw new InvalidOperationException($"Tab did not come back to the first stop within {StepLimit} presses.");
+        throw new InvalidOperationException($"Tab did not come back to the first stop within {StepLimit} presses; it started on {Describe(start)} and last went through {string.Join(", ", stops.TakeLast(8).Select(Describe))}.");
     }
+
+    private string Describe(IInputElement element) =>
+        element is Control control ? $"{control.GetType().Name}({AutomationProperties.GetName(control)}{(control as ContentControl)?.Content as string})" : element.GetType().Name;
 
     public void WalkAndCancel(Control content, string titleKey)
     {

@@ -136,7 +136,7 @@ public sealed class OdpObjectOpsRoundTripTests
     }
 
     [Fact]
-    public void ConnectorSurvivesAsGeometry()
+    public void ConnectorSurvivesAsAGluedConnector()
     {
         var (deck, slide) = Base();
         slide.Add(Shape("a", 0, 0, 1000, 1000));
@@ -145,7 +145,11 @@ public sealed class OdpObjectOpsRoundTripTests
         slide.Add(connector);
 
         var back = RoundTrip(deck);
-        Assert.Contains(back.Slides[0].Elements.OfType<ObjectElement>(), o => o.Content is FreeformObject);
+        var read = Assert.Single(back.Slides[0].Elements.OfType<ObjectElement>().Select(o => o.Content).OfType<ConnectorObject>());
+        var shapes = back.Slides[0].Elements.OfType<ObjectElement>().Where(o => o.Content is ShapeObject).Select(o => o.Id).ToList();
+        Assert.Equal(shapes, [read.Start.ObjectId!, read.End.ObjectId!]);
+        Assert.Equal(ConnectorKind.Elbow, read.Shape);
+        Assert.NotEmpty(read.Path.Figures);
     }
 
     [Fact]

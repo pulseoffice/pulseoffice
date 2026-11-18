@@ -31,7 +31,7 @@ public sealed class ChartAxisPainter(ChartText text)
     public void MinorTicks(DrawingContext context, IReadOnlyList<double> ticks, PlotScale scale, Rect plot, bool horizontal, bool opposite)
     {
         if (ticks.Count == 0) return;
-        var pen = new Pen(Brushes.Gray, 1);
+        var pen = new Pen(text.Ink.Stroke, 1);
         foreach (var value in ticks)
         {
             var position = scale.Position(value);
@@ -50,7 +50,7 @@ public sealed class ChartAxisPainter(ChartText text)
 
     public void Crossings(DrawingContext context, Rect plot, bool horizontal, double? valueCrossing, double? categoryCrossing)
     {
-        var axis = new Pen(Brushes.Gray, 1);
+        var axis = new Pen(text.Ink.Stroke, 1);
         if (valueCrossing is { } along)
         {
             if (horizontal) context.DrawLine(axis, new Point(along, plot.Y), new Point(along, plot.Bottom));
@@ -66,7 +66,7 @@ public sealed class ChartAxisPainter(ChartText text)
 
     public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid, string? format)
     {
-        var pen = new Pen(new SolidColorBrush(Colors.Gray, 0.3));
+        var pen = new Pen(text.Ink.Grid);
 
         foreach (var value in scale.Divisions())
         {
@@ -87,7 +87,7 @@ public sealed class ChartAxisPainter(ChartText text)
         if (!(scale.Minimum < 0 && scale.Maximum > 0)) return;
 
         var zero = scale.Position(0);
-        var axis = new Pen(Brushes.Gray, 1);
+        var axis = new Pen(text.Ink.Stroke, 1);
         if (horizontal) context.DrawLine(axis, new Point(zero, plot.Y), new Point(zero, plot.Bottom));
         else context.DrawLine(axis, new Point(plot.X, zero), new Point(plot.Right, zero));
     }
@@ -129,7 +129,7 @@ public sealed class ChartAxisPainter(ChartText text)
 
     public void Groups(DrawingContext context, IReadOnlyList<IReadOnlyList<ChartCategoryGroup>> levels, CategoryScale scale, Rect plot, bool horizontal, double? line)
     {
-        var pen = new Pen(new SolidColorBrush(Colors.Gray, 0.6), 1);
+        var pen = new Pen(text.Ink.Stroke, 1);
         for (var level = 0; level < levels.Count; level++)
         {
             var ring = levels.Count - level;

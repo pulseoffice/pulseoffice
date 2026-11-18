@@ -21,10 +21,10 @@ public sealed class ConnectorFramer(IConnectorRouter router) : IConnectorFramer
         var points = new SegmentPoints().Of(outline).ToList();
         if (points.Count == 0) return null;
 
-        var left = points.Min(point => point.X) - Margin;
-        var top = points.Min(point => point.Y) - Margin;
-        var width = Math.Max(1, points.Max(point => point.X) - left + Margin);
-        var height = Math.Max(1, points.Max(point => point.Y) - top + Margin);
+        var left = Math.Floor(points.Min(point => point.X) - Margin);
+        var top = Math.Floor(points.Min(point => point.Y) - Margin);
+        var width = Math.Max(1, Math.Ceiling(points.Max(point => point.X) - left + Margin));
+        var height = Math.Max(1, Math.Ceiling(points.Max(point => point.Y) - top + Margin));
 
         return new FramedConnector(new OutlineFrame(left, top, width, height).Normalize(outline), left, top, width, height);
     }

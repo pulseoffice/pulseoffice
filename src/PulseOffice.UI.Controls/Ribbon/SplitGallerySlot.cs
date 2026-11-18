@@ -90,6 +90,7 @@ public sealed class SplitGallerySlot : RibbonSlot
         _arrow.Padding = new Thickness(Context.Metrics.SpacingSmall, 2);
         _arrow.CornerRadius = new CornerRadius(0, 0, Context.Metrics.RadiusTight, Context.Metrics.RadiusTight);
         _arrow.Click += (_, _) => Context.Dismissal.Toggle(_flyout!, this);
+        Opener = _arrow;
 
         var layout = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), VerticalAlignment = VerticalAlignment.Stretch };
         Grid.SetRow(_arrow, 1);
@@ -114,6 +115,7 @@ public sealed class SplitGallerySlot : RibbonSlot
         _arrow.Padding = default;
         _arrow.CornerRadius = new CornerRadius(0, Context.Metrics.RadiusTight, Context.Metrics.RadiusTight, 0);
         _arrow.Click += (_, _) => Context.Dismissal.Toggle(_flyout!, _main);
+        Opener = _arrow;
 
         return new StackPanel { Orientation = Orientation.Horizontal, Children = { _main, _arrow } };
     }

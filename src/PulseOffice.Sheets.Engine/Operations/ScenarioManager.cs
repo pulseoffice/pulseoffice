@@ -62,7 +62,10 @@ public sealed class ScenarioManager : IScenarioManager
         var previous = new Dictionary<CellAddress, ScenarioCell>();
         var target = new Dictionary<CellAddress, ScenarioCell>();
 
-        foreach (var address in scenario.Addresses)
+        var addresses = scenario.Addresses.ToHashSet();
+        addresses.UnionWith(Occupied(sheet, scenario.Range)?.Cells() ?? []);
+
+        foreach (var address in addresses)
         {
             var cell = sheet[address];
             previous[address] = new ScenarioCell(cell.Value, cell.HasFormula ? cell.Formula : null);

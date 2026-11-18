@@ -32,13 +32,13 @@ public sealed class PptxDeckShapeMapper
         _shapes = new DeckPresetShapeCodec(styles, new ShapePresets());
         _freeforms = new DeckFreeformReader(styles);
         _fontwork = new DeckFontworkCodec(styles);
-        _connections = new DeckConnectionShapeReader(styles, new ConnectorPresetPaths());
+        _connections = new DeckConnectionShapeReader(styles, new ConnectorPresetPaths(), new OoxmlConnectionSites());
         _scenes = new DeckSceneCodec(styles);
         _builders =
         [
             _scenes, _shapes, _pictures, _vectors, _formulas, _fontwork,
             new DeckGeometryCodec<FreeformObject>(styles, "DeckFreeform", freeform => freeform.Path.ToOutline(), freeform => freeform.Style),
-            new DeckGeometryCodec<ConnectorObject>(styles, "DeckConnector", connector => connector.Path, connector => connector.Style),
+            new DeckConnectorCodec(styles),
         ];
     }
 

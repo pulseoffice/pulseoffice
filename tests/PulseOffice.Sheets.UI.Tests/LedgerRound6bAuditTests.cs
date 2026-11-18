@@ -160,7 +160,7 @@ public class LedgerRound6bAuditTests
             new AnsweringDialogs(answer), status,
             new Dialogs.SheetReferenceSources(scene.Context, reader, new Engine.Operations.SheetRangeReferences(), Fake<PulseOffice.UI.Controls.References.IReferencePickers>()),
             reader, Texts,
-            new Engine.Operations.DefinedNameRules());
+            new Engine.Operations.DefinedNameRules(), new Engine.Operations.TableRenaming());
 
         await Run(commands.GetCommands(), "ledger.database.define", TestContext.Current.CancellationToken);
 
@@ -183,7 +183,7 @@ public class LedgerRound6bAuditTests
         var commands = new LedgerDatabaseRangeCommands(scene.Context, Fake<Engine.Operations.ISheetRegions>(), Fake<IQueryRefreshRunner>(),
             new AnsweringDialogs(answer), new RecordingStatus(),
             new Dialogs.SheetReferenceSources(scene.Context, reader, new Engine.Operations.SheetRangeReferences(), Fake<PulseOffice.UI.Controls.References.IReferencePickers>()),
-            reader, Texts, new Engine.Operations.DefinedNameRules());
+            reader, Texts, new Engine.Operations.DefinedNameRules(), new Engine.Operations.TableRenaming());
 
         await Run(commands.GetCommands(), "ledger.database.define", TestContext.Current.CancellationToken);
 

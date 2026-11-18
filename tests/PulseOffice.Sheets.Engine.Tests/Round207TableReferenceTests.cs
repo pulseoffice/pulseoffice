@@ -53,7 +53,7 @@ public class Round207TableReferenceTests(EngineFixture fixture) : IClassFixture<
         engine.SetFormula(C("H1"), "=COLUMNS(Sales[[Name]:[Amount]])");
 
         Assert.Equal(40, engine.GetValue(C("C3")).AsNumber());
-        Assert.Equal(CellError.Reference, engine.GetValue(C("D1")).Error);
+        Assert.Equal(CellError.Value, engine.GetValue(C("D1")).Error);
         Assert.Equal("Name", engine.GetValue(C("E1")).AsText());
         Assert.Equal(60, engine.GetValue(C("F1")).AsNumber());
         Assert.Equal(5, engine.GetValue(C("G1")).AsNumber());

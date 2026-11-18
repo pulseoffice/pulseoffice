@@ -59,6 +59,17 @@ public abstract class RibbonSlot : ContentControl
 
     public KeyTipTarget KeyTip() => new(Item.Title, this, new Avalonia.Rect(Bounds.Size), ActivateFromKeyTip);
 
+    protected Button? Opener { get; set; }
+
+    public IEnumerable<KeyTipTarget> KeyTips()
+    {
+        yield return KeyTip();
+        if (Opener is not { IsEffectivelyVisible: true, IsEffectivelyEnabled: true } opener) yield break;
+        var options = opener;
+        yield return new KeyTipTarget(Context.Texts.Format("ribbon.keyTip.options", Item.Title), options, new Avalonia.Rect(options.Bounds.Size),
+            () => options.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)));
+    }
+
     private void ActivateFromKeyTip()
     {
         if (Content is not Control root) return;

@@ -76,3 +76,18 @@ internal sealed class PptxMixedTableRuns : IPptxReadLoss
         run?.FontSize?.Value, run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.SolidFill>()?.OuterXml,
         run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.LatinFont>()?.Typeface?.Value);
 }
+
+internal sealed class PptxShapeTextLayout : IPptxReadLoss
+{
+    public Diagnostic Loss { get; } = Diagnostic.Warning("PPTX226",
+        "Some shapes have vertical or stacked text, text rotated inside the shape or text in columns: Deck lays shape text out horizontally in one column, so these settings are not imported.");
+
+    public bool Present(PresentationPart presentation) =>
+        presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.BodyProperties>().Any(Laid) == true);
+
+    private bool Laid(DocumentFormat.OpenXml.Drawing.BodyProperties body) =>
+        body.Vertical?.InnerText is { Length: > 0 } vertical && vertical != "horz"
+        || body.ColumnCount?.Value > 1
+        || body.Rotation?.Value is { } rotation && rotation != 0
+        || body.UpRight?.Value == true;
+}

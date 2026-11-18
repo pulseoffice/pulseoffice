@@ -89,11 +89,13 @@ internal sealed class GridObjectPainter(
 
         if (placed.Content is ChartDefinition chart)
         {
-            context.FillRectangle(Brushes.White, bounds);
-            context.DrawRectangle(new Pen(Brushes.LightGray), bounds);
+            var ink = theme.ChartInk();
+            context.FillRectangle(ink.Paper, bounds);
+            context.DrawRectangle(new Pen(theme.Brush(Palette.Keys.Border, Brushes.LightGray)), bounds);
             var refreshed = services.ChartErrorValues.Refresh(viewport.Engine.Workbook, chart);
             services.ChartRenderer.Render(
-                context, refreshed, services.ChartData.Extract(viewport.Engine.Workbook, chart, visibleOnly: true), bounds, renderers.Culture);
+                context, refreshed, services.ChartData.Extract(viewport.Engine.Workbook, chart, visibleOnly: true), bounds,
+                PulseOffice.UI.Controls.Charts.ChartRenderMode.Full, renderers.Culture, ink);
             return;
         }
 

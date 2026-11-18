@@ -14,7 +14,7 @@ public sealed class StyleSelectionTests
     public StyleSelectionTests()
     {
         _selection = new StyleFromSelection(_f.Stories, _f.Text, new DirectFormatting());
-        _styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree));
+        _styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree));
         _f.Type("Testo in evidenza", "Altro");
         _f.Editor.SetParagraph(_f.Document, _f.History, DocumentRange.At(_f.At(0, 0)), new ParagraphProperties { Align = TextAlign.Center, SpaceAfter = 9 });
         _f.Editor.SetCharacter(_f.Document, _f.History, new DocumentRange(_f.At(0, 0), _f.At(0, 17)), new CharacterProperties { Bold = true });

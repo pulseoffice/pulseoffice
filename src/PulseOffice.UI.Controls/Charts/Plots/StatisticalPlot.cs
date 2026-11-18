@@ -154,7 +154,7 @@ public sealed class StatisticalPlot : ChartPlotBase
         if (everything.Count == 0) return;
 
         var scale = PlotScale.Nice(everything.Min(), everything.Max(), frame.Plot.Bottom, frame.Plot.Y);
-        var pen = new Pen(Brushes.DimGray, 1.2);
+        var pen = new Pen(frame.Marks.Stroke, 1.2);
 
         for (var index = 0; index < frame.Data.Series.Count; index++)
         {
@@ -175,7 +175,7 @@ public sealed class StatisticalPlot : ChartPlotBase
                 new Rect(centre - half, Math.Min(top, bottom), half * 2, Math.Abs(bottom - top)));
 
             var median = scale.Position(summary.Median);
-            frame.Context.DrawLine(new Pen(Brushes.Black, 1.5),
+            frame.Context.DrawLine(new Pen(frame.Marks.Strong, 1.5),
                 new Point(centre - half, median), new Point(centre + half, median));
 
             frame.Context.DrawLine(pen,
@@ -269,7 +269,7 @@ public sealed class StatisticalPlot : ChartPlotBase
                 Brush(frame.Data, 0), null,
                 new Point(horizontal.Position(theoretical), vertical.Position(observed)), 3, 3);
 
-        var pen = new Pen(new SolidColorBrush(Colors.Gray, 0.8), 1)
+        var pen = new Pen(frame.Marks.Stroke, 1)
         {
             DashStyle = new DashStyle([4, 3], 0),
         };

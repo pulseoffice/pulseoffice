@@ -83,9 +83,24 @@ internal sealed class PrimitiveShapeReader(OdfDeckShapeMapper shapes, OdfAltText
 {
     protected override string Kind => "shape";
 
-    protected override IEnumerable<XElement> Candidates(XElement page) => page.Elements().Where(node => shapes.Primitives.Contains(node.Name));
+    protected override IEnumerable<XElement> Candidates(XElement page) => page.Elements().Where(node => shapes.Primitives.Contains(node.Name) && !shapes.IsConnector(node));
 
     protected override ObjectElement? ReadOne(XElement node, string id, OdpReadContext context) => shapes.ReadPrimitive(node, id, context.Styles.Drawings);
+}
+
+internal sealed class ConnectorReader(OdfDeckShapeMapper shapes, OdfAltTextMapper altText) : OdpObjectReader(altText)
+{
+    protected override string Kind => "connector";
+
+    protected override IEnumerable<XElement> Candidates(XElement page) => page.Elements().Where(shapes.IsConnector);
+
+    protected override ObjectElement? ReadOne(XElement node, string id, OdpReadContext context) => shapes.ReadConnector(node, id, context.Styles.Drawings);
+}
+
+internal sealed class ConnectorGlueReader(SlideConnectorGlue glue) : IOdpPageReader
+{
+    public void Read(XElement page, SlideAssembly<string> assembly, OdpReadContext context) =>
+        glue.Resolve(assembly.Slide, raw => assembly.ElementByFrame.GetValueOrDefault(raw), _ => true);
 }
 
 internal sealed class SceneReader(OdfDeckShapeMapper shapes, OdfAltTextMapper altText) : OdpObjectReader(altText)

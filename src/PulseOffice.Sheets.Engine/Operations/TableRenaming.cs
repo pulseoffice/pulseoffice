@@ -9,6 +9,8 @@ public interface ITableRenaming
 
 public sealed class TableRenaming : ITableRenaming
 {
+    private readonly TableReferenceOwners _owners = new();
+
     public bool Rename(CalculationEngine engine, string table, string newName)
     {
         ArgumentNullException.ThrowIfNull(engine);
@@ -27,6 +29,7 @@ public sealed class TableRenaming : ITableRenaming
                     if (renamer.Rewrite(cell.Formula!) is { } rewritten && renamer.Changed)
                         sheet[address] = cell with { Formula = rewritten };
                 }
+            _owners.Rename(workbook, renames);
             workbook.DatabaseRanges.Remove(existing.Name);
             workbook.DatabaseRanges.Define(existing with { Name = newName });
         });

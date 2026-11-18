@@ -104,7 +104,7 @@ public sealed class ListEditingTests
     [Fact]
     public void LeModificheAgliStiliSiAnnullano()
     {
-        var styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree));
+        var styles = new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree));
         styles.Change(_f.Document, _f.History, _f.Document.Styles.List, DefaultStyleNames.Numbering123,
             list => list.Levels = [.. list.Levels.Select(level => level with { Suffix = ")" })], "list-style");
         styles.ChangeOutline(_f.Document, _f.History, new ListStyle(StyleSheet.OutlineStyleName, [new ListLevel(NumberFormat.UpperRoman)]), "outline");

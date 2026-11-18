@@ -388,7 +388,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             }
 
             if (_names.Build(workbook, sheet.Name) is { } local) Emit(writer, local);
-            if (_conditionals.Build(sheet) is { } rules) Emit(writer, rules);
+            if (_conditionals.Build(workbook, sheet) is { } rules) Emit(writer, rules);
             if (new OdfSparklineMapper().Build(sheet) is { } sparklines) Emit(writer, sparklines);
 
             writer.WriteEndElement();

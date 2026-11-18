@@ -14,9 +14,10 @@ public sealed class DocxStyleMap
     public string Bind(StyleFamily family, string name)
     {
         if (_ids.TryGetValue((family, name), out var known)) return known;
-        var id = family == StyleFamily.Paragraph && name == DefaultStyleNames.Standard ? WordNormal : Sanitize(name);
+        var standard = family == StyleFamily.Paragraph && name == DefaultStyleNames.Standard;
+        var id = standard ? WordNormal : Sanitize(name);
         var candidate = id;
-        for (var suffix = 2; _names.ContainsKey(candidate); suffix++) candidate = id + suffix;
+        for (var suffix = 2; _names.ContainsKey(candidate) || (!standard && candidate == WordNormal); suffix++) candidate = id + suffix;
         _ids[(family, name)] = candidate;
         _names[candidate] = (family, name);
         return candidate;
@@ -33,14 +34,19 @@ public sealed class DocxStyleMap
 
     public string? NameOf(string? id) => id is not null && _names.TryGetValue(id, out var entry) ? entry.Name : null;
 
-    public string ModelName(string? wordName, string id)
+    public string ModelName(string? wordName, string id, string defaultParagraphId)
     {
-        if (id == WordNormal) return DefaultStyleNames.Standard;
+        if (id == defaultParagraphId) return DefaultStyleNames.Standard;
         if (wordName is null) return id;
         if (wordName.StartsWith("heading ", StringComparison.Ordinal)) return "Heading " + wordName[8..];
         if (LevelOf(wordName, WordContentsPrefix, StringComparison.OrdinalIgnoreCase) is { } level) return DefaultStyleNames.ContentsLevel(level);
         return string.Equals(wordName, WordContentsHeading, StringComparison.OrdinalIgnoreCase) ? DefaultStyleNames.ContentsHeading : wordName;
     }
+
+    public string DefaultParagraphId(IEnumerable<W.Style> styles) =>
+        styles.FirstOrDefault(style => (style.Type?.Value ?? W.StyleValues.Paragraph) == W.StyleValues.Paragraph && style.Default?.Value == true)?.StyleId?.Value ?? WordNormal;
+
+    public bool IsDefaultParagraph(string id) => id == WordNormal;
 
     public string WordName(string id, string name)
     {
@@ -122,8 +128,10 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     {
         if (styles is null) return;
         var elements = styles.Elements<W.Style>().Where(style => style.StyleId?.Value is not null).ToList();
+        var defaultParagraph = map.DefaultParagraphId(elements);
         foreach (var style in elements)
-            map.Adopt(style.StyleId!.Value!, Family(style), map.ModelName(style.StyleName?.Val?.Value, style.StyleId!.Value!));
+            map.Adopt(style.StyleId!.Value!, Family(style),
+                Family(style) == StyleFamily.Paragraph ? map.ModelName(style.StyleName?.Val?.Value, style.StyleId!.Value!, defaultParagraph) : map.ModelName(style.StyleName?.Val?.Value, style.StyleId!.Value!, string.Empty));
 
         if (styles.DocDefaults is { } defaults)
         {
@@ -153,7 +161,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                         ListStyleName = Outline(sheet, extras, lists) ? null : lists.NameOf(extras.ListId),
                         ListLevel = extras.ListId is not null && extras.ListLevel > 0 && !Outline(sheet, extras, lists) ? extras.ListLevel + 1 : null,
                         DisplayName = element.Aliases?.Val?.Value,
-                        Hidden = element.SemiHidden is not null,
+                        Hidden = Hidden(element),
                     };
                     sheet.Paragraph.Replace(paragraph);
                     break;
@@ -163,7 +171,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                         ParentName = parent,
                         Character = characters.Read(element.StyleRunProperties),
                         DisplayName = element.Aliases?.Val?.Value,
-                        Hidden = element.SemiHidden is not null,
+                        Hidden = Hidden(element),
                     });
                     break;
                 case StyleFamily.Table:
@@ -176,7 +184,8 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next)
     {
         var id = map.Bind(family, style.Name);
-        var element = new W.Style { Type = type, StyleId = id, CustomStyle = id != "Normal" };
+        var element = new W.Style { Type = type, StyleId = id, CustomStyle = !map.IsDefaultParagraph(id) };
+        if (family == StyleFamily.Paragraph && map.IsDefaultParagraph(id)) element.Default = true;
         element.Append(new W.StyleName { Val = map.WordName(id, style.Name) });
         if (style.DisplayName is not null) element.Append(new W.Aliases { Val = style.DisplayName });
         if (style.ParentName is not null && map.IdOf(family, style.ParentName) is { } parent) element.Append(new W.BasedOn { Val = parent });
@@ -184,6 +193,8 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
         if (style.Hidden) element.Append(new W.SemiHidden());
         return element;
     }
+
+    private bool Hidden(W.Style style) => style.SemiHidden is { } hidden && hidden.Val?.Value != W.OnOffOnlyValues.Off;
 
     private StyleFamily Family(W.Style style) =>
         style.Type?.Value == W.StyleValues.Character ? StyleFamily.Character

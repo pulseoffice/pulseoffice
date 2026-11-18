@@ -163,15 +163,42 @@ internal sealed class DeckGeometryCodec<TContent>(XlsxShapeStyleMapper styles, s
     }
 }
 
-internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, ConnectorPresetPaths paths) : DeckDrawingCodec
+internal sealed class DeckConnectorCodec(XlsxShapeStyleMapper styles) : DeckElementBuilder
 {
+    private readonly OoxmlGeometry _geometry = new();
+
+    public override bool Builds(EmbeddedObject content) => content is ConnectorObject;
+
+    public override OpenXmlElement Build(ObjectElement element, uint id, SlidePart part)
+    {
+        var connector = (ConnectorObject)element.Content;
+        var properties = new P.ShapeProperties(Transform(element), _geometry.CustomGeometry(connector.Path));
+        properties.Append(styles.Fill(ShapeFill.None));
+        properties.Append(styles.Line(connector.Style.Line));
+        if (styles.Effects(connector.Style) is { } effects) properties.Append(effects);
+
+        return new P.ConnectionShape(
+            new P.NonVisualConnectionShapeProperties(
+                new P.NonVisualDrawingProperties { Id = id, Name = $"Connector {id}" },
+                new P.NonVisualConnectorShapeDrawingProperties(),
+                new P.ApplicationNonVisualDrawingProperties()),
+            properties);
+    }
+}
+
+internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, ConnectorPresetPaths paths, OoxmlConnectionSites sites) : DeckDrawingCodec
+{
+    private readonly OoxmlGeometry _geometry = new();
+
     public ObjectElement? Read(P.ConnectionShape connection, string id)
     {
         if (connection.ShapeProperties is not { } properties) return null;
         var transform = properties.Transform2D;
         var geometry = properties.GetFirstChild<D.PresetGeometry>();
-        var kind = styles.Connector(geometry?.Preset?.InnerText);
+        var custom = properties.GetFirstChild<D.CustomGeometry>() is { } found && _geometry.OutlineOf(found) is { Figures.Count: > 0 } outline ? outline : null;
+        var kind = custom is null ? styles.Connector(geometry?.Preset?.InnerText) : KindOf(custom);
         var style = styles.Read(properties, null);
+        var visual = connection.NonVisualConnectionShapeProperties?.NonVisualConnectorShapeDrawingProperties;
 
         return new ObjectElement
         {
@@ -182,12 +209,19 @@ internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, Con
             {
                 Id = id,
                 Shape = kind,
+                Start = sites.Endpoint(visual?.GetFirstChild<D.StartConnection>()),
+                End = sites.Endpoint(visual?.GetFirstChild<D.EndConnection>()),
                 Style = style with { Fill = ShapeFill.None },
-                Path = paths.Of(kind, geometry?.Preset?.InnerText, Adjustment(geometry),
+                Path = custom ?? paths.Of(kind, geometry?.Preset?.InnerText, Adjustment(geometry),
                     transform?.HorizontalFlip?.Value ?? false, transform?.VerticalFlip?.Value ?? false),
             },
         };
     }
+
+    private ConnectorKind KindOf(ShapeOutline outline) =>
+        outline.Figures.SelectMany(figure => figure.Segments).Any(segment => segment is CubicSegment) ? ConnectorKind.Curved
+        : outline.Figures.Sum(figure => figure.Segments.Count) <= 2 ? ConnectorKind.Straight
+        : ConnectorKind.Elbow;
 
     private double? Adjustment(D.PresetGeometry? geometry) =>
         geometry?.AdjustValueList?.Elements<D.ShapeGuide>().FirstOrDefault()?.Formula?.Value is { } formula

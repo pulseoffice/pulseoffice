@@ -10,6 +10,7 @@ public sealed class OdfConditionalMapper
 {
     private readonly ConditionStyleSheet _styles = new();
     private readonly OdfRangeAddresses _addresses = new();
+    private readonly OdfTableFormulas _tableFormulas = new();
     private readonly IReadOnlyList<ConditionalRuleCodec> _codecs;
 
     public OdfConditionalMapper()
@@ -20,8 +21,9 @@ public sealed class OdfConditionalMapper
 
     public IReadOnlyList<XElement> NamedStyles => _styles.Styles;
 
-    public XElement? Build(Worksheet sheet)
+    public XElement? Build(Workbook workbook, Worksheet sheet)
     {
+        ArgumentNullException.ThrowIfNull(workbook);
         ArgumentNullException.ThrowIfNull(sheet);
         if (sheet.ConditionalRules.Count == 0) return null;
 
@@ -29,8 +31,17 @@ public sealed class OdfConditionalMapper
         foreach (var group in sheet.ConditionalRules.GroupBy(rule => rule.RangeText))
             root.Add(new XElement(Namespaces.Calcext + "conditional-format",
                 new XAttribute(Namespaces.Calcext + "target-range-address", string.Join(' ', group.First().Ranges.Select(range => _addresses.Write(sheet.Name, range)))),
-                group.OrderBy(rule => rule.Priority).Select(rule => _codecs.First(codec => codec.Writes(rule)).Write(sheet, rule))));
+                group.OrderBy(rule => rule.Priority).Select(rule => Write(workbook, sheet, rule))));
         return root;
+    }
+
+    private XElement Write(Workbook workbook, Worksheet sheet, ConditionalRule rule)
+    {
+        var at = new SheetCell(workbook.IndexOf(sheet), rule.Anchor);
+        var flattened = rule.WithFormulas(formula => _tableFormulas.FlattenText(formula, workbook, at));
+        var element = _codecs.First(codec => codec.Writes(flattened)).Write(sheet, flattened);
+        element.Add(_tableFormulas.Kept(rule.Formula, flattened.Formula));
+        return element;
     }
 
     public IReadOnlyList<ConditionalRule> ReadRules(XElement table, IReadOnlyDictionary<string, CellStyle> namedStyles)
@@ -49,7 +60,8 @@ public sealed class OdfConditionalMapper
             foreach (var element in format.Elements())
             {
                 if (_codecs.FirstOrDefault(codec => codec.Element == element.Name) is not { } codec) continue;
-                rules.Add(codec.Read(element, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] });
+                var rule = codec.Read(element, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] };
+                rules.Add(_tableFormulas.Read(element) is { } structured ? rule with { Formula = structured } : rule);
             }
         }
         return rules;

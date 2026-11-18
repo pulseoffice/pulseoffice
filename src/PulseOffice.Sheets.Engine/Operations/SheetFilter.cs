@@ -46,6 +46,10 @@ public sealed class SheetFilterService(NumericText numbers, IFilterRowKey rowKey
 
     private readonly CellColorMatcher _colors = new();
 
+    private readonly RelativeDatePeriods _periods = new();
+
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
     private readonly TopItemsRanking _ranking = new();
 
     private readonly NumericText _canonical = new(PulseOffice.Sheets.Formatting.FixedSpreadsheetLocale.Invariant());
@@ -250,6 +254,10 @@ public sealed class SheetFilterService(NumericText numbers, IFilterRowKey rowKey
         if (value.IsEmpty && !filter.IncludeBlanks) return false;
 
         if (filter.AllowedValues is { } allowed && !value.IsEmpty && !allowed.Contains(value.ToString()))
+            return false;
+
+        if (filter.Period is { } period
+            && (value.Kind != ValueKind.Number || !_periods.Bounds(period, Clock.GetLocalNow().DateTime).Contains(value.AsNumber())))
             return false;
 
         return matcher?.Matches(value) ?? true;

@@ -19,6 +19,8 @@ public sealed record ColumnFilter(int ColumnOffset)
 
     public TopItemsCriterion? Top { get; init; }
 
+    public RelativeDatePeriod? Period { get; init; }
+
     public IReadOnlySet<string>? AllowedValues { get; init; }
 
     public string? Criteria { get; init; }
@@ -32,7 +34,7 @@ public sealed record ColumnFilter(int ColumnOffset)
 
     public bool IncludeBlanks { get; init; } = true;
 
-    public bool IsEmpty => AllowedValues is null && IncludeBlanks && string.IsNullOrEmpty(Criteria) && string.IsNullOrEmpty(SecondCriteria) && Color is null && Top is null;
+    public bool IsEmpty => AllowedValues is null && IncludeBlanks && string.IsNullOrEmpty(Criteria) && string.IsNullOrEmpty(SecondCriteria) && Color is null && Top is null && Period is null;
 }
 
 public sealed class AutoFilterState

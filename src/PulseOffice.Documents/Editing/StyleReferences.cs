@@ -60,6 +60,8 @@ public sealed class StyleReferences(IStoryCatalog stories, IBlockTree tree) : IS
                     if (style.ParentName == name) style.ParentName = target;
                     if (style.NextStyleName == name) style.NextStyleName = target;
                 });
+                RewriteStyles(recorder, sheet.Paragraph, style => style.Paragraph.PageStyleName == name,
+                    style => style.Paragraph = style.Paragraph with { PageStyleName = target });
                 RewriteParagraphs(document, recorder, content => content.PageStyleName == name || content.NextPageStyleName == name, content => content with
                 {
                     PageStyleName = content.PageStyleName == name ? target : content.PageStyleName,

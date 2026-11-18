@@ -111,7 +111,7 @@ public sealed class ChartRenderer
         DrawTitle(scene.Text, context, definition, bounds);
         scene.Legend.Paint(context, definition.Legend, items, area, plot, bounds);
 
-        var frame = new Plots.ChartFrame(context, definition, data, plot, bounds, scene.Text.Culture, scene.Text.Ink.Muted);
+        var frame = new Plots.ChartFrame(context, definition, data, plot, bounds, scene.Text.Culture, scene.Text.Ink.Muted, scene.Text.Ink);
         var horizontal = painter.HorizontalAxis(definition.Type);
         double? categoryLine = null;
 
@@ -250,7 +250,7 @@ public sealed class ChartRenderer
         var frame = bounds.Deflate(Math.Min(bounds.Width, bounds.Height) * 0.25);
         if (frame.Width <= 0 || frame.Height <= 0) return;
 
-        context.DrawRectangle(null, new Pen(Brushes.Gray, 1) { DashStyle = new DashStyle([4, 3], 0) }, frame);
+        context.DrawRectangle(null, new Pen(text.Ink.Stroke, 1) { DashStyle = new DashStyle([4, 3], 0) }, frame);
     }
 
     private void DrawTitle(ChartText chartText, DrawingContext context, ChartDefinition definition, Rect bounds)

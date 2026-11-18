@@ -156,12 +156,10 @@ public sealed class FolioStyleActions(
         switch (family)
         {
             case StyleFamily.Paragraph when sheet.Paragraph.Find(basis) is { } paragraph:
-                var newParagraph = new ParagraphStyle(name) { ParentName = parent ?? paragraph.ParentName, NextStyleName = paragraph.NextStyleName };
-                if (!asChild)
-                {
-                    newParagraph.Paragraph = paragraph.Paragraph;
-                    newParagraph.Character = paragraph.Character;
-                }
+                var newParagraph = asChild ? new ParagraphStyle(name) { ParentName = basis, Category = paragraph.Category } : (ParagraphStyle)paragraph.CloneAs(name);
+                newParagraph.NextStyleName = paragraph.NextStyleName == basis ? name : paragraph.NextStyleName;
+                newParagraph.DisplayName = null;
+                newParagraph.Hidden = false;
                 editor.Change(() => styles.Add(editor.Document, editor.History, sheet.Paragraph, newParagraph, "style-new-paragraph"));
                 break;
             case StyleFamily.Character when sheet.Character.Find(basis) is { } character:
@@ -213,6 +211,8 @@ public sealed class FolioStyleActions(
         target.Orientation = source.Orientation;
         target.Margins = source.Margins;
         target.Columns = source.Columns;
+        target.Gutter = source.Gutter;
+        target.GutterAtTop = source.GutterAtTop;
         target.Usage = source.Usage;
         target.Background = source.Background;
         target.Borders = source.Borders;

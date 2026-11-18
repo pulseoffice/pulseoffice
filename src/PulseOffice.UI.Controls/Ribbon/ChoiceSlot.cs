@@ -89,6 +89,7 @@ public sealed class ChoiceSlot : RibbonSlot
         more.Classes.Add("field");
         more.Padding = default;
         more.Click += (_, _) => Context.Dismissal.Toggle(_flyout!, this);
+        Opener = more;
         ToolTip.SetTip(more, Item.Title);
         Avalonia.Automation.AutomationProperties.SetName(more, Item.Title);
 

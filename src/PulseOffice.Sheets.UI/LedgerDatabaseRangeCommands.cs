@@ -18,12 +18,14 @@ public sealed class LedgerDatabaseRangeCommands(
     Dialogs.ISheetReferenceSources sources,
     Dialogs.ISheetReferenceReader reader,
     ITextCatalog texts,
-    IDefinedNameRules names) : LedgerCommandSet(context)
+    IDefinedNameRules names,
+    ITableRenaming renaming) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Command("ledger.database.define", ct => DefineAsync(ct)),
         Command("ledger.database.select", ct => SelectAsync(ct)),
+        Command("ledger.database.rename", ct => RenameAsync(ct)) with { IconKey = "ledger.database.rename" },
         Command("ledger.database.refresh", ct => queryRefresh.RefreshAsync(ct)) with { RunsDocumentQueries = true },
     ];
 
@@ -140,5 +142,63 @@ public sealed class LedgerDatabaseRangeCommands(
 
         Context.SelectSheet(chosen.SheetIndex);
         Context.SelectRange(chosen.Range);
+    }
+
+    private async Task RenameAsync(CancellationToken ct)
+    {
+        if (Context.Workbook is not { } workbook) return;
+
+        var tables = workbook.DatabaseRanges.All.ToList();
+        if (tables.Count == 0)
+        {
+            status.Report(texts["database.none"], NotificationSeverity.Warning);
+            return;
+        }
+
+        var current = tables.FindIndex(table => table.SheetIndex == Context.SheetIndex && table.Range.Contains(Context.Selection.Start));
+        var form = new FormPromptView(
+            texts["database.rename.explanation"],
+            [
+                new ChoiceField("area", texts["database.name"], [.. tables.Select(table => table.Name)], Math.Max(current, 0)),
+                new TextField("name", texts["database.rename.newName"], current >= 0 ? tables[current].Name : string.Empty),
+            ],
+            texts);
+
+        var values = await dialogs.ShowAsync<Dictionary<string, object>>(
+            form, new DialogOptions { TitleKey = "command.ledger.database.rename.title" }, ct)
+            .ConfigureAwait(true);
+
+        if (values is null || Context.Workbook != workbook || Context.Engine is not { } engine) return;
+
+        var index = (int)Convert.ToInt64(values["area"], System.Globalization.CultureInfo.InvariantCulture);
+        var oldName = tables[Math.Clamp(index, 0, tables.Count - 1)].Name;
+        var newName = (values["name"] as string ?? string.Empty).Trim();
+        if (string.Equals(oldName, newName, StringComparison.Ordinal)) return;
+        if (!names.IsValid(newName))
+        {
+            status.Report(texts.Format("names.invalid", newName), NotificationSeverity.Error);
+            return;
+        }
+        if (!renaming.Rename(engine, oldName, newName))
+        {
+            status.Report(texts.Format("database.rename.taken", newName), NotificationSeverity.Error);
+            return;
+        }
+
+        Context.History?.Push(new DelegateAction(
+            texts["command.ledger.database.rename.title"],
+            redo: () =>
+            {
+                renaming.Rename(engine, oldName, newName);
+                Context.RequestRefresh();
+            },
+            undo: () =>
+            {
+                renaming.Rename(engine, newName, oldName);
+                Context.RequestRefresh();
+            }));
+
+        Context.RequestRefresh();
+        status.Report(texts.Format("database.renamed", oldName, newName), NotificationSeverity.Success);
     }
 }

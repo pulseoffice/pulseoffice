@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using PulseOffice.Foundation.Modules;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls.Ribbon;
@@ -26,6 +27,8 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion, IKe
     private readonly RibbonTabStrip _tabStrip;
     private readonly Border _body;
     private readonly KeyTipAssigner _assigner = new();
+    private readonly KeyTipCollector _collector = new();
+    private readonly Dictionary<Flyout, Interactive> _popupTops = [];
     private TopLevel? _top;
     private bool _altAlone;
     private bool _swallowText;
@@ -64,6 +67,12 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion, IKe
 
         var tipLayer = new Canvas();
         KeyTips = new RibbonKeyTips(tipLayer, this, _assigner, _metrics);
+        _factory.Context.PopoverOpened += (_, flyout) => HookPopup(flyout);
+        _factory.Context.PopoverClosed += (_, flyout) =>
+        {
+            UnhookPopup(flyout);
+            KeyTips.ItemsClosed();
+        };
         Content = new Panel { Children = { layout, tipLayer } };
 
         BorderThickness = new Thickness(0, 0, 0, 1);
@@ -117,7 +126,43 @@ public sealed class RibbonView : ContentControl, Text.ITextEditingCompanion, IKe
             var chosen = index;
             targets.Add(new KeyTipTarget(tabs[index].Title, _tabStrip, bounds, () => _tabStrip.Choose(chosen), OpensLevel: true));
         }
+        foreach (var region in KeyTipRegions) targets.AddRange(region.KeyTipTargets());
         return targets;
+    }
+
+    public List<IKeyTipRegion> KeyTipRegions { get; } = [];
+
+    public KeyTipCollector KeyTipCollector => _collector;
+
+    public KeyTipItems? Items()
+    {
+        if (_factory.Context.OpenPopover is not { Content: Control content } popover) return null;
+        content.UpdateLayout();
+        return new KeyTipItems(popover, _collector.Collect(content));
+    }
+
+    public void CloseItems() => _factory.Context.OpenPopover?.Hide();
+
+    private void HookPopup(Flyout flyout)
+    {
+        if (flyout.Content is not Visual content || PopupRoot(content) is not { } root || _popupTops.ContainsKey(flyout)) return;
+        var shared = _popupTops.ContainsValue(root);
+        _popupTops[flyout] = root;
+        if (shared) return;
+        root.AddHandler(KeyDownEvent, OnTopKeyDown, RoutingStrategies.Tunnel, true);
+        root.AddHandler(KeyUpEvent, OnTopKeyUp, RoutingStrategies.Tunnel, true);
+        root.AddHandler(TextInputEvent, OnTopTextInput, RoutingStrategies.Tunnel, true);
+    }
+
+    private Interactive? PopupRoot(Visual content) =>
+        content.GetSelfAndVisualAncestors().OfType<Interactive>().FirstOrDefault(ancestor => ancestor is Avalonia.Controls.Primitives.OverlayPopupHost or Avalonia.Controls.Primitives.PopupRoot);
+
+    private void UnhookPopup(Flyout flyout)
+    {
+        if (!_popupTops.Remove(flyout, out var root) || _popupTops.ContainsValue(root)) return;
+        root.RemoveHandler(KeyDownEvent, OnTopKeyDown);
+        root.RemoveHandler(KeyUpEvent, OnTopKeyUp);
+        root.RemoveHandler(TextInputEvent, OnTopTextInput);
     }
 
     public IReadOnlyList<KeyTipTarget> Commands()

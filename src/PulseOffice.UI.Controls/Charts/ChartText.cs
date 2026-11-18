@@ -8,7 +8,20 @@ public sealed record ChartInk(IBrush Text, IBrush Paper)
 {
     public static readonly ChartInk Print = new(Brushes.Black, Brushes.White);
 
-    public IBrush Muted => Text is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.5 * solid.Opacity) : Brushes.Gray;
+    public IBrush Muted => Faded(Text, 0.5, Brushes.Gray);
+
+    public IBrush Stroke => Faded(Text, 0.55, Brushes.Gray);
+
+    public IBrush Grid => Faded(Text, 0.2, new SolidColorBrush(Colors.Gray, 0.3));
+
+    public IBrush Strong => Text;
+
+    public IBrush Separator => Paper;
+
+    public IBrush Track => Faded(Text, 0.15, new SolidColorBrush(Colors.Gray, 0.25));
+
+    private static IBrush Faded(IBrush brush, double opacity, IBrush fallback) =>
+        brush is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, opacity * solid.Opacity) : fallback;
 
     public IBrush Backdrop => Paper is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.7 * solid.Opacity) : new SolidColorBrush(Colors.White, 0.7);
 }

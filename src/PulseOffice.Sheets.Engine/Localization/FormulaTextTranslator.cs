@@ -21,7 +21,7 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
     {
         ArgumentNullException.ThrowIfNull(canonical);
         ArgumentNullException.ThrowIfNull(local);
-        return Translate(canonical, functionName, name => bareName(Parameter(name)), (text, index, inArray) => text[index] switch
+        return Translate(canonical, functionName, name => bareName(Parameter(name)), _tableReferences.Display, (text, index, inArray) => text[index] switch
         {
             CanonicalSeparator => inArray ? local.ArrayColumn : local.Argument,
             CanonicalArrayRow when inArray => local.ArrayRow,
@@ -34,7 +34,7 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
     {
         ArgumentNullException.ThrowIfNull(typed);
         ArgumentNullException.ThrowIfNull(local);
-        return Translate(typed, functionName, bareName, (text, index, inArray) =>
+        return Translate(typed, functionName, bareName, reference => reference, (text, index, inArray) =>
         {
             var character = text[index];
             if (local.Decimal != '.' && character == local.Decimal && IsDecimalPoint(text, index)) return '.';
@@ -50,7 +50,7 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
     private string Parameter(string name) =>
         name.StartsWith(ParameterPrefix, StringComparison.OrdinalIgnoreCase) ? name[ParameterPrefix.Length..] : name;
 
-    private string Translate(string text, Func<string, string> functionName, Func<string, string> otherName, Func<string, int, bool, char> punctuation)
+    private string Translate(string text, Func<string, string> functionName, Func<string, string> otherName, Func<string, string> tableReference, Func<string, int, bool, char> punctuation)
     {
         var builder = new StringBuilder(text.Length);
         var arrayDepth = 0;
@@ -81,7 +81,7 @@ public sealed class FormulaTextTranslator : IFormulaTextTranslator
                 if (end < text.Length && text[end] == '[')
                 {
                     var close = _tableReferences.End(text, end);
-                    builder.Append(text, index, close - index);
+                    builder.Append(tableReference(text[index..close]));
                     index = close;
                     continue;
                 }

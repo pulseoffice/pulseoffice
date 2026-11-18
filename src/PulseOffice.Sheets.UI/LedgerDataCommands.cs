@@ -117,7 +117,7 @@ public sealed class LedgerDataCommands(
         if (!ReferenceEquals(Context.Workbook, workbook) || !ReferenceEquals(Context.Engine, engine) || Context.SheetIndex != sheetIndex)
             return;
 
-        var plan = duplicates.Plan(sheet, new DuplicateRemovalRequest(area, choice.HasHeader) { KeyColumns = choice.KeyColumns });
+        var plan = duplicates.Plan(sheet, new DuplicateRemovalRequest(area, choice.HasHeader) { KeyColumns = choice.KeyColumns, CaseSensitive = choice.CaseSensitive });
 
         if (plan.RowsToRemove.Count == 0)
         {

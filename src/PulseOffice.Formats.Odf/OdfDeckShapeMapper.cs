@@ -16,6 +16,7 @@ public sealed class OdfDeckShapeMapper
     private readonly DeckTableCodec _tables;
     private readonly DeckFontworkCodec _fontwork;
     private readonly DeckSceneCodec _scenes = new();
+    private readonly DeckConnectorCodec _connectors = new(new ShapePathWriter(), new OdfShapeStyleReader(), new OdfGluePoints());
 
     public OdfDeckShapeMapper()
     {
@@ -33,6 +34,12 @@ public sealed class OdfDeckShapeMapper
     public ObjectElement ReadFontwork(XElement node, string id, IReadOnlyDictionary<string, XElement> definitions) => _fontwork.Read(node, id, definitions);
 
     public XElement BuildPath(ObjectElement element, ShapeOutline outline, string styleName) => _paths.Build(element, outline, styleName);
+
+    public XElement BuildConnector(ObjectElement element, ConnectorObject connector, string styleName, Func<string, bool> written) => _connectors.Build(element, connector, styleName, written);
+
+    public bool IsConnector(XElement node) => _connectors.Reads(node);
+
+    public ObjectElement ReadConnector(XElement node, string id, IReadOnlyDictionary<string, XElement> definitions) => _connectors.Read(node, id, definitions);
 
     public ObjectElement? ReadPath(XElement node, string id, IReadOnlyDictionary<string, XElement>? definitions = null) => _paths.Read(node, id, definitions);
 

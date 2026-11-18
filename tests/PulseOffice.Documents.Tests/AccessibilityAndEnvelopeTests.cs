@@ -41,7 +41,7 @@ public sealed class AccessibilityAndEnvelopeTests
     public void LaBustaDiventaLaPrimaPaginaESiAnnulla()
     {
         _f.Type("Lettera");
-        var envelopes = new Envelopes(new StyleEditing(new StyleReferences(_f.Stories, _f.Tree)));
+        var envelopes = new Envelopes(new StyleEditing(new StyleReferences(_f.Stories, _f.Tree), new PulseOffice.Documents.Clipboard.FragmentRemapper(_f.Stories, _f.Tree)));
 
         envelopes.Insert(_f.Document, _f.History, new EnvelopeRequest("Mario Rossi\nVia Roma 1", "Ditta", envelopes.Formats[0]));
 

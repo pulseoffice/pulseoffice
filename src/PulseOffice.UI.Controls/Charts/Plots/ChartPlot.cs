@@ -6,8 +6,10 @@ namespace PulseOffice.UI.Controls.Charts.Plots;
 
 public sealed record ChartFrame(
     DrawingContext Context, ChartDefinition Definition, ChartData Data, Rect Plot, Rect Bounds,
-    System.Globalization.CultureInfo? Culture = null, IBrush? Ink = null)
+    System.Globalization.CultureInfo? Culture = null, IBrush? Ink = null, ChartInk? Inks = null)
 {
+    public ChartInk Marks => Inks ?? ChartInk.Print;
+
     public IBrush LabelInk => Ink ?? Brushes.Gray;
 
     public System.Globalization.CultureInfo Formatting => Culture ?? System.Globalization.CultureInfo.InvariantCulture;

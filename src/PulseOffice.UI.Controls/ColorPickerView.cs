@@ -294,8 +294,29 @@ public sealed class ColorPickerView : UserControl
         var greys = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         foreach (var grey in Greys) greys.Children.Add(Swatch(grey));
         swatches.Children.Add(greys);
+        Avalonia.Input.KeyboardNavigation.SetTabNavigation(swatches, Avalonia.Input.KeyboardNavigationMode.Once);
+        swatches.KeyDown += (_, e) => e.Handled = e.Handled || MoveAmongSwatches(swatches, e.Key);
 
         return swatches;
+    }
+
+    private bool MoveAmongSwatches(StackPanel swatches, Avalonia.Input.Key key)
+    {
+        var rows = swatches.Children.OfType<StackPanel>().Select(row => row.Children).ToList();
+        if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is not Control focused) return false;
+        var row = rows.FindIndex(children => children.Contains(focused));
+        if (row < 0) return false;
+        var column = rows[row].IndexOf(focused);
+        (row, column) = key switch
+        {
+            Avalonia.Input.Key.Left => (row, column - 1),
+            Avalonia.Input.Key.Right => (row, column + 1),
+            Avalonia.Input.Key.Up => (row - 1, column),
+            Avalonia.Input.Key.Down => (row + 1, column),
+            _ => (-1, -1),
+        };
+        if (row < 0 || row >= rows.Count || column < 0) return false;
+        return rows[row][Math.Min(column, rows[row].Count - 1)].Focus(Avalonia.Input.NavigationMethod.Directional);
     }
 
     private Control Swatch(string colour)
