@@ -13,9 +13,10 @@ public interface IPivotCoordinator
     void Remove(Workbook workbook, string id);
 }
 
-public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer renderer, IPivotSources? sources = null) : IPivotCoordinator
+public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer renderer, IPivotSources? sources = null, IPivotChartLinks? charts = null) : IPivotCoordinator
 {
     private readonly IPivotSources _sources = sources ?? new PivotSources();
+    private readonly IPivotChartLinks _charts = charts ?? new PivotChartLinks();
 
     public OperationResult<CellRange> Apply(Workbook workbook, PivotDefinition definition, PivotLabels labels)
     {
@@ -70,6 +71,8 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
         if (existing is null) workbook.Pivots.Add(stored);
         else workbook.Pivots[workbook.Pivots.IndexOf(existing)] = stored;
 
+        _charts.Follow(workbook, existing?.Name ?? stored.Name, stored, table);
+
         return OperationResult<CellRange>.Ok(written);
     }
 
@@ -108,6 +111,8 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
         ArgumentNullException.ThrowIfNull(workbook);
 
         if (workbook.Pivots.FirstOrDefault(pivot => pivot.Id == id) is not { } definition) return;
+
+        _charts.Detach(workbook, definition);
 
         if (definition.OutputRange is { } range
             && workbook.FindSheet(definition.DestinationSheet) is { } sheet)

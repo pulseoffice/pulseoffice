@@ -55,6 +55,9 @@ internal static class LedgerDataComposition
         services.AddSingleton<IPivotEngine, PivotEngine>();
         services.AddSingleton<IPivotRenderer, PivotRenderer>();
         services.AddSingleton<IPivotSources, PivotSources>();
+        services.AddSingleton<IPivotChartLinks>(provider => new PivotChartLinks(
+            provider.GetService<PulseOffice.Sheets.Engine.Operations.IChartSourceReferences>() ?? new PulseOffice.Sheets.Engine.Operations.ChartSourceReferences(),
+            provider.GetService<PulseOffice.Sheets.Engine.Operations.IChartDataExtractor>() ?? new PulseOffice.Sheets.Engine.Operations.ChartDataExtractor()));
         services.AddSingleton<IPivotCoordinator, PivotCoordinator>();
         services.AddSingleton<LedgerPivotCommands>();
 

@@ -18,7 +18,8 @@ public sealed class ShellDocumentCommands(
     IStatusBarService status,
     ITextCatalog texts,
     ITabbedForms forms,
-    PulseOffice.Foundation.Identity.IUserIdentity identity)
+    PulseOffice.Foundation.Identity.IUserIdentity identity,
+    PulseOffice.Platform.ITemporaryFiles temporary)
 {
     private readonly SafeFileName _fileNames = new();
     private readonly KeywordListText _keywords = new();
@@ -296,7 +297,7 @@ public sealed class ShellDocumentCommands(
 
     private async Task<T> WithVersionFileAsync<T>(PulseOffice.Document.Versions.DocumentVersion version, IDocumentOperations module, Func<string, Task<T>> use, CancellationToken ct)
     {
-        var folder = Directory.CreateTempSubdirectory("pulseoffice-version-").FullName;
+        var folder = temporary.NewFolder("version-");
         var path = Path.Combine(folder, $"{_fileNames.Of(version.Name, "version")}.{module.NativeExtension}");
         try
         {

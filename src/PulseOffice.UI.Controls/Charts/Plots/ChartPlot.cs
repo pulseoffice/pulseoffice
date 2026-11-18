@@ -44,6 +44,8 @@ public interface IChartPlot
 
     bool HorizontalAxis(ChartType type);
 
+    bool DrawsReversedCategories { get; }
+
     bool KeepsGaps { get; }
 
     void Draw(ChartFrame frame);
@@ -83,6 +85,8 @@ public abstract class ChartPlotBase : IChartPlot
 
     public virtual bool KeepsGaps => false;
 
+    public virtual bool DrawsReversedCategories => false;
+
     public virtual bool HasCategoryAxis(ChartType type) => DrawsAxes;
 
     public virtual PlotScale? CategoryValueAxis(ChartFrame frame) => null;
@@ -118,15 +122,17 @@ public abstract class ChartPlotBase : IChartPlot
             : PlotScale.Nice(minimum, maximum, plot.Bottom, plot.Y);
     }
 
-    protected CategoryScale Categories(ChartData data, Rect plot, bool horizontal = false)
+    protected CategoryScale Categories(ChartFrame frame, ChartData data, bool horizontal = false)
     {
+        var plot = frame.Plot;
+        var reversed = DrawsReversedCategories && frame.Definition.CategoryAxis.Reversed;
         var count = Math.Max(
             data.Categories.Count,
             data.Series.Count == 0 ? 0 : data.Series.Max(series => series.Values.Count));
 
         return horizontal
-            ? new CategoryScale(Math.Max(count, 1), plot.Y, plot.Bottom, Reversed: true)
-            : new CategoryScale(Math.Max(count, 1), plot.X, plot.Right);
+            ? new CategoryScale(Math.Max(count, 1), plot.Y, plot.Bottom, Reversed: !reversed)
+            : new CategoryScale(Math.Max(count, 1), plot.X, plot.Right, Reversed: reversed);
     }
 
     protected void Label(ChartFrame frame, string text, Point origin, double size = 9)

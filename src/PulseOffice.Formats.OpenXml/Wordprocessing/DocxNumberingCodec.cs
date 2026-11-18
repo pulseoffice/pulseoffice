@@ -174,7 +174,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
     {
         var text = level.Format == NumberFormat.Bullet
             ? level.Bullet
-            : level.Prefix + string.Join(".", Enumerable.Range(index + 2 - Math.Clamp(level.DisplayLevels, 1, index + 1), Math.Clamp(level.DisplayLevels, 1, index + 1)).Select(n => "%" + values.Text(n))) + level.Suffix;
+            : level.Prefix + string.Join(level.Separator, Enumerable.Range(index + 2 - Math.Clamp(level.DisplayLevels, 1, index + 1), Math.Clamp(level.DisplayLevels, 1, index + 1)).Select(n => "%" + values.Text(n))) + level.Suffix;
         var element = new W.Level(
             new W.StartNumberingValue { Val = level.StartAt },
             new W.NumberingFormat { Val = _formats[level.Format] },
@@ -220,6 +220,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             Prefix = first > 0 ? text[..first] : string.Empty,
             Suffix = last >= 0 && last + 2 <= text.Length ? text[(last + 2)..] : string.Empty,
             DisplayLevels = Math.Max(1, placeholders),
+            Separator = placeholders > 1 && text.IndexOf('%', first + 1) is var second && second >= first + 2 ? text[(first + 2)..second] : ".",
             Legal = level.IsLegalNumberingStyle is { } legal && (legal.Val?.Value ?? true),
             StartAt = start,
             Indent = left - hanging,

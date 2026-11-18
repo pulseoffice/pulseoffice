@@ -7,6 +7,7 @@ using Avalonia.Media;
 using PulseOffice.Charts;
 using PulseOffice.Localization;
 using PulseOffice.UI.Controls.Services;
+using PulseOffice.UI.Controls.Tabs;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Icons;
 using PulseOffice.UI.Theming;
@@ -46,20 +47,20 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
     private readonly CheckBox _header = new();
     private readonly TextBox _categoryAxis = new();
     private readonly TextBox _valueAxis = new();
-    private readonly CheckBox _labels = new();
     private readonly CheckBox _grid = new();
     private readonly ComboBox _seriesLayout = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly TextBox _range = new();
     private readonly TextBlock _rangeError = new() { TextWrapping = TextWrapping.Wrap, IsVisible = false };
     private readonly ChartSeriesRanges? _seriesRanges;
-    private readonly TextBox _minimum = new();
-    private readonly TextBox _maximum = new();
-    private readonly TextBox _majorUnit = new();
-    private readonly CheckBox _logarithmic = new();
-    private readonly CheckBox _reversed = new();
     private readonly ComboBox _trendline = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ComboBox _errorBars = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly TextBox _errorAmount = new();
+    private readonly ChartEditorFields _fields;
+    private readonly ChartAxisScaleEditor _axes;
+    private readonly ChartSeriesFormatEditor _seriesFormats;
+    private readonly ChartDataLabelEditor _dataLabels;
+    private readonly List<Control> _pages = [];
+    private readonly ContentControl _page = new();
 
     private static readonly TrendlineKind?[] TrendlineChoices =
     [
@@ -102,6 +103,13 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             _seriesRanges.Show(request.Settings, _data, perSeries: true);
             _seriesRanges.Edited += (_, _) => Reload();
         }
+        _fields = new ChartEditorFields(services.Texts, _metrics, request.Culture);
+        _axes = new ChartAxisScaleEditor(_fields, request.Settings.CategoryAxisScale, request.Settings.ValueAxisScale, request.Settings.SecondaryValueAxisScale);
+        _axes.Changed += (_, _) => Refresh();
+        _seriesFormats = new ChartSeriesFormatEditor(_fields, request.Settings.SeriesFormats, SeriesNames());
+        _seriesFormats.Changed += (_, _) => Refresh();
+        _dataLabels = new ChartDataLabelEditor(_fields, request.Settings.ShowDataLabels, request.Settings.DataLabels);
+        _dataLabels.Changed += (_, _) => Refresh();
         _sections = BuildSections(services.Recommender.Recommend(_data, request.Culture));
         var editing = request.Mode == ChartPickerMode.Edit;
         _type = editing ? request.Settings.Type : _sections[0].Types[0];
@@ -220,7 +228,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         var grid = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,*"),
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,240"),
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,320"),
         };
 
         Place(grid, _sectionTitle, 0, 0, 3);
@@ -266,8 +274,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _legend.SelectedIndex = Math.Max(0, Array.IndexOf(LegendPositions, settings.Legend));
         _legend.SelectionChanged += (_, _) => Refresh();
 
-        Check(_labels, "chart.showDataLabels", settings.ShowDataLabels, Refresh);
-        ScaleOptions(settings);
+        AnalysisOptions(settings);
         Check(_grid, "chart.showGridLines", settings.ShowGridLines, Refresh);
         Check(_header, "chart.firstRowIsHeader", settings.FirstRowIsHeader, Reload);
         _header.IsEnabled = _request.HeaderEditable;
@@ -284,40 +291,59 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         Avalonia.Automation.AutomationProperties.SetName(_range, Texts["chart.range"]);
         Avalonia.Automation.AutomationProperties.SetName(_seriesLayout, Texts["chart.picker.data"]);
 
-        var stack = new StackPanel
+        _pages.Add(Page(
+            Caption(Texts["chart.title"]),
+            _title,
+            Caption(Texts["chart.axes"]),
+            _categoryAxis,
+            _valueAxis,
+            Caption(Texts["chart.picker.appearance"]),
+            FieldLabel(Texts["chart.legend"]),
+            _legend,
+            _grid));
+        _pages.Add(Page(_axes));
+        _pages.Add(Page(
+            _seriesFormats,
+            Caption(Texts["chart.analysis"]),
+            FieldLabel(Texts["chart.trendline"]),
+            _trendline,
+            FieldLabel(Texts["chart.errorBars"]),
+            _errorBars,
+            FieldLabel(Texts["chart.errorBars.amount"]),
+            _errorAmount));
+        _pages.Add(Page(_dataLabels));
+        _pages.Add(Page(DataOptions(settings)));
+
+        var tabs = new PageTabStrip(_metrics,
+        [
+            Texts["chart.tab.general"], Texts["chart.tab.axes"], Texts["chart.tab.series"], Texts["chart.tab.labels"], Texts["chart.tab.data"],
+        ]);
+        tabs.SelectionChanged += (_, index) => _page.Content = _pages[Math.Clamp(index, 0, _pages.Count - 1)];
+        _page.Content = _pages[0];
+
+        var panel = new DockPanel();
+        DockPanel.SetDock(tabs, Dock.Top);
+        tabs.Margin = new Thickness(0, 0, 0, _metrics.SpacingSmall);
+        panel.Children.Add(tabs);
+        panel.Children.Add(_page);
+        return panel;
+    }
+
+    private Control Page(params Control[] children)
+    {
+        var stack = new StackPanel { Spacing = _metrics.SpacingSmall };
+        foreach (var child in children) stack.Children.Add(child);
+        return new ScrollViewer
         {
-            Spacing = _metrics.SpacingSmall,
-            Children =
-            {
-                Caption(Texts["chart.title"]),
-                _title,
-                Caption(Texts["chart.axes"]),
-                _categoryAxis,
-                _valueAxis,
-                Caption(Texts["chart.picker.appearance"]),
-                FieldLabel(Texts["chart.legend"]),
-                _legend,
-                _labels,
-                _grid,
-                Caption(Texts["chart.scale"]),
-                FieldLabel(Texts["chart.scale.minimum"]),
-                _minimum,
-                FieldLabel(Texts["chart.scale.maximum"]),
-                _maximum,
-                FieldLabel(Texts["chart.scale.majorUnit"]),
-                _majorUnit,
-                _logarithmic,
-                _reversed,
-                Caption(Texts["chart.analysis"]),
-                FieldLabel(Texts["chart.trendline"]),
-                _trendline,
-                FieldLabel(Texts["chart.errorBars"]),
-                _errorBars,
-                FieldLabel(Texts["chart.errorBars.amount"]),
-                _errorAmount,
-                Caption(Texts["chart.picker.data"]),
-            },
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = stack,
         };
+    }
+
+    private Control DataOptions(ChartSettings settings)
+    {
+        var stack = new StackPanel { Spacing = _metrics.SpacingSmall };
 
         if (_request.RangeValidator is not null)
         {
@@ -327,6 +353,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             _rangeError.Text = Texts["status.analysis.badReference"];
             _rangeError.FontSize = _metrics.FontSizeSmall;
             _rangeError.Themed(TextBlock.ForegroundProperty, Palette.Keys.Danger);
+            stack.Children.Add(FieldLabel(Texts["chart.range"]));
             stack.Children.Add(RangeRow(_request.RangeValidator));
             stack.Children.Add(_rangeError);
         }
@@ -340,23 +367,11 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             stack.Children.Add(_seriesRanges);
         }
 
-        return new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = stack,
-        };
+        return stack;
     }
 
-    private void ScaleOptions(ChartSettings settings)
+    private void AnalysisOptions(ChartSettings settings)
     {
-        var scale = settings.ValueAxisScale;
-        Number(_minimum, scale.Minimum, "chart.scale.minimum");
-        Number(_maximum, scale.Maximum, "chart.scale.maximum");
-        Number(_majorUnit, scale.MajorUnit, "chart.scale.majorUnit");
-        Check(_logarithmic, "chart.scale.logarithmic", scale.Logarithmic, Refresh);
-        Check(_reversed, "chart.scale.reversed", scale.Reversed, Refresh);
-
         _trendline.ItemsSource = TrendlineChoices.Select(kind => Texts[kind is { } chosen ? $"chart.trendline.{Lower(chosen.ToString())}" : "chart.trendline.none"]).ToArray();
         _trendline.SelectedIndex = Math.Max(0, Array.IndexOf(TrendlineChoices, settings.Trendline?.Kind));
         _trendline.SelectionChanged += (_, _) => Refresh();
@@ -364,35 +379,15 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _errorBars.ItemsSource = _errorBarChoices.Select(kind => Texts[kind is { } chosen ? $"chart.errorBars.{Lower(chosen.ToString())}" : "chart.errorBars.none"]).ToArray();
         _errorBars.SelectedIndex = Math.Max(0, Array.IndexOf(_errorBarChoices, settings.ErrorBars?.Kind));
         _errorBars.SelectionChanged += (_, _) => Refresh();
-        Number(_errorAmount, settings.ErrorBars?.Value, "chart.errorBars.amount");
+        _errorAmount.Text = _fields.Shown(settings.ErrorBars?.Value);
+        _errorAmount.PlaceholderText = Texts["chart.scale.automatic"];
+        _errorAmount.TextChanged += (_, _) => Refresh();
+        Avalonia.Automation.AutomationProperties.SetName(_errorAmount, Texts["chart.errorBars.amount"]);
         Avalonia.Automation.AutomationProperties.SetName(_trendline, Texts["chart.trendline"]);
         Avalonia.Automation.AutomationProperties.SetName(_errorBars, Texts["chart.errorBars"]);
     }
 
-    private void Number(TextBox box, double? value, string name)
-    {
-        box.Text = value is { } number ? number.ToString(_request.Culture) : string.Empty;
-        box.PlaceholderText = Texts["chart.scale.automatic"];
-        box.TextChanged += (_, _) => Refresh();
-        Avalonia.Automation.AutomationProperties.SetName(box, Texts[name]);
-    }
-
-    private double? Parsed(TextBox box) =>
-        double.TryParse((box.Text ?? string.Empty).Trim(), System.Globalization.NumberStyles.Float, _request.Culture, out var value) && double.IsFinite(value) ? value : null;
-
-    private ChartAxisScale ChosenScale()
-    {
-        var original = _request.Settings.ValueAxisScale;
-        var scale = original with
-        {
-            Minimum = Parsed(_minimum),
-            Maximum = Parsed(_maximum),
-            MajorUnit = Parsed(_majorUnit) is > 0 and var unit ? unit : null,
-            Logarithmic = _logarithmic.IsChecked == true,
-            Reversed = _reversed.IsChecked == true,
-        };
-        return scale.IsAutomatic ? ChartAxisScale.Automatic : scale;
-    }
+    private IReadOnlyList<string> SeriesNames() => _data.Series.Select(series => series.Name).ToArray();
 
     private ChartTrendline? ChosenTrendline()
     {
@@ -406,7 +401,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         var kind = _errorBars.SelectedIndex > 0 && _errorBars.SelectedIndex < _errorBarChoices.Length ? _errorBarChoices[_errorBars.SelectedIndex] : null;
         if (kind is not { } chosen) return null;
         if (chosen == ErrorBarKind.Custom) return _request.Settings.ErrorBars;
-        var amount = Parsed(_errorAmount) ?? (chosen == ErrorBarKind.Percentage ? 5 : 1);
+        var amount = _fields.Parsed(_errorAmount) ?? (chosen == ErrorBarKind.Percentage ? 5 : 1);
         return _request.Settings.ErrorBars is { } original && original.Kind == chosen
             ? original with { Value = amount }
             : new ChartErrorBars(chosen, amount);
@@ -445,6 +440,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         }
 
         _data = _request.Data(CurrentSettings());
+        _seriesFormats.ShowSeries(SeriesNames());
         var recommended = RecommendedSection(_services.Recommender.Recommend(_data, _request.Culture));
         var changed = !recommended.Types.SequenceEqual(_sections[0].Types);
         _sections[0] = recommended;
@@ -462,11 +458,15 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         SeriesInColumns = _seriesLayout.SelectedIndex != 1,
         CategoryAxisTitle = _categoryAxis.Text,
         ValueAxisTitle = _valueAxis.Text,
-        ShowDataLabels = _labels.IsChecked == true,
+        ShowDataLabels = _dataLabels.ShowsLabels,
+        DataLabels = _dataLabels.Options,
         ShowGridLines = _grid.IsChecked == true,
         SourceRange = _request.RangeValidator is null ? _request.Settings.SourceRange : (_range.Text ?? string.Empty).Trim(),
         SeriesSources = _seriesRanges is null ? _request.Settings.SeriesSources : _seriesRanges.Sources,
-        ValueAxisScale = ChosenScale(),
+        ValueAxisScale = _axes.Scale(ChartAxisRole.Value),
+        CategoryAxisScale = _axes.Scale(ChartAxisRole.Category),
+        SecondaryValueAxisScale = _axes.Scale(ChartAxisRole.SecondaryValue),
+        SeriesFormats = _seriesFormats.Formats,
         Trendline = ChosenTrendline(),
         ErrorBars = ChosenErrorBars(),
         SeriesCount = _data.Series.Count,

@@ -26,6 +26,14 @@ public sealed record ChartSettings
 
     public ChartAxisScale ValueAxisScale { get; init; } = ChartAxisScale.Automatic;
 
+    public ChartAxisScale CategoryAxisScale { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartAxisScale SecondaryValueAxisScale { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartDataLabelOptions DataLabels { get; init; } = ChartDataLabelOptions.ValuesOnly;
+
+    public IReadOnlyList<ChartSeriesFormat>? SeriesFormats { get; init; }
+
     public ChartTrendline? Trendline { get; init; }
 
     public ChartErrorBars? ErrorBars { get; init; }
@@ -60,6 +68,12 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
             SourceRange = string.IsNullOrEmpty(chart.SourceRange) ? null : chart.SourceRange,
             SeriesSources = chart.SeriesSources,
             ValueAxisScale = chart.ValueAxis,
+            CategoryAxisScale = chart.CategoryAxis,
+            SecondaryValueAxisScale = chart.SecondaryValueAxis,
+            DataLabels = chart.DataLabels,
+            SeriesFormats = chart.SeriesFormats is { Count: > 0 } formats
+                ? Enumerable.Range(0, formats.Count).Select(chart.SeriesFormat).ToArray()
+                : null,
             Trendline = chart.SeriesFormat(0).Trendline,
             ErrorBars = chart.SeriesFormat(0).ErrorBars,
         };
@@ -70,7 +84,7 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var formatted = Analysed(chart, settings);
+        var formatted = Analysed(Formatted(chart, settings), settings);
         return formatted with
         {
             Type = settings.Type,
@@ -84,8 +98,35 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
             ShowGridLines = settings.ShowGridLines,
             SourceRange = Clean(settings.SourceRange) ?? chart.SourceRange,
             SeriesSources = settings.SeriesSources is { Count: > 0 } sources ? sources : null,
-            ValueAxis = settings.ValueAxisScale.IsAutomatic ? ChartAxisScale.Automatic : settings.ValueAxisScale,
+            ValueAxis = Normalized(settings.ValueAxisScale),
+            CategoryAxis = Normalized(settings.CategoryAxisScale),
+            SecondaryValueAxis = Normalized(settings.SecondaryValueAxisScale),
+            DataLabels = settings.DataLabels.IsValuesOnly ? ChartDataLabelOptions.ValuesOnly : settings.DataLabels,
         };
+    }
+
+    private ChartAxisScale Normalized(ChartAxisScale scale) =>
+        scale.IsAutomatic ? ChartAxisScale.Automatic : scale;
+
+    private ChartDefinition Formatted(ChartDefinition chart, ChartSettings settings)
+    {
+        if (settings.SeriesFormats is not { } formats) return chart;
+        var result = chart;
+        for (var series = 0; series < formats.Count; series++)
+        {
+            var current = result.SeriesFormat(series);
+            var chosen = formats[series] ?? ChartSeriesFormat.Plain;
+            var edited = current with
+            {
+                LineWidthPoints = chosen.LineWidthPoints,
+                Dash = chosen.Dash,
+                Marker = chosen.Marker,
+                MarkerSize = chosen.MarkerSize,
+                SecondaryAxis = chosen.SecondaryAxis,
+            };
+            if (edited != current) result = result.WithSeriesFormat(series, edited);
+        }
+        return result;
     }
 
     private ChartDefinition Analysed(ChartDefinition chart, ChartSettings settings)

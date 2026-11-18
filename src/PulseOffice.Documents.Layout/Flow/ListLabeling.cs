@@ -142,13 +142,14 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
     {
         var first = Math.Max(0, level - Math.Max(1, display) + 1);
         var parts = new List<string>();
-        var legal = style.Level(level).Legal;
+        var definition = style.Level(level);
+        var legal = definition.Legal;
         for (var l = first; l <= level; l++)
         {
             var format = legal ? NumberFormat.Arabic : style.Level(l).Format;
             var value = counts[l] ?? style.Level(l).StartAt;
             parts.Add(_formatters.TryGetValue(format, out var formatter) ? formatter.Render(value) : value.ToString(CultureInfo.InvariantCulture));
         }
-        return string.Join('.', parts);
+        return string.Join(definition.Separator, parts);
     }
 }

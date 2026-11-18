@@ -25,6 +25,8 @@ public sealed class XlsxChartMapper
     private readonly ModelSeriesSlots _slots = new();
     private readonly ChartDataExtractor _data = new(new CanonicalSeriesNames(), new DocumentLanguageChartCellText());
     private readonly ChartErrorValueRefresh _errorValues = new();
+    private readonly LiteralSeriesSource _literals = new();
+    private readonly XlsxPivotChartLink _pivotLink = new();
 
     public XlsxChartMapper()
     {
@@ -43,9 +45,12 @@ public sealed class XlsxChartMapper
         {
             var definition = _errorValues.Refresh(workbook, (ChartDefinition)placed.Content);
             var chartPart = drawingsPart.AddNewPart<ChartPart>();
-            chartPart.ChartSpace = _builder.Build(
-                definition, _data.Extract(workbook, definition),
-                definition.HasSeriesSources ? new ReferencedSeriesSource(definition, _references) : new SheetSeriesSource(definition));
+            chartPart.ChartSpace = IsStatic(definition)
+                ? _builder.Build(definition, definition.InlineData!, _literals)
+                : _builder.Build(
+                    definition, _data.Extract(workbook, definition),
+                    definition.HasSeriesSources ? new ReferencedSeriesSource(definition, _references) : new SheetSeriesSource(definition));
+            _pivotLink.Write(chartPart.ChartSpace, definition.PivotSource, definition.SourceSheet);
             chartPart.ChartSpace.Save();
 
             yield return _anchors.Build(sheet.Layout, placed, drawingsPart.GetIdOfPart(chartPart));
@@ -85,6 +90,9 @@ public sealed class XlsxChartMapper
                 SourceSheet = sourceSheet,
                 SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sourceSheet, StringComparison.CurrentCultureIgnoreCase))]),
             }), Sources(content.Series, pivot)));
+            definition = definition with { PivotSource = _pivotLink.Read(space) };
+            if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
+                definition = definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null };
 
             placed.Add(anchors.Place(anchor, new PlacedObject
             {
@@ -98,6 +106,9 @@ public sealed class XlsxChartMapper
 
         return placed;
     }
+
+    private static bool IsStatic(ChartDefinition definition) =>
+        definition.InlineData is not null && !definition.HasSeriesSources && string.IsNullOrEmpty(definition.SourceSheet);
 
     private IReadOnlyList<ChartSeriesSource> Sources(IReadOnlyList<OpenXmlCompositeElement> series, bool pivot)
     {
@@ -176,6 +187,68 @@ internal sealed class SheetReferenceUnion
         return bottom < 0
             ? "A1"
             : new CellRange(new CellAddress(top, left), new CellAddress(bottom, right)).ToString();
+    }
+}
+
+internal sealed class XlsxPivotChartLink
+{
+    private const string Chart2010Namespace = "http://schemas.microsoft.com/office/drawing/2007/8/2/chart";
+    private const string PivotOptionsUri = "{781A3756-C4B2-4CAC-9D66-4F8BD8637D16}";
+
+    private readonly PulseOffice.Sheets.Engine.Parsing.SheetNameQuoting _quoting = new();
+
+    public void Write(C.ChartSpace space, ChartPivotSource? pivot, string sheet)
+    {
+        if (pivot is null) return;
+
+        var name = string.IsNullOrEmpty(sheet) ? pivot.PivotName : $"{_quoting.Quoted(sheet)}!{pivot.PivotName}";
+        var source = new C.PivotSource(
+            new C.PivotTableName(name),
+            new C.FormatId { Val = (uint)Math.Max(0, pivot.FormatId) });
+
+        if (space.GetFirstChild<C.Chart>() is { } chart)
+        {
+            space.InsertBefore(source, chart);
+            var formats = new C.PivotFormats();
+            var before = chart.ChildElements.FirstOrDefault(child => child.LocalName is "view3D" or "floor" or "sideWall" or "backWall" or "plotArea");
+            if (before is null) chart.AppendChild(formats);
+            else chart.InsertBefore(formats, before);
+        }
+        else space.AppendChild(source);
+
+        if (!pivot.ShowFieldButtons) return;
+
+        var extensions = space.GetFirstChild<C.ChartSpaceExtensionList>() ?? space.AppendChild(new C.ChartSpaceExtensionList());
+        var extension = new C.ChartSpaceExtension { Uri = PivotOptionsUri };
+        var options = new OpenXmlUnknownElement("c14", "pivotOptions", Chart2010Namespace);
+        foreach (var zone in new[] { "dropZoneFilter", "dropZoneCategories", "dropZoneData", "dropZoneSeries", "dropZonesVisible" })
+        {
+            var element = new OpenXmlUnknownElement("c14", zone, Chart2010Namespace);
+            element.SetAttribute(new OpenXmlAttribute("val", string.Empty, "1"));
+            options.AppendChild(element);
+        }
+        extension.AppendChild(options);
+        extensions.AppendChild(extension);
+    }
+
+    public ChartPivotSource? Read(C.ChartSpace space)
+    {
+        if (space.GetFirstChild<C.PivotSource>() is not { } source) return null;
+        var text = source.ChildElements.FirstOrDefault(child => child.LocalName == "name")?.InnerText?.Trim();
+        if (string.IsNullOrEmpty(text)) return null;
+        var separator = text.LastIndexOf('!');
+        var name = separator >= 0 ? text[(separator + 1)..] : text;
+        if (name.Length == 0) return null;
+
+        var formatText = source.ChildElements.FirstOrDefault(child => child.LocalName == "fmtId")?.GetAttributes().FirstOrDefault(attribute => attribute.LocalName == "val").Value;
+        var buttons = space.Descendants().Where(element => element.LocalName == "pivotOptions").SelectMany(options => options.ChildElements)
+            .Any(zone => zone.GetAttributes().Any(attribute => attribute.LocalName == "val" && attribute.Value is "1" or "true"));
+
+        return new ChartPivotSource(name)
+        {
+            FormatId = int.TryParse(formatText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var format) && format >= 0 ? format : 0,
+            ShowFieldButtons = buttons,
+        };
     }
 }
 

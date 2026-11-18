@@ -57,6 +57,11 @@ public sealed class LedgerFinalCommands(
             DeletePivot();
             return Task.CompletedTask;
         }) with { EnabledWhen = _ => HasPivot },
+        Command("ledger.pivot.chart", "data/pivot", _ =>
+        {
+            InsertPivotChart();
+            return Task.CompletedTask;
+        }) with { EnabledWhen = _ => HasPivot },
 
         Command("ledger.object.enterGroup", "format/arrange", _ =>
         {
@@ -428,6 +433,55 @@ public sealed class LedgerFinalCommands(
 
         Context.RequestRefresh();
     }
+
+    private void InsertPivotChart()
+    {
+        if (Context.Workbook is not { } workbook) return;
+        if (workbook.Pivots.Count == 0)
+        {
+            status.Report(texts["pivot.none"], NotificationSeverity.Warning);
+            return;
+        }
+
+        var index = CurrentPivot(workbook);
+        if (index < 0 || workbook.Pivots[index] is not { OutputRange: { } output } pivot)
+        {
+            status.Report(texts["pivot.chart.notUnderCursor"], NotificationSeverity.Warning);
+            return;
+        }
+
+        var sheet = workbook.Sheets[Context.SheetIndex];
+        var chart = new PulseOffice.Charts.ChartDefinition
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Type = PulseOffice.Charts.ChartType.Column,
+            SourceSheet = pivot.DestinationSheet,
+            SourceRange = output.ToString(),
+            PivotSource = new PulseOffice.Charts.ChartPivotSource(pivot.Name) { FormatId = NextPivotFormat(workbook) },
+        };
+        var placed = new PlacedObject
+        {
+            Id = chart.Id,
+            Content = chart,
+            Anchor = new CellAddress(output.Start.Row, Math.Min(output.End.Column + 2, CellAddress.MaxColumns - 1)),
+            ZOrder = sheet.Objects.Count == 0 ? 0 : sheet.Objects.Max(item => item.ZOrder) + 1,
+        };
+
+        var result = Checkpointed(checkpoints, texts["history.pivot.chart"], () =>
+        {
+            sheet.Objects.Add(placed);
+            return pivots.Apply(workbook, pivot, new PulseOffice.Sheets.Pivot.PivotLabels(texts["pivot.grandTotal"], texts["pivot.subtotal"]));
+        }, outcome => outcome.Succeeded);
+
+        Context.RequestRefresh();
+        if (!result.Succeeded)
+            status.Report(texts.Format($"pivot.diagnostic.{result.Diagnostics[0].Code}", result.Diagnostics[0].Location ?? string.Empty), NotificationSeverity.Error);
+    }
+
+    private int NextPivotFormat(Workbook workbook) =>
+        workbook.Sheets.SelectMany(sheet => sheet.Objects)
+            .Select(item => item.Content is PulseOffice.Charts.ChartDefinition { PivotSource: { } link } ? link.FormatId + 1 : 0)
+            .DefaultIfEmpty(0).Max();
 
     private void EnterGroup()
     {

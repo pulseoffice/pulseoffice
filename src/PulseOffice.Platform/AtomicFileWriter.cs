@@ -13,9 +13,13 @@ public interface IAtomicFileWriter
     Task<T> WriteThroughPathAsync<T>(ChosenFile file, Func<string, CancellationToken, Task<T>> produce, Predicate<T> keep, CancellationToken ct = default);
 }
 
-public sealed class AtomicFileWriter : IAtomicFileWriter
+public sealed class AtomicFileWriter(IPrivateFiles privateFiles) : IAtomicFileWriter
 {
     private const int MaximumTemporaryStem = 64;
+
+    public AtomicFileWriter() : this(new PrivateFilesFactory().Create())
+    {
+    }
 
     public async Task ReplaceAsync(string path, Stream content, CancellationToken ct = default)
     {
@@ -84,7 +88,9 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
 
         if (IsLocal(file)) return await CommitAsync(file.Path, produce, keep, ct).ConfigureAwait(true);
 
-        var scratch = Path.Combine(Path.GetTempPath(), $"pulseoffice-{Guid.NewGuid():N}{Path.GetExtension(file.Name)}");
+        var folder = Path.Combine(Path.GetTempPath(), $"pulseoffice-{Guid.NewGuid():N}");
+        privateFiles.CreateFolder(folder);
+        var scratch = Path.Combine(folder, $"scratch{Path.GetExtension(file.Name)}");
         try
         {
             var result = await produce(scratch, ct).ConfigureAwait(true);
@@ -96,7 +102,7 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         }
         finally
         {
-            if (File.Exists(scratch)) File.Delete(scratch);
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
         }
     }
 

@@ -17,20 +17,34 @@ public sealed class BarPlot : ChartPlotBase
 
     public override PlotScale? ValueAxis(ChartFrame frame) => Primary(frame, Prepared(frame), HorizontalAxis(frame.Definition.Type));
 
-    public override PlotScale? SecondaryValueAxis(ChartFrame frame) => SecondaryScale(frame, Prepared(frame), Splits(frame), HorizontalAxis(frame.Definition.Type));
+    public override PlotScale? SecondaryValueAxis(ChartFrame frame) => Secondary(frame, Prepared(frame), HorizontalAxis(frame.Definition.Type));
 
     public override PlotScale? SeriesScale(ChartFrame frame, int series) =>
         ScaleOf(frame, series, Primary(frame, Prepared(frame), HorizontalAxis(frame.Definition.Type)), SecondaryValueAxis(frame));
 
+    public override bool DrawsReversedCategories => true;
+
     private readonly ChartSeriesStroke _strokes = new();
 
+    private readonly ChartAxisMarks _marks = new();
+
     private bool Splits(ChartFrame frame) =>
-        frame.Definition.HasSecondaryAxis && !Stacked(frame.Definition.Type) && frame.Definition.Type != ChartType.PopulationPyramid;
+        frame.Definition.HasSecondaryAxis && frame.Definition.Type != ChartType.PopulationPyramid;
 
     private PlotScale Primary(ChartFrame frame, ChartData data, bool horizontal) =>
         Stacked(frame.Definition.Type)
-            ? Scaled(StackScale(data, frame.Plot, horizontal, true), frame.Definition.ValueAxis)
+            ? Scaled(StackScale(Side(frame, data, false, Splits(frame)), frame.Plot, horizontal, true), frame.Definition.ValueAxis)
             : PrimaryScale(frame, data, Splits(frame), horizontal);
+
+    private PlotScale? Secondary(ChartFrame frame, ChartData data, bool horizontal) =>
+        !Splits(frame) ? null
+        : Stacked(frame.Definition.Type)
+            ? Scaled(StackScale(Side(frame, data, true, true), frame.Plot, horizontal, true), frame.Definition.SecondaryValueAxis)
+            : SecondaryScale(frame, data, true, horizontal);
+
+    private double Baseline(ChartFrame frame, int series, PlotScale scale, PlotScale? secondary) =>
+        scale.Position(_marks.ValueCrossing(scale,
+            secondary is not null && frame.Definition.SeriesFormat(series).SecondaryAxis ? frame.Definition.SecondaryValueAxis : frame.Definition.ValueAxis));
 
     public override void Draw(ChartFrame frame)
     {
@@ -45,8 +59,8 @@ public sealed class BarPlot : ChartPlotBase
     private void DrawCombination(ChartFrame frame, ChartData data)
     {
         var scale = Primary(frame, data, false);
-        var secondary = SecondaryScale(frame, data, Splits(frame));
-        var categories = Categories(data, frame.Plot);
+        var secondary = Secondary(frame, data, false);
+        var categories = Categories(frame, data);
         var columns = Enumerable.Range(0, data.Series.Count).Where(series => !frame.Definition.IsLineSeries(series, data.Series.Count)).ToList();
         var lines = Enumerable.Range(0, data.Series.Count).Where(series => frame.Definition.IsLineSeries(series, data.Series.Count));
 
@@ -57,7 +71,7 @@ public sealed class BarPlot : ChartPlotBase
                 if (!IsPlotted(data.Series[series], index) || Value(data.Series[series], index) == 0) continue;
                 var (start, width) = categories.Slot(index, slot, columns.Count);
                 var own = ScaleOf(frame, series, scale, secondary);
-                frame.Context.FillRectangle(Brush(data, series), Rectangle(false, start, width, own.Position(Math.Max(0, own.Minimum)), own.Position(Value(data.Series[series], index))));
+                frame.Context.FillRectangle(Brush(data, series), Rectangle(false, start, width, Baseline(frame, series, own, secondary), own.Position(Value(data.Series[series], index))));
             }
 
         foreach (var series in lines)
@@ -94,8 +108,8 @@ public sealed class BarPlot : ChartPlotBase
     private void DrawGrouped(ChartFrame frame, ChartData data, bool horizontal)
     {
         var scale = Primary(frame, data, horizontal);
-        var secondary = SecondaryScale(frame, data, Splits(frame), horizontal);
-        var categories = Categories(data, frame.Plot, horizontal);
+        var secondary = Secondary(frame, data, horizontal);
+        var categories = Categories(frame, data, horizontal);
 
         for (var index = 0; index < categories.Count; index++)
             for (var series = 0; series < data.Series.Count; series++)
@@ -107,35 +121,49 @@ public sealed class BarPlot : ChartPlotBase
 
                 frame.Context.FillRectangle(
                     Brush(data, series),
-                    Rectangle(horizontal, start, width, own.Position(Math.Max(0, own.Minimum)), position));
+                    Rectangle(horizontal, start, width, Baseline(frame, series, own, secondary), position));
             }
     }
 
     private void DrawStacked(ChartFrame frame, ChartData data, bool horizontal)
     {
+        foreach (var segment in StackedSegments(frame, data, horizontal))
+        {
+            if (segment.From == segment.To) continue;
+            frame.Context.FillRectangle(
+                Brush(data, segment.Series),
+                Rectangle(horizontal, segment.Start, segment.Width, segment.Scale.Position(segment.From), segment.Scale.Position(segment.To)));
+        }
+    }
+
+    private sealed record StackedSegment(int Series, int Index, double Start, double Width, double From, double To, PlotScale Scale);
+
+    private IEnumerable<StackedSegment> StackedSegments(ChartFrame frame, ChartData data, bool horizontal)
+    {
         var scale = Primary(frame, data, horizontal);
-        var categories = Categories(data, frame.Plot, horizontal);
+        var secondary = Secondary(frame, data, horizontal);
+        var categories = Categories(frame, data, horizontal);
+        var groups = secondary is null ? 1 : 2;
 
         for (var index = 0; index < categories.Count; index++)
         {
-            var positive = 0.0;
-            var negative = 0.0;
-
-            for (var series = 0; series < data.Series.Count; series++)
+            for (var group = 0; group < groups; group++)
             {
-                var value = Value(data.Series[series], index);
-                if (value == 0) continue;
-                var from = value >= 0 ? positive : negative;
-                var to = from + value;
+                var positive = 0.0;
+                var negative = 0.0;
+                var width = categories.Width * 0.7 / groups;
+                var start = categories.Start(index) + categories.Width * 0.15 + width * group;
 
-                if (value >= 0) positive = to; else negative = to;
-
-                var start = categories.Start(index) + categories.Width * 0.15;
-                var width = categories.Width * 0.7;
-
-                frame.Context.FillRectangle(
-                    Brush(data, series),
-                    Rectangle(horizontal, start, width, scale.Position(from), scale.Position(to)));
+                for (var series = 0; series < data.Series.Count; series++)
+                {
+                    var onSecondary = secondary is not null && frame.Definition.SeriesFormat(series).SecondaryAxis;
+                    if (onSecondary != (group == 1) || !IsPlotted(frame.Data.Series[series], index)) continue;
+                    var value = Value(data.Series[series], index);
+                    var from = value >= 0 ? positive : negative;
+                    var to = from + value;
+                    if (value >= 0) positive = to; else negative = to;
+                    yield return new StackedSegment(series, index, start, width, from, to, onSecondary ? secondary! : scale);
+                }
             }
         }
     }
@@ -144,29 +172,32 @@ public sealed class BarPlot : ChartPlotBase
     {
         var horizontal = HorizontalAxis(frame.Definition.Type);
         var data = Prepared(frame);
-        var stacked = Stacked(frame.Definition.Type);
+
+        if (Stacked(frame.Definition.Type))
+        {
+            foreach (var segment in StackedSegments(frame, data, horizontal))
+            {
+                var along = segment.Scale.Position(segment.To);
+                var across = segment.Start + segment.Width / 2;
+                yield return new ChartDataLabel(
+                    horizontal ? new Point(along, across) : new Point(across, along),
+                    Value(frame.Data.Series[segment.Series], segment.Index))
+                { Series = segment.Series, Index = segment.Index, Across = segment.Index + 1 };
+            }
+            yield break;
+        }
+
         var scale = Primary(frame, data, horizontal);
-        var secondary = SecondaryScale(frame, data, Splits(frame), horizontal);
-        var categories = Categories(data, frame.Plot, horizontal);
+        var secondary = Secondary(frame, data, horizontal);
+        var categories = Categories(frame, data, horizontal);
 
         for (var index = 0; index < categories.Count; index++)
         {
-            var positive = 0.0;
-            var negative = 0.0;
             for (var series = 0; series < data.Series.Count; series++)
             {
                 if (!IsPlotted(frame.Data.Series[series], index)) continue;
-                var value = Value(data.Series[series], index);
-                var end = value;
-                if (stacked)
-                {
-                    end = (value >= 0 ? positive : negative) + value;
-                    if (value >= 0) positive = end; else negative = end;
-                }
-                var (start, width) = stacked
-                    ? (categories.Start(index) + categories.Width * 0.15, categories.Width * 0.7)
-                    : categories.Slot(index, series, data.Series.Count);
-                var along = ScaleOf(frame, series, scale, secondary).Position(end);
+                var (start, width) = categories.Slot(index, series, data.Series.Count);
+                var along = ScaleOf(frame, series, scale, secondary).Position(Value(data.Series[series], index));
                 yield return new ChartDataLabel(
                     horizontal ? new Point(along, start + width / 2) : new Point(start + width / 2, along),
                     Value(frame.Data.Series[series], index))

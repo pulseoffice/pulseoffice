@@ -121,6 +121,8 @@ public sealed record CategoryScale(int Count, double From, double To, bool Rever
 
     public double Centre(int index) => Start(index) + Width * 0.5;
 
+    public double Boundary(double index) => From + Width * (Reversed ? Count - index : index);
+
     public double Start(int index) => From + Width * (Reversed ? Count - 1 - index : index);
 
     public (double Start, double Width) Slot(int index, int series, int seriesCount)

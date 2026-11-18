@@ -18,6 +18,8 @@ public interface IFolioTypingAssist
 
     bool EndEmptyListItem(FolioEditor editor);
 
+    bool RemoveNumberAtItemStart(FolioEditor editor);
+
     AutoFormatMatch? FormatBeforeSplit(FolioEditor editor);
 
     void SettleAfterSplit(FolioEditor editor, AutoFormatMatch? applied, string formattedParagraphId);
@@ -27,7 +29,8 @@ public sealed class FolioTypingAssist(
     IAutoCorrectSettings settings,
     IDocumentAutoFormat formatting,
     IWordCompletion completion,
-    IWordBoundaryCorrection boundary) : IFolioTypingAssist
+    IWordBoundaryCorrection boundary,
+    IListEditing lists) : IFolioTypingAssist
 {
     private DocumentRange? _offered;
 
@@ -79,9 +82,20 @@ public sealed class FolioTypingAssist(
 
     public bool EndEmptyListItem(FolioEditor editor)
     {
-        if (editor.HasSelection || editor.ContentOf(editor.Caret.ParagraphId) is not { ListStyleName: not null, Text.Length: 0 }) return false;
+        if (editor.HasSelection || editor.ContentOf(editor.Caret.ParagraphId) is not { ListStyleName: not null, Text.Length: 0 } content) return false;
         var id = editor.Caret.ParagraphId;
-        return editor.Apply((writer, range) => writer.SetList(editor.Document, editor.History, range, null, 0), DocumentRange.In(id, 0, 0));
+        var item = DocumentRange.In(id, 0, 0);
+        if (content.BulletLevel > 0)
+            return !editor.RefusesEdit(item) && editor.Change(() => lists.ShiftLevel(editor.Document, editor.History, item, -1, false));
+        return editor.Apply((writer, range) => writer.SetList(editor.Document, editor.History, range, null, 0), item);
+    }
+
+    public bool RemoveNumberAtItemStart(FolioEditor editor)
+    {
+        if (editor.HasSelection || editor.Caret.Offset != 0
+            || editor.ContentOf(editor.Caret.ParagraphId) is not { ListStyleName: not null, ListHeader: false }) return false;
+        var item = DocumentRange.In(editor.Caret.ParagraphId, 0, 0);
+        return !editor.RefusesEdit(item) && editor.Change(() => lists.SetNumbered(editor.Document, editor.History, item, false));
     }
 
     public AutoFormatMatch? FormatBeforeSplit(FolioEditor editor)

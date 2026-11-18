@@ -7,17 +7,60 @@ namespace PulseOffice.UI.Controls.Charts;
 public sealed class ChartAxisPainter(ChartText text)
 {
     private const double LabelSize = 9;
+    private const double MinorTickLength = 3;
     private readonly IBrush _labels = Brushes.Gray;
 
     public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid) =>
         Values(context, scale, plot, horizontal, grid, null);
 
-    public void Secondary(DrawingContext context, PlotScale scale, Rect plot, string? format)
+    public void Secondary(DrawingContext context, PlotScale scale, Rect plot, string? format) =>
+        Secondary(context, scale, plot, format, false);
+
+    public void Secondary(DrawingContext context, PlotScale scale, Rect plot, string? format, bool horizontal)
     {
         foreach (var value in scale.Divisions())
         {
             var label = text.Layout(text.Formatted(value, format), _labels, LabelSize);
-            context.DrawText(label, new Point(plot.Right + 4, scale.Position(value) - label.Height / 2));
+            var position = scale.Position(value);
+            context.DrawText(label, horizontal
+                ? new Point(position - label.Width / 2, plot.Y - label.Height - 4)
+                : new Point(plot.Right + 4, position - label.Height / 2));
+        }
+    }
+
+    public void MinorTicks(DrawingContext context, IReadOnlyList<double> ticks, PlotScale scale, Rect plot, bool horizontal, bool opposite)
+    {
+        if (ticks.Count == 0) return;
+        var pen = new Pen(Brushes.Gray, 1);
+        foreach (var value in ticks)
+        {
+            var position = scale.Position(value);
+            if (horizontal)
+            {
+                var edge = opposite ? plot.Y : plot.Bottom;
+                context.DrawLine(pen, new Point(position, edge), new Point(position, edge + (opposite ? MinorTickLength : -MinorTickLength)));
+            }
+            else
+            {
+                var edge = opposite ? plot.Right : plot.X;
+                context.DrawLine(pen, new Point(edge, position), new Point(edge + (opposite ? -MinorTickLength : MinorTickLength), position));
+            }
+        }
+    }
+
+    public void Crossings(DrawingContext context, Rect plot, bool horizontal, double? valueCrossing, double? categoryCrossing)
+    {
+        var axis = new Pen(Brushes.Gray, 1);
+        if (valueCrossing is { } along)
+        {
+            if (horizontal) context.DrawLine(axis, new Point(along, plot.Y), new Point(along, plot.Bottom));
+            else context.DrawLine(axis, new Point(plot.X, along), new Point(plot.Right, along));
+        }
+
+        if (categoryCrossing is { } across)
+        {
+            if (horizontal) context.DrawLine(axis, new Point(plot.X, across), new Point(plot.Right, across));
+            else context.DrawLine(axis, new Point(across, plot.Y), new Point(across, plot.Bottom));
         }
     }
 
@@ -49,7 +92,10 @@ public sealed class ChartAxisPainter(ChartText text)
         else context.DrawLine(axis, new Point(plot.X, zero), new Point(plot.Right, zero));
     }
 
-    public void Categories(DrawingContext context, IReadOnlyList<string> names, CategoryScale scale, Rect plot, bool horizontal)
+    public void Categories(DrawingContext context, IReadOnlyList<string> names, CategoryScale scale, Rect plot, bool horizontal) =>
+        Categories(context, names, scale, plot, horizontal, null);
+
+    public void Categories(DrawingContext context, IReadOnlyList<string> names, CategoryScale scale, Rect plot, bool horizontal, double? line)
     {
         if (names.Count == 0) return;
 
@@ -59,7 +105,7 @@ public sealed class ChartAxisPainter(ChartText text)
             for (var index = 0; index < names.Count && index < scale.Count; index += skip)
             {
                 var label = text.Layout(names[index], _labels, LabelSize);
-                context.DrawText(label, new Point(plot.X - label.Width - 4, scale.Centre(index) - label.Height / 2));
+                context.DrawText(label, new Point((line ?? plot.X) - label.Width - 4, scale.Centre(index) - label.Height / 2));
             }
             return;
         }
@@ -71,7 +117,7 @@ public sealed class ChartAxisPainter(ChartText text)
             label.MaxTextWidth = Math.Max(scale.Width * every, 1);
             label.MaxLineCount = 1;
             label.Trimming = TextTrimming.CharacterEllipsis;
-            context.DrawText(label, new Point(scale.Centre(index) - label.Width / 2, plot.Bottom + 4));
+            context.DrawText(label, new Point(scale.Centre(index) - label.Width / 2, (line ?? plot.Bottom) + 4));
         }
     }
 

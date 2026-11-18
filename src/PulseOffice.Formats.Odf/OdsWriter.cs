@@ -11,8 +11,13 @@ using static PulseOffice.Formats.Packaging.OdfPackage;
 
 namespace PulseOffice.Formats.Odf;
 
-public sealed class OdsWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors)
+public sealed class OdsWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors, IContentSpool spool)
 {
+    public OdsWriter(bool template, SignatureLineImage signatureImages, VectorFallback vectors)
+        : this(template, signatureImages, vectors, new MemoryContentSpool())
+    {
+    }
+
     public OdsWriter(bool template = false)
         : this(template, new SignatureLineImage())
     {
@@ -40,7 +45,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
 
         using var package = OdfPackage.Create(stream, _mimeType);
 
-        var builder = new ContentBuilder(workbook, _altText, package.Characters, _paragraphs, signatureImages, vectors);
+        var builder = new ContentBuilder(workbook, _altText, package.Characters, _paragraphs, signatureImages, vectors, spool);
         using (var body = builder.WriteBody())
             package.WriteXml("content.xml", writer => builder.WriteDocument(writer, body));
         package.WriteXml("styles.xml", new OdsStylesDocumentBuilder().Build(builder.ConditionalStyles, builder.ShapeDefinitions, workbook));
@@ -75,7 +80,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
         package.WriteManifest(_mimeType, entries);
     }
 
-    private sealed class ContentBuilder(Workbook workbook, OdfAltTextMapper altText, XmlCharacterFilter characters, IOdfParagraphText paragraphs, SignatureLineImage signatureImages, VectorFallback vectors)
+    private sealed class ContentBuilder(Workbook workbook, OdfAltTextMapper altText, XmlCharacterFilter characters, IOdfParagraphText paragraphs, SignatureLineImage signatureImages, VectorFallback vectors, IContentSpool spool)
     {
         private readonly OdfStyleMapper _styles = new();
         private readonly OdfConditionalMapper _conditionals = new();
@@ -133,8 +138,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
 
         public Stream WriteBody()
         {
-            var file = new FileStream(Path.Combine(Path.GetTempPath(), $"pulseoffice-{Guid.NewGuid():N}.xml"), FileMode.CreateNew,
-                FileAccess.ReadWrite, FileShare.None, 1 << 16, FileOptions.DeleteOnClose);
+            var file = spool.Create();
             try
             {
                 using (var writer = XmlWriter.Create(file, _bodySettings)) WriteBody(writer);

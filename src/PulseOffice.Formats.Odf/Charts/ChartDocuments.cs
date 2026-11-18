@@ -96,7 +96,8 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
             new XAttribute(Chart + "class", chartClass),
             new XAttribute(PulseChart + "type", definition.Type.ToString()),
             new XAttribute(Svg + "width", units.Cm(size.Width)),
-            new XAttribute(Svg + "height", units.Cm(size.Height)));
+            new XAttribute(Svg + "height", units.Cm(size.Height)),
+            PivotAttributes(definition.PivotSource));
 
         if (definition.ChartTitle is { Length: > 0 } title)
             chart.Add(new XElement(Chart + "title", paragraphs.Paragraphs(title)));
@@ -127,6 +128,17 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     }
 
     protected abstract IEnumerable<XAttribute> PlotAttributes(ChartDefinition definition);
+
+    private IEnumerable<XAttribute> PivotAttributes(ChartPivotSource? pivot) =>
+        pivot is null
+            ? []
+            :
+            [
+                new(Loext + "data-pilot-source", pivot.PivotName),
+                new(PulseChart + "pivot-source", pivot.PivotName),
+                new(PulseChart + "pivot-format", pivot.FormatId.ToString(CultureInfo.InvariantCulture)),
+                new(PulseChart + "pivot-field-buttons", pivot.ShowFieldButtons ? "true" : "false"),
+            ];
 
     protected abstract string? ValuesAddress(ChartDefinition definition, ChartData data, int series);
 

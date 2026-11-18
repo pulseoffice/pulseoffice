@@ -438,6 +438,7 @@ public sealed class FolioEditor : IDisposable
     public bool Backspace()
     {
         if (RefusesFilling() || !HasSelection && Caret.Offset == 0 && Neighbour(Caret.ParagraphId, -1) is { } previous && Generated(previous.Id)) return false;
+        if (_services.Assist.RemoveNumberAtItemStart(this)) return true;
         using (History.BeginTransaction("delete"))
         {
             var done = BackspaceCore();

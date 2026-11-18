@@ -107,23 +107,39 @@ public sealed class ChartRenderer
 
         var frame = new Plots.ChartFrame(context, definition, data, plot, bounds, scene.Text.Culture);
         var horizontal = painter.HorizontalAxis(definition.Type);
+        double? categoryLine = null;
 
         if (painter.DrawsAxes && !thumbnail)
         {
             var values = painter.ValueAxis(frame) ?? _axisScaling.Apply(DefaultScale(data, plot, horizontal), definition.ValueAxis);
+            categoryLine = _marks.CategoryAxisLine(values, definition.ValueAxis, horizontal ? plot.X : plot.Bottom);
             scene.Axes.Values(context, values, plot, horizontal, definition.ShowGridLines, definition.ValueAxis.NumberFormat);
-            if (painter.CategoryValueAxis(frame) is { } across) scene.Axes.Values(context, across, plot, !horizontal, definition.ShowGridLines, definition.CategoryAxis.NumberFormat);
-            if (!horizontal && painter.SecondaryValueAxis(frame) is { } secondary) scene.Axes.Secondary(context, secondary, plot, definition.SecondaryValueAxis.NumberFormat);
+            scene.Axes.MinorTicks(context, _marks.MinorTicks(values, definition.ValueAxis), values, plot, horizontal, opposite: false);
+            var across = painter.CategoryValueAxis(frame);
+            if (across is not null)
+            {
+                scene.Axes.Values(context, across, plot, !horizontal, definition.ShowGridLines, definition.CategoryAxis.NumberFormat);
+                scene.Axes.MinorTicks(context, _marks.MinorTicks(across, definition.CategoryAxis), across, plot, !horizontal, opposite: false);
+            }
+            if (painter.SecondaryValueAxis(frame) is { } secondary)
+            {
+                scene.Axes.Secondary(context, secondary, plot, definition.SecondaryValueAxis.NumberFormat, horizontal);
+                scene.Axes.MinorTicks(context, _marks.MinorTicks(secondary, definition.SecondaryValueAxis), secondary, plot, horizontal, opposite: true);
+            }
+            if (across is null && painter.HasCategoryAxis(definition.Type))
+                scene.Axes.Crossings(context, plot, horizontal,
+                    definition.ValueAxis.Crossing == AxisCrossing.Automatic ? null : values.Position(_marks.ValueCrossing(values, definition.ValueAxis)),
+                    CategoryCrossing(definition, data, plot, horizontal, painter.DrawsReversedCategories && definition.CategoryAxis.Reversed));
         }
 
         painter.Draw(frame);
 
-        if (!thumbnail && !horizontal && painter.DrawsAxes && HasAnalysis(definition, data))
-            _analysis.Paint(context, painter, frame, [.. painter.DataLabels(frame)]);
+        if (!thumbnail && painter.DrawsAxes && HasAnalysis(definition, data))
+            _analysis.Paint(context, painter, frame, [.. painter.DataLabels(frame)], horizontal);
 
         if (painter.DrawsAxes && !thumbnail)
         {
-            if (painter.HasCategoryAxis(definition.Type)) scene.Axes.Categories(context, data.Categories, Categories(data, plot, horizontal), plot, horizontal);
+            if (painter.HasCategoryAxis(definition.Type)) scene.Axes.Categories(context, data.Categories, Categories(data, plot, horizontal, painter.DrawsReversedCategories && definition.CategoryAxis.Reversed), plot, horizontal, categoryLine);
             scene.Axes.Titles(context, definition.CategoryAxisTitle, definition.ValueAxisTitle, plot, horizontal);
         }
 
@@ -131,6 +147,8 @@ public sealed class ChartRenderer
     }
 
     private readonly ChartAxisScaling _axisScaling = new();
+
+    private readonly ChartAxisMarks _marks = new();
 
     private readonly ChartAnalysisPainter _analysis = new();
 
@@ -176,16 +194,25 @@ public sealed class ChartRenderer
 
         var left = area.X + ValueLabelWidth + (Has(definition.ValueAxisTitle) || Has(definition.CategoryAxisTitle) ? AxisTitleSpace : 0);
         var bottom = area.Bottom - AxisLabelHeight - (Has(definition.CategoryAxisTitle) || Has(definition.ValueAxisTitle) ? AxisTitleSpace : 0);
-        var right = area.Right - (definition.HasSecondaryAxis ? ValueLabelWidth : 0);
-        return new Rect(left, area.Y, Math.Max(right - left, 10), Math.Max(bottom - area.Y, 10));
+        var horizontal = painter.HorizontalAxis(definition.Type);
+        var right = area.Right - (definition.HasSecondaryAxis && !horizontal ? ValueLabelWidth : 0);
+        var top = area.Y + (definition.HasSecondaryAxis && horizontal ? AxisLabelHeight : 0);
+        return new Rect(left, top, Math.Max(right - left, 10), Math.Max(bottom - top, 10));
+    }
+
+    private double? CategoryCrossing(ChartDefinition definition, ChartData data, Rect plot, bool horizontal, bool reversed)
+    {
+        if (definition.CategoryAxis.Crossing == AxisCrossing.Automatic) return null;
+        var categories = Categories(data, plot, horizontal, reversed);
+        return categories.Boundary(_marks.CategoryCrossing(categories.Count, definition.CategoryAxis));
     }
 
     private bool Has(string? text) => text is { Length: > 0 };
 
-    private CategoryScale Categories(ChartData data, Rect plot, bool horizontal)
+    private CategoryScale Categories(ChartData data, Rect plot, bool horizontal, bool reversed)
     {
         var count = Math.Max(1, Math.Max(data.Categories.Count, data.Series.Count == 0 ? 0 : data.Series.Max(series => series.Values.Count)));
-        return horizontal ? new CategoryScale(count, plot.Y, plot.Bottom, Reversed: true) : new CategoryScale(count, plot.X, plot.Right);
+        return horizontal ? new CategoryScale(count, plot.Y, plot.Bottom, Reversed: !reversed) : new CategoryScale(count, plot.X, plot.Right, Reversed: reversed);
     }
 
     private PlotScale DefaultScale(ChartData data, Rect plot, bool horizontal)

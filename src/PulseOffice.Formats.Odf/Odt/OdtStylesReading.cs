@@ -336,6 +336,7 @@ internal sealed class OdtStylesReader(
             StartAt = Math.Clamp(measure.Integer(startText) ?? 1, 0, ushort.MaxValue),
             DisplayLevels = Math.Clamp(measure.Integer(displayText) ?? 1, 1, PulseOffice.Documents.Styles.ListStyle.LevelCount),
             Legal = !bullet && !image && (string?)element.Attribute(Pt + "legal") == "true",
+            Separator = (string?)element.Attribute(Pt + "level-separator") ?? ".",
             Indent = indent,
             Hanging = hanging,
             CharacterStyleName = characterStyle is { Length: > 0 } character ? context.StyleNames.Resolve(character) : null,

@@ -117,6 +117,8 @@ public sealed record ListLevel(NumberFormat Format)
 
     public int DisplayLevels { get; init; } = 1;
 
+    public string Separator { get; init; } = ".";
+
     public bool Legal { get; init; }
 
     public double Indent { get; init; }

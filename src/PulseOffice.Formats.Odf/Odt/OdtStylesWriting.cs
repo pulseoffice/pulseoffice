@@ -270,6 +270,7 @@ internal sealed class OdtStylesWriter(
             element.Add(new XAttribute(Text + "start-value", level.StartAt));
             if (level.DisplayLevels > 1) element.Add(new XAttribute(Text + "display-levels", level.DisplayLevels));
             if (level.Legal) element.Add(new XAttribute(Pt + "legal", "true"));
+            if (level.Separator != ".") element.Add(new XAttribute(Pt + "level-separator", level.Separator));
         }
         if (bullet && level.Bullet.Length == 0) element.Add(new XAttribute(Pt + "bullet-empty", "true"));
         if (bullet) element.Add(new XAttribute(Pt + "start-value", level.StartAt), new XAttribute(Pt + "display-levels", level.DisplayLevels));

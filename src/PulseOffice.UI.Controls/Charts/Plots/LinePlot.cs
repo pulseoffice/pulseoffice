@@ -22,7 +22,10 @@ public sealed class LinePlot : ChartPlotBase
         ScaleOf(frame, series, PrimaryScale(frame, Prepared(frame), Splits(frame)), SecondaryValueAxis(frame));
 
     private bool Splits(ChartFrame frame) =>
-        frame.Definition.HasSecondaryAxis && frame.Definition.Type is ChartType.Line or ChartType.SmoothLine or ChartType.SteppedLine or ChartType.Area;
+        frame.Definition.HasSecondaryAxis && frame.Definition.Type is ChartType.Line or ChartType.SmoothLine or ChartType.SteppedLine or ChartType.Area
+            or ChartType.StackedLine or ChartType.PercentStackedLine or ChartType.StackedArea or ChartType.PercentStackedArea;
+
+    public override bool DrawsReversedCategories => true;
 
     private readonly ChartSeriesStroke _strokes = new();
 
@@ -32,7 +35,11 @@ public sealed class LinePlot : ChartPlotBase
         var stacked = type is ChartType.StackedLine or ChartType.PercentStackedLine
             or ChartType.StackedArea or ChartType.PercentStackedArea;
 
-        return Prepare(frame.Data, stacked, type is ChartType.PercentStackedLine or ChartType.PercentStackedArea);
+        var split = Splits(frame);
+        var sides = Enumerable.Range(0, frame.Data.Series.Count)
+            .Select(series => split && frame.Definition.SeriesFormat(series).SecondaryAxis)
+            .ToList();
+        return Prepare(frame.Data, stacked, type is ChartType.PercentStackedLine or ChartType.PercentStackedArea, sides);
     }
 
     public override void Draw(ChartFrame frame)
@@ -44,7 +51,7 @@ public sealed class LinePlot : ChartPlotBase
 
         var scale = PrimaryScale(frame, data, Splits(frame));
         var secondary = SecondaryScale(frame, data, Splits(frame));
-        var categories = Categories(data, frame.Plot);
+        var categories = Categories(frame, data);
 
         for (var series = data.Series.Count - 1; series >= 0; series--)
         {
@@ -62,7 +69,7 @@ public sealed class LinePlot : ChartPlotBase
         var data = Prepared(frame);
         var scale = PrimaryScale(frame, data, Splits(frame));
         var secondary = SecondaryScale(frame, data, Splits(frame));
-        var categories = Categories(data, frame.Plot);
+        var categories = Categories(frame, data);
         for (var series = 0; series < data.Series.Count; series++)
             for (var index = 0; index < data.Series[series].Values.Count; index++)
                 if (IsPlotted(frame.Data.Series[series], index) && IsPlotted(data.Series[series], index))
@@ -174,35 +181,39 @@ public sealed class LinePlot : ChartPlotBase
         return runs;
     }
 
-    private ChartData Prepare(ChartData data, bool stacked, bool percent)
+    private ChartData Prepare(ChartData data, bool stacked, bool percent, IReadOnlyList<bool> secondary)
     {
         if (!stacked) return data;
 
         var count = data.Series.Count == 0 ? 0 : data.Series.Max(series => series.Values.Count);
 
-        var totals = Enumerable.Range(0, count)
-            .Select(index => data.Series.Sum(series => Math.Abs(Value(series, index))))
-            .ToList();
+        double[] Totals(bool side) =>
+        [
+            .. Enumerable.Range(0, count).Select(index =>
+                data.Series.Where((_, series) => secondary[series] == side).Sum(series => Math.Abs(Value(series, index)))),
+        ];
 
-        var running = new double[count];
-        var series = new List<ChartSeries>();
+        var totals = new[] { Totals(false), Totals(true) };
+        var running = new[] { new double[count], new double[count] };
+        var result = new List<ChartSeries>();
 
-        foreach (var current in data.Series)
+        for (var series = 0; series < data.Series.Count; series++)
         {
+            var side = secondary[series] ? 1 : 0;
             var values = new List<double>(count);
 
             for (var index = 0; index < count; index++)
             {
-                var value = Value(current, index);
-                if (percent) value = totals[index] <= 0 ? 0 : value / totals[index] * 100;
+                var value = Value(data.Series[series], index);
+                if (percent) value = totals[side][index] <= 0 ? 0 : value / totals[side][index] * 100;
 
-                running[index] += value;
-                values.Add(running[index]);
+                running[side][index] += value;
+                values.Add(running[side][index]);
             }
 
-            series.Add(current with { Values = values });
+            result.Add(data.Series[series] with { Values = values });
         }
 
-        return new ChartData(data.Categories, series);
+        return new ChartData(data.Categories, result);
     }
 }

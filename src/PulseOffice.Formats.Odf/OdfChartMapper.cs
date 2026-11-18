@@ -19,6 +19,8 @@ public sealed class OdfChartMapper
     private readonly OdfValues _values = new();
     private readonly SheetChartDocumentBuilder _builder;
     private readonly SheetChartDocumentReader _reader;
+    private readonly InlineChartDocumentBuilder _staticBuilder;
+    private readonly InlineChartDocumentReader _staticReader;
     private readonly AnchoredFrames _frames = new();
     private readonly OdfDrawUnits _draw = new();
     private readonly ISheetPlacement _placement;
@@ -33,6 +35,8 @@ public sealed class OdfChartMapper
         var vocabulary = new OdfChartVocabulary();
         _builder = new SheetChartDocumentBuilder(vocabulary, _units, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
         _reader = new SheetChartDocumentReader(vocabulary, new CellRangeAddresses(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
+        _staticBuilder = new InlineChartDocumentBuilder(vocabulary, _units, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
+        _staticReader = new InlineChartDocumentReader(vocabulary, new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText());
     }
 
     public IReadOnlyList<(string Path, XDocument Content)> Objects => _objects;
@@ -48,8 +52,9 @@ public sealed class OdfChartMapper
             var definition = _errorValues.Refresh(workbook, stored);
 
             var path = $"Object {_objects.Count + 1}";
-            _objects.Add((path, _builder.Build(definition,
-                _data.Extract(workbook, definition), placed.Size)));
+            _objects.Add((path, IsStatic(definition)
+                ? _staticBuilder.Build(definition, definition.InlineData!, placed.Size)
+                : _builder.Build(definition, _data.Extract(workbook, definition), placed.Size)));
 
             if (!frames.TryGetValue(placed.Anchor, out var list)) frames[placed.Anchor] = list = [];
             list.Add(Frame(placed, definition, path, sheet));
@@ -79,7 +84,15 @@ public sealed class OdfChartMapper
                 new XAttribute(Xlink + "type", "simple"),
                 new XAttribute(Xlink + "show", "embed"),
                 new XAttribute(Xlink + "actuate", "onLoad"),
-                new XAttribute(Draw + "notify-on-update-of-ranges", definition.HasSeriesSources ? _sources.Whole(definition) : definition.SourceRange)));
+                IsStatic(definition) ? null : new XAttribute(Draw + "notify-on-update-of-ranges", definition.HasSeriesSources ? _sources.Whole(definition) : definition.SourceRange)));
+
+    private static bool IsStatic(ChartDefinition definition) =>
+        definition.InlineData is not null && !definition.HasSeriesSources && string.IsNullOrEmpty(definition.SourceSheet);
+
+    private static bool Referenced(XElement chart) =>
+        chart.Element(Table + "table") is null
+        || chart.Descendants().SelectMany(element => element.Attributes())
+            .Any(attribute => attribute.Name.LocalName is "values-cell-range-address" or "cell-range-address" && !attribute.Value.StartsWith("local-table", StringComparison.Ordinal));
 
     private PlacedObject? Read(AnchoredFrame anchored, OdfPackage package)
     {
@@ -89,7 +102,7 @@ public sealed class OdfChartMapper
         if (package.ReadXml($"{path}/content.xml")?.Descendants(Chart + "chart").FirstOrDefault() is not { } chart) return null;
 
         var name = (string?)anchored.Frame.Attribute(Draw + "name") ?? path;
-        if (_reader.Read(chart, name) is not { } definition) return null;
+        if ((Referenced(chart) ? _reader.Read(chart, name) : _staticReader.Read(chart, name)) is not { } definition) return null;
 
         return new PlacedObject
         {

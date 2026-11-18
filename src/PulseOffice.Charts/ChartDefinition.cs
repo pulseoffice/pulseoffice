@@ -27,6 +27,13 @@ public sealed record ChartData(IReadOnlyList<string> Categories, IReadOnlyList<C
 
 public sealed record ChartSeriesSource(string? Name, string? Values, string? Categories);
 
+public sealed record ChartPivotSource(string PivotName)
+{
+    public int FormatId { get; init; }
+
+    public bool ShowFieldButtons { get; init; } = true;
+}
+
 public enum LegendPosition { None, Right, Bottom, Top, Left }
 
 public sealed record ChartDefinition : EmbeddedObject
@@ -39,6 +46,10 @@ public sealed record ChartDefinition : EmbeddedObject
     public ChartData? InlineData { get; init; }
 
     public IReadOnlyList<ChartSeriesSource>? SeriesSources { get; init; }
+
+    public ChartPivotSource? PivotSource { get; init; }
+
+    public bool IsPivotChart => PivotSource is not null;
 
     public bool HasSeriesSources => SeriesSources is { Count: > 0 };
 

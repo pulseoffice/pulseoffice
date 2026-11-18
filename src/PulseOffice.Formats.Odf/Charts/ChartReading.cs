@@ -52,7 +52,19 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
             ValueAxis = _scales.Read(verticalStyle, horizontalStyle, numbers),
             SecondaryValueAxis = _scales.Read(secondaryStyle, null, numbers),
             SeriesFormats = formats.Any(format => !format.IsPlain) ? [.. formats.Select(format => format.IsPlain ? null : format)] : null,
+            PivotSource = PivotOf(chart),
         });
+    }
+
+    private ChartPivotSource? PivotOf(XElement chart)
+    {
+        var name = (string?)chart.Attribute(PulseChart + "pivot-source") ?? (string?)chart.Attribute(Loext + "data-pilot-source");
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        return new ChartPivotSource(name)
+        {
+            FormatId = int.TryParse((string?)chart.Attribute(PulseChart + "pivot-format"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var format) && format >= 0 ? format : 0,
+            ShowFieldButtons = (string?)chart.Attribute(PulseChart + "pivot-field-buttons") != "false",
+        };
     }
 
     private IReadOnlyList<string?>? SeriesColors(XElement chart, XElement plot)

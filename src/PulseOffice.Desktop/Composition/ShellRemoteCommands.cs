@@ -25,7 +25,8 @@ public sealed class ShellRemoteCommands(
     IDialogService dialogs,
     IStatusBarService status,
     ITextCatalog texts,
-    IDiagnosticTexts diagnostics)
+    IDiagnosticTexts diagnostics,
+    PulseOffice.Platform.ITemporaryFiles temporary)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -104,8 +105,7 @@ public sealed class ShellRemoteCommands(
                 return;
             }
 
-            var folder = Directory.CreateDirectory(Path.Combine(
-                Path.GetTempPath(), "pulseoffice-remote", Guid.NewGuid().ToString("N")));
+            var folder = new DirectoryInfo(temporary.NewFolder("remote-"));
 
             var name = choice.Path.TrimEnd('/', '\\').Split('/', '\\').LastOrDefault(part => part.Length > 0) ?? string.Empty;
             name = string.Concat(name.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
