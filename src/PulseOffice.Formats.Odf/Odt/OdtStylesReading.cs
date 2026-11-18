@@ -152,7 +152,12 @@ internal sealed class OdtStylesReader(
                 Hidden = (string?)master.Attribute(Pt + "hidden") == "true",
             };
             if ((string?)master.Attribute(Style + "page-layout-name") is { } layoutName && layouts.TryGetValue(layoutName, out var layout))
+            {
                 Layout(page, layout);
+                if (layout.Element(Style + "page-layout-properties")?.Element(Style + "footnote-sep") is { } own
+                    && Separator(own) is var separator && separator != context.Document.Notes.FootnoteSeparator)
+                    page.FootnoteSeparator = separator;
+            }
 
             Region(master, "header", page.Header, page, context, blocks);
             Region(master, "footer", page.Footer, page, context, blocks);

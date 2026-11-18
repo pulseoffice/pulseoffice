@@ -91,7 +91,8 @@ public sealed class ShapeRenderer : IShapeRenderer
         ShapeStyle style,
         Matrix transform,
         string? text,
-        Rect bounds) => Paint(context, outline, style, transform, text, null, bounds, new ShapeSurroundings(), 0, null);
+        Rect bounds) => Paint(context, outline, style, transform, text, null, bounds, new ShapeSurroundings(), 0,
+            new ShapeObject { Id = "preview", Shape = ShapeKind.Rectangle, Style = style, Text = text } is var preview && _listText.Draws(preview) ? preview : null);
 
     private void Paint(
         DrawingContext context,
@@ -158,10 +159,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawListText(DrawingContext context, ShapeObject shape, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var ink = _brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White);
-        var layout = shapeStyle.Text.Layout;
-        bounds = _flow.Box(bounds, layout);
-        using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, shapeStyle.Text.RotationDegrees, shapeRotation))))
-            _listText.Draw(context, shape, bounds, ink, backdrop.Language);
+        _listText.Draw(context, shape with { Style = shapeStyle }, bounds, ink, backdrop.Language, shapeRotation);
     }
 
     private void PaintDimension(DrawingContext context, ShapeObject shape, DimensionLine dimension, Rect bounds, ShapeSurroundings backdrop)
@@ -343,11 +341,9 @@ public sealed class ShapeRenderer : IShapeRenderer
     {
         var style = shapeStyle.Text;
         var layout = style.Layout;
-        var stacked = _flow.Stacks(layout);
         bounds = _flow.Box(bounds, layout);
-        if (stacked) content = _flow.Stacked(content);
         var inset = style.Inset.ToPoints();
-        var columns = stacked ? 1 : Math.Max(1, layout.Columns);
+        var columns = Math.Max(1, layout.Columns);
         var inner = new Rect(bounds.X + inset, bounds.Y + inset, Math.Max(1, bounds.Width - inset * 2), Math.Max(1, bounds.Height - inset * 2));
 
         var typeface = new Typeface(
@@ -371,7 +367,7 @@ public sealed class ShapeRenderer : IShapeRenderer
 
         if (style.Underline)
             text.SetTextDecorations(TextDecorations.Underline);
-        if (runs is { Count: > 0 } && !stacked) Format(text, runs, style);
+        if (runs is { Count: > 0 }) Format(text, runs, style);
 
         using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, style.RotationDegrees, shapeRotation))))
         {
@@ -389,16 +385,6 @@ public sealed class ShapeRenderer : IShapeRenderer
                 TextVerticalPlacement.Bottom => inner.Bottom - text.Height,
                 _ => bounds.Y + (bounds.Height - text.Height) / 2,
             };
-            if (layout.LinesLeftToRight && !stacked)
-            {
-                foreach (var band in _lines.Measure(text, content))
-                {
-                    var top = y + text.Height - band.Bottom;
-                    using (context.PushClip(new Rect(bounds.X, top, bounds.Width, band.Bottom - band.Top)))
-                        context.DrawText(text, new Point(inner.X, top - band.Top));
-                }
-                return;
-            }
             context.DrawText(text, new Point(inner.X, y));
         }
     }

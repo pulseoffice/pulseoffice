@@ -39,6 +39,8 @@ public sealed class SectionBlock(string id, string name, BlockContainer content)
 
     public bool Hidden { get; set; }
 
+    public bool? CollectsEndnotes { get; set; }
+
     public string? Condition { get; set; }
 
     public string? LinkedFile { get; set; }
@@ -57,6 +59,7 @@ public sealed class SectionBlock(string id, string name, BlockContainer content)
         Protected = Protected,
         ProtectionKey = ProtectionKey,
         Hidden = Hidden,
+        CollectsEndnotes = CollectsEndnotes,
         Condition = Condition,
         LinkedFile = LinkedFile,
         Index = index,

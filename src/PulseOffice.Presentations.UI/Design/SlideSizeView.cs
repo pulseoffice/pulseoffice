@@ -18,7 +18,7 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Presentations.UI.Design;
 
-public sealed record SlideSizeResult(SlideSize Size, bool FitContents);
+public sealed record SlideSizeResult(SlideSize Size, bool FitContents, int FirstSlideNumber = 1);
 
 public sealed record SlideSizeServices(ISlideResize Resize, IMeasureUnits Units, IIconCatalog Icons, ITextCatalog Texts, IGalleryNavigator Navigator);
 
@@ -75,11 +75,23 @@ public sealed class SlideSizeView : UserControl, IDialogContent, IDialogFooterOw
     private readonly IconChoiceGroup _orientation;
     private readonly StackPanel _scaling = new() { Spacing = 6 };
     private bool _fit = true;
+    private readonly NumericUpDown _firstNumber;
     private bool _syncing;
 
-    public SlideSizeView(SlideSize current, SlideSizeServices services)
+    public SlideSizeView(SlideSize current, SlideSizeServices services, int firstSlideNumber = 1)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        _firstNumber = new NumericUpDown
+        {
+            Minimum = 0,
+            Maximum = 9999,
+            Increment = 1,
+            FormatString = "0",
+            Value = Math.Clamp(firstSlideNumber, 0, 9999),
+            Width = 120,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        Avalonia.Automation.AutomationProperties.SetName(_firstNumber, Texts["deck.slideSize.firstNumber"]);
         var presets = Enum.GetValues<SlideSizePreset>();
         _gallery = new ThumbnailGallery<SlideSizePreset>(
             [.. presets.Select(preset => new ThumbnailGalleryItem<SlideSizePreset>(preset, Texts[$"deck.slideSize.preset.{Key(preset)}"]))],
@@ -115,6 +127,7 @@ public sealed class SlideSizeView : UserControl, IDialogContent, IDialogFooterOw
         var heightRow = size.Add(Texts["deck.slideSize.heightShort"], _height);
         if (heightRow.Label is { } scrubHeight) _height.AttachScrubber(scrubHeight);
         size.Add(Texts["deck.slideSize.orientation"], _orientation, editorWidth: 260);
+        size.Add(Texts["deck.slideSize.firstNumber"], _firstNumber);
 
         var scaling = new DialogSection(Texts["deck.slideSize.scaling"], _metrics);
         scaling.Add(null, _scaling, DialogRowKind.Wide);
@@ -169,7 +182,11 @@ public sealed class SlideSizeView : UserControl, IDialogContent, IDialogFooterOw
 
     public SlideSize Size => new(Twip.FromCentimeters(_width.Value), Twip.FromCentimeters(_height.Value));
 
-    public SlideSizeResult Result() => new(Size, _fit);
+    public int FirstSlideNumber => (int)Math.Clamp(_firstNumber.Value ?? 1, 0, 9999);
+
+    public NumericUpDown FirstNumberField => _firstNumber;
+
+    public SlideSizeResult Result() => new(Size, _fit, FirstSlideNumber);
 
     public void ChooseScaling(bool fit)
     {

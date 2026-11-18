@@ -76,18 +76,3 @@ internal sealed class PptxMixedTableRuns : IPptxReadLoss
         run?.FontSize?.Value, run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.SolidFill>()?.OuterXml,
         run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.LatinFont>()?.Typeface?.Value);
 }
-
-internal sealed class PptxShapeTextLayout : IPptxReadLoss
-{
-    private readonly PulseOffice.Text.Rich.EastAsianUprightText _upright = new();
-
-    public Diagnostic Loss { get; } = Diagnostic.Warning("PPTX226",
-        "Some shapes have East Asian vertical text: Deck turns its East Asian characters with the line instead of keeping them upright.");
-
-    public bool Present(PresentationPart presentation) =>
-        presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.BodyProperties>().Any(Approximated) == true);
-
-    private bool Approximated(DocumentFormat.OpenXml.Drawing.BodyProperties body) =>
-        body.Vertical?.InnerText == "eaVert"
-        && _upright.Contains(body.Parent?.InnerText);
-}

@@ -44,6 +44,7 @@ public sealed class BlockConverter : SnapshotConverter<Block>
                 Protected = node.Get("protected", false),
                 ProtectionKey = node.Get<byte[]>("protectionKey"),
                 Hidden = node.Get("hidden", false),
+                CollectsEndnotes = node.Get<bool?>("collectsEndnotes"),
                 Condition = node.Get<string>("condition"),
                 LinkedFile = node.Get<string>("linkedFile"),
                 Index = node.Get<PulseOffice.Documents.Indexes.IndexDefinition>("index"),
@@ -67,7 +68,7 @@ public sealed class BlockConverter : SnapshotConverter<Block>
 
         public SnapshotWriter VisitSection(SectionBlock section) =>
             node.Put("block", Section).Put("name", section.Name).Put("content", section.Content).Put("columns", section.Columns)
-                .Put("protected", section.Protected).Put("protectionKey", section.ProtectionKey).Put("hidden", section.Hidden).Put("condition", section.Condition).Put("linkedFile", section.LinkedFile).Put("index", section.Index);
+                .Put("protected", section.Protected).Put("protectionKey", section.ProtectionKey).Put("hidden", section.Hidden).Put("collectsEndnotes", section.CollectsEndnotes).Put("condition", section.Condition).Put("linkedFile", section.LinkedFile).Put("index", section.Index);
     }
 }
 

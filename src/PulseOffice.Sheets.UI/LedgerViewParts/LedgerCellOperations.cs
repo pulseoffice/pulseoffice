@@ -116,7 +116,7 @@ internal sealed class LedgerCellOperations(
             return;
         }
 
-        void Set(CommentBox box)
+        void Set(CommentBox? box)
         {
             if (sheet.Comments.TryGetValue(change.Address, out var comment)) sheet.Comments[change.Address] = comment with { Box = box };
         }

@@ -85,7 +85,7 @@ public sealed class SlideImageRenderer(ISlideRenderer renderer, PulseOffice.UI.C
 
     private void Draw(DrawingContext context, Presentation deck, Slide slide, Rect area, Func<string, ElementVisual>? visuals)
     {
-        var number = deck.IndexOf(slide) + 1;
+        var number = deck.NumberOf(slide);
         var chrome = new HeaderFooterResolver().Resolve(deck.HeaderFooter, slide, number, DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
         renderer.Render(context, slide, deck.Size, area,
             deck.ThemeOf(slide), deck.MasterOf(slide), ExportPalette, visuals, chrome, new SlideFieldsFactory().For(deck, slide));

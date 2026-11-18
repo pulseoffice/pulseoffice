@@ -79,9 +79,10 @@ internal sealed class SheetGridPartsFactory
             dependencies.FormBinding);
 
         var decorations = new CellDecorationPainter(theme, services, dependencies.Sparklines);
+        var icons = new ConditionalIcons();
         var cells = new GridCellPainter(
-            viewport, dependencies.Presenter, dependencies.Conditional, new ConditionalIcons(), options, services, theme,
-            decorations, new CellValuePainter(viewport, services, options));
+            viewport, dependencies.Presenter, dependencies.Conditional, icons, options, services, theme,
+            decorations, new CellValuePainter(viewport, services, options, theme));
         var overlay = new GridOverlayPainter(viewport, selection, options, theme);
         var objectPainter = new GridObjectPainter(
             viewport, theme, objects, renderers, services, options, dependencies.Ordering,
@@ -97,7 +98,7 @@ internal sealed class SheetGridPartsFactory
             viewport, selection, options, surface, notifications, objects, renderers, gestures, drawing, overlay,
             decorations, dependencies.Ordering, dependencies.Manipulator, dependencies.Adjusting, dependencies.Frame,
             dependencies.PathEditing, dependencies.FormInteraction, dependencies.GroupLinks,
-            new GridCellLinkTarget(viewport, dependencies.Presenter, services, options, new CellLinkHitArea()),
+            new GridCellLinkTarget(viewport, dependencies.Presenter, services, options, new CellLinkHitArea(), dependencies.Conditional, icons),
             notes, new CommentBoxDrag());
 
         var keyboard = new GridKeyboardInput(

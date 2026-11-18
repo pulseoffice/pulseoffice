@@ -90,6 +90,9 @@ public sealed class DeckActions
     public void SetPlaceholderBounds(SlideLayout kind, PlaceholderRole role, DocumentRect bounds) =>
         _design.SetPlaceholderBounds(kind, role, bounds);
 
+    public void SetFirstSlideNumber(int number) =>
+        _slides.SetFirstSlideNumber(number);
+
     public void SetSlideSize(SlideSize size, bool fitContents) =>
         _slides.SetSlideSize(size, fitContents);
 

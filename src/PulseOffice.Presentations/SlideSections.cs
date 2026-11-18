@@ -4,6 +4,10 @@ public sealed record DeckSection(string Name, IReadOnlyList<Slide> Slides);
 
 public sealed record SectionMarker(string Name, string? Id);
 
+public sealed record EmptySection(string Name, string? Id, string? BeforeSlideId);
+
+public sealed record OrderedSection(string Name, string? Id, IReadOnlyList<Slide> Slides);
+
 public sealed class SlideSections
 {
     public IReadOnlyList<DeckSection> Group(IReadOnlyList<Slide> slides)
@@ -24,6 +28,28 @@ public sealed class SlideSections
             current?.Add(slide);
         }
 
+        return sections;
+    }
+
+    public IReadOnlyList<OrderedSection> Ordered(Presentation deck)
+    {
+        ArgumentNullException.ThrowIfNull(deck);
+        var sections = new List<OrderedSection>();
+        List<Slide>? current = null;
+        foreach (var slide in deck.Slides)
+        {
+            foreach (var empty in deck.EmptySections.Where(section => section.BeforeSlideId == slide.Id))
+                sections.Add(new OrderedSection(empty.Name, empty.Id, []));
+            if (slide.SectionName is { } name)
+            {
+                current = [];
+                sections.Add(new OrderedSection(name, slide.SectionId, current));
+            }
+            current?.Add(slide);
+        }
+        var ids = deck.Slides.Select(slide => slide.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var empty in deck.EmptySections.Where(section => section.BeforeSlideId is null || !ids.Contains(section.BeforeSlideId)))
+            sections.Add(new OrderedSection(empty.Name, empty.Id, []));
         return sections;
     }
 

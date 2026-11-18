@@ -149,6 +149,7 @@ public sealed class FragmentRemapper(IStoryCatalog stories, IBlockTree tree) : I
                 Protected = section.Protected,
                 ProtectionKey = section.ProtectionKey,
                 Hidden = section.Hidden,
+                CollectsEndnotes = section.CollectsEndnotes,
                 Condition = section.Condition,
                 LinkedFile = section.LinkedFile,
                 Index = section.Index,

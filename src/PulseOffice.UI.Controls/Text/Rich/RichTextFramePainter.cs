@@ -22,6 +22,7 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
 
     private readonly SpellingWaves _waves = new();
     private readonly RunText _runText = new();
+    private readonly UprightGlyphs _upright = new();
 
     public void Paint(RichTextScene scene, RichText text)
     {
@@ -48,6 +49,7 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
                 var origin = composed.Origin(index, segment);
                 PaintHighlights(scene, line, segment, origin);
                 scene.Context.DrawText(segment.Text, origin);
+                _upright.Paint(scene.Context, segment.Text, origin, segment.Start, segment.Upright);
                 if (words is not null) _waves.Paint(scene.Context, segment.Text, origin, line.Offset - segment.Start, Within(words, line.Offset, segment), scene.Scale);
             }
         }

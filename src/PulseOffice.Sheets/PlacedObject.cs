@@ -23,5 +23,7 @@ public sealed record PlacedObject
 
     public string? Hyperlink { get; init; }
 
+    public string? HyperlinkTip { get; init; }
+
     public bool IsSelected { get; init; }
 }

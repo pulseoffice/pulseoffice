@@ -54,6 +54,7 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckMediaFiles, PulseOffice.Presentations.UI.DeckMediaFiles>();
         services.AddSingleton<PulseOffice.Presentations.UI.IShowMediaPlayer, PulseOffice.Presentations.UI.ShowMediaPlayer>();
         services.AddSingleton<PulseOffice.Presentations.UI.IShowMediaSessions, PulseOffice.Presentations.UI.ShowMediaSessions>();
+        services.TryAddSingleton<PulseOffice.UI.Controls.Links.ILinkTips, PulseOffice.UI.Controls.Links.LinkTips>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckCommands>();
         services.AddSingleton<PulseOffice.Text.Rich.IRichTextFormatter, PulseOffice.Text.Rich.RichTextFormatter>();
         services.AddSingleton<PulseOffice.Text.Rich.IRichTextInsertion, PulseOffice.Text.Rich.RichTextInsertion>();

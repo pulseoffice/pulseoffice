@@ -20,6 +20,8 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
     private readonly ICaretWord _words;
     private readonly InlineImeClient _ime;
     private readonly DispatcherTimer _blink;
+    private readonly CaretArrows _arrows = new();
+    private bool _released;
     private bool _caretShown = true;
     private bool _navigating;
     private double? _preferredX;
@@ -117,12 +119,24 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
     public void Update(ComposedTextFrame frame, Rect bounds)
     {
         Frame = frame;
+        _released = false;
         Origin = bounds.TopLeft;
         Width = bounds.Width;
         Height = bounds.Height;
         Box.Width = bounds.Width;
         Box.Height = bounds.Height;
         _ime.CaretMoved();
+        InvalidateVisual();
+    }
+
+    public void Release()
+    {
+        Frame = null;
+        _released = true;
+        Width = double.NaN;
+        Height = double.NaN;
+        Box.Width = double.NaN;
+        Box.Height = double.NaN;
         InvalidateVisual();
     }
 
@@ -153,7 +167,7 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
 
         if (!Box.IsFocused || !_caretShown) return;
         var caret = _geometry.Caret(frame, _positions.Locate(text, Box.CaretIndex));
-        context.FillRectangle(CaretBrush, new Rect(caret.X - 0.75, caret.Y, 1.5, Math.Max(caret.Height, 4)));
+        context.FillRectangle(CaretBrush, _geometry.Bar(caret));
     }
 
     private void PaintPreedit(DrawingContext context, ComposedTextFrame frame, PreeditComposition composition)
@@ -167,11 +181,12 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
             context.DrawLine(pen, new Point(bounds.Left, bounds.Bottom - 1), new Point(bounds.Right, bounds.Bottom - 1));
         }
         var caret = _geometry.Caret(frame, _positions.Locate(composition.Text, composition.Caret));
-        context.FillRectangle(CaretBrush, new Rect(caret.X - 0.75, caret.Y, 1.5, Math.Max(caret.Height, 4)));
+        context.FillRectangle(CaretBrush, _geometry.Bar(caret));
     }
 
     private void OnClientRequested(object? sender, TextInputMethodClientRequestedEventArgs e)
     {
+        if (_released) return;
         if (e.Client is { } client && !ReferenceEquals(client, _ime)) _ime.Wrap(client);
         if (e.Client is not null) e.Client = _ime;
     }
@@ -179,7 +194,7 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
     private void OnBoxKeyDown(object? sender, KeyEventArgs e)
     {
         if (_preedit is not null || Frame is not { } frame) return;
-        if (MoveFor(e) is not { } move) return;
+        if (MoveFor(e, frame) is not { } move) return;
 
         var text = Box.Text ?? string.Empty;
         var rows = _geometry.Rows(frame, position => _positions.Index(text, position));
@@ -200,7 +215,7 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
         e.Handled = true;
     }
 
-    private CaretMove? MoveFor(KeyEventArgs e)
+    private CaretMove? MoveFor(KeyEventArgs e, ComposedTextFrame frame)
     {
         var modifiers = e.KeyModifiers & ~KeyModifiers.Shift;
         if (modifiers == KeyModifiers.Meta)
@@ -211,10 +226,18 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
                 _ => null,
             };
         if (modifiers != KeyModifiers.None) return null;
+        if (Arrow(e.Key) is { } arrow)
+        {
+            if (frame.Stacked || !frame.Placement.IsIdentity) return _arrows.Move(_arrows.InFrame(frame.Placement, arrow), frame.Stacked);
+            return arrow switch
+            {
+                CaretArrow.Up => CaretMove.Up,
+                CaretArrow.Down => CaretMove.Down,
+                _ => null,
+            };
+        }
         return e.Key switch
         {
-            Key.Up => CaretMove.Up,
-            Key.Down => CaretMove.Down,
             Key.Home => CaretMove.RowStart,
             Key.End => CaretMove.RowEnd,
             Key.PageUp => CaretMove.PageUp,
@@ -222,6 +245,15 @@ public sealed class InlineTextEditor : Decorator, IInlineImeSurface
             _ => null,
         };
     }
+
+    private CaretArrow? Arrow(Key key) => key switch
+    {
+        Key.Up => CaretArrow.Up,
+        Key.Down => CaretArrow.Down,
+        Key.Left => CaretArrow.Left,
+        Key.Right => CaretArrow.Right,
+        _ => null,
+    };
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {

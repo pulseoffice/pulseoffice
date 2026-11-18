@@ -15,7 +15,7 @@ public sealed class DeckConnectorCommands(IActiveDeckContext context, IDeckConne
         Connector("deck.connector.curved", ConnectorKind.Curved),
         Prototype("deck.connector.sites") with
         {
-            Surface = CommandSurface.Advanced,
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => SelectedConnector() is not null,

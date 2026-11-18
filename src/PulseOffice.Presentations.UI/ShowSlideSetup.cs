@@ -14,7 +14,7 @@ public sealed class ShowSlideSetup
         canvas.Size = deck.Size;
         canvas.Chrome = slide is null
             ? default
-            : _headerFooter.Resolve(deck.HeaderFooter, slide, deck.IndexOf(slide) + 1, DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
+            : _headerFooter.Resolve(deck.HeaderFooter, slide, deck.NumberOf(slide), DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
         canvas.Fields = _fields.For(deck, slide);
         canvas.Show(slide);
     }

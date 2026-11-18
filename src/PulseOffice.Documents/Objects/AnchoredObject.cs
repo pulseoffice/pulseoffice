@@ -134,6 +134,18 @@ public sealed record ObjectPlacement(Twip X, Twip Y)
     public HorizontalRelation Horizontal { get; init; } = HorizontalRelation.Paragraph;
 
     public VerticalRelation Vertical { get; init; } = VerticalRelation.Paragraph;
+
+    public ObjectAlignment HorizontalAlign { get; init; } = ObjectAlignment.None;
+
+    public ObjectAlignment VerticalAlign { get; init; } = ObjectAlignment.None;
+}
+
+public enum ObjectAlignment
+{
+    None,
+    Start,
+    Center,
+    End,
 }
 
 public readonly record struct ContourPoint(double X, double Y);
@@ -194,6 +206,8 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
 
     public string? Hyperlink { get; set; }
 
+    public string? HyperlinkTip { get; set; }
+
     public AnchoredObject Clone() => CopyAs(Id, Anchor, Content.Clone());
 
     public void Assign(AnchoredObject source)
@@ -214,13 +228,15 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
         FlipHorizontal = source.FlipHorizontal;
         FlipVertical = source.FlipVertical;
         Hyperlink = source.Hyperlink;
+        HyperlinkTip = source.HyperlinkTip;
     }
 
     public bool SameState(AnchoredObject other) =>
         Anchor == other.Anchor && Size == other.Size && Placement == other.Placement && Wrap == other.Wrap && WrapSpacing == other.WrapSpacing
         && StyleName == other.StyleName && Name == other.Name && ZOrder == other.ZOrder && RotationDegrees.Equals(other.RotationDegrees)
         && InBackground == other.InBackground && WrapContour == other.WrapContour && Equals(Contour, other.Contour)
-        && WrapFirstParagraph == other.WrapFirstParagraph && FlipHorizontal == other.FlipHorizontal && FlipVertical == other.FlipVertical && Hyperlink == other.Hyperlink;
+        && WrapFirstParagraph == other.WrapFirstParagraph && FlipHorizontal == other.FlipHorizontal && FlipVertical == other.FlipVertical && Hyperlink == other.Hyperlink
+        && HyperlinkTip == other.HyperlinkTip;
 
     public AnchoredObject CopyAs(string id, ObjectAnchor anchor, AnchoredContent content) => new(id, anchor, content, Size)
     {
@@ -238,6 +254,7 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
         FlipHorizontal = FlipHorizontal,
         FlipVertical = FlipVertical,
         Hyperlink = Hyperlink,
+        HyperlinkTip = HyperlinkTip,
     };
 }
 

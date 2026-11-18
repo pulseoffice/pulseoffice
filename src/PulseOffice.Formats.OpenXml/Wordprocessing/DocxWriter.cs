@@ -52,6 +52,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Info("DOCX119", "DrawingML custom dashes are measured in line widths and have square ends: rounded dashes and dash lengths given in centimetres become relative lengths in DOCX. ODT keeps them.")),
         new(document => DrawingStyles(document).Any(_drawing.LosesArrowSize),
             Diagnostic.Info("DOCX112", "DrawingML arrowheads come in three sizes: other arrow scales become small, medium or large in DOCX. ODT keeps them.")),
+        new(document => document.Objects.All.Any(item => item.Content is PulseOffice.Documents.Objects.EmbeddedContent { Value: PulseOffice.Drawing.Assets.RasterImageObject image }
+                && image.Filter is not (PulseOffice.Drawing.Assets.ImageFilter.None or PulseOffice.Drawing.Assets.ImageFilter.Grayscale)),
+            Diagnostic.Info("DOCX046", "Image filters other than greyscale have no DrawingML equivalent: the original image is written to DOCX and the filter is lost.")),
         new(document => document.Objects.All.Any(item => !drawings.Writes(item)),
             Diagnostic.Warning("DOCX002", "Connectors, linked files, form controls without a Word content control, groups holding charts and 3D scenes are not written to DOCX; they are kept in ODT.")),
         new(document => document.Objects.All.Any(item => drawings.Inline(item) && item.Anchor is not PulseOffice.Documents.Objects.AsCharacterAnchor),
@@ -154,6 +157,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Info("DOCX045", "Word turns different even-page headers on for the whole document: hidden even-page headers and footers of page styles that do not show them are not written to DOCX when another page style shows its own. ODT keeps them.")),
         new(document => !_noteSettings.Expressible(document),
             Diagnostic.Info("DOCX271", "Word numbers notes only with 1, a, A, i or I and never restarts endnotes on each page: other note number formats are written as 1, 2, 3 and endnotes restarting on each page are numbered continuously in DOCX. Word has no notice at the top of a continued note: the backward continuation notice is lost in DOCX. ODT keeps them.")),
+        new(document => UsedPageStyles(document).Any(style => style.FootnoteSeparator is { } own && own != document.Notes.FootnoteSeparator),
+            Diagnostic.Info("DOCX273", "Word has one footnote separator for the whole document: a separator line set on a single page style is written as the document's line in DOCX. ODT keeps it on each page style.")),
         new(document => !document.Notes.ContinuousEndnotes && document.Notes.OfKind(PulseOffice.Documents.Annotations.NoteKind.Endnote).Any(),
             Diagnostic.Info("DOCX115", "Word places endnotes right after the text: endnotes collected on their own pages are written to continue after the last paragraph in DOCX. ODT keeps the setting.")),
         new(document => document.Changes.All.OfType<PulseOffice.Documents.Annotations.Deletion>()

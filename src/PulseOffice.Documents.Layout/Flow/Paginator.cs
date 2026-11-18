@@ -22,6 +22,8 @@ public sealed record PaginationRequest(
 
     public PulseOffice.Documents.Annotations.NoteSeparator Separator { get; init; } = new();
 
+    public Func<string, PulseOffice.Documents.Annotations.NoteSeparator?>? PageSeparator { get; init; }
+
     public bool FootnotesBelowText { get; init; }
 
     public string? ContinuationForward { get; init; }

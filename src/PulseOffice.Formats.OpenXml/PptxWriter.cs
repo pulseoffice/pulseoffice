@@ -106,6 +106,7 @@ public sealed class PptxWriter : IPresentationWriter
 
         var part = document.AddPresentationPart();
         part.Presentation = new P.Presentation();
+        if (deck.FirstSlideNumber != 1) part.Presentation.FirstSlideNum = deck.FirstSlideNumber;
         part.Presentation.AddNamespaceDeclaration("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
 
         var session = new PptxWriteSession(document, part, deck);

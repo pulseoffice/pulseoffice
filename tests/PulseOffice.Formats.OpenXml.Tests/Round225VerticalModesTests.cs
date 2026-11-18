@@ -50,17 +50,17 @@ public sealed class Round225VerticalModesTests
     }
 
     [Fact]
-    public void Only_East_Asian_characters_in_East_Asian_vertical_text_are_declared()
+    public void East_Asian_vertical_text_is_no_longer_declared()
     {
         using var pptx = new MemoryStream();
         Assert.True(new PptxWriter().Write(Deck(TextFlow.EastAsianVertical, "縦書き"), pptx).Succeeded);
         pptx.Position = 0;
-        Assert.Contains(new PptxReader(_themes, _masters).Read(pptx).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
+        Assert.DoesNotContain(new PptxReader(_themes, _masters).Read(pptx).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
 
         using var odp = new MemoryStream();
         Assert.True(new OdpWriter().Write(Deck(TextFlow.EastAsianVertical, "縦書き"), odp).Succeeded);
         odp.Position = 0;
-        Assert.Contains(new OdpReader(_themes, _masters).Read(odp).Diagnostics, diagnostic => diagnostic.Code == "ODP217");
+        Assert.DoesNotContain(new OdpReader(_themes, _masters).Read(odp).Diagnostics, diagnostic => diagnostic.Code == "ODP217");
     }
 
     [Fact]

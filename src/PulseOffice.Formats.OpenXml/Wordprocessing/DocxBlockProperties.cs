@@ -125,6 +125,7 @@ public sealed class DocxBlockProperties(DocxCustomXmlParts parts, DocxListHeader
         if (section.Protected) entry.Add(new XAttribute("protected", "true"));
         if (section.ProtectionKey is { Length: > 0 } key) entry.Add(new XAttribute("key", Convert.ToBase64String(key)));
         if (section.Hidden) entry.Add(new XAttribute("hidden", "true"));
+        if (section.CollectsEndnotes is { } collects) entry.Add(new XAttribute("endnotes", collects ? "collect" : "keep"));
         if (section.Condition is { } condition) entry.Add(new XAttribute("condition", condition));
         if (section.LinkedFile is { } link) entry.Add(new XAttribute("link", link));
         Mark(first, last, entry, writing);
@@ -186,6 +187,7 @@ public sealed class DocxBlockProperties(DocxCustomXmlParts parts, DocxListHeader
         section.Protected = entry.Attribute("protected")?.Value == "true";
         section.ProtectionKey = Key(entry.Attribute("key")?.Value);
         section.Hidden = entry.Attribute("hidden")?.Value == "true";
+        section.CollectsEndnotes = entry.Attribute("endnotes")?.Value switch { "collect" => true, "keep" => false, _ => null };
         section.Condition = entry.Attribute("condition")?.Value;
         section.LinkedFile = entry.Attribute("link")?.Value;
     }

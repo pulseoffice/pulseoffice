@@ -82,6 +82,12 @@ public sealed class Presentation : PulseOffice.Security.IMacroSignatureHolder, P
 
     public ShowSetup Setup { get; set; } = new();
 
+    public List<EmptySection> EmptySections { get; } = [];
+
+    public int FirstSlideNumber { get; set; } = 1;
+
+    public int NumberOf(Slide slide) => Math.Max(IndexOf(slide), 0) + FirstSlideNumber;
+
     public string? FileName { get; set; }
 
     public HeaderFooterSettings HeaderFooter { get; set; } = new();

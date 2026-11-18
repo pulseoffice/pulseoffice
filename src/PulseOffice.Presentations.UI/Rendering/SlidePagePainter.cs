@@ -41,7 +41,7 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
     private void Paint(Presentation deck, Slide slide, IPageCanvas canvas, DocumentRect area)
     {
         var target = new Rect(area.Left.ToPoints(), area.Top.ToPoints(), area.Width.ToPoints(), area.Height.ToPoints());
-        var number = deck.IndexOf(slide) + 1;
+        var number = deck.NumberOf(slide);
         var chrome = new HeaderFooterResolver().Resolve(deck.HeaderFooter, slide, number, DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
         var layers = renderer.Layers(slide, deck.Size, target, deck.ThemeOf(slide), deck.MasterOf(slide), _palette,
             null, chrome, new SlideFieldsFactory().For(deck, slide));

@@ -34,26 +34,55 @@ internal abstract class PresentationXmlReader : IPptxPresentationPartReader
     protected abstract void Read(XElement root, Presentation deck, SlideIndex index);
 }
 
+internal sealed class PptxLeadingSection
+{
+    public const string Id = "3A5F0C2E-8B1D-4E6A-9C7B-231D0DEF5EC7";
+
+    public bool Is(string? id) => id is not null && Guid.TryParse(id, out var read) && read == Guid.Parse(Id);
+}
+
 internal sealed class SectionReader : PresentationXmlReader
 {
     private static readonly XNamespace P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 
+    private readonly PptxLeadingSection _leading = new();
+
     protected override void Read(XElement root, Presentation deck, SlideIndex index)
     {
-        foreach (var section in root.Descendants(P14 + "section"))
+        var pending = new List<(string Name, string? Id)>();
+        var sections = root.Descendants(P14 + "section").ToList();
+        for (var ordinal = 0; ordinal < sections.Count; ordinal++)
         {
-            if ((string?)section.Attribute("name") is not { Length: > 0 } name) continue;
-
+            var section = sections[ordinal];
+            var name = (string?)section.Attribute("name") ?? string.Empty;
+            var id = (string?)section.Attribute("id") is { } raw && Guid.TryParse(raw, out _) ? raw : null;
             var first = section.Descendants(P14 + "sldId")
                 .Select(e => (string?)e.Attribute("id"))
-                .FirstOrDefault(id => id is not null && index.ByNumber.ContainsKey(id));
+                .FirstOrDefault(number => number is not null && index.ByNumber.ContainsKey(number));
+            var slide = first is null ? null : deck.Slides.FirstOrDefault(s => s.Id == index.ByNumber[first]);
 
-            if (first is not null && deck.Slides.FirstOrDefault(s => s.Id == index.ByNumber[first]) is { } slide)
+            if (slide is null)
             {
-                slide.SectionName = name;
-                slide.SectionId = (string?)section.Attribute("id") is { } id && Guid.TryParse(id, out _) ? id : null;
+                if (name.Length > 0) pending.Add((name, id));
+                continue;
             }
+
+            foreach (var empty in pending) deck.EmptySections.Add(new EmptySection(empty.Name, empty.Id, slide.Id));
+            pending.Clear();
+            if (ordinal == 0 && _leading.Is(id)) continue;
+            if (name.Length == 0) continue;
+            slide.SectionName = name;
+            slide.SectionId = id;
         }
+        foreach (var empty in pending) deck.EmptySections.Add(new EmptySection(empty.Name, empty.Id, null));
+    }
+}
+
+internal sealed class FirstSlideNumberReader : IPptxPresentationPartReader
+{
+    public void Read(PresentationPart part, Presentation deck, SlideIndex index)
+    {
+        if (part.Presentation?.FirstSlideNum?.Value is { } first) deck.FirstSlideNumber = Math.Clamp(first, 0, 9999);
     }
 }
 

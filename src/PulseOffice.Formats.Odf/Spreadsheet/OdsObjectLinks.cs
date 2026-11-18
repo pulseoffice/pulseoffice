@@ -4,9 +4,11 @@ using Namespaces = PulseOffice.Formats.Packaging.OdfPackage.Namespaces;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed class OdsObjectLinkTable(IReadOnlyDictionary<string, string> links)
+internal sealed class OdsObjectLinkTable(IReadOnlyDictionary<string, string> links, IReadOnlyDictionary<string, string> tips)
 {
     public IReadOnlyDictionary<string, string> Links => links;
+
+    public IReadOnlyDictionary<string, string> Tips => tips;
 }
 
 internal sealed class OdsObjectLinks
@@ -14,6 +16,7 @@ internal sealed class OdsObjectLinks
     private readonly XName _anchor = Namespaces.Draw + "a";
     private readonly XName _name = Namespaces.Draw + "name";
     private readonly XName _href = Namespaces.Xlink + "href";
+    private readonly XName _title = Namespaces.Office + "title";
     private readonly HashSet<XName> _holders = [Namespaces.Table + "table-cell", Namespaces.Table + "covered-table-cell", Namespaces.Table + "shapes"];
     private readonly HashSet<XName> _linkedText =
     [
@@ -28,7 +31,7 @@ internal sealed class OdsObjectLinks
         content.Descendants(Namespaces.Table + "table").Descendants()
             .Any(element => element.Name.Namespace == Namespaces.Draw && element.Name != _anchor && !_linkedText.Contains(element.Name) && element.Elements(Namespaces.Text + "p").Descendants(Namespaces.Text + "a").Any());
 
-    public void Wrap(XElement container, IReadOnlyDictionary<string, string> links)
+    public void Wrap(XElement container, IReadOnlyDictionary<string, string> links, IReadOnlyDictionary<string, string> tips)
     {
         if (links.Count == 0) return;
         foreach (var shape in container.Descendants().Where(element => element.Parent is { } parent && _holders.Contains(parent.Name)).ToList())
@@ -37,6 +40,7 @@ internal sealed class OdsObjectLinks
             var anchor = new XElement(_anchor,
                 new XAttribute(Namespaces.Xlink + "type", "simple"),
                 new XAttribute(_href, target));
+            if (tips.TryGetValue(name, out var tip)) anchor.SetAttributeValue(_title, tip);
             shape.ReplaceWith(anchor);
             anchor.Add(shape);
         }
@@ -45,10 +49,12 @@ internal sealed class OdsObjectLinks
     public void Unwrap(XElement table)
     {
         var links = new Dictionary<string, string>(StringComparer.Ordinal);
+        var tips = new Dictionary<string, string>(StringComparer.Ordinal);
         var unnamed = 0;
         foreach (var anchor in table.Descendants(_anchor).Where(anchor => anchor.Parent is { } parent && _holders.Contains(parent.Name)).ToList())
         {
             var href = (string?)anchor.Attribute(_href);
+            var title = (string?)anchor.Attribute(_title);
             var shapes = anchor.Elements().Where(element => element.Name.Namespace == Namespaces.Draw).ToList();
             foreach (var shape in shapes)
             {
@@ -59,10 +65,11 @@ internal sealed class OdsObjectLinks
                     shape.SetAttributeValue(_name, name);
                 }
                 links.TryAdd(name, href);
+                if (title is { Length: > 0 }) tips.TryAdd(name, title);
             }
             anchor.ReplaceWith(anchor.Nodes());
         }
-        table.AddAnnotation(new OdsObjectLinkTable(links));
+        table.AddAnnotation(new OdsObjectLinkTable(links, tips));
     }
 
     public void Apply(XElement table, Worksheet sheet)
@@ -70,7 +77,7 @@ internal sealed class OdsObjectLinks
         if (table.Annotation<OdsObjectLinkTable>() is not { Links.Count: > 0 } found) return;
         for (var index = 0; index < sheet.Objects.Count; index++)
             if (found.Links.TryGetValue(sheet.Objects[index].Id, out var link))
-                sheet.Objects[index] = sheet.Objects[index] with { Hyperlink = link };
+                sheet.Objects[index] = sheet.Objects[index] with { Hyperlink = link, HyperlinkTip = found.Tips.GetValueOrDefault(sheet.Objects[index].Id) };
     }
 }
 

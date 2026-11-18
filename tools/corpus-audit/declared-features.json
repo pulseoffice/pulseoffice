@@ -5,6 +5,7 @@
   "DOCX039": [],
   "DOCX040": [],
   "DOCX045": ["*"],
+  "DOCX046": ["images"],
   "DOCX102": ["shapes", "images", "frames", "groups", "charts"],
   "DOCX113": ["comments"],
   "DOCX117": ["revisions", "fields"],

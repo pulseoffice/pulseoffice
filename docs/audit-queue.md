@@ -9,30 +9,33 @@ the round that fixes it is joined and the join run is green.
 - Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
   reference suite have not opened such a file here. (194)
 - The built-in media player has not run live on any system (Windows and macOS cannot be tested here). (193)
-- East Asian vertical text keeps its East Asian characters turned with the line instead of upright (PPTX226, ODP217,
-  declared only when such characters are present); Mongolian lines are mirrored in single-column shape text and text
-  boxes but not inside shape text columns; right-to-left stacked text is mirrored in text boxes only. Not seen live. (225)
-- Stacked shape text is edited in the plain overlay text box, whose caret does not follow the stacked glyphs; up and
-  down keys in stacked text boxes move one character; up and down keys in Mongolian text boxes follow the stored line
-  order, not the mirrored one. Shape text column breaks are probed per character on the composed text, which costs a
-  geometry per character for long texts. (218, 225)
+- Upright East Asian glyphs are centred in the advance of their cluster in the line, which is narrower than the line
+  height, so neighbouring upright glyphs can overlap slightly; vertical punctuation forms are not substituted. Mongolian
+  lines are not mirrored inside shape or text box columns, and list labels of mirrored Mongolian paragraphs stay at the
+  paragraph top. None of the East Asian, stacked or Mongolian modes has been seen live. (225, 230)
+- Shape text in vertical, 270-degree and upright flows (other than stacked) is still edited in the turned overlay text
+  box; arrow keys in turned text boxes now follow the drawn directions but Folio has no shape text flows. Shape text
+  column breaks are probed per character on the composed text, which costs a geometry per character for long texts.
+  (218, 230)
 - ODF has no form for upright text or text box rotation: they keep our `urn:pulseoffice:shape-text` extension; the
   270-degree flow is now written as the extension writing mode `bt-lr` beside `tb-rl`, not yet opened in another
   application. Shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
   standard `draw:text-rotate-angle`; its sign has not been checked against another application. (214, 227)
 - Connector glue output (`p:cxnSp`, `draw:connector`, the automatic-end extension) has not been opened in PowerPoint,
   Excel or the reference suite here. (213, 214)
-- Deck's Connector Ends command (shared `ConnectorSitesDialog`) is on the Advanced surface only, not in the slide
-  context menu; neither module's dialog has been seen live. (225, 227)
-- Deleting a title line in the Deck outline shifts the following texts up one slide instead of merging the two
-  slides; lines cannot move slides and the outline does not delete slides. Outline edits keep paragraph formatting
-  only through the text splice, and titles with several paragraphs are shown joined on one line. (229)
-- Empty sections are lost: the model marks a section on its first slide, so `p14:section` elements without slides
-  and sections whose slides are all deleted do not survive. Slides before the first section are written to PPTX in a
-  leading "Default Section", which reads back as a named section. Neither has been opened in PowerPoint here. (229)
-- Deck has no "number slides from" setting: `p:presentation/@firstSlideNum` and ODP page number offsets are not read
-  or written. (229)
-
+- Deck's Connector Ends dialog (shared `ConnectorSitesDialog`) has not been seen live; it is now also in the slide
+  object context menu. (225, 227, 231)
+- Outline edits keep paragraph formatting only through the text splice, and titles with several paragraphs are shown
+  joined on one line. Slides are matched to outline lines by title, so two slides with the same title whose blocks
+  are swapped by hand may keep their old order.
+  (229, 231)
+- Empty sections are kept in the model, PPTX and ODP, but the filmstrip and sorter do not show them, so they cannot
+  be renamed or removed in the app; moving a slide that an empty section precedes moves the empty section with it.
+  The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
+  as no section. ODP empty sections are `urn:pulseoffice:presentation-section` elements inside `draw:page`. None of
+  this has been opened in PowerPoint or the reference suite here. (229, 231)
+- "Number slides from" 0 is written to ODP only as our extension attribute (`style:first-page-number` takes positive
+  integers); slide number fields do not write `text:page-adjust`. Not opened in another application. (231)
 ## Charts
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
@@ -49,12 +52,19 @@ the round that fixes it is joined and the join run is green.
   value), inside tables, frames, notes and comments, on a paragraph that defers a page style change, and any restart
   when numbering restarts on every page (DOCX248). Not yet opened in Word. (204, 209, reviewed again in 212: the remaining cases have no Word
   section form)
-- Folio notes: "section end" placement collects at the end of each top-level text section (ODT `text:section`), not of
-  each Word section (page style run); endnote collection is one setting for the whole document, while ODT can set it per
-  section; the separator line is one document setting, while ODT stores it per page layout; continuation notices are not
-  selectable text and use the footnote paragraph style. (223)
+- Folio notes: continuation notices are not selectable text and use the footnote paragraph style (223). A page style run
+  starts only at a top-level paragraph with a page style (not at a table); Word has one footnote separator per document,
+  so a page style's own line is declared (DOCX273); none of this has been opened in Word or the reference suite. (232)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
+- Folio object positions: the vertical "margin" relation means the paragraph area in ODT (`paragraph-content`), the
+  top margin in DOCX (`topMargin`) and the text area in the layout; the three need one meaning. DOCX reads the column
+  relation back as paragraph. The position dialog does not offer the new aligned positions (left, centre, right, top,
+  middle, bottom), which come only from files; ODF `inside`/`outside` and Word mirrored-page alignment are read as
+  offsets. Aligned positions relative to the paragraph or line can only be aligned at the top. (233)
+- Deck reads and writes the ODP `fo:clip` of cropped images against the frame size, as Folio did before round 233; it
+  should share the original-image measure of `OdtImageClip`. The same image inserted twice is stored twice in ODT and
+  DOCX. (233)
 
 
 ## Shell and formats
@@ -69,14 +79,12 @@ the round that fixes it is joined and the join run is green.
   is not announced, only drawn as the placeholder. (220)
 - XLSX table-reference rule forms are matched by priority and ordinal within range and priority, then by range and
   flat formula; a rule Excel renumbered and edited keeps the flat form (by design). Not opened in Excel. (220)
-- Round 228 (Ledger notes and links), open: the plain click on a cell link measures the text with the cell font but
-  ignores conditional-format icons and overflow into neighbours; no hand cursor over link text. Dragging a note has no
-  move/resize cursor, keeps `CommentBox.Default` as the undo state of a note that had no box, and is refused only as a
-  whole on a protected sheet. Mentions are detected only for people already in the workbook; there is no mention
-  picker. The annotated range is highlighted in the cell editor only (not in the grid) and is not adjusted when the cell
-  text is edited. Printed comment wrapping estimates widths (0.55 em per character) instead of measuring. Folio object
-  links (anchored objects) and Ledger object links still have no ScreenTip, and Folio and Deck do not show the tip on
-  hover. Not opened in Excel, Word, PowerPoint or the reference suite. (228)
+- Round 232 (Ledger links and notes), open: dragging a note is refused as a whole on a protected sheet; the mention
+  picker is in the review panel only, not in the cell note editor; the grid highlight of an annotated range is drawn only
+  when the shown text equals the cell value (not for formatted numbers); the Ledger grid keeps its own tooltip code
+  beside the shared `ILinkTips`; Folio hover tips use the nearest text position, Deck shows tips on hover only during
+  the show (object click actions), not in the editor nor for text run links; group member links have no tip. Not
+  opened in Excel, Word, PowerPoint or the reference suite. (232)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over

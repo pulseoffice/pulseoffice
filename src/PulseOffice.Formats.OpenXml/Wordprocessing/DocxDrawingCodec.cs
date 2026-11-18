@@ -90,9 +90,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
     {
         if (((EmbeddedContent)item.Content).Value is VectorGraphicObject vector) return Vector(item, vector, context);
         var image = (RasterImageObject)((EmbeddedContent)item.Content).Value;
-        var part = context.AddImage(types.PartOf(image.MediaType));
-        using (var stream = part.GetStream(FileMode.Create)) stream.Write(image.Data.Span);
-        var blip = new A.Blip { Embed = context.Part.GetIdOfPart(part) };
+        var blip = Blip(image, context);
         if (image.Filter == ImageFilter.Grayscale) blip.Append(new A.Grayscale());
         _duotones.Write(blip, image.Duotone);
         var fill = new PIC.BlipFill(blip);
@@ -106,6 +104,34 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
             fill,
             new PIC.ShapeProperties(Transform(item), new A.PresetGeometry(new A.AdjustValueList()) { Preset = A.ShapeTypeValues.Rectangle }));
     }
+
+    private A.Blip Blip(RasterImageObject image, DocxWriteContext context)
+    {
+        if (image.LinkPath is { Length: > 0 } linked)
+            return new A.Blip { Link = context.Part.AddExternalRelationship(ImageRelationship, _targets.Of(_links.ToHref(linked))).Id };
+        var part = context.AddImage(types.PartOf(image.MediaType));
+        using (var stream = part.GetStream(FileMode.Create)) stream.Write(image.Data.Span);
+        return new A.Blip { Embed = context.Part.GetIdOfPart(part) };
+    }
+
+    private RasterImageObject? Linked(A.Blip? blip, DocxReadContext context, string id) =>
+        blip?.Link?.Value is { } link && _externals.Of(context.Part, link) is { } external
+        && _links.ToPath(external.Uri.OriginalString) is { Length: > 0 } path
+            ? new RasterImageObject
+            {
+                Id = id,
+                Data = ReadOnlyMemory<byte>.Empty,
+                MediaType = types.MediaTypeOf(path),
+                LinkPath = path,
+                Filter = blip.GetFirstChild<A.Grayscale>() is not null ? ImageFilter.Grayscale : ImageFilter.None,
+                Duotone = _duotones.Read(blip),
+            }
+            : null;
+
+    private const string ImageRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+    private readonly LinkedFiles _links = new();
+    private readonly ExternalTargetUris _targets = new();
+    private readonly ExternalRelationshipIndex _externals = new();
 
     private PIC.Picture Vector(AnchoredObject item, VectorGraphicObject vector, DocxWriteContext context)
     {
@@ -137,13 +163,21 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
                 FlipVertical = transform?.VerticalFlip?.Value ?? false,
             };
         }
-        if (blip?.Embed?.Value is not { } embed || !context.Part.TryGetPartById(embed, out var found) || found is not ImagePart part) return null;
-        using var stream = part.GetStream();
-        using var buffer = new MemoryStream();
-        stream.CopyTo(buffer);
         var crop = picture.BlipFill?.SourceRectangle is { } source
             ? (Fraction(source.Left), Fraction(source.Top), Fraction(source.Right), Fraction(source.Bottom))
             : default;
+        if (blip?.Embed?.Value is not { } embed || !context.Part.TryGetPartById(embed, out var found) || found is not ImagePart part)
+            return Linked(blip, context, id) is { } linkedImage
+                ? new DocxGraphic(new EmbeddedContent(linkedImage with { Crop = crop }), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } linkedName ? linkedName : null, null,
+                    Rotation(picture.ShapeProperties?.Transform2D))
+                {
+                    FlipHorizontal = picture.ShapeProperties?.Transform2D?.HorizontalFlip?.Value ?? false,
+                    FlipVertical = picture.ShapeProperties?.Transform2D?.VerticalFlip?.Value ?? false,
+                }
+                : null;
+        using var stream = part.GetStream();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
         var bytes = buffer.ToArray();
         var pixels = header.Size(bytes);
         var image = new RasterImageObject
@@ -590,6 +624,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
 
     private readonly IReadOnlyList<DocxGraphicCodec> _codecs = [.. codecs];
 
+    private readonly DocxObjectAlignments _alignments = new();
+
     private readonly IReadOnlyList<(HorizontalRelation Relation, DW.HorizontalRelativePositionValues Word)> _horizontal =
     [
         (HorizontalRelation.Paragraph, DW.HorizontalRelativePositionValues.Column),
@@ -625,7 +661,12 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         var properties = new DW.DocProperties { Id = id, Name = item.Name ?? "Object " + values.Text((int)id) };
         if (item.Content is EmbeddedContent { Value.Description: { } description }) properties.Description = description;
         if (item.Content is EmbeddedContent { Value.Title: { } title }) properties.Title = title;
-        if (item.Hyperlink is { Length: > 0 } link) properties.Append(new A.HyperlinkOnClick { Id = context.Link(link) });
+        if (item.Hyperlink is { Length: > 0 } link)
+        {
+            var click = new A.HyperlinkOnClick { Id = context.Link(link) };
+            if (item.HyperlinkTip is { Length: > 0 } tip) click.Tooltip = tip;
+            properties.Append(click);
+        }
         if (item.Anchor is PageAnchor or ParagraphAnchor || item.WrapFirstParagraph && item.Anchor is not AsCharacterAnchor) properties.Append(Marker(item.Anchor, item.WrapFirstParagraph));
         var extent = new DW.Extent { Cx = item.Size.Width.Value * PulseOffice.Foundation.Units.Emu.PerTwip, Cy = item.Size.Height.Value * PulseOffice.Foundation.Units.Emu.PerTwip };
         var spacing = item.WrapSpacing;
@@ -641,8 +682,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         var vertical = _vertical.First(pair => pair.Relation == item.Placement.Vertical).Word;
         var anchor = new DW.Anchor(
             new DW.SimplePosition { X = 0, Y = 0 },
-            new DW.HorizontalPosition(new DW.PositionOffset(values.Text((int)Emu(item.Placement.X)))) { RelativeFrom = horizontal },
-            new DW.VerticalPosition(new DW.PositionOffset(values.Text((int)Emu(item.Placement.Y)))) { RelativeFrom = vertical },
+            new DW.HorizontalPosition(_alignments.Horizontal(item.Placement.HorizontalAlign) is { } across ? new DW.HorizontalAlignment(across) : (OpenXmlElement)new DW.PositionOffset(values.Text((int)Emu(item.Placement.X)))) { RelativeFrom = horizontal },
+            new DW.VerticalPosition(_alignments.Vertical(item.Placement.VerticalAlign) is { } down ? new DW.VerticalAlignment(down) : (OpenXmlElement)new DW.PositionOffset(values.Text((int)Emu(item.Placement.Y)))) { RelativeFrom = vertical },
             extent,
             new DW.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 },
             Wrap(item),
@@ -705,6 +746,7 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
             FlipVertical = turned ? !graphic.FlipVertical : graphic.FlipVertical,
             WrapSpacing = new Margins(Length(Distance(source, "distL")), Length(Distance(source, "distT")), Length(Distance(source, "distR")), Length(Distance(source, "distB"))),
             Hyperlink = properties?.GetFirstChild<A.HyperlinkOnClick>()?.Id?.Value is { Length: > 0 } relationship ? context.Link(relationship) : null,
+            HyperlinkTip = properties?.GetFirstChild<A.HyperlinkOnClick>()?.Tooltip?.Value is { Length: > 0 } tooltip ? tooltip : null,
         };
         if (anchor is not null)
         {
@@ -716,6 +758,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
             {
                 Horizontal = _horizontal.FirstOrDefault(pair => pair.Word == horizontal?.RelativeFrom?.Value, (HorizontalRelation.Paragraph, default)).Relation,
                 Vertical = _vertical.FirstOrDefault(pair => pair.Word == vertical?.RelativeFrom?.Value, (VerticalRelation.Paragraph, default)).Relation,
+                HorizontalAlign = _alignments.Horizontal(horizontal?.HorizontalAlignment?.Text),
+                VerticalAlign = _alignments.Vertical(vertical?.VerticalAlignment?.Text),
             };
             item.InBackground = anchor.BehindDoc?.Value ?? false;
             item.ZOrder = (int)((anchor.RelativeHeight?.Value ?? 1024) / 1024) - 1;

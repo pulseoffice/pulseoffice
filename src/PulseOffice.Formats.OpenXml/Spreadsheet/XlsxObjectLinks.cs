@@ -16,15 +16,17 @@ public sealed class XlsxObjectLinks
         ArgumentNullException.ThrowIfNull(objects);
         var links = objects.Where(placed => placed.Hyperlink is { Length: > 0 })
             .GroupBy(placed => placed.Id, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First().Hyperlink!, StringComparer.Ordinal);
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         if (links.Count == 0) return;
         foreach (var properties in Properties(part))
         {
-            if (properties.Name?.Value is not { } name || !links.TryGetValue(name, out var target)
-                || !Uri.TryCreate(target, UriKind.RelativeOrAbsolute, out var uri))
+            if (properties.Name?.Value is not { } name || !links.TryGetValue(name, out var placed)
+                || !Uri.TryCreate(placed.Hyperlink, UriKind.RelativeOrAbsolute, out var uri))
                 continue;
             properties.RemoveAllChildren<A.HyperlinkOnClick>();
-            properties.PrependChild(new A.HyperlinkOnClick { Id = part.AddHyperlinkRelationship(uri, true).Id });
+            var click = new A.HyperlinkOnClick { Id = part.AddHyperlinkRelationship(uri, true).Id };
+            if (placed.HyperlinkTip is { Length: > 0 } tip) click.Tooltip = tip;
+            properties.PrependChild(click);
         }
     }
 
@@ -38,6 +40,16 @@ public sealed class XlsxObjectLinks
                 && _targets.Of(part, relationship) is { Length: > 0 } target)
                 links.TryAdd(name, target);
         return links;
+    }
+
+    public IReadOnlyDictionary<string, string> ReadTips(DrawingsPart? part)
+    {
+        var tips = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (part is null) return tips;
+        foreach (var properties in Properties(part))
+            if (properties.Name?.Value is { } name && properties.GetFirstChild<A.HyperlinkOnClick>()?.Tooltip?.Value is { Length: > 0 } tip)
+                tips.TryAdd(name, tip);
+        return tips;
     }
 
     private IEnumerable<Xdr.NonVisualDrawingProperties> Properties(DrawingsPart part) =>

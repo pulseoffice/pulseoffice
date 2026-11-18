@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using Avalonia;
 using PulseOffice.Text.Rich;
 
@@ -8,8 +6,6 @@ namespace PulseOffice.UI.Controls.Text.Rich;
 public interface ITextFlowFrame
 {
     Rect Box(Rect bounds, TextLayout layout);
-
-    string Stacked(string content);
 
     bool Stacks(TextLayout layout);
 
@@ -47,19 +43,5 @@ public sealed class TextFlowFrame : ITextFlowFrame
         return Matrix.CreateTranslation(-centre.X, -centre.Y)
             * Matrix.CreateRotation(degrees * Math.PI / 180)
             * Matrix.CreateTranslation(centre.X, centre.Y);
-    }
-
-    public string Stacked(string content)
-    {
-        ArgumentNullException.ThrowIfNull(content);
-        var stacked = new StringBuilder(content.Length * 2);
-        var elements = StringInfo.GetTextElementEnumerator(content);
-        while (elements.MoveNext())
-        {
-            var element = elements.GetTextElement();
-            if (stacked.Length > 0 && stacked[^1] != '\n' && element != "\n") stacked.Append('\n');
-            stacked.Append(element);
-        }
-        return stacked.ToString();
     }
 }

@@ -10,7 +10,11 @@ public interface IShapeListText
 {
     bool Draws(ShapeObject shape);
 
-    void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null);
+    void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0);
+
+    RichText Framed(ShapeObject shape, double shapeRotation);
+
+    ITextTheme Theme(ShapeObject shape, Color ink);
 }
 
 public sealed record ShapeTextTheme(uint Ink, string Family) : ITextTheme
@@ -30,11 +34,29 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
     {
     }
 
-    public bool Draws(ShapeObject shape) => lists.Listed(shape) || lists.Directed(shape);
+    private readonly TextFlowFrame _flow = new();
 
-    public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null)
+    public bool Draws(ShapeObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return lists.Listed(shape) || lists.Directed(shape) || Composed(shape.Style.Text.Layout);
+    }
+
+    public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(shape);
+        painter.Paint(new RichTextScene(context, bounds, PointScale, Theme(shape, ink), new TextFields(0, DateTime.Now, Language: language)), Framed(shape, shapeRotation));
+    }
+
+    public ITextTheme Theme(ShapeObject shape, Color ink)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return new ShapeTextTheme(ink.ToUInt32(), shape.Style.Text.Family);
+    }
+
+    public RichText Framed(ShapeObject shape, double shapeRotation)
+    {
         ArgumentNullException.ThrowIfNull(shape);
         var style = shape.Style.Text;
         var align = style.Horizontal switch
@@ -59,8 +81,13 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
                 },
                 Insets = new TextInsets(inset, inset, inset, inset),
                 WordWrap = style.Wrap,
+                Layout = style.Layout,
+                RotationDegrees = style.Layout.Upright ? style.RotationDegrees : style.RotationDegrees + shapeRotation,
             },
         };
-        painter.Paint(new RichTextScene(context, bounds, PointScale, new ShapeTextTheme(ink.ToUInt32(), style.Family), new TextFields(0, DateTime.Now, Language: language)), framed);
+        return framed;
     }
+
+    private bool Composed(TextLayout layout) =>
+        layout.Flow is TextFlow.EastAsianVertical or TextFlow.MongolianVertical || _flow.Stacks(layout);
 }

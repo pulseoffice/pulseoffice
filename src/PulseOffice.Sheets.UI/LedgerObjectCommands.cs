@@ -88,20 +88,23 @@ public sealed class LedgerObjectCommands(
             TextEditable = false,
             Kinds = [PulseOffice.UI.Controls.Links.LinkKind.Web, PulseOffice.UI.Controls.Links.LinkKind.File, PulseOffice.UI.Controls.Links.LinkKind.Mail],
             CanRemove = placed.Hyperlink is not null,
+            ShowsTip = true,
+            Tip = placed.HyperlinkTip,
         };
         if (await hyperlinks.AskAsync(request, ct).ConfigureAwait(true) is not { } choice) return;
-        SetLink(choice.Remove ? null : choice.Address, texts["command.ledger.object.hyperlink.title"]);
+        SetLink(choice.Remove ? null : choice.Address, texts["command.ledger.object.hyperlink.title"], choice.Remove ? null : choice.Tip);
     }
 
-    private void SetLink(string? link, string description)
+    private void SetLink(string? link, string description, string? tip = null)
     {
         if (Context.Workbook is not { } workbook || Context.SelectedObject is not { } placed) return;
         var value = link?.Trim() is { Length: > 0 } trimmed ? trimmed : null;
-        if (value == placed.Hyperlink) return;
+        var shownTip = value is not null && tip?.Trim() is { Length: > 0 } given ? given : null;
+        if (value == placed.Hyperlink && shownTip == placed.HyperlinkTip) return;
         var sheet = workbook.Sheets[Context.SheetIndex];
         var index = sheet.Objects.IndexOf(placed);
         if (index < 0) return;
-        Replace(sheet, index, placed, placed with { Hyperlink = value }, description);
+        Replace(sheet, index, placed, placed with { Hyperlink = value, HyperlinkTip = shownTip }, description);
     }
 
     private CommandDefinition Command(string id, Func<EmbeddedObject, EmbeddedObject?> change) =>

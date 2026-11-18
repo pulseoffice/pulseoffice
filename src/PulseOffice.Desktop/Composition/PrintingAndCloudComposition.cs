@@ -49,6 +49,8 @@ internal static class PrintingAndCloudComposition
     public static IServiceCollection AddPrintingAndCloud(this IServiceCollection services, IUserDataPaths paths)
     {
         services.AddSingleton<IPdfFontMetrics, PdfFontMetrics>();
+        services.AddSingleton<IPrintTextMeasure, StandardFontTextMeasure>();
+        services.AddSingleton<PulseOffice.Sheets.Printing.ISheetCommentPrinter>(provider => new PulseOffice.Sheets.Printing.SheetCommentPrinter(provider.GetRequiredService<IPrintTextMeasure>()));
         services.AddSingleton(provider => new PulseOffice.Typography.OpenType.Metrics.IndexedFontLocator(
             provider.GetRequiredService<ISystemFontDirectories>(), new PulseOffice.Typography.OpenType.OpenTypeReader(),
             provider.GetRequiredService<PulseOffice.Typography.OpenType.Metrics.IFontMetricsReader>()));

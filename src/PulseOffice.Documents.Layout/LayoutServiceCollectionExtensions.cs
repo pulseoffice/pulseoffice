@@ -72,6 +72,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddTransient<IChangeMarkup, ChangeMarkup>();
         services.AddTransient<IPlaceholderMarkup, PlaceholderMarkup>();
         services.AddSingleton<IHiddenParagraphs, HiddenParagraphs>();
+        services.TryAddSingleton<PulseOffice.Documents.Annotations.ISectionNoteCollection, PulseOffice.Documents.Annotations.SectionNoteCollection>();
         services.AddTransient<IFlowBuilder, FlowBuilder>();
         services.AddTransient<ITableMeasure, TableMeasure>();
         services.AddTransient<IPageFrames, PageFrames>();

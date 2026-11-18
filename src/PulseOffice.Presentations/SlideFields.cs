@@ -8,9 +8,8 @@ public sealed class SlideFieldsFactory
     {
         ArgumentNullException.ThrowIfNull(deck);
 
-        var index = slide is null ? 0 : deck.IndexOf(slide);
         return new TextFields(
-            Math.Max(index, 0) + 1,
+            slide is null ? deck.FirstSlideNumber : deck.NumberOf(slide),
             DateTime.Now,
             deck.Slides.Count,
             slide is null ? string.Empty : TitleOf(slide),

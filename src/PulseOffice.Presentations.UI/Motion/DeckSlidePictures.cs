@@ -37,7 +37,7 @@ public sealed class DeckSlidePictures(ISlideRenderer renderer, HeaderFooterResol
         var settings = options ?? new SlidePictureOptions();
         var master = settings.Master ?? deck.MasterOf(slide);
         var theme = settings.Theme ?? deck.ThemeOf(slide);
-        var number = Math.Max(1, deck.IndexOf(slide) + 1);
+        var number = deck.NumberOf(slide);
         var resolved = settings.Chrome
             ?? chrome.Resolve(settings.HeaderFooter ?? deck.HeaderFooter, slide, number, DateTime.Now, master.Elements, deck.TextLanguage);
         return new SlidePicture(renderer, slide, deck.Size, theme, master, resolved, settings.Framed) { Width = width, Height = height };

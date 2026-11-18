@@ -114,9 +114,12 @@ public sealed class LedgerReviewSource : IReviewSource
             : comment
         : string.Equals(comment.Text, text, StringComparison.Ordinal) ? comment : comment with { Text = text, Mentions = _mentions.Detect(text, People()) });
 
+    IReadOnlyList<string> IReviewSource.People => [.. People().Where(name => name.Length > 0).Distinct(StringComparer.Ordinal)];
+
     private IEnumerable<string> People() => _context.Workbook is { } workbook
         ? workbook.Sheets.SelectMany(sheet => sheet.Comments.Values)
-            .SelectMany(comment => new[] { comment.Author }.Concat(comment.Replies.Select(reply => reply.Author)))
+            .SelectMany(comment => new[] { comment.Author }.Concat(comment.Replies.Select(reply => reply.Author))
+                .Concat(comment.Mentions.Concat(comment.Replies.SelectMany(reply => reply.Mentions)).Select(mention => mention.Person)))
             .OfType<string>()
             .Append(_identity.Name)
         : [_identity.Name];

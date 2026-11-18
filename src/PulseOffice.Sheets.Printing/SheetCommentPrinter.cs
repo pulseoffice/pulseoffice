@@ -13,7 +13,7 @@ public interface ISheetCommentPrinter
     void PaintDisplayed(IPageCanvas canvas, Worksheet sheet, IReadOnlyDictionary<int, Twip> rowTops, IReadOnlyDictionary<int, Twip> columnLefts);
 }
 
-public sealed class SheetCommentPrinter : ISheetCommentPrinter
+public sealed class SheetCommentPrinter(IPrintTextMeasure measure) : ISheetCommentPrinter
 {
     private static readonly PrintFont Font = new("Helvetica", 9);
     private static readonly Twip LineHeight = Twip.FromPoints(12);
@@ -22,9 +22,11 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
     private static readonly PrintColor Fill = new(255, 255, 225);
     private static readonly PrintColor Edge = new(128, 128, 128);
 
-    private const double AverageAdvance = 0.55;
-
     private static readonly Twip NarrowestColumn = Twip.FromPoints(36);
+
+    public SheetCommentPrinter() : this(new AverageAdvanceTextMeasure())
+    {
+    }
 
     private readonly CommentBoxGeometry _geometry = new();
     private readonly TextWrapper _wrapper = new();
@@ -37,8 +39,8 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
             if (area is { } range && !range.Contains(address)) continue;
             if (lines.Count > 0) lines.Add(string.Empty);
             lines.Add(address.ToA1());
-            lines.AddRange(Wrapped("    ", Lines(comment.Author, comment.Text), content.Width));
-            foreach (var reply in comment.Replies) lines.AddRange(Wrapped("        ", Lines(reply.Author, reply.Text), content.Width));
+            lines.AddRange(Wrapped("    ", Lines(comment.Author, comment.Text), content.Width, measure));
+            foreach (var reply in comment.Replies) lines.AddRange(Wrapped("        ", Lines(reply.Author, reply.Text), content.Width, measure));
         }
 
         var perPage = Math.Max((int)(content.Height.Value / LineHeight.Value), 1);
@@ -57,6 +59,7 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
 
     public void PaintDisplayed(IPageCanvas canvas, Worksheet sheet, IReadOnlyDictionary<int, Twip> rowTops, IReadOnlyDictionary<int, Twip> columnLefts)
     {
+        var onCanvas = new CanvasTextMeasure(canvas);
         foreach (var (address, comment) in sheet.Comments)
         {
             if (!comment.IsAlwaysVisible || !rowTops.TryGetValue(address.Row, out var top) || !columnLefts.TryGetValue(address.Column, out var left)) continue;
@@ -77,7 +80,7 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
             using (canvas.Clip(bounds))
             {
                 var y = bounds.Top + Padding;
-                foreach (var line in Wrapped(string.Empty, Lines(comment.Author, comment.Text).Concat(comment.Replies.SelectMany(reply => Lines(reply.Author, reply.Text))), bounds.Width - Padding * 2))
+                foreach (var line in Wrapped(string.Empty, Lines(comment.Author, comment.Text).Concat(comment.Replies.SelectMany(reply => Lines(reply.Author, reply.Text))), bounds.Width - Padding * 2, onCanvas))
                 {
                     if ((y + LineHeight).Value > bounds.Bottom.Value) break;
                     canvas.DrawText(line, new DocumentRect(bounds.Left + Padding, y, bounds.Width - Padding * 2, LineHeight), Font, Ink, baseline: TextBaseline.Top);
@@ -87,13 +90,12 @@ public sealed class SheetCommentPrinter : ISheetCommentPrinter
         }
     }
 
-    private IEnumerable<string> Wrapped(string indent, IEnumerable<string> lines, Twip width)
+    private IEnumerable<string> Wrapped(string indent, IEnumerable<string> lines, Twip width, IPrintTextMeasure measurer)
     {
-        var available = new Twip(Math.Max(width.Value - Estimate(indent).Value, NarrowestColumn.Value));
-        return lines.SelectMany(line => line.Length == 0 ? new[] { string.Empty } : _wrapper.Wrap(line, available, Estimate)).Select(part => indent + part);
+        Twip Width(string text) => measurer.Measure(text, Font);
+        var available = new Twip(Math.Max(width.Value - Width(indent).Value, NarrowestColumn.Value));
+        return lines.SelectMany(line => line.Length == 0 ? new[] { string.Empty } : _wrapper.Wrap(line, available, Width)).Select(part => indent + part);
     }
-
-    private Twip Estimate(string text) => Twip.FromPoints(text.Length * Font.SizePoints * AverageAdvance);
 
     private Twip Max(Twip first, Twip second) => first.Value >= second.Value ? first : second;
 

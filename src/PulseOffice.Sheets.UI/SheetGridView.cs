@@ -493,7 +493,7 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
 
     public sealed record ResizeRequest(bool IsColumn, int Index, Twip? Before, Twip After);
 
-    public sealed record NoteBoxChange(CellAddress Address, CommentBox Before, CommentBox After);
+    public sealed record NoteBoxChange(CellAddress Address, CommentBox? Before, CommentBox After);
 
     public enum GridPart { Corner, RowHeader, ColumnHeader, Cell }
 

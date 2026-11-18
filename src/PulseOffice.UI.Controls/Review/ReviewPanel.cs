@@ -37,7 +37,7 @@ public sealed class ReviewPanel : UserControl
     private string? _author;
     private bool _refillPending;
 
-    public ReviewPanel(IReviewSource source, IIconCatalog icons, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact, IReviewPanelRequests? requests = null)
+    public ReviewPanel(IReviewSource source, IIconCatalog icons, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact, IReviewPanelRequests? requests = null, MentionPicker? mentions = null)
     {
         _requests = requests;
         ArgumentNullException.ThrowIfNull(icons);
@@ -102,6 +102,7 @@ public sealed class ReviewPanel : UserControl
             SendReply();
             args.Handled = true;
         };
+        mentions?.Attach(_reply, () => _source.People);
         Grid.SetColumn(_send, 1);
         _replyRow.Children.Add(_reply);
         _replyRow.Children.Add(_send);

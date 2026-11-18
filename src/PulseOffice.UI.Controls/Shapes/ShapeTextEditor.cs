@@ -43,6 +43,11 @@ public sealed class ShapeTextEditor : Decorator
     private PendingShapeFormat? _pending;
     private readonly ICaretWord _words;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
+    private readonly ShapeListText _frames = new();
+    private readonly PulseOffice.UI.Controls.Text.Rich.TextFrameComposer _composer = new(new ListLabels());
+    private readonly PulseOffice.UI.Controls.Text.Editing.InlineTextEditor _inline;
+    private ShapeTextPlacement? _placement;
+    private Color _inkColour;
 
     private readonly PulseOffice.UI.Controls.Text.ITextEditingFocus _focus;
 
@@ -69,7 +74,10 @@ public sealed class ShapeTextEditor : Decorator
         _box.Styles.Add(Transparent(":focus"));
         _box.Styles.Add(Transparent(":pointerover"));
         _box.Styles.Add(Transparent(string.Empty));
-        Child = _box;
+        _inline = new PulseOffice.UI.Controls.Text.Editing.InlineTextEditor(
+            _box, new PulseOffice.UI.Controls.Text.Rich.TextCaretGeometry(), new PlainTextPositions(), new CaretRowNavigation(), new PulseOffice.Text.Input.PreeditComposer(), words);
+        Child = _inline;
+        Overlay();
         IsVisible = false;
         Cursor = new Cursor(StandardCursorType.Ibeam);
         RenderTransformOrigin = RelativePoint.Center;
@@ -77,6 +85,7 @@ public sealed class ShapeTextEditor : Decorator
         _box.TextChanged += (_, _) =>
         {
             if (!IsEditing) return;
+            Recompose();
             LiveChanged?.Invoke(this, EventArgs.Empty);
         };
         _box.AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
@@ -111,7 +120,11 @@ public sealed class ShapeTextEditor : Decorator
     public IBrush SelectionBrush
     {
         get => _box.SelectionBrush ?? Brushes.Transparent;
-        set => _box.SelectionBrush = value;
+        set
+        {
+            _box.SelectionBrush = value;
+            _inline.SelectionBrush = value;
+        }
     }
 
     public bool IsEditing => _id is not null;
@@ -119,6 +132,16 @@ public sealed class ShapeTextEditor : Decorator
     public string? EditingId => _id;
 
     public TextBox Box => _box;
+
+    public bool InPlace => _base is { } shape && InPlaceFor(shape.Style.Text.Layout);
+
+    public PulseOffice.UI.Controls.Text.Rich.ComposedTextFrame? Frame => _inline.Frame;
+
+    public bool InPlaceFor(TextLayout layout)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        return _flow.Stacks(layout) || layout.LinesLeftToRight;
+    }
 
     public ShapeObject? Live => _base is { } shape ? _editing.WithText(shape, _box.Text ?? string.Empty) : null;
 
@@ -207,7 +230,20 @@ public sealed class ShapeTextEditor : Decorator
     public void Place(ShapeTextPlacement placement)
     {
         ArgumentNullException.ThrowIfNull(placement);
+        _placement = placement;
         var text = _base?.Style.Text ?? ShapeTextStyle.Default;
+        if (InPlaceFor(text.Layout))
+        {
+            Canvas.SetLeft(this, placement.Bounds.X);
+            Canvas.SetTop(this, placement.Bounds.Y);
+            Width = Math.Max(placement.Bounds.Width, 1);
+            Height = Math.Max(placement.Bounds.Height, 1);
+            RenderTransform = null;
+            _scale = placement.PixelsPerPoint;
+            Recompose();
+            return;
+        }
+        Overlay();
         var bounds = _flow.Box(placement.Bounds, text.Layout);
         var degrees = _flow.Degrees(text.Layout, text.RotationDegrees, placement.RotationDegrees);
         Canvas.SetLeft(this, bounds.X);
@@ -219,6 +255,24 @@ public sealed class ShapeTextEditor : Decorator
         _scale = placement.PixelsPerPoint;
     }
 
+    private void Recompose()
+    {
+        if (_placement is not { } placement || Live is not { } shape || !InPlaceFor(shape.Style.Text.Layout)) return;
+        _box.Opacity = 0;
+        _box.IsHitTestVisible = false;
+        var frame = _composer.Compose(
+            _frames.Framed(shape, placement.RotationDegrees), placement.Bounds, _frames.Theme(shape, _inkColour),
+            new TextFields(0, DateTime.Now), placement.PixelsPerPoint / PulseOffice.UI.Controls.Text.Rich.ParagraphTypesetter.PointToTwip);
+        _inline.Update(frame, placement.Bounds);
+    }
+
+    private void Overlay()
+    {
+        _box.Opacity = 1;
+        _box.IsHitTestVisible = true;
+        _inline.Release();
+    }
+
     public void Reformat(ShapeObject formatted, ShapeSurroundings backdrop)
     {
         ArgumentNullException.ThrowIfNull(formatted);
@@ -226,10 +280,12 @@ public sealed class ShapeTextEditor : Decorator
         var (start, end) = Selection;
         _base = formatted;
         Restyle(formatted, backdrop);
+        if (_placement is { } placement) Place(placement);
         _box.Text = _editing.PlainText(formatted);
         _box.SelectionStart = start;
         _box.SelectionEnd = end;
         _box.Focus();
+        Recompose();
         LiveChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -244,6 +300,7 @@ public sealed class ShapeTextEditor : Decorator
             _original = null;
             _base = null;
             IsVisible = false;
+            Overlay();
             var result = new ShapeTextEdited(id, original, edited);
             Committed?.Invoke(this, result);
             return result;
@@ -259,7 +316,10 @@ public sealed class ShapeTextEditor : Decorator
     private void Restyle(ShapeObject shape, ShapeSurroundings backdrop)
     {
         var ink = _brushes.Colour(_ink.Resolve(shape.Style, Behind(shape.Style.Fill, backdrop).Hex), Colors.Black);
-        _box.CaretBrush = new SolidColorBrush(ink);
+        _inkColour = ink;
+        var caret = new SolidColorBrush(ink);
+        _box.CaretBrush = caret;
+        _inline.CaretBrush = caret;
         Typeset(shape, _scale);
     }
 

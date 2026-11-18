@@ -22,6 +22,8 @@ public sealed class NoteNumbers(IReadOnlyDictionary<string, string> citations, I
 
     public IReadOnlyDictionary<string, string> Sections { get; init; } = new Dictionary<string, string>();
 
+    public IReadOnlyDictionary<string, string> RunBreaks { get; init; } = new Dictionary<string, string>();
+
     public IEnumerable<string> InSection(string sectionId) =>
         Footnotes.Concat(Endnotes).Where(id => Sections.TryGetValue(id, out var section) && section == sectionId);
 
@@ -80,7 +82,7 @@ public sealed class HiddenParagraphs : IHiddenParagraphs
     public bool Show { get; set; }
 }
 
-public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, IListLabeling labeling, IEnumerable<INumberFormatter> formatters, IPageFieldText fields, PageFlowOptions options, ITableAppearance appearance, IChangeMarkup markup, IHiddenParagraphs hidden, IPlaceholderMarkup placeholders) : IFlowBuilder
+public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, IListLabeling labeling, IEnumerable<INumberFormatter> formatters, IPageFieldText fields, PageFlowOptions options, ITableAppearance appearance, IChangeMarkup markup, IHiddenParagraphs hidden, IPlaceholderMarkup placeholders, ISectionNoteCollection sectionNotes) : IFlowBuilder
 {
     private readonly IReadOnlyDictionary<NumberFormat, INumberFormatter> _formatters = formatters.ToDictionary(formatter => formatter.Format);
     private readonly ConditionalWeakTable<TextParagraph, TextParagraph> _styled = new();
@@ -145,7 +147,8 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var endnoteCount = 0;
         var footnoteSettings = document.Notes.FootnoteSettings;
         var endnoteSettings = document.Notes.EndnoteSettings;
-        foreach (var (paragraph, section) in NoteOrder(document))
+        var runs = RunStarts(document);
+        foreach (var (paragraph, section, block) in NoteOrder(document, runs))
         {
             if ((footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
                 && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1)
@@ -164,24 +167,37 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
                 citations[note.Id] = note.Citation ?? Render(settings.FormatName, value);
                 if (footnote) footnotes.Add(note.Id);
                 else endnotes.Add(note.Id);
-                if (section is not null && settings.Placement == NotePlacement.SectionEnd) sections[note.Id] = section;
+                var collects = footnote || block is null ? settings.Placement == NotePlacement.SectionEnd : sectionNotes.CollectsEndnotes(document, block);
+                if (section is not null && collects) sections[note.Id] = section;
             }
         }
-        return new NoteNumbers(citations, endnotes) { Footnotes = footnotes, Sections = sections };
+        var breaks = runs.Select((id, index) => (id, index)).ToDictionary(pair => pair.id, pair => RunKey(pair.index), StringComparer.Ordinal);
+        return new NoteNumbers(citations, endnotes) { Footnotes = footnotes, Sections = sections, RunBreaks = breaks };
     }
 
-    private IEnumerable<(ParagraphBlock Paragraph, string? Section)> NoteOrder(TextDocument document)
+    private List<string> RunStarts(TextDocument document) =>
+        [.. document.Body.Blocks.Skip(1).OfType<ParagraphBlock>()
+            .Where(paragraph => entries.Effective(document.Styles, paragraph, paragraph.Content).PageStyleName is not null)
+            .Select(paragraph => paragraph.Id)];
+
+    private string RunKey(int index) => "#page-run-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private IEnumerable<(ParagraphBlock Paragraph, string? Section, SectionBlock? Block)> NoteOrder(TextDocument document, List<string> runStarts)
     {
-        var sections = new Dictionary<string, string>(StringComparer.Ordinal);
+        var sections = new Dictionary<string, SectionBlock>(StringComparer.Ordinal);
         foreach (var section in document.Body.Blocks.OfType<SectionBlock>().Where(section => !section.Hidden))
-            foreach (var paragraph in tree.Paragraphs(section.Content)) sections.TryAdd(paragraph.Id, section.Id);
+            foreach (var paragraph in tree.Paragraphs(section.Content)) sections.TryAdd(paragraph.Id, section);
+        var starts = runStarts.ToHashSet(StringComparer.Ordinal);
+        var run = 0;
         foreach (var paragraph in tree.Paragraphs(document.Body))
         {
-            var section = sections.GetValueOrDefault(paragraph.Id);
-            yield return (paragraph, section);
+            if (starts.Contains(paragraph.Id)) run++;
+            var block = sections.GetValueOrDefault(paragraph.Id);
+            var section = block?.Id ?? (run < runStarts.Count ? RunKey(run) : null);
+            yield return (paragraph, section, block);
             foreach (var item in document.Objects.AnchoredTo(paragraph.Id))
                 if (item.Content.Story is { } story)
-                    foreach (var inner in tree.Paragraphs(story)) yield return (inner, section);
+                    foreach (var inner in tree.Paragraphs(story)) yield return (inner, section, block);
         }
     }
 
@@ -209,8 +225,14 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
     public IReadOnlyList<FlowItem> Build(BlockContainer container, FlowContext context)
     {
         var visitor = new Visitor(this, context);
-        return [.. container.Blocks.SelectMany(block => block.Accept(visitor))];
+        var breaks = context.Story == StoryKind.Body && context.Sections && ReferenceEquals(container, context.Document.Body) ? context.Notes.RunBreaks : null;
+        return [.. container.Blocks.SelectMany(block => breaks is not null && breaks.TryGetValue(block.Id, out var ended)
+            ? RunNotes(ended, context).Concat(block.Accept(visitor))
+            : block.Accept(visitor))];
     }
+
+    private IEnumerable<FlowItem> RunNotes(string run, FlowContext context) =>
+        context.Notes.InSection(run).SelectMany(id => Notes(id, context with { Lists = new Dictionary<string, ListPlacement?>() }));
 
     private string Render(string format, int value)
     {
@@ -306,7 +328,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         item.ZOrder)
     {
         Spacing = item.WrapSpacing,
-        Outline = $"{item.WrapContour}:{item.Contour?.GetHashCode()}:{item.WrapFirstParagraph}:{item.FlipHorizontal}:{item.FlipVertical}:{item.RotationDegrees}:{(item.Content as TextBoxContent)?.NextFrameName}",
+        Outline = $"{item.WrapContour}:{item.Contour?.GetHashCode()}:{item.WrapFirstParagraph}:{item.FlipHorizontal}:{item.FlipVertical}:{item.RotationDegrees}:{(item.Content as TextBoxContent)?.NextFrameName}:{item.Placement.HorizontalAlign}:{item.Placement.VerticalAlign}",
         Text = item.Content.Story is { } story ? [.. tree.Paragraphs(story).Select(paragraph => paragraph.Content)] : [],
     };
 

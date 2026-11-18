@@ -401,6 +401,8 @@ internal sealed class OdtNoteWriter(OdtVocabulary vocabulary) : OdtXml
 
 internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, OdtStyleNames names, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingWriter drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
+    private readonly OdtImageClip _clip = new(measure);
+
     private XElement? SignatureFallback(AnchoredObject item, OdtWriteSession session)
     {
         if (item.Content is not EmbeddedContent { Value: PulseOffice.Document.Forms.SignatureLineObject line }) return null;
@@ -425,12 +427,6 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
             new XAttribute(Draw + "mime-type", "image/png"));
     }
 
-    private string Clip(DocumentSize size, (double Left, double Top, double Right, double Bottom) crop)
-    {
-        string Side(double fraction, Twip length) => measure.Points(fraction * length.ToPoints());
-        return $"rect({Side(crop.Top, size.Height)}, {Side(crop.Right, size.Width)}, {Side(crop.Bottom, size.Height)}, {Side(crop.Left, size.Width)})";
-    }
-
     public XElement? Write(string objectId, OdtStyleSink sink, OdtWriteSession session, IOdtBlockWriter blocks) =>
         session.Document.Objects.Find(objectId) is { } item ? Write(item, sink, session, blocks) : null;
 
@@ -440,7 +436,8 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
     private XElement? Linked(AnchoredObject item, XElement? placed) =>
         placed is null || item.Hyperlink is not { Length: > 0 } link || item.Anchor is PageAnchor
             ? placed
-            : new XElement(Draw + "a", new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "href", link), placed);
+            : new XElement(Draw + "a", new XAttribute(Xlink + "type", "simple"), new XAttribute(Xlink + "href", link),
+                item.HyperlinkTip is { Length: > 0 } tip ? new XAttribute(Office + "title", tip) : null, placed);
 
     private XElement? Placed(AnchoredObject item, OdtStyleSink sink, OdtWriteSession session, IOdtBlockWriter blocks)
     {
@@ -458,9 +455,9 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
 
         var graphic = new XElement(Style + "graphic-properties",
             new XAttribute(Style + "wrap", frames.Wrap(item.Wrap)),
-            new XAttribute(Style + "horizontal-pos", "from-left"),
+            new XAttribute(Style + "horizontal-pos", frames.HorizontalPosition(item.Placement.HorizontalAlign)),
             new XAttribute(Style + "horizontal-rel", frames.Horizontal(item.Placement.Horizontal)),
-            new XAttribute(Style + "vertical-pos", "from-top"),
+            new XAttribute(Style + "vertical-pos", frames.VerticalPosition(item.Placement.VerticalAlign)),
             new XAttribute(Style + "vertical-rel", frames.Vertical(item.Placement.Vertical)),
             new XAttribute(Fo + "margin-left", measure.Length(item.WrapSpacing.Left)),
             new XAttribute(Fo + "margin-right", measure.Length(item.WrapSpacing.Right)),
@@ -475,7 +472,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
         if (item.Content is EmbeddedContent { Value: RasterImageObject picture })
         {
             if (picture.Filter == ImageFilter.Grayscale) graphic.Add(new XAttribute(Draw + "color-mode", "greyscale"));
-            if (picture.Crop != default) graphic.Add(new XAttribute(Fo + "clip", Clip(item.Size, picture.Crop)));
+            if (picture.Crop != default) graphic.Add(new XAttribute(Fo + "clip", _clip.Write(picture, item.Size)));
         }
         var parentStyle = item.StyleName is null ? null : names.Encode(item.StyleName);
         if (drawing is not null)
@@ -504,6 +501,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
         var drawnByShapeLayer = item.Content is EmbeddedContent { Value: PulseOffice.Document.Forms.SignatureLineObject };
         var styleName = sink.Register("graphic", parentStyle ?? (drawnByShapeLayer ? null : names.Encode(DefaultStyleNames.Graphics)), [graphic], drawnByShapeLayer ? "gr" : "fr");
 
+        var transform = contours.Transform(item);
         var frame = new XElement(Draw + "frame",
             new XAttribute(Draw + "style-name", styleName),
             new XAttribute(Draw + "name", item.Name ?? item.Id),
@@ -511,8 +509,9 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
             implied ? new XAttribute(Pt + "implied-style", "true") : null,
             new XAttribute(Text + "anchor-type", anchorType),
             item.Anchor is PageAnchor page ? new XAttribute(Text + "anchor-page-number", page.PageNumber) : null,
-            item.Anchor is AsCharacterAnchor ? null : new XAttribute(Svg + "x", measure.Length(item.Placement.X)),
-            item.Anchor is AsCharacterAnchor ? null : new XAttribute(Svg + "y", measure.Length(item.Placement.Y)),
+            item.Anchor is AsCharacterAnchor || transform is not null ? null : new XAttribute(Svg + "x", measure.Length(item.Placement.X)),
+            item.Anchor is AsCharacterAnchor || transform is not null ? null : new XAttribute(Svg + "y", measure.Length(item.Placement.Y)),
+            transform is null ? null : new XAttribute(Draw + "transform", transform),
             new XAttribute(Svg + "width", measure.Length(item.Size.Width)),
             new XAttribute(Svg + "height", measure.Length(item.Size.Height)),
             new XAttribute(Draw + "z-index", item.ZOrder),
@@ -768,13 +767,13 @@ internal sealed class OdtTableFormulas(ITableFormulaParser parser, ITableFormula
         cell.Content.Blocks.OfType<ParagraphBlock>().SelectMany(paragraph => paragraph.Content.Runs).Select(run => run.Language).FirstOrDefault(language => !string.IsNullOrEmpty(language));
 }
 
-internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec indexes) : OdtXml
+internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec indexes, ISectionNoteCollection collection) : OdtXml
 {
     public XElement Write(SectionBlock section, OdtStyleSink sink, OdtWriteSession session, IOdtBlockWriter blocks)
     {
         var properties = new XElement(Style + "section-properties", columns.Write(section.Columns));
         if (!section.Columns.Balanced) properties.Add(new XAttribute(Text + "dont-balance-text-columns", "true"));
-        if (session.Document.Notes.EndnoteSettings.Placement == NotePlacement.SectionEnd && section.Index is null && session.Document.Body.Blocks.Contains(section))
+        if (section.Index is null && session.Document.Body.Blocks.Contains(section) && collection.CollectsEndnotes(session.Document, section))
             properties.Add(new XElement(Text + "notes-configuration", new XAttribute(Text + "note-class", "endnote")));
         if (section.Index is { } index) return indexes.Write(section, index, sink.Register("section", null, [properties], "Sect"), sink, session, blocks);
         var element = new XElement(Text + "section",

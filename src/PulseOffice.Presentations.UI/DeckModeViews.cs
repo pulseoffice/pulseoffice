@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText)
+internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText, IOutlineSlideMatching outlineMatching, IOutlineBlockMove outlineMove)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -162,6 +162,12 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
             VerticalContentAlignment = VerticalAlignment.Top,
         };
         editor.LostFocus += (_, _) => ApplyOutline(editor.Text ?? string.Empty);
+        editor.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.KeyModifiers != (KeyModifiers.Alt | KeyModifiers.Shift) || e.Key is not (Key.Up or Key.Down)) return;
+            MoveOutlineBlock(editor, e.Key == Key.Up);
+            e.Handled = true;
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _outlineEditor = editor;
 
         return new Border { Child = editor }.Themed(Border.BackgroundProperty, Palette.Keys.Canvas);
@@ -170,13 +176,36 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
     private string BuildOutlineText()
     {
         var text = _outlineText.Render(_deck.Slides);
+        _outlineSlides = [.. _deck.Slides];
+        _outlineEntries = _outlineText.Parse(text);
         _outlineOriginal = [.. _outlineText.Parse(text).SelectMany(entry => entry.Body.Select(line => line.Text).Prepend(entry.Title))];
         return text;
     }
 
     private readonly IDeckOutlineText _outlineText = outlineText;
 
+    private readonly IOutlineSlideMatching _outlineMatching = outlineMatching;
+
+    private readonly IOutlineBlockMove _outlineMove = outlineMove;
+
     private HashSet<string> _outlineOriginal = [];
+
+    private List<Slide> _outlineSlides = [];
+
+    private IReadOnlyList<OutlineEntry> _outlineEntries = [];
+
+    private void MoveOutlineBlock(TextBox editor, bool up)
+    {
+        var text = editor.Text ?? string.Empty;
+        var caret = Math.Clamp(editor.CaretIndex, 0, text.Length);
+        var normalized = text.Replace("\r\n", "\n");
+        var line = text[..caret].Replace("\r\n", "\n").Count(c => c == '\n');
+        var (moved, at) = _outlineMove.Move(normalized, line, up);
+        if (moved == normalized) return;
+        editor.Text = moved;
+        var lines = moved.Split('\n');
+        editor.CaretIndex = lines.Take(at).Sum(part => part.Length + 1);
+    }
 
     private string CorrectedLine(string line) => _outlineOriginal.Contains(line) ? line : _correction.Corrected(line);
 
@@ -185,17 +214,45 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         var entries = _outlineText.Parse(text)
             .Select(entry => new OutlineEntry(CorrectedLine(entry.Title), [.. entry.Body.Select(line => line with { Text = CorrectedLine(line.Text) })]))
             .ToList();
-        var existing = Math.Min(entries.Count, _deck.Slides.Count);
-        var changes = Enumerable.Range(0, existing)
-            .Select(index => (_deck.Slides[index], entries[index].Title, entries[index].Body))
-            .ToList();
-        var added = entries.Skip(existing)
-            .Where(entry => entry.Title.Length > 0 || entry.Body.Any(line => line.Text.Length > 0))
-            .Select(entry => new OutlineSlide(entry.Title, [.. entry.Body.Select(line => new TextParagraph(line.Text) { BulletLevel = line.Level })]))
-            .ToList();
+        var originals = _outlineSlides.Where(slide => _deck.IndexOf(slide) >= 0).ToList();
+        IReadOnlyList<int?> matches = originals.Count == _outlineSlides.Count
+            ? _outlineMatching.Match(_outlineEntries, entries)
+            : [.. entries.Select((_, index) => index < originals.Count ? (int?)index : null)];
+        if (originals.Count != _outlineSlides.Count) _outlineSlides = originals;
+
+        var changes = new List<(Slide Slide, string Title, IReadOnlyList<OutlineLine> Body)>();
+        for (var i = 0; i < entries.Count; i++)
+            if (matches[i] is { } kept) changes.Add((_outlineSlides[kept], entries[i].Title, entries[i].Body));
+        var used = matches.OfType<int>().ToHashSet();
+        var removed = _outlineSlides.Where((_, index) => !used.Contains(index)).ToList();
+        if (removed.Count == 0 && changes.Count == entries.Count && changes.Select(change => change.Slide).SequenceEqual(_outlineSlides)
+            && entries.Count == _outlineSlides.Count && OutlineUnchanged(entries)) return;
 
         using var step = _actions.History.BeginTransaction(_texts["deck.action.editText"]);
         _actions.SetSlideOutline(changes);
-        if (added.Count > 0) _actions.InsertOutlineSlides(_deck.Slides.Count - 1, added, "deck.action.editText");
+
+        var order = new List<Slide>();
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (matches[i] is { } kept) { order.Add(_outlineSlides[kept]); continue; }
+            var entry = entries[i];
+            if (entry.Title.Length == 0 && entry.Body.All(line => line.Text.Length == 0)) continue;
+            var after = order.Count == 0 ? -1 : _deck.IndexOf(order[^1]);
+            var created = _actions.InsertOutlineSlides(after,
+                [new OutlineSlide(entry.Title, [.. entry.Body.Select(line => new TextParagraph(line.Text) { BulletLevel = line.Level })])],
+                "deck.action.editText");
+            if (created.Count > 0) order.Add(created[0]);
+        }
+
+        foreach (var slide in removed) _actions.DeleteSlide(slide);
+        for (var position = 0; position < order.Count; position++)
+            if (_deck.IndexOf(order[position]) != position && _deck.IndexOf(order[position]) >= 0) _actions.MoveSlide(order[position], position);
+
+        _outlineSlides = [.. _deck.Slides];
+        _outlineEntries = entries;
     }
+
+    private bool OutlineUnchanged(IReadOnlyList<OutlineEntry> entries) =>
+        entries.Count == _outlineEntries.Count
+        && entries.Select((entry, index) => entry.Title == _outlineEntries[index].Title && entry.Body.SequenceEqual(_outlineEntries[index].Body)).All(same => same);
 }

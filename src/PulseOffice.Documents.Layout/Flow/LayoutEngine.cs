@@ -189,6 +189,7 @@ public sealed class DocumentLayoutEngine(
                 return notice;
             },
             Separator = document.Notes.FootnoteSeparator,
+            PageSeparator = name => document.Styles.Page.Find(name)?.FootnoteSeparator,
             FootnotesBelowText = document.Notes.FootnoteSettings.Placement == NotePlacement.BelowText,
             ContinuationForward = document.Notes.FootnoteSettings.ContinuationForward,
             ContinuationBackward = document.Notes.FootnoteSettings.ContinuationBackward,

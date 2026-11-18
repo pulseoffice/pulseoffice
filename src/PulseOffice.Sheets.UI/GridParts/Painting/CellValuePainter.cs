@@ -6,8 +6,10 @@ using PulseOffice.Sheets.Styling;
 
 namespace PulseOffice.Sheets.UI.GridParts.Painting;
 
-internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices services, GridDisplayOptions options)
+internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices services, GridDisplayOptions options, IGridTheme theme)
 {
+    private const double AnnotatedOpacity = 0.3;
+
     public void Paint(
         DrawingContext context, FormattedCell presented, CellStyle style, IBrush foreground, Rect bounds,
         Rect? spill = null, CellAddress? address = null)
@@ -43,8 +45,12 @@ internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices
             && text.Width > bounds.Width - padding * 2)
         {
             services.TextComposer.Wrap(text, bounds.Width - padding * 2, style.Horizontal);
+            var wrappedOrigin = new Point(bounds.X + padding, placement.Top(box, text.Height, style.Vertical, 1));
             using (context.PushClip(bounds))
-                context.DrawText(text, new Point(bounds.X + padding, placement.Top(box, text.Height, style.Vertical, 1)));
+            {
+                DrawAnnotated(context, text, presented.Text, address, wrappedOrigin);
+                context.DrawText(text, wrappedOrigin);
+            }
             return;
         }
 
@@ -96,6 +102,7 @@ internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices
                 context.DrawText(shadow, new Point(x + 1.2, top + 1.2));
             }
 
+            DrawAnnotated(context, text, presented.Text, address, new Point(x, top));
             context.DrawText(text, new Point(x, top));
 
             if (style.Font.DoubleUnderline)
@@ -109,6 +116,16 @@ internal sealed class CellValuePainter(GridViewport viewport, GridRenderServices
 
             if (address is { } cell) DrawSpellingMarks(context, presented.Text, style, cell, x, top + text.Height);
         }
+    }
+
+    private void DrawAnnotated(DrawingContext context, FormattedText text, string shown, CellAddress? address, Point origin)
+    {
+        if (address is not { } cell || viewport.Sheet is not { } sheet) return;
+        if (sheet.Comments.GetValueOrDefault(cell) is not { AnnotatedText: { } span }) return;
+        if (!string.Equals(sheet[cell].Value.ToString(), shown, StringComparison.Ordinal) || span.Start >= shown.Length) return;
+        if (text.BuildHighlightGeometry(origin, span.Start, Math.Min(span.Length, shown.Length - span.Start)) is not { } area) return;
+        using (context.PushOpacity(AnnotatedOpacity))
+            context.DrawGeometry(theme.Brush(PulseOffice.UI.Theming.Palette.Keys.Warning, Brushes.Transparent), null, area);
     }
 
     private void DrawSpellingMarks(

@@ -70,7 +70,7 @@ internal sealed class OdtStylesWriter(
         foreach (var page in document.Styles.Page.All)
         {
             var layoutName = "pm" + (++index).ToString(CultureInfo.InvariantCulture);
-            automatic.Add(Layout(layoutName, page, document.Notes.FootnoteSeparator));
+            automatic.Add(Layout(layoutName, page, page.FootnoteSeparator ?? document.Notes.FootnoteSeparator));
 
             var master = new XElement(Style + "master-page",
                 new XAttribute(Style + "name", names.Encode(page.Name)),

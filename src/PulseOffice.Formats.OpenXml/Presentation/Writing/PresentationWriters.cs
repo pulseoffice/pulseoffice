@@ -62,10 +62,10 @@ internal sealed class SectionsExtension : PresentationExtension
 
     protected override string Body(PptxWriteSession session)
     {
-        var groups = new SlideSections().Group(session.Deck.Slides).ToList();
+        var groups = new SlideSections().Ordered(session.Deck).ToList();
         if (groups.Count == 0) return string.Empty;
         var leading = session.Deck.Slides.TakeWhile(slide => slide.SectionName is null).ToList();
-        if (leading.Count > 0) groups.Insert(0, new DeckSection(LeadingSectionName, leading));
+        if (leading.Count > 0) groups.Insert(0, new OrderedSection(LeadingSectionName, PptxLeadingSection.Id, leading));
 
         var xml = new StringBuilder().Append("<p14:sectionLst xmlns:p14=\"").Append(P14).Append("\">");
         var used = new HashSet<Guid>();
@@ -82,13 +82,14 @@ internal sealed class SectionsExtension : PresentationExtension
         return xml.Append("</p14:sectionLst>").ToString();
     }
 
-    private static Guid SectionId(DeckSection group, int ordinal, HashSet<Guid> used)
+    private static Guid SectionId(OrderedSection group, int ordinal, HashSet<Guid> used)
     {
-        if (group.Slides[0].SectionId is { } kept && Guid.TryParse(kept, out var read) && read != Guid.Empty && used.Add(read)) return read;
+        if (group.Id is { } kept && Guid.TryParse(kept, out var read) && read != Guid.Empty && used.Add(read)) return read;
 
+        var anchor = group.Slides.Count > 0 ? group.Slides[0].Id : string.Empty;
         for (var attempt = 0; ; attempt++)
         {
-            var seed = Encoding.UTF8.GetBytes($"{group.Slides[0].Id}\u0000{group.Name}\u0000{ordinal}\u0000{attempt}");
+            var seed = Encoding.UTF8.GetBytes($"{anchor}\u0000{group.Name}\u0000{ordinal}\u0000{attempt}");
             var bytes = System.Security.Cryptography.SHA256.HashData(seed).AsSpan(0, 16).ToArray();
             bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50);
             bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80);

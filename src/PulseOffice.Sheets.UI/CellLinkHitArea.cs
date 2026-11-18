@@ -10,6 +10,8 @@ public sealed record CellTextSpan(double Left, double Right)
 public interface ICellLinkHitArea
 {
     CellTextSpan Span(double cellLeft, double cellRight, double textWidth, double padding, CellHorizontalAlignment alignment, bool alignsRight, bool wraps);
+
+    CellTextSpan Spilled(double cellLeft, double cellRight, OverflowSpan spill, double textWidth, double padding, CellHorizontalAlignment alignment);
 }
 
 public sealed class CellLinkHitArea : ICellLinkHitArea
@@ -28,6 +30,17 @@ public sealed class CellLinkHitArea : ICellLinkHitArea
             ? cellLeft + (width - textWidth) / 2
             : right ? cellRight - padding - textWidth : cellLeft + padding;
         return new CellTextSpan(left, left + textWidth);
+    }
+
+    public CellTextSpan Spilled(double cellLeft, double cellRight, OverflowSpan spill, double textWidth, double padding, CellHorizontalAlignment alignment)
+    {
+        var left = alignment switch
+        {
+            CellHorizontalAlignment.Center => cellLeft + (cellRight - cellLeft - textWidth) / 2,
+            CellHorizontalAlignment.Right => cellRight - padding - textWidth,
+            _ => cellLeft + padding,
+        };
+        return new CellTextSpan(Math.Max(left, spill.Left), Math.Min(left + textWidth, spill.Right));
     }
 }
 

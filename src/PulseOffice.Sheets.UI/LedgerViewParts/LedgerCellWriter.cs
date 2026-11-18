@@ -31,6 +31,8 @@ internal sealed class LedgerCellWriter(
 
     public ICellEntryStyle EntryStyles { get; set; } = new CellEntryStyle();
 
+    public IAnnotatedSpanFollowing AnnotatedSpans { get; set; } = new AnnotatedSpanFollowing();
+
     private string FormulaLanguage => texts.Language.ToCode();
 
     public string Language => FormulaLanguage;
@@ -132,11 +134,29 @@ internal sealed class LedgerCellWriter(
         if (previous == next) return;
 
         var owner = engine;
+        var comments = workbook.Sheets[target.SheetIndex].Comments;
+        var annotated = comments.GetValueOrDefault(target.Address) is { AnnotatedText: { } span } comment
+            ? (Before: comment, After: comment with { AnnotatedText = AnnotatedSpans.Follow(previous.Value.ToString(), next.Value.ToString(), span) })
+            : ((CellComment Before, CellComment After)?)null;
 
+        void Note(Func<(CellComment Before, CellComment After), CellComment> pick)
+        {
+            if (annotated is { } pair && comments.ContainsKey(target.Address)) comments[target.Address] = pick(pair);
+        }
+
+        Note(pair => pair.After);
         history.Push(new PulseOffice.Document.Commands.DelegateAction(
             texts.Format("history.cell.edit", target.Address.ToA1()),
-            redo: () => Restore(owner, target, next),
-            undo: () => Restore(owner, target, previous)));
+            redo: () =>
+            {
+                Restore(owner, target, next);
+                Note(pair => pair.After);
+            },
+            undo: () =>
+            {
+                Restore(owner, target, previous);
+                Note(pair => pair.Before);
+            }));
     }
 
     private Cell Entered(Cell previous, string text, Worksheet sheet, CellAddress address)

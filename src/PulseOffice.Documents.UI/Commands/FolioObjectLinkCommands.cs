@@ -48,12 +48,14 @@ public sealed class FolioObjectLinkCommands(IActiveFolioContext context, IFolioO
             TextEditable = false,
             Places = places.Places(editor.Document),
             CanRemove = current is not null,
+            ShowsTip = target.Member is null,
+            Tip = objectLinks.Tip(editor, target),
         };
         if (await prompt.AskAsync(request, ct).ConfigureAwait(true) is not { } choice || Editor is not { } after || !ReferenceEquals(after, editor)) return;
         using (editor.History.BeginTransaction("hyperlink"))
         {
             var address = choice.Remove ? null : places.Settle(editor.Document, editor.History, choice.Address);
-            editor.Change(() => objectLinks.Set(editor, target, address));
+            editor.Change(() => objectLinks.Set(editor, target, address, choice.Remove ? null : choice.Tip));
         }
     }
 }

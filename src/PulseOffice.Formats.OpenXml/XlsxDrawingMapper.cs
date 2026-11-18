@@ -87,6 +87,7 @@ public sealed class XlsxDrawingMapper
 
         var described = _altText.ReadByName(drawing);
         var links = _links.Read(drawings);
+        var tips = _links.ReadTips(drawings);
 
         return
         [
@@ -98,7 +99,7 @@ public sealed class XlsxDrawingMapper
                 _images.ReadImages(drawings, layout),
             }.SelectMany(objects => objects).Select(placed => described.TryGetValue(placed.Id, out var text)
                 ? placed with { Content = text.ApplyTo(placed.Content) }
-                : placed).Select(placed => links.TryGetValue(placed.Id, out var link) ? placed with { Hyperlink = link } : placed),
+                : placed).Select(placed => links.TryGetValue(placed.Id, out var link) ? placed with { Hyperlink = link, HyperlinkTip = tips.GetValueOrDefault(placed.Id) } : placed),
         ];
     }
 }

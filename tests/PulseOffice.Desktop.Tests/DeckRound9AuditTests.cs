@@ -193,7 +193,7 @@ public sealed class DeckRound9AuditTests : IDisposable
             shell.Service<PulseOffice.UI.Controls.Forms.IFormDesignMode>(), shell.Service<PulseOffice.Document.Forms.IFormControlInteraction>(),
             shell.Service<PulseOffice.Presentations.Remote.IRemoteSession>(),
             shell.Service<IShowMediaPlayer>(), shell.Service<IShowMediaSessions>(), shell.Service<ShowSetupServices>(),
-            shell.Service<ICustomShowEditing>());
+            shell.Service<ICustomShowEditing>(), shell.Service<PulseOffice.UI.Controls.Links.ILinkTips>());
         var command = commands.GetCommands().Single(each => each.Id == new CommandId("deck.setupShow"));
         await command.Execute(null!, CancellationToken.None);
 

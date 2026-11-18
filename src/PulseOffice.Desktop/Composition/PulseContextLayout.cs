@@ -48,7 +48,7 @@ public static class PulseContextLayout
             "deck.object.rotateLeft", "deck.object.rotateRight", "deck.object.flipHorizontal", "deck.object.flipVertical"),
         .. Place("object/format",
             "deck.object.style", "deck.object.positionSize", "deck.object.altText", "deck.object.mediaOptions", "deck.object.name", "deck.object.hide",
-            "deck.style.new", "deck.style.update", "deck.form.properties", "deck.object.openPackaged"),
+            "deck.style.new", "deck.style.update", "deck.form.properties", "deck.object.openPackaged", "deck.connector.sites"),
         ("deck.convert.", "object/format/convert"),
         .. Place("object/image",
             "deck.image.crop", "deck.image.originalSize", "deck.image.color", "deck.image.colorReplacer",

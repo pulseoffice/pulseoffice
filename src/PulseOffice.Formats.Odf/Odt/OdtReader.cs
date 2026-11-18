@@ -55,7 +55,8 @@ public sealed class OdtReader : ITextDocumentReader
             names,
             new PulseOffice.Documents.Controls.ContentControlCatalog(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree),
             new OdtReadLosses(),
-            new PulseOffice.Documents.Editing.ListThreads(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree, new StyleResolver()));
+            new PulseOffice.Documents.Editing.ListThreads(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree, new StyleResolver()),
+            new SectionNoteCollection());
     }
 
     public TextDocumentFormat Format { get; } = new()
@@ -172,7 +173,8 @@ internal sealed class OdtDocumentReader(
     OdtStyleNames names,
     PulseOffice.Documents.Controls.IContentControlCatalog controls,
     OdtReadLosses losses,
-    PulseOffice.Documents.Editing.IListThreads threads) : OdtXml
+    PulseOffice.Documents.Editing.IListThreads threads,
+    ISectionNoteCollection sectionNotes) : OdtXml
 {
     private static readonly XNamespace Config = "urn:oasis:names:tc:opendocument:xmlns:config:1.0";
 
@@ -260,6 +262,7 @@ internal sealed class OdtDocumentReader(
         Finish(document, context);
         controls.Join(document);
         threads.Settle(document);
+        sectionNotes.Settle(document);
 
         new OdfMetaMapper().Read(package.ReadXml("meta.xml"), document.Properties);
         document.Fonts = new OdfFontFaceReader().Read(package, stylesDocument, new XDocument(new XElement(Office + "document-content", contentFonts)));

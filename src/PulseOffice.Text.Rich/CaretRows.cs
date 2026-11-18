@@ -23,6 +23,8 @@ public enum CaretMove
     RowEnd,
     PageUp,
     PageDown,
+    Previous,
+    Next,
 }
 
 public readonly record struct CaretTarget(int Index, double? PreferredX);
@@ -52,8 +54,24 @@ public sealed class CaretRowNavigation : ICaretRowNavigation
             CaretMove.Down => Vertical(usable, current, 1, x, usable[^1].Last),
             CaretMove.PageUp => Vertical(usable, current, -Math.Max(1, pageRows), x, usable[0].First),
             CaretMove.PageDown => Vertical(usable, current, Math.Max(1, pageRows), x, usable[^1].Last),
+            CaretMove.Previous => Step(usable, current, caret, -1),
+            CaretMove.Next => Step(usable, current, caret, 1),
             _ => new CaretTarget(caret, preferredX),
         };
+    }
+
+    private CaretTarget Step(IReadOnlyList<CaretRow> rows, int current, int caret, int step)
+    {
+        var ordered = rows[current].Stops.OrderBy(stop => stop.X).ToList();
+        var at = ordered.FindIndex(stop => stop.Index == caret);
+        if (at >= 0 && at + step >= 0 && at + step < ordered.Count) return new CaretTarget(ordered[at + step].Index, null);
+
+        var row = current + step;
+        if (row < 0 || row >= rows.Count) return new CaretTarget(caret, null);
+        var other = rows[row].Stops.OrderBy(stop => stop.X).ToList();
+        var edge = step < 0 ? other[^1] : other[0];
+        if (edge.Index == caret && other.Count > 1) edge = step < 0 ? other[^2] : other[1];
+        return new CaretTarget(edge.Index, null);
     }
 
     private CaretTarget Vertical(IReadOnlyList<CaretRow> rows, int current, int step, double x, int edge)

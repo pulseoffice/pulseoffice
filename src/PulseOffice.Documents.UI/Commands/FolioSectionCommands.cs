@@ -1,3 +1,4 @@
+using PulseOffice.Documents.Annotations;
 using PulseOffice.Documents.Blocks;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Foundation.Units;
@@ -29,7 +30,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
     private string Lead(SectionBlock section, string fallback) =>
         section.Content.Blocks.FirstOrDefault(block => block is ParagraphBlock) is ParagraphBlock paragraph ? paragraph.Id : fallback;
 
-    private IReadOnlyList<FormField> Fields(SectionSettings settings, double textWidth, string prefix = "")
+    private IReadOnlyList<FormField> Fields(SectionSettings settings, double textWidth, bool documentCollects, string prefix = "")
     {
         var columnsTitle = texts["folio.page.tab.columns"];
         var protection = texts["folio.section.group.protection"];
@@ -49,10 +50,11 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
                 ShownWhen = values => values.Flag(prefix + "protected"),
             },
             new CheckField(prefix + "hidden", texts["folio.section.hidden"], settings.Hidden) { Section = protection },
+            new CheckField(prefix + "collectEndnotes", texts["folio.section.collectEndnotes"], settings.CollectsEndnotes ?? documentCollects) { Section = texts["folio.section.group.notes"] },
         ];
     }
 
-    private SectionSettings Read(IReadOnlyDictionary<string, object> values, string fallback, byte[]? previous = null, string prefix = "", SectionColumns? before = null)
+    private SectionSettings Read(IReadOnlyDictionary<string, object> values, string fallback, bool documentCollects, byte[]? previous = null, string prefix = "", SectionColumns? before = null)
     {
         var layout = values.TryGetValue(prefix + "columnLayout", out var chosen) && chosen is ColumnLayout picked ? picked : new ColumnLayout(1, 1.25, false);
         var balanced = values.Flag(prefix + "balanced");
@@ -60,6 +62,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         return new SectionSettings(values.Text(prefix + "name").Trim() is { Length: > 0 } name ? name : fallback, sectionColumns, values.Flag(prefix + "protected"), values.Flag(prefix + "hidden"))
         {
             ProtectionKey = values.Text(prefix + "password") is { Length: > 0 } password ? keys.Digest(password) : previous,
+            CollectsEndnotes = values.Flag(prefix + "collectEndnotes") == documentCollects ? null : !documentCollects,
         };
     }
 
@@ -68,8 +71,8 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         if (Editor is not { } editor) return;
         var name = texts.Format("folio.section.default", sections.Sections(editor.Document).Count + 1);
         var initial = new SectionSettings(name, new SectionColumns(2, Twip.FromCentimeters(1.25)), false, false);
-        if (await forms.AskAsync("command.folio.insert.section.title", "folio.section.explanation", Fields(initial, TextWidth(editor.Document, editor.Caret.ParagraphId)), ct).ConfigureAwait(true) is not { } values) return;
-        var settings = Read(values, name);
+        if (await forms.AskAsync("command.folio.insert.section.title", "folio.section.explanation", Fields(initial, TextWidth(editor.Document, editor.Caret.ParagraphId), Collects(editor.Document)), ct).ConfigureAwait(true) is not { } values) return;
+        var settings = Read(values, name, Collects(editor.Document));
         editor.Change(() => sections.Wrap(editor.Document, editor.History, editor.ParagraphRange(), settings));
     }
 
@@ -86,7 +89,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
             var fields = new List<FormField>();
             if (section.ProtectionKey is not null)
                 fields.Add(new TextField(prefix + "unlock", texts["folio.section.unlockField"], string.Empty) { Secret = true, Section = texts["folio.section.group.unlock"] });
-            fields.AddRange(Fields(new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden), TextWidth(editor.Document, Lead(section, editor.Caret.ParagraphId)), prefix));
+            fields.AddRange(Fields(new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden) { CollectsEndnotes = section.CollectsEndnotes }, TextWidth(editor.Document, Lead(section, editor.Caret.ParagraphId)), Collects(editor.Document), prefix));
             fields.Add(new CheckField(prefix + "remove", texts["folio.section.remove"], false) { Section = texts["folio.section.group.protection"] });
             return new FormTab(section.Name, texts["folio.section.explanation"], fields);
         }).ToList();
@@ -97,8 +100,8 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         {
             var section = all[index];
             var prefix = Prefix(index);
-            var before = new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden) { ProtectionKey = section.ProtectionKey };
-            var after = Read(values, section.Name, section.ProtectionKey, prefix, section.Columns);
+            var before = new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden) { ProtectionKey = section.ProtectionKey, CollectsEndnotes = section.CollectsEndnotes };
+            var after = Read(values, section.Name, Collects(editor.Document), section.ProtectionKey, prefix, section.Columns);
             var remove = values.Flag(prefix + "remove");
             if (!remove && Same(before, after)) continue;
             if (section.ProtectionKey is { } key && !keys.Matches(key, values.Text(prefix + "unlock")))
@@ -122,7 +125,10 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
 
     private string Prefix(int index) => $"section{index}.";
 
+    private bool Collects(TextDocument document) => document.Notes.EndnoteSettings.Placement == NotePlacement.SectionEnd;
+
     private bool Same(SectionSettings before, SectionSettings after) =>
         before.Name == after.Name && before.Columns == after.Columns && before.Protected == after.Protected && before.Hidden == after.Hidden
+        && before.CollectsEndnotes == after.CollectsEndnotes
         && ReferenceEquals(before.ProtectionKey, after.ProtectionKey);
 }

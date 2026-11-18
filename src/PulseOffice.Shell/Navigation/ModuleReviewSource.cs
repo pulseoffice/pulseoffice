@@ -72,6 +72,8 @@ public sealed class ModuleReviewSource : IReviewSource, IModuleReviewSources
 
     public string? Current => Active?.Current;
 
+    public IReadOnlyList<string> People => Active?.People ?? [];
+
     public void Go(string id) => Active?.Go(id);
 
     public void Accept(IReadOnlyList<string> ids)

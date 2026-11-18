@@ -10,6 +10,7 @@ internal sealed class NoteBoxGesture(
     GridNotifications notifications,
     ICommentBoxDrag drag,
     CellAddress address,
+    CommentBox? stored,
     CommentBox start,
     NoteBoxEdges edges,
     Point origin) : GridGesture
@@ -28,7 +29,7 @@ internal sealed class NoteBoxGesture(
     {
         var after = options.NotePreview is { } preview && preview.Address == address ? preview.Box : start;
         options.NotePreview = null;
-        if (after != start) notifications.NoteBox(new SheetGridView.NoteBoxChange(address, start, after));
+        if (after != start) notifications.NoteBox(new SheetGridView.NoteBoxChange(address, stored, after));
         surface.Invalidate();
     }
 

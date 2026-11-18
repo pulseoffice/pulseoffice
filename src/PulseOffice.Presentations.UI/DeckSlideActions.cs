@@ -42,6 +42,15 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
         var inherits = slide.SectionName is not null && next is { SectionName: null };
         var section = slide.SectionName;
         var sectionId = slide.SectionId;
+        var emptiesBefore = deck.EmptySections.ToList();
+        var emptiesAfter = emptiesBefore
+            .Select(empty => empty.BeforeSlideId == slide.Id ? empty with { BeforeSlideId = next?.Id } : empty)
+            .ToList();
+        if (section is not null && !inherits)
+        {
+            var following = emptiesBefore.FindIndex(empty => empty.BeforeSlideId == next?.Id);
+            emptiesAfter.Insert(following < 0 ? emptiesAfter.Count : following, new EmptySection(section, sectionId, next?.Id));
+        }
 
         Do(texts["deck.action.deleteSlide"],
             () =>
@@ -50,16 +59,24 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
                 ReplaceShows(showsAfter);
                 deck.Setup = setupAfter;
                 if (inherits) (next!.SectionName, next.SectionId) = (section, sectionId);
+                ReplaceEmptySections(emptiesAfter);
                 Focus(deck.Slides[Math.Clamp(index, 0, deck.Slides.Count - 1)]);
             },
             () =>
             {
                 if (inherits) (next!.SectionName, next.SectionId) = (null, null);
+                ReplaceEmptySections(emptiesBefore);
                 deck.Setup = setupBefore;
                 ReplaceShows(showsBefore);
                 deck.InsertExisting(index, slide);
                 Focus(slide);
             });
+    }
+
+    private void ReplaceEmptySections(IReadOnlyList<EmptySection> sections)
+    {
+        deck.EmptySections.Clear();
+        deck.EmptySections.AddRange(sections);
     }
 
     public Slide? DuplicateSlide(Slide slide)
@@ -230,6 +247,16 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
         Do(texts["deck.action.layout"],
             () => { deck.ReplaceAt(deck.IndexOf(slide), replacement); Focus(replacement); },
             () => { deck.ReplaceAt(deck.IndexOf(replacement), slide); Focus(slide); });
+    }
+
+    public void SetFirstSlideNumber(int number)
+    {
+        var before = deck.FirstSlideNumber;
+        var after = Math.Clamp(number, 0, 9999);
+        if (before == after) return;
+        Do(texts["deck.action.firstSlideNumber"],
+            () => { deck.FirstSlideNumber = after; deck.Raise(); },
+            () => { deck.FirstSlideNumber = before; deck.Raise(); });
     }
 
     public void SetSlideSize(SlideSize size, bool fitContents)

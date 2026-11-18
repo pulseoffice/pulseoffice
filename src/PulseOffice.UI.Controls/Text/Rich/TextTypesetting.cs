@@ -143,7 +143,10 @@ public sealed class SpellingWaves
     }
 }
 
-public sealed record TypesetSegment(FormattedText Text, double X, double Y, int Start, int End);
+public sealed record TypesetSegment(FormattedText Text, double X, double Y, int Start, int End)
+{
+    public IReadOnlyList<UprightGlyph> Upright { get; init; } = [];
+}
 
 public sealed record TypesetBulletPicture(ListBulletPicture Picture, Rect Box)
 {
@@ -222,6 +225,8 @@ public sealed class TextBlockTypesetter(
     private const string PictureSpace = "\u2003";
 
     private readonly PulseOffice.Text.Rich.Bidi.AlignMirroring _aligns = new();
+    private readonly EastAsianUprightText _eastAsian = new();
+    private readonly UprightGlyphs _glyphs = new();
 
     public TextBlockTypesetter(ITextTheme theme, IListLabels labels, RunText runText)
         : this(theme, labels, runText, new FirstLineBreaker(), new ParagraphLineBreaker(), new LineJustifier(), new TabLayout(), new BulletPictureSizing())
@@ -229,7 +234,7 @@ public sealed class TextBlockTypesetter(
     }
 
     public IReadOnlyList<TypesetLine> Typeset(
-        IReadOnlyList<TextParagraph> paragraphs, TextFrameArea area, TextFields fields, double fontFactor, bool wrap = true, bool stacked = false)
+        IReadOnlyList<TextParagraph> paragraphs, TextFrameArea area, TextFields fields, double fontFactor, bool wrap = true, bool stacked = false, bool upright = false, bool broken = false)
     {
         var typesetter = new ParagraphTypesetter(theme, area.Scale * fontFactor);
         var styler = new RunStyler(theme, typesetter);
@@ -261,7 +266,10 @@ public sealed class TextBlockTypesetter(
                     ? Unwrapped(styled, width, margin + (hanging ? 0 : Math.Max(0, indent)), _aligns.Physical(paragraph.Align, paragraph.Direction))
                     : paragraph.Align == TextAlign.Justify
                         ? Justified(styled, width, margin, hanging ? margin : margin + Math.Max(0, indent))
+                        : broken
+                        ? Broken(styled, width, margin, hanging ? margin : margin + Math.Max(0, indent))
                         : Wrapped(styled, width, margin, hanging ? 0 : indent, hanging);
+            if (upright && !stacked) segments = Lifted(styled, segments);
 
             var labelText = hanging ? typesetter.Typeset(label, paragraph, typesetter.Ink(paragraph), Math.Max(1, -indent), runText.Culture(runs.FirstOrDefault(), fields)) : null;
             if (labelText is not null && runs.FirstOrDefault() is { } first) styler.Apply(labelText, label, Bulleted(first with { Underline = false, DoubleUnderline = false, Strikethrough = false, Hyperlink = null }, paragraph), paragraph, 0, label.Length);
@@ -281,6 +289,16 @@ public sealed class TextBlockTypesetter(
     }
 
     public double Height(IReadOnlyList<TypesetLine> lines) => lines.Sum(line => line.Advance);
+
+    private IReadOnlyList<TypesetSegment> Lifted(StyledParagraph styled, IReadOnlyList<TypesetSegment> segments)
+    {
+        var clusters = _eastAsian.Clusters(styled.Content);
+        if (clusters.Count == 0) return segments;
+        return [.. segments.Select(segment => segment with
+        {
+            Upright = _glyphs.Lift(segment.Text, segment.Start, segment.End - segment.Start, clusters, (from, to) => styled.Build(from, to, double.PositiveInfinity)),
+        })];
+    }
 
     private TypesetBulletPicture Placed(ListBulletPicture picture, TextParagraph paragraph, IReadOnlyList<TextRun> runs, ParagraphTypesetter typesetter, FormattedText line, double baseline, double x)
     {
@@ -317,6 +335,24 @@ public sealed class TextBlockTypesetter(
             new TypesetSegment(first, textX, 0, 0, split.End),
             new TypesetSegment(rest, margin, first.Height, split.Next, content.Length),
         ];
+    }
+
+    private IReadOnlyList<TypesetSegment> Broken(StyledParagraph styled, double width, double margin, double firstX)
+    {
+        var content = styled.Content;
+        double Natural(int start, int end) => end <= start ? 0 : styled.Build(start, end, double.PositiveInfinity).Width;
+
+        var segments = new List<TypesetSegment>();
+        var y = 0.0;
+        foreach (var line in lines.Break(content, Math.Max(1, width - firstX), Math.Max(1, width - margin), Natural))
+        {
+            var x = line.Start == 0 ? firstX : margin;
+            var end = Math.Max(line.End, line.Next);
+            var formatted = styled.Build(line.Start, end, Math.Max(1, width - x) + 0.5);
+            segments.Add(new TypesetSegment(formatted, x, y, line.Start, end));
+            y += formatted.Height;
+        }
+        return segments;
     }
 
     private IReadOnlyList<TypesetSegment> Justified(StyledParagraph styled, double width, double margin, double firstX)

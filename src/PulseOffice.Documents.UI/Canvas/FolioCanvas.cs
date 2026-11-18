@@ -41,7 +41,8 @@ public sealed record FolioCanvasServices(
     Commands.IFolioContentControls ContentControls,
     Editing.IFolioObjectEditing ObjectEditing,
     PulseOffice.UI.Controls.Shapes.IAdjustHandleChrome Adjusting,
-    Editing.IFolioObjectLinks ObjectLinks)
+    Editing.IFolioObjectLinks ObjectLinks,
+    Editing.IFolioLinkTips LinkTips)
 {
     public PulseOffice.Documents.Objects.IGroupMemberText GroupText { get; init; } = new PulseOffice.Documents.Objects.GroupMemberText();
 
@@ -468,6 +469,7 @@ public sealed class FolioCanvas : Control
         {
             UpdateOffer(e.GetPosition(this));
             UpdateCursor(e.GetPosition(this));
+            ShowLinkTip(e.GetPosition(this));
             return;
         }
         if (_block is { } block)
@@ -638,6 +640,11 @@ public sealed class FolioCanvas : Control
     }
 
     private StandardCursorType _cursor = StandardCursorType.Ibeam;
+
+    private void ShowLinkTip(Point point) =>
+        _services.LinkTips.Show(this, _objectGestures.ObjectAt(point) is { } hit
+            ? _services.LinkTips.OfObject(_editor, hit.Box.ObjectId)
+            : SlotAt(point) is not null && PositionAt(point) is { } position ? _services.LinkTips.At(_editor, position) : null);
 
     private ColumnDrag? BoundaryAt(Point point)
     {

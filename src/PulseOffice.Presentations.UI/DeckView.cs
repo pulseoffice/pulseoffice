@@ -154,7 +154,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         _inspector = new DeckInspector(_state, this, _player, new PulseOffice.Presentations.UI.Motion.DeckElementNames(_state.Texts));
         _modes = new DeckModeViews(_state, this, renderer,
             new DeckMasterViews(_state, this, renderer, handoutLayout ?? new HandoutLayout(), masterSlides ?? new SlideFactory(), new DeckChoiceNames(_state.Texts),
-                new Design.LayoutChoices(new DeckChoiceNames(_state.Texts), actions.Layouts.Catalog)), _correction, stillImages, new DeckOutlineText());
+                new Design.LayoutChoices(new DeckChoiceNames(_state.Texts), actions.Layouts.Catalog)), _correction, stillImages, new DeckOutlineText(), new OutlineSlideMatching(), new OutlineBlockMove(new DeckOutlineText()));
         _insertion = new DeckObjectInsertion(_state, this, images, extents ?? new PulseOffice.Drawing.Assets.ImageExtents(), _modeHost);
 
         AddHandler(KeyDownEvent, _menus.OnMenuKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);

@@ -247,6 +247,8 @@ public sealed class PageStyle(string name) : DocumentStyle(name)
 
     public PageWatermark? Watermark { get; set { field = value; Touch(); } }
 
+    public PulseOffice.Documents.Annotations.NoteSeparator? FootnoteSeparator { get; set { field = value; Touch(); } }
+
     public HeaderFooterContent Header { get; private set; } = new();
 
     public HeaderFooterContent Footer { get; private set; } = new();
@@ -281,6 +283,7 @@ public sealed class PageStyle(string name) : DocumentStyle(name)
         Background = Background,
         Borders = Borders,
         Watermark = Watermark,
+        FootnoteSeparator = FootnoteSeparator,
         Header = Header.Clone(),
         Footer = Footer.Clone(),
         FirstPageDifferent = FirstPageDifferent,

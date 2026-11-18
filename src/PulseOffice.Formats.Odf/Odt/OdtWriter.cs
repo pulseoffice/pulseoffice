@@ -57,7 +57,7 @@ public sealed class OdtWriter : ITextDocumentWriter
             catalog,
             new PulseOffice.Documents.Marks.MarkOrder());
         var paragraphs = new OdtParagraphWriter(paragraphCodec, direct, resolver, names, inline);
-        var blocks = new OdtBlockWriter(paragraphs, new OdtTableWriter(measure, names, vocabulary, borders, new TableAppearance(resolver), new OdtTableFormulas(new PulseOffice.Document.Tables.TableFormulaParser(), new PulseOffice.Document.Tables.WriterFormulaSyntax(), new PulseOffice.Document.Tables.CanonicalFormulaSyntax(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellNumbers(new PulseOffice.Documents.Editing.Tables.CellValueText(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellDirections()), new OdtSectionWriter(columns, new OdtIndexCodec(names, new PulseOffice.Documents.Indexes.IndexStyles())), resolver, names);
+        var blocks = new OdtBlockWriter(paragraphs, new OdtTableWriter(measure, names, vocabulary, borders, new TableAppearance(resolver), new OdtTableFormulas(new PulseOffice.Document.Tables.TableFormulaParser(), new PulseOffice.Document.Tables.WriterFormulaSyntax(), new PulseOffice.Document.Tables.CanonicalFormulaSyntax(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellNumbers(new PulseOffice.Documents.Editing.Tables.CellValueText(), new PulseOffice.Text.Rich.TextCultures()), new OdtCellDirections()), new OdtSectionWriter(columns, new OdtIndexCodec(names, new PulseOffice.Documents.Indexes.IndexStyles()), new PulseOffice.Documents.Annotations.SectionNoteCollection()), resolver, names);
 
         var changeWriter = new OdtChangeWriter(new OdfParagraphText());
         _writer = new OdtDocumentWriter(

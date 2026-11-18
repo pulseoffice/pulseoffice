@@ -21,7 +21,7 @@ internal sealed class GridNotePainter(GridViewport viewport, IGridTheme theme, G
             GridGeometry.ToPixels(Twip.FromPoints(box.Height)));
     }
 
-    public (CellAddress Address, CommentBox Box, Rect Bounds)? NoteAt(Point point)
+    public (CellAddress Address, CommentBox? Stored, CommentBox Box, Rect Bounds)? NoteAt(Point point)
     {
         if (viewport.Sheet is not { } sheet || sheet.Comments.Count == 0 || !viewport.GridArea().Contains(point)) return null;
 
@@ -29,7 +29,7 @@ internal sealed class GridNotePainter(GridViewport viewport, IGridTheme theme, G
         {
             if (!comment.IsAlwaysVisible) continue;
             var bounds = NoteBounds(address, comment);
-            if (bounds.Contains(point)) return (address, comment.Box ?? CommentBox.Default, bounds);
+            if (bounds.Contains(point)) return (address, comment.Box, comment.Box ?? CommentBox.Default, bounds);
         }
 
         return null;

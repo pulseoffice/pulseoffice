@@ -348,7 +348,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 if (_placedObjects is { } pagePlaced)
                 {
                     altText.WriteByName(shapes, pagePlaced.Content);
-                    _objectLinks.Wrap(shapes, pagePlaced.Links);
+                    _objectLinks.Wrap(shapes, pagePlaced.Links, pagePlaced.Tips);
                 }
                 table.Add(shapes);
             }
@@ -637,7 +637,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             if (_placedObjects is { } placed)
             {
                 altText.WriteByName(row, placed.Content);
-                _objectLinks.Wrap(row, placed.Links);
+                _objectLinks.Wrap(row, placed.Links, placed.Tips);
             }
             return row;
         }

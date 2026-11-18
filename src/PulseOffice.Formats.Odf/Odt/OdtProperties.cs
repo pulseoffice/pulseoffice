@@ -332,6 +332,20 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
         (VerticalRelation.Paragraph, "paragraph"), (VerticalRelation.PageArea, "page-content"), (VerticalRelation.Page, "page"),
         (VerticalRelation.Margin, "paragraph-content"), (VerticalRelation.Line, "line"), (VerticalRelation.Character, "char"));
 
+    private readonly TokenMap<ObjectAlignment> _horizontalPosition = new(ObjectAlignment.None, "from-left",
+        (ObjectAlignment.None, "from-left"), (ObjectAlignment.Start, "left"), (ObjectAlignment.Center, "center"), (ObjectAlignment.End, "right"));
+
+    private readonly TokenMap<ObjectAlignment> _verticalPosition = new(ObjectAlignment.None, "from-top",
+        (ObjectAlignment.None, "from-top"), (ObjectAlignment.Start, "top"), (ObjectAlignment.Center, "middle"), (ObjectAlignment.End, "bottom"));
+
+    public string HorizontalPosition(ObjectAlignment alignment) => _horizontalPosition.Token(alignment);
+
+    public ObjectAlignment HorizontalPosition(string? token) => _horizontalPosition.Value(token);
+
+    public string VerticalPosition(ObjectAlignment alignment) => _verticalPosition.Token(alignment);
+
+    public ObjectAlignment VerticalPosition(string? token) => _verticalPosition.Value(token);
+
     public string Wrap(WrapMode mode) => _wrap.Token(mode);
 
     public WrapMode Wrap(string? token, bool topAndBottom) => token == "none" && topAndBottom ? WrapMode.TopAndBottom : _wrap.Value(token);

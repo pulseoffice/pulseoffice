@@ -18,9 +18,11 @@ public interface IFolioObjectLinks
 
     string? EffectiveLink(FolioEditor editor, FolioObjectLinkTarget target);
 
+    string? Tip(FolioEditor editor, FolioObjectLinkTarget target);
+
     bool Follow(FolioEditor editor, FolioObjectLinkTarget target);
 
-    bool Set(FolioEditor editor, FolioObjectLinkTarget target, string? link);
+    bool Set(FolioEditor editor, FolioObjectLinkTarget target, string? link, string? tip = null);
 }
 
 public sealed class FolioObjectLinks(IGroupChildLinks children, IFolioObjectEditing objects, IFolioNavigation navigation, ILinkFollower follower) : IFolioObjectLinks
@@ -71,10 +73,18 @@ public sealed class FolioObjectLinks(IGroupChildLinks children, IFolioObjectEdit
         return own ?? (item.Hyperlink is { Length: > 0 } link ? link : null);
     }
 
+    public string? Tip(FolioEditor editor, FolioObjectLinkTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(editor);
+        ArgumentNullException.ThrowIfNull(target);
+        if (target.Member is not null || editor.Document.Objects.Find(target.ObjectId) is not { Hyperlink.Length: > 0 } item) return null;
+        return item.HyperlinkTip is { Length: > 0 } tip ? tip : null;
+    }
+
     public bool Follow(FolioEditor editor, FolioObjectLinkTarget target) =>
         EffectiveLink(editor, target) is { } link && follower.Follow(link, place => navigation.Follow(editor, place));
 
-    public bool Set(FolioEditor editor, FolioObjectLinkTarget target, string? link)
+    public bool Set(FolioEditor editor, FolioObjectLinkTarget target, string? link, string? tip = null)
     {
         ArgumentNullException.ThrowIfNull(editor);
         ArgumentNullException.ThrowIfNull(target);
@@ -82,7 +92,12 @@ public sealed class FolioObjectLinks(IGroupChildLinks children, IFolioObjectEdit
         var value = link?.Trim() is { Length: > 0 } trimmed ? trimmed : null;
         if (target.Member is { } member)
             return objects.Replace(editor, content => content is ShapeGroupObject group ? children.WithLink(group, member, value) : content);
-        return objects.Change(editor, item => item.Hyperlink = value);
+        var shownTip = value is not null && tip?.Trim() is { Length: > 0 } given ? given : null;
+        return objects.Change(editor, item =>
+        {
+            item.Hyperlink = value;
+            item.HyperlinkTip = shownTip;
+        });
     }
 
     private (double X, double Y) Unrotated(double x, double y, ObjectBox box, double degrees)

@@ -16,20 +16,31 @@ public sealed class ObjectPlacement : IObjectPlacement
     {
         var width = item.Size.Width.ToPoints();
         var height = item.Size.Height.ToPoints();
-        var x = item.Placement.X.ToPoints() + item.Placement.Horizontal switch
+        var (left, across) = item.Placement.Horizontal switch
         {
-            HorizontalRelation.Page => 0,
-            HorizontalRelation.PageArea or HorizontalRelation.Margin => frame.Page.Content.X,
-            _ => frame.ColumnLeft,
+            HorizontalRelation.Page => (0d, frame.Page.Width),
+            HorizontalRelation.Margin => (0d, frame.Page.Content.X),
+            HorizontalRelation.PageArea => (frame.Page.Content.X, frame.Page.Content.Width),
+            _ => (frame.ColumnLeft, frame.ColumnWidth),
         };
-        var y = item.Placement.Y.ToPoints() + item.Placement.Vertical switch
+        var (top, down) = item.Placement.Vertical switch
         {
-            VerticalRelation.Page => 0,
-            VerticalRelation.PageArea or VerticalRelation.Margin => frame.Page.Content.Y,
-            _ => frame.ParagraphTop,
+            VerticalRelation.Page => (0d, frame.Page.Height),
+            VerticalRelation.PageArea or VerticalRelation.Margin => (frame.Page.Content.Y, frame.Page.Content.Height),
+            _ => (frame.ParagraphTop, double.NaN),
         };
+        var x = Aligned(item.Placement.HorizontalAlign, left, across, width) ?? left + item.Placement.X.ToPoints();
+        var y = Aligned(item.Placement.VerticalAlign, top, down, height) ?? top + item.Placement.Y.ToPoints();
         return new LayoutRect(x, y, width, height);
     }
+
+    private double? Aligned(ObjectAlignment alignment, double start, double extent, double size) => alignment switch
+    {
+        ObjectAlignment.Start => start,
+        ObjectAlignment.Center when double.IsFinite(extent) => start + (extent - size) / 2,
+        ObjectAlignment.End when double.IsFinite(extent) => start + extent - size,
+        _ => null,
+    };
 }
 
 public readonly record struct WrapSegment(double Left, double Right)

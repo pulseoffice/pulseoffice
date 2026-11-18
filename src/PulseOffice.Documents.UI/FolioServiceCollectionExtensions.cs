@@ -139,6 +139,8 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<PulseOffice.Documents.UI.Editing.IFolioObjectLinks, PulseOffice.Documents.UI.Editing.FolioObjectLinks>();
         services.AddSingleton<FolioIndexCommands>();
         services.AddSingleton<FolioTableServices>();
+        services.TryAddSingleton<PulseOffice.UI.Controls.Links.ILinkTips, PulseOffice.UI.Controls.Links.LinkTips>();
+        services.AddSingleton<IFolioLinkTips, FolioLinkTips>();
         services.AddSingleton<FolioCanvasServices>();
         services.AddSingleton<IFolioEditRefusals, FolioEditRefusals>();
         services.AddTransient<FolioViewServices>();

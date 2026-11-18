@@ -24,7 +24,8 @@ public sealed class DeckCommands(
     IShowMediaPlayer media,
     IShowMediaSessions mediaSessions,
     Design.ShowSetupServices showSetup,
-    ICustomShowEditing customShows)
+    ICustomShowEditing customShows,
+    PulseOffice.UI.Controls.Links.ILinkTips linkTips)
 {
     private readonly ShowStart _showStart = new();
     private readonly ShowPlaylist _playlists = new();
@@ -280,6 +281,7 @@ public sealed class DeckCommands(
                 MonitorIndex = _monitorIndex,
                 EndOfShowText = texts["deck.present.endOfShow"],
                 Texts = texts,
+                LinkTips = linkTips,
                 Forms = design.IsDesigning ? null : forms,
                 ControlChanged = (slide, element) =>
                 {

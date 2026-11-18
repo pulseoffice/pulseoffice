@@ -562,18 +562,7 @@ internal sealed class OdtNoteReader(OdtVocabulary vocabulary) : OdtXml
 
 internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingReader drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
-    private (double Left, double Top, double Right, double Bottom) Clip(string? clip, DocumentSize size)
-    {
-        if (clip is null) return default;
-        var open = clip.IndexOf('(');
-        var close = clip.IndexOf(')');
-        if (open < 0 || close <= open) return default;
-        var parts = clip[(open + 1)..close].Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 4) return default;
-        double Part(int index) => measure.Points(parts[index]) ?? 0;
-        double width = size.Width.ToPoints(), height = size.Height.ToPoints();
-        return (width > 0 ? Part(3) / width : 0, height > 0 ? Part(0) / height : 0, width > 0 ? Part(1) / width : 0, height > 0 ? Part(2) / height : 0);
-    }
+    private readonly OdtImageClip _clip = new(measure);
 
     public bool Handles(XElement element) => element.Name == Draw + "frame" || element.Name == Draw + "a" || drawings.Handles(element);
 
@@ -620,9 +609,9 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
         var graphic = style?.Element(Style + "graphic-properties");
         var placement = new ObjectPlacement(Length(frame, "x"), Length(frame, "y"));
         var rotation = double.TryParse((string?)frame.Attribute(Pt + "rotation"), NumberStyles.Float, CultureInfo.InvariantCulture, out var stored) ? stored : 0;
-        if (frame.Attribute(Pt + "rotation") is null && frame.Name == Draw + "frame" && contours.Transform(frame, size) is { } transformed)
+        if (frame.Name == Draw + "frame" && contours.Transform(frame, size) is { } transformed)
         {
-            rotation = transformed.Rotation;
+            if (frame.Attribute(Pt + "rotation") is null) rotation = transformed.Rotation;
             placement = new ObjectPlacement(transformed.X, transformed.Y);
         }
         var shapeChain = (string?)graphic?.Attribute(Draw + "chain-next-name");
@@ -652,7 +641,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             content = new EmbeddedContent(picture with
             {
                 Filter = (string?)graphic?.Attribute(Draw + "color-mode") == "greyscale" ? ImageFilter.Grayscale : picture.Filter,
-                Crop = Clip((string?)graphic?.Attribute(Fo + "clip"), size),
+                Crop = _clip.Read((string?)graphic?.Attribute(Fo + "clip"), picture, size),
                 Map = imageMaps.Read(frame, size),
             });
         if (content is null) return null;
@@ -668,6 +657,8 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             {
                 Horizontal = frames.Horizontal((string?)graphic?.Attribute(Style + "horizontal-rel")),
                 Vertical = frames.Vertical((string?)graphic?.Attribute(Style + "vertical-rel")),
+                HorizontalAlign = frames.HorizontalPosition((string?)graphic?.Attribute(Style + "horizontal-pos")),
+                VerticalAlign = frames.VerticalPosition((string?)graphic?.Attribute(Style + "vertical-pos")),
             },
             Wrap = frames.Wrap((string?)graphic?.Attribute(Style + "wrap") ?? "parallel", (string?)graphic?.Attribute(Pt + "wrap") == "top-and-bottom"),
             WrapSpacing = new Margins(
@@ -682,6 +673,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             FlipVertical = contours.Vertical((string?)graphic?.Attribute(Style + "mirror")),
             Contour = contours.Read(frame),
             Hyperlink = element.Name == Draw + "a" && (string?)element.Attribute(Xlink + "href") is { Length: > 0 } link ? link : null,
+            HyperlinkTip = element.Name == Draw + "a" && (string?)element.Attribute(Office + "title") is { Length: > 0 } title ? title : null,
             StyleName = (string?)frame.Attribute(Pt + "implied-style") == "true" ? null : style is null
                 ? ((string?)frame.Attribute(Draw + "style-name") is { } named ? context.StyleNames.Resolve(named) : null)
                 : (string?)style.Attribute(Style + "parent-style-name") is { } parent ? context.StyleNames.Resolve(parent) : null,
@@ -1025,8 +1017,6 @@ internal sealed class OdtSectionReader(OdtColumnsCodec columns, OdtIndexCodec in
         var id = context.Id(element, "sec");
         var properties = context.Automatic.Find("section", (string?)element.Attribute(Text + "style-name"))?.Element(Style + "section-properties");
         var display = (string?)element.Attribute(Text + "display");
-        if (properties?.Elements(Text + "notes-configuration").Any(configuration => (string?)configuration.Attribute(Text + "note-class") == "endnote") == true)
-            context.Document.Notes.EndnoteSettings = context.Document.Notes.EndnoteSettings with { Placement = NotePlacement.SectionEnd };
         var content = new BlockContainer(blocks.Read(element, context));
         return new SectionBlock(id, (string?)element.Attribute(Text + "name") ?? id, content)
         {
@@ -1034,6 +1024,7 @@ internal sealed class OdtSectionReader(OdtColumnsCodec columns, OdtIndexCodec in
             Protected = (string?)element.Attribute(Text + "protected") == "true",
             ProtectionKey = Key((string?)element.Attribute(Text + "protection-key")),
             Hidden = display == "none",
+            CollectsEndnotes = properties?.Elements(Text + "notes-configuration").Any(configuration => (string?)configuration.Attribute(Text + "note-class") == "endnote") == true,
             Condition = (string?)element.Attribute(Text + "condition"),
             LinkedFile = (string?)element.Element(Text + "section-source")?.Attribute(Xlink + "href") is { } source ? new LinkedFiles().FromPackageHref(source) : null,
         };

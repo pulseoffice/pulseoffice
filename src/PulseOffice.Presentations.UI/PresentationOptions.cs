@@ -25,4 +25,6 @@ public sealed record PresentationOptions(int StartIndex = 0, bool Loop = false, 
     public Action<Slide, SlideElement>? ControlChanged { get; init; }
 
     public ShowMediaOptions? Media { get; init; }
+
+    public PulseOffice.UI.Controls.Links.ILinkTips? LinkTips { get; init; }
 }

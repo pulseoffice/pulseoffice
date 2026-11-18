@@ -40,5 +40,5 @@ internal sealed class DeckViewState(Presentation deck, DeckActions actions, ITex
 
     public SlideChrome ChromeFor(Slide? slide) =>
         slide is null ? default
-        : new HeaderFooterResolver().Resolve(deck.HeaderFooter, slide, deck.IndexOf(slide) + 1, DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
+        : new HeaderFooterResolver().Resolve(deck.HeaderFooter, slide, deck.NumberOf(slide), DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
 }

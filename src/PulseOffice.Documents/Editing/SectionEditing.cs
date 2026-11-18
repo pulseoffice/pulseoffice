@@ -6,6 +6,8 @@ namespace PulseOffice.Documents.Editing;
 public sealed record SectionSettings(string Name, SectionColumns Columns, bool Protected, bool Hidden)
 {
     public byte[]? ProtectionKey { get; init; }
+
+    public bool? CollectsEndnotes { get; init; }
 }
 
 public interface ISectionEditing
@@ -77,6 +79,7 @@ public sealed class SectionEditing(IStoryCatalog stories, IBlockTree tree) : ISe
         section.Protected = settings.Protected;
         section.ProtectionKey = settings.Protected ? settings.ProtectionKey : null;
         section.Hidden = settings.Hidden;
+        section.CollectsEndnotes = settings.CollectsEndnotes;
         return section;
     }
 

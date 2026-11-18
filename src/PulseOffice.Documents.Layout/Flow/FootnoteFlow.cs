@@ -24,7 +24,9 @@ internal sealed class FootnoteFlow(PaginationRun run, PaginationRequest request,
 
     public bool HasPending => _pending.Count > 0;
 
-    private double Separator => request.Separator.SpaceBefore + request.Separator.Thickness + request.Separator.SpaceAfter;
+    private PulseOffice.Documents.Annotations.NoteSeparator Rule => request.PageSeparator?.Invoke(run.Geometry.StyleName) ?? request.Separator;
+
+    private double Separator => Rule.SpaceBefore + Rule.Thickness + Rule.SpaceAfter;
 
     public double ColumnHeight(int column) => _columnNotes[column];
 
@@ -130,7 +132,7 @@ internal sealed class FootnoteFlow(PaginationRun run, PaginationRequest request,
             if (request.FootnotesBelowText && group.Key < 0) top = Math.Min(top, Math.Max(geometry.Body.Y, contentBottom));
             var left = group.First().Left;
             var width = group.First().Width;
-            var rule = request.Separator;
+            var rule = Rule;
             content.Add(new DecorationBox(DecorationKind.FootnoteSeparator, new LayoutRect(left, top + rule.SpaceBefore, width * rule.RelativeLength, rule.Thickness), null, rule.Thickness));
             var y = top + Separator;
             foreach (var note in group)

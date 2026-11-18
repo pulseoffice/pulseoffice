@@ -112,12 +112,20 @@ public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjec
     public bool Nudge(FolioEditor editor, string objectId, double dx, double dy)
     {
         if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { Anchor: not AsCharacterAnchor } item || editor.Objects.Locked(item)) return false;
-        Change(editor, objectId, target => target.Placement = target.Placement with
-        {
-            X = Points(target.Placement.X.ToPoints() + dx),
-            Y = Points(target.Placement.Y.ToPoints() + dy),
-        }, null);
+        var bounds = hits.Find(editor.Layout, objectId, out _)?.Bounds;
+        Change(editor, objectId, target => target.Placement = Nudged(target.Placement, bounds, dx, dy), null);
         return true;
+    }
+
+    private ObjectPlacement Nudged(ObjectPlacement placement, PulseOffice.Documents.Layout.Tree.LayoutRect? bounds, double dx, double dy)
+    {
+        var nudged = placement with { X = Points(placement.X.ToPoints() + dx), Y = Points(placement.Y.ToPoints() + dy) };
+        if (bounds is not { } box) return nudged;
+        if (placement.HorizontalAlign != ObjectAlignment.None)
+            nudged = nudged with { X = Points(box.X + dx), Horizontal = HorizontalRelation.Page, HorizontalAlign = ObjectAlignment.None };
+        if (placement.VerticalAlign != ObjectAlignment.None)
+            nudged = nudged with { Y = Points(box.Y + dy), Vertical = VerticalRelation.Page, VerticalAlign = ObjectAlignment.None };
+        return nudged;
     }
 
     private void Change(FolioEditor editor, string objectId, Action<AnchoredObject> change, DocumentPosition? markAt)

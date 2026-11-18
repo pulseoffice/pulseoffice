@@ -40,6 +40,8 @@ public interface IReviewSource
 
     string? Current { get; }
 
+    IReadOnlyList<string> People => [];
+
     void Go(string id);
 
     void Accept(IReadOnlyList<string> ids);

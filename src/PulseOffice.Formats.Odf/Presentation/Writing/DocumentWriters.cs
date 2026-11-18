@@ -37,7 +37,7 @@ internal sealed class OdpPageWriter(
             new XAttribute(Draw + "master-page-name", new OdfMasterPages().NameOf(session.Deck, slide)),
             new XAttribute(Presentation + "presentation-page-layout-name", layouts.OdfName(slide.Layout)));
         if (session.Deck.HeaderFooter.Any) _headerFooter.Use(page, session.Deck.HeaderFooter);
-        _sections.Write(page, slide);
+        _sections.Write(page, slide, session.Deck);
 
         var nodes = new SlideGroupNodes<XElement>();
         foreach (var element in slide.InZOrder())
@@ -200,6 +200,7 @@ internal sealed class OdpStylesBuilder(OdfUnits units, ISlideLayoutRegistry layo
                     new XAttribute(Fo + "page-height", units.Cm(deck.Size.Height)),
                     new XAttribute(Style + "print-orientation", "landscape"))),
         };
+        new OdpFirstSlideNumber().Write(automatic[0].Element(Style + "page-layout-properties")!, deck);
         var masterPages = new OdfMasterPages();
         var masters = masterPages.MasterStyles(deck, automatic, session);
         var names = new OdfSeedNames();

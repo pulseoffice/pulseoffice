@@ -38,6 +38,19 @@ internal sealed class OdtContours(OdtMeasure measure) : OdtXml
         return (Math.Round(degrees, 4) % 360, Twip.FromPoints(cx - halfWidth), Twip.FromPoints(cy - halfHeight));
     }
 
+    public string? Transform(AnchoredObject item)
+    {
+        if (item.Anchor is AsCharacterAnchor || Math.Abs(item.RotationDegrees) < 1e-9 || !double.IsFinite(item.RotationDegrees)) return null;
+        var angle = item.RotationDegrees * Math.PI / 180;
+        var halfWidth = item.Size.Width.ToPoints() / 2;
+        var halfHeight = item.Size.Height.ToPoints() / 2;
+        var cx = item.Placement.X.ToPoints() + halfWidth;
+        var cy = item.Placement.Y.ToPoints() + halfHeight;
+        var tx = cx - halfWidth * Math.Cos(angle) + halfHeight * Math.Sin(angle);
+        var ty = cy - halfWidth * Math.Sin(angle) - halfHeight * Math.Cos(angle);
+        return $"rotate ({(-angle).ToString("0.########", CultureInfo.InvariantCulture)}) translate ({measure.Points(tx)} {measure.Points(ty)})";
+    }
+
     public XElement? Write(AnchoredObject item)
     {
         if (item.Content is not EmbeddedContent || item.Anchor is AsCharacterAnchor || item.Contour is not { Points.Count: >= 3 } contour) return null;

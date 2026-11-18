@@ -235,7 +235,26 @@ internal sealed class GridPointerInput(
             options.PickingReference ? StandardCursorType.Cross
             : viewport.ColumnBorderAt(point) >= 0 ? StandardCursorType.SizeWestEast
             : viewport.RowBorderAt(point) >= 0 ? StandardCursorType.SizeNorthSouth
+            : NoteCursor(point) is { } note ? note
+            : ObjectAt(point) is null && cellLinks.LinkAt(point) is not null ? StandardCursorType.Hand
             : StandardCursorType.Arrow));
+    }
+
+    private StandardCursorType? NoteCursor(Point point)
+    {
+        if (options.DesignMode || notes.NoteAt(point) is not { } note) return null;
+        return noteDrag.EdgesAt(note.Bounds.Width, note.Bounds.Height, point.X - note.Bounds.X, point.Y - note.Bounds.Y, NoteGrip) switch
+        {
+            NoteBoxEdges.Left | NoteBoxEdges.Top => StandardCursorType.TopLeftCorner,
+            NoteBoxEdges.Right | NoteBoxEdges.Top => StandardCursorType.TopRightCorner,
+            NoteBoxEdges.Left | NoteBoxEdges.Bottom => StandardCursorType.BottomLeftCorner,
+            NoteBoxEdges.Right | NoteBoxEdges.Bottom => StandardCursorType.BottomRightCorner,
+            NoteBoxEdges.Left => StandardCursorType.LeftSide,
+            NoteBoxEdges.Right => StandardCursorType.RightSide,
+            NoteBoxEdges.Top => StandardCursorType.TopSide,
+            NoteBoxEdges.Bottom => StandardCursorType.BottomSide,
+            _ => StandardCursorType.SizeAll,
+        };
     }
 
     private Cursor CursorOf(StandardCursorType type)
@@ -282,6 +301,12 @@ internal sealed class GridPointerInput(
 
     private void ShowTipUnder(Point point)
     {
+        if (ObjectAt(point) is { } placed && LinkAt(placed, point) is { } objectLink)
+        {
+            surface.ShowTip(placed.HyperlinkTip is { Length: > 0 } objectTip && objectLink == placed.Hyperlink ? objectTip : objectLink);
+            return;
+        }
+
         if (viewport.CellAt(point) is not { } address || viewport.Sheet is not { } sheet)
         {
             surface.ShowTip(null);
@@ -323,7 +348,7 @@ internal sealed class GridPointerInput(
     {
         if (options.DesignMode || notes.NoteAt(point) is not { } note) return false;
         var edges = noteDrag.EdgesAt(note.Bounds.Width, note.Bounds.Height, point.X - note.Bounds.X, point.Y - note.Bounds.Y, NoteGrip);
-        Begin(new NoteBoxGesture(options, surface, notifications, noteDrag, note.Address, note.Box, edges, point), e.Pointer);
+        Begin(new NoteBoxGesture(options, surface, notifications, noteDrag, note.Address, note.Stored, note.Box, edges, point), e.Pointer);
         e.Handled = true;
         return true;
     }

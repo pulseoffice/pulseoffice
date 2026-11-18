@@ -25,7 +25,8 @@ public sealed class SheetPrintDocumentBuilder(
     PulseOffice.Drawing.Printing.IObjectPathBuilder paths,
     ISpreadsheetLocale locale,
     PulseOffice.Drawing.Printing.IOriginalImageSources originals,
-    ISheetPrintOptionsFactory options) : ISheetPrintDocumentBuilder
+    ISheetPrintOptionsFactory options,
+    ISheetCommentPrinter comments) : ISheetPrintDocumentBuilder
 {
     public IPrintableDocument? Build(string documentName) =>
         context.Workbook is { } workbook ? Build(workbook, context.Engine, documentName) : null;
@@ -74,7 +75,7 @@ public sealed class SheetPrintDocumentBuilder(
             : new NoConditionalAppearance();
 
         return _options.For(workbook, sheet, documentName, chosen).Select(options => new SheetPrintDocument(
-            sheet, workbook.Styles, presenter, fields, options, conditional: appearance, images: images, numbering: numbering));
+            sheet, workbook.Styles, presenter, fields, options, conditional: appearance, images: images, numbering: numbering, comments: comments));
     }
 
     private readonly ISheetPrintOptionsFactory _options = options;
