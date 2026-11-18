@@ -36,7 +36,9 @@ internal sealed class OdfHeaderFooterText(IHeaderFooterCodes codes)
             if (token.Kind == HeaderFooterTokenKind.Text) paragraph.Add(token.Value);
             else if (token.Kind == HeaderFooterTokenKind.Field
                 && _fields.FirstOrDefault(field => field.Code == "&" + (token.Value == "Z" ? "F" : token.Value)) is { } match)
-                paragraph.Add(new XElement(match.Element));
+                paragraph.Add(token.Offset == 0
+                    ? new XElement(match.Element)
+                    : new XElement(match.Element, new XAttribute(Namespaces.Text + "page-adjust", token.Offset.ToString(CultureInfo.InvariantCulture))));
         }
         return paragraph;
     }
@@ -53,6 +55,13 @@ internal sealed class OdfHeaderFooterText(IHeaderFooterCodes codes)
         return text.ToString();
     }
 
+    private string PageAdjust(XElement field) =>
+        field.Name == Namespaces.Text + "page-number"
+        && int.TryParse((string?)field.Attribute(Namespaces.Text + "page-adjust"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var offset)
+        && offset != 0
+            ? offset.ToString("+0;-0", CultureInfo.InvariantCulture)
+            : string.Empty;
+
     private void Append(XElement container, StringBuilder text)
     {
         foreach (var node in container.Nodes())
@@ -60,7 +69,7 @@ internal sealed class OdfHeaderFooterText(IHeaderFooterCodes codes)
             if (node is XText literal) text.Append(literal.Value.Replace("&", "&&", StringComparison.Ordinal));
             else if (node is XElement element)
             {
-                if (_fields.FirstOrDefault(field => field.Element == element.Name) is { } field) text.Append(field.Code);
+                if (_fields.FirstOrDefault(field => field.Element == element.Name) is { } field) text.Append(field.Code).Append(PageAdjust(element));
                 else if (element.Name == Namespaces.Text + "s") text.Append(' ');
                 else Append(element, text);
             }

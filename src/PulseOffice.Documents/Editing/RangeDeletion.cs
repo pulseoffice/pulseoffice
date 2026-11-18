@@ -115,14 +115,14 @@ public sealed class RangeDeletion(IParagraphText text, IBlockTree tree, IContent
         }
         foreach (var block in removed)
         {
-            if (session.Joined.Contains(block.Id))
-            {
-                container.Remove(block);
-                continue;
-            }
+            if (session.Joined.Contains(block.Id)) continue;
             Discard(session.Purge, block);
             session.Removed.Add(new RemovedBlock(block, [.. tree.Paragraphs(new BlockContainer([block])).Select(paragraph => paragraph.Id)]));
-            container.Remove(block);
+        }
+        if (removed.Count > 0)
+        {
+            var gone = new HashSet<Block>(removed, ReferenceEqualityComparer.Instance);
+            container.Replace([.. container.Blocks.Where(block => !gone.Contains(block))]);
         }
         if (container.Count == 0)
         {
@@ -220,6 +220,7 @@ public sealed class RangeDeletion(IParagraphText text, IBlockTree tree, IContent
         private readonly HashSet<string> _opened = new(StringComparer.Ordinal);
         private readonly HashSet<string> _closed = new(StringComparer.Ordinal);
         private readonly HashSet<string> _discarded = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _doomedComments = new(StringComparer.Ordinal);
         private readonly Dictionary<string, LostMark> _lost = new(StringComparer.Ordinal);
 
         public EditRecorder Recorder { get; } = recorder;
@@ -268,6 +269,7 @@ public sealed class RangeDeletion(IParagraphText text, IBlockTree tree, IContent
 
         public void Flush(DocumentPosition? caret = null)
         {
+            RemoveDoomedComments();
             Cover();
             Settle(caret);
             _opened.Clear();
@@ -289,12 +291,18 @@ public sealed class RangeDeletion(IParagraphText text, IBlockTree tree, IContent
                 _stripped.Add(comment.Key);
                 return;
             }
+            _stripped.Add(comment.Key);
+            _doomedComments.Add(comment.CommentId);
+        }
+
+        private void RemoveDoomedComments()
+        {
+            if (_doomedComments.Count == 0) return;
             Recorder.Touch(document.Comments, () => document.Comments.All, document.Comments.Replace);
-            foreach (var gone in document.Comments.Thread(comment.CommentId).Select(reply => reply.Id).ToList())
-            {
-                _stripped.Add(new CommentMark(0, gone, MarkEdge.Point).Key);
-                document.Comments.Remove(gone);
-            }
+            var gone = document.Comments.Threads(_doomedComments);
+            foreach (var id in gone) _stripped.Add(new CommentMark(0, id, MarkEdge.Point).Key);
+            document.Comments.RemoveAll(gone);
+            _doomedComments.Clear();
         }
 
         private void Lose(InlineMark mark, string paragraphId)

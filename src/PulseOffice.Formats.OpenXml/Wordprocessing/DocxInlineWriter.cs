@@ -264,9 +264,15 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
         return elements;
     }
 
-    private string EntryInstruction(IndexEntryMark entry, string? range) =>
-        " XE \"" + string.Join(":", entry.Path.Select(level => level.Replace(":", "\\:", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal))) + "\" "
-        + (range is null ? string.Empty : "\\r " + range + " ");
+    private string EntryInstruction(IndexEntryMark entry, string? range)
+    {
+        if (entry.Index is "toc" or "table-of-contents")
+            return " TC \"" + entry.Entry.Replace("\"", "\\\"", StringComparison.Ordinal) + "\" \\l "
+                   + (entry.Level ?? 1).ToString(CultureInfo.InvariantCulture) + " ";
+        return " XE \"" + string.Join(":", entry.Path.Select(level => level.Replace(":", "\\:", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal))) + "\" "
+               + (entry.Index == "alphabetical" ? string.Empty : "\\f \"" + entry.Index + "\" ")
+               + (range is null ? string.Empty : "\\r " + range + " ");
+    }
 
     private bool Referenced(DocxWriteContext context, string name) =>
         (context.ReferencedNames ??= ReferencedNames(context.Document)).Contains(name);
@@ -380,6 +386,11 @@ public sealed class DocxInlineWriter(IDirectFormatting formatting, DocxCharacter
                 break;
             case FieldCodeMark fieldCode:
                 foreach (var fieldRun in fieldCodes.Write(fieldCode, context)) yield return new Piece(fieldRun, null, state.Change);
+                break;
+            case IndexEntryMark entry when entry.Edge == MarkEdge.Start && entry.Index is "toc" or "table-of-contents":
+                yield return new Piece(new W.SimpleField { Instruction = EntryInstruction(entry, null) }, null, state.Change);
+                break;
+            case IndexEntryMark entry when entry.Edge == MarkEdge.End && entry.Index is "toc" or "table-of-contents":
                 break;
             case IndexEntryMark entry when entry.Edge == MarkEdge.Start:
                 var range = context.OpenIndexRange(entry.Key);

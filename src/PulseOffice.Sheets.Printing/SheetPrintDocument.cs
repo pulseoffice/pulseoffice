@@ -166,15 +166,17 @@ public sealed class SheetPrintDocument : IPrintableDocument
         var content = ContentArea(scale);
 
         var columns = paginator.Split(
-            new ColumnBand(_sheet.Layout, area.Start.Column, area.End.Column, _options.ColumnBreaks),
+            new ColumnBand(_sheet.Layout, area.Start.Column, area.End.Column, ManualBreaks(_options.ColumnBreaks)),
             content.Width, RepeatedColumns(area));
 
         var rows = paginator.Split(
-            new RowBand(_sheet.Layout, area.Start.Row, area.End.Row, _options.RowBreaks),
+            new RowBand(_sheet.Layout, area.Start.Row, area.End.Row, ManualBreaks(_options.RowBreaks)),
             content.Height, RepeatedRows(area));
 
         return (columns, rows);
     }
+
+    private IReadOnlySet<int>? ManualBreaks(IReadOnlySet<int>? breaks) => Setup.FitsToPages ? null : breaks;
 
     private DocumentRect ContentArea() => ContentArea(_scale);
 

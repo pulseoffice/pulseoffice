@@ -25,7 +25,7 @@ internal sealed class TableRows
     }
 
     public IEnumerable<XElement> Columns(XElement container) =>
-        Flattened(container, Table + "table-column", Table + "table-column-group", Table + "table-header-columns");
+        Flattened(container, Table + "table-column", [Table + "table-column-group", Table + "table-header-columns", Table + "table-columns"]);
 
     public int Advance(int index, int repeat) => (int)Math.Min((long)index + repeat, int.MaxValue);
 
@@ -33,16 +33,16 @@ internal sealed class TableRows
         int.TryParse((string?)element.Attribute(attribute), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : 1;
 
     private IEnumerable<XElement> Rows(XElement container) =>
-        Flattened(container, Table + "table-row", Table + "table-row-group", Table + "table-header-rows");
+        Flattened(container, Table + "table-row", [Table + "table-row-group", Table + "table-header-rows", Table + "table-rows"]);
 
-    private IEnumerable<XElement> Flattened(XElement container, XName item, XName group, XName header)
+    private IEnumerable<XElement> Flattened(XElement container, XName item, IReadOnlyCollection<XName> wrappers)
     {
         var pending = new Stack<XElement>();
         Push(container);
         while (pending.TryPop(out var element))
         {
             if (element.Name == item) yield return element;
-            else if (element.Name == group || element.Name == header) Push(element);
+            else if (wrappers.Contains(element.Name)) Push(element);
         }
 
         void Push(XElement parent)

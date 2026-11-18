@@ -443,11 +443,14 @@ internal sealed class OdtInlineReader(
             _ => (string?)element.Attribute(Text + "index-name") ?? "user",
         };
         var id = (string?)element.Attribute(Text + "id") ?? string.Empty;
+        int? level = kindName == "toc-mark" && int.TryParse((string?)element.Attribute(Text + "outline-level"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var outline)
+            ? Math.Clamp(outline, 1, 10)
+            : null;
 
         if (local.EndsWith("-start", StringComparison.Ordinal))
         {
             var entry = (string?)element.Attribute(Pt + "entry");
-            builder.Marks.Add(new IndexEntryMark(builder.Length, entry ?? string.Empty, MarkEdge.Start) { Index = index, Key1 = Key(element, "key1"), Key2 = Key(element, "key2") });
+            builder.Marks.Add(new IndexEntryMark(builder.Length, entry ?? string.Empty, MarkEdge.Start) { Index = index, Key1 = Key(element, "key1"), Key2 = Key(element, "key2"), Level = level });
             if (entry is null) context.OpenIndexMarks[id] = (paragraphId, builder.Length, index);
         }
         else if (local.EndsWith("-end", StringComparison.Ordinal))
@@ -460,7 +463,7 @@ internal sealed class OdtInlineReader(
                 var position = builder.Marks.IndexOf(start);
                 builder.Marks[position] = start with { Entry = entry };
             }
-            builder.Marks.Add(new IndexEntryMark(builder.Length, entry, MarkEdge.End) { Index = index, Key1 = start?.Key1, Key2 = start?.Key2 });
+            builder.Marks.Add(new IndexEntryMark(builder.Length, entry, MarkEdge.End) { Index = index, Key1 = start?.Key1, Key2 = start?.Key2, Level = start?.Level });
         }
         else
         {
@@ -471,7 +474,7 @@ internal sealed class OdtInlineReader(
                 value = keys[^1];
                 keys.RemoveAt(keys.Count - 1);
             }
-            builder.Marks.Add(new IndexEntryMark(builder.Length, value, MarkEdge.Point) { Index = index, Key1 = keys.Count > 0 ? keys[0] : null, Key2 = keys.Count > 1 ? keys[1] : null });
+            builder.Marks.Add(new IndexEntryMark(builder.Length, value, MarkEdge.Point) { Index = index, Key1 = keys.Count > 0 ? keys[0] : null, Key2 = keys.Count > 1 ? keys[1] : null, Level = level });
         }
         return true;
     }

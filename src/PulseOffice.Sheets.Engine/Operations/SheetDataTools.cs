@@ -82,13 +82,13 @@ public interface ITextToColumns
     IReadOnlyList<string> Split(string text, TextToColumnsRequest request);
 }
 
-public sealed class TextToColumns(IDelimitedText delimited, PulseOffice.Sheets.Formatting.ISpreadsheetLocale locale) : ITextToColumns
+public sealed class TextToColumns(IDelimitedText delimited, PulseOffice.Sheets.Formatting.ISpreadsheetLocale locale, ISelectionWorkArea workArea) : ITextToColumns
 {
     private readonly IDelimitedText _delimited = delimited;
     private readonly SeparatorUnifier _unifier = new();
     private readonly SplitNumberReader _numbers = new(new Evaluation.Functions.NumericText(locale));
 
-    public TextToColumns(IDelimitedText delimited) : this(delimited, new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale())
+    public TextToColumns(IDelimitedText delimited) : this(delimited, new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale(), new SelectionWorkArea())
     {
     }
 
@@ -99,8 +99,9 @@ public sealed class TextToColumns(IDelimitedText delimited, PulseOffice.Sheets.F
 
         var values = new Dictionary<CellAddress, CellValue>();
         var widest = 0;
+        if (workArea.Bound(request.Range, sheet.UsedRange()) is not { } rows) return new TextToColumnsPlan(values, widest);
 
-        for (var row = request.Range.Start.Row; row <= request.Range.End.Row; row++)
+        for (var row = rows.Start.Row; row <= rows.End.Row; row++)
         {
             var source = sheet.GetValue(new CellAddress(row, request.Range.Start.Column));
             if (source.Kind != ValueKind.Text) continue;

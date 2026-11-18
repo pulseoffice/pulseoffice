@@ -91,8 +91,6 @@ public sealed class FolioFieldCommands(
     IFolioFieldsDialog dialog,
     IStatusBarService status) : FolioCommandSet(context)
 {
-    private const string HeadingBookmark = "__RefHeading__";
-
     private readonly IReadOnlyList<string> _numberFormats = ["1", "a", "A", "i", "I"];
 
     public IEnumerable<CommandDefinition> GetCommands() =>
@@ -195,7 +193,7 @@ public sealed class FolioFieldCommands(
         var name = run.FieldArgument ?? string.Empty;
         if (run.Field == TextFieldKind.NoteReference)
             return (editor.Document.Notes.All.FirstOrDefault(note => note.Id == name)?.Kind == NoteKind.Endnote ? ReferenceTargetKind.Endnotes : ReferenceTargetKind.Footnotes, null, name);
-        if (name.StartsWith(HeadingBookmark, StringComparison.Ordinal)) return (ReferenceTargetKind.Headings, null, name[HeadingBookmark.Length..]);
+        if (targets.HeadingOf(editor.Document, name) is { } heading) return (ReferenceTargetKind.Headings, null, heading);
         foreach (var sequence in targets.Sequences(editor.Document))
             foreach (var caption in targets.Targets(editor.Document, ReferenceTargetKind.Captions, sequence))
                 if (editor.Services.Stories.Find(editor.Document, caption.Key).Paragraph.Content.Runs.Any(candidate => candidate.Field == TextFieldKind.Sequence && candidate.FieldDetail?.Format == name))

@@ -127,10 +127,8 @@ public sealed class RevisionResolver(
         var recorder = new EditRecorder(document, "reject-change");
         switch (change)
         {
-            case FormatChange format when region is not null && format.PreviousKnown && region.Start.ParagraphId == region.End.ParagraphId:
-                var paragraph = stories.Find(document, region.Start.ParagraphId).Paragraph;
-                recorder.Touch(paragraph);
-                paragraph.State = text.Restyle(paragraph.State, region.Start.Offset, region.End.Offset, format.PreviousRuns);
+            case FormatChange format when region is not null && format.PreviousKnown:
+                Restyle(document, recorder, region.Start, region.End, format.PreviousRuns);
                 break;
             case ParagraphFormatChange layout when region is not null && layout.PreviousKnown:
                 var target = stories.Find(document, region.Start.ParagraphId).Paragraph;
@@ -158,6 +156,45 @@ public sealed class RevisionResolver(
                 Restore(document, history, region.Start, deletion);
                 break;
         }
+    }
+
+    private void Restyle(TextDocument document, EditRecorder recorder, DocumentPosition start, DocumentPosition end, IReadOnlyList<PulseOffice.Text.Rich.TextRun> previous)
+    {
+        var covered = new List<Blocks.ParagraphBlock>();
+        foreach (var paragraph in stories.Paragraphs(document).SkipWhile(paragraph => paragraph.Id != start.ParagraphId))
+        {
+            covered.Add(paragraph);
+            if (paragraph.Id == end.ParagraphId) break;
+        }
+        if (covered.Count == 0 || covered[^1].Id != end.ParagraphId) return;
+        var segments = covered.Select(paragraph => (
+            Paragraph: paragraph,
+            From: paragraph.Id == start.ParagraphId ? start.Offset : 0,
+            To: paragraph.Id == end.ParagraphId ? end.Offset : paragraph.Length)).ToList();
+        if (segments.Sum(segment => segment.To - segment.From) != previous.Sum(run => run.Text.Length)) return;
+        var consumed = 0;
+        foreach (var (paragraph, from, to) in segments)
+        {
+            var slice = Slice(previous, consumed, to - from);
+            consumed += to - from;
+            if (slice.Count == 0) continue;
+            recorder.Touch(paragraph);
+            paragraph.State = text.Restyle(paragraph.State, from, to, slice);
+        }
+    }
+
+    private static List<PulseOffice.Text.Rich.TextRun> Slice(IReadOnlyList<PulseOffice.Text.Rich.TextRun> runs, int start, int length)
+    {
+        var slice = new List<PulseOffice.Text.Rich.TextRun>();
+        var offset = 0;
+        foreach (var run in runs)
+        {
+            var from = Math.Max(start, offset);
+            var to = Math.Min(start + length, offset + run.Text.Length);
+            if (to > from) slice.Add(run with { Text = run.Text[(from - offset)..(to - offset)] });
+            offset += run.Text.Length;
+        }
+        return slice;
     }
 
     private DocumentEdit Revive(TextDocument document, UndoStack history, DocumentPosition at, Deletion deletion)

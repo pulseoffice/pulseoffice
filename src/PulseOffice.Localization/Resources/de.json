@@ -8120,6 +8120,7 @@
   "diagnostic.odf273": "Einige Kopf- oder Fußzeilen enthalten Excel-Formatcodes (Schrift, Größe, Fett, Farbe, Bild): ODS behält Text und Felder, die Formatierung geht verloren.",
   "diagnostic.odp107": "ODF kennt ein Seitenlayout je Layouttyp: weitere Layouts desselben Typs, etwa aus PowerPoint gelesene benutzerdefinierte Layouts, werden wie das erste dieses Typs geschrieben.",
   "diagnostic.docx223": "SET-Felder in Word zeigen ihren Wert nie an: Variablen mit sichtbarem Wert behalten ihn in DOCX, zeigen ihn aber nicht mehr im Text.",
+  "diagnostic.docx224": "Verschobener Text wird als aufgezeichnete Löschung an der alten Stelle und als aufgezeichnete Einfügung an der neuen Stelle importiert: Das Annehmen oder Ablehnen einer Seite erledigt die andere nicht mehr, und die Verschiebung wird als Löschung und Einfügung zurückgeschrieben.",
   "diagnostic.odf102": "Bedingte Regeln „über/unter dem Durchschnitt“ mit einer Anzahl Standardabweichungen gibt es in ODS nicht: sie werden als einfache Regeln über oder unter dem Durchschnitt geschrieben.",
   "diagnostic.xlsx231": "Eine gefilterte Spalte mit zwei Bedingungen und zusätzlichem Ausschluss leerer Zellen lässt sich nicht in XLSX schreiben: der Ausschluss leerer Zellen geht verloren. ODS behält ihn.",
   "diagnostic.xlsx232": "Ein Standardfilter wird in XLSX als AutoFilter geschrieben: Beim erneuten Öffnen zeigt der Bereich Filterschaltflächen. ODS behält den Standardfilter.",

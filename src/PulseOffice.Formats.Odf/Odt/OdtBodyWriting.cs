@@ -329,6 +329,8 @@ internal sealed class OdtMarkWriter(OdtCommentWriter comments, OdtNoteWriter not
         }
         if (kind == "user-index-mark" && mark.Edge != MarkEdge.End) element.Add(new XAttribute(Text + "index-name", mark.Index));
         if (kind == "toc-mark" && mark.Index != "toc") element.Add(new XAttribute(Pt + "index", mark.Index));
+        if (kind == "toc-mark" && mark.Edge != MarkEdge.End && mark.Level is { } level)
+            element.Add(new XAttribute(Text + "outline-level", level.ToString(CultureInfo.InvariantCulture)));
         return element;
     }
 }

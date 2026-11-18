@@ -131,7 +131,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
 
     private readonly IReadOnlySet<string> _structural = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "HYPERLINK", "XE", "TOC", "INDEX", "BIBLIOGRAPHY", "FORMTEXT", "FORMCHECKBOX", "FORMDROPDOWN",
+        "HYPERLINK", "XE", "TC", "TOC", "INDEX", "BIBLIOGRAPHY", "FORMTEXT", "FORMCHECKBOX", "FORMDROPDOWN",
     };
 
     public bool Structural(string? instruction)

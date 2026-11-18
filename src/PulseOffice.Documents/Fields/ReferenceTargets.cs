@@ -27,6 +27,8 @@ public interface IReferenceTargets
     string Prepare(TextDocument document, EditRecorder recorder, ReferenceTarget target);
 
     string? Touches(TextDocument document, ReferenceTarget target);
+
+    string? HeadingOf(TextDocument document, string bookmarkName);
 }
 
 public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutline outline, IDocumentReadingOrder order, IStoryCatalog stories, IFieldRunRewriter rewriter) : IReferenceTargets
@@ -57,10 +59,16 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
 
     public string? Touches(TextDocument document, ReferenceTarget target) => target.Kind switch
     {
-        ReferenceTargetKind.Headings => stories.Find(document, target.Key).Paragraph.Marks.OfType<BookmarkMark>().Any(mark => mark.Name == HeadingPrefix + target.Key) ? null : target.Key,
+        ReferenceTargetKind.Headings => HeadingBookmark(stories.Find(document, target.Key).Paragraph) is null ? target.Key : null,
         ReferenceTargetKind.Captions => stories.Find(document, target.Key).Paragraph.Content.Runs.FirstOrDefault(run => run.Field == TextFieldKind.Sequence)?.FieldDetail?.Format is { Length: > 0 } ? null : target.Key,
         _ => null,
     };
+
+    public string? HeadingOf(TextDocument document, string bookmarkName) =>
+        bookmarkName.StartsWith(HeadingPrefix, StringComparison.Ordinal) && bookmarks.Find(document, bookmarkName) is { } bookmark ? bookmark.ParagraphId : null;
+
+    private string? HeadingBookmark(ParagraphBlock heading) =>
+        heading.Marks.OfType<BookmarkMark>().FirstOrDefault(mark => mark.Edge == MarkEdge.Start && mark.Offset == 0 && mark.Name.StartsWith(HeadingPrefix, StringComparison.Ordinal))?.Name;
 
     public string Prepare(TextDocument document, EditRecorder recorder, ReferenceTarget target)
     {
@@ -68,8 +76,11 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
         {
             case ReferenceTargetKind.Headings:
                 var heading = stories.Find(document, target.Key).Paragraph;
+                if (HeadingBookmark(heading) is { } existing) return existing;
+                var used = bookmarks.Bookmarks(document).Select(bookmark => bookmark.Name).ToHashSet(StringComparer.Ordinal);
                 var name = HeadingPrefix + heading.Id;
-                if (heading.Marks.OfType<BookmarkMark>().Any(mark => mark.Name == name)) return name;
+                for (var suffix = 1; used.Contains(name); suffix++)
+                    name = HeadingPrefix + heading.Id + "_" + suffix.ToString(CultureInfo.InvariantCulture);
                 recorder.Touch(heading);
                 heading.State = heading.State with
                 {
@@ -80,7 +91,7 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
                 var caption = stories.Find(document, target.Key).Paragraph;
                 var runs = caption.Content.Runs.ToList();
                 var index = runs.FindIndex(run => run.Field == TextFieldKind.Sequence);
-                if (runs[index].FieldDetail?.Format is { Length: > 0 } existing) return existing;
+                if (runs[index].FieldDetail?.Format is { Length: > 0 } captionName) return captionName;
                 var taken = bookmarks.SequenceTargets(document).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
                 var number = 0;
                 string reference;

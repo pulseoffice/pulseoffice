@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using PulseOffice.Documents.Layout.Tree;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Localization;
 using PulseOffice.UI.Controls.Services;
@@ -17,12 +19,30 @@ public sealed class FolioPageJump : IFolioPageJump
     public int PageOf(FolioEditor editor, DocumentPosition position)
     {
         ArgumentNullException.ThrowIfNull(editor);
-        var pages = editor.Layout.Pages;
-        for (var index = pages.Count - 1; index >= 0; index--)
-            if (pages[index].Lines.Any(line => line.ParagraphId == position.ParagraphId && line.Line.Start <= position.Offset))
-                return index + 1;
-        return 1;
+        var starts = _indexes.GetValue(editor.Layout, IndexOf);
+        if (!starts.TryGetValue(position.ParagraphId, out var lines)) return 1;
+        var page = 1;
+        foreach (var line in lines)
+            if (line.Start <= position.Offset && line.Page > page) page = line.Page;
+        return page;
     }
+
+    private readonly ConditionalWeakTable<DocumentLayout, Dictionary<string, List<PageLineStart>>> _indexes = new();
+
+    private static Dictionary<string, List<PageLineStart>> IndexOf(DocumentLayout layout)
+    {
+        var index = new Dictionary<string, List<PageLineStart>>(StringComparer.Ordinal);
+        var pages = layout.Pages;
+        for (var page = 0; page < pages.Count; page++)
+            foreach (var line in pages[page].Lines)
+            {
+                if (!index.TryGetValue(line.ParagraphId, out var starts)) index[line.ParagraphId] = starts = [];
+                starts.Add(new PageLineStart(line.Line.Start, page + 1));
+            }
+        return index;
+    }
+
+    private readonly record struct PageLineStart(int Start, int Page);
 
     public bool Go(FolioEditor editor, int page)
     {

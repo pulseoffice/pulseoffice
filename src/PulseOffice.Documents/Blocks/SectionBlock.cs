@@ -37,7 +37,9 @@ public sealed class SectionBlock(string id, string name, BlockContainer content)
 
     public override T Accept<T>(IBlockVisitor<T> visitor) => visitor.VisitSection(this);
 
-    public override Block Clone() => new SectionBlock(Id, Name, Content.Clone())
+    public override Block Clone() => WithContent(Content.Clone(), Index);
+
+    public SectionBlock WithContent(BlockContainer content, Indexes.IndexDefinition? index) => new(Id, Name, content)
     {
         Columns = Columns,
         Protected = Protected,
@@ -45,6 +47,6 @@ public sealed class SectionBlock(string id, string name, BlockContainer content)
         Hidden = Hidden,
         Condition = Condition,
         LinkedFile = LinkedFile,
-        Index = Index,
+        Index = index,
     };
 }

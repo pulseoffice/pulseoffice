@@ -85,6 +85,26 @@ public sealed class CommentCollection
         return thread;
     }
 
+    public IReadOnlySet<string> Threads(IEnumerable<string> roots)
+    {
+        var replies = _comments.Where(comment => comment.ParentId is not null).ToLookup(comment => comment.ParentId!, StringComparer.Ordinal);
+        var members = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>(roots.Where(root => Find(root) is not null));
+        while (pending.TryPop(out var current))
+        {
+            if (!members.Add(current)) continue;
+            foreach (var reply in replies[current]) pending.Push(reply.Id);
+        }
+        return members;
+    }
+
+    public int RemoveAll(IReadOnlySet<string> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        _byId = null;
+        return _comments.RemoveAll(comment => ids.Contains(comment.Id));
+    }
+
     public int DetachBrokenReplies()
     {
         var detached = 0;

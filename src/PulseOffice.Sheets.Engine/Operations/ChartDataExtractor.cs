@@ -100,15 +100,17 @@ internal abstract class SeriesLayout
         var categories = indices.Select(index => Category(grid, range, definition, index, firstValue)).ToList();
 
         var series = new List<ChartSeries>();
-        for (var lane = FirstSeries(range, definition); lane <= LastSeries(range); lane++)
+        var firstSeries = FirstSeries(range, definition);
+        for (var lane = firstSeries; lane <= LastSeries(range); lane++)
         {
             if (LaneHidden(grid, lane)) continue;
+            var ordinal = lane - firstSeries;
             var values = indices.Select(index => Value(grid, lane, index)).ToList();
-            var name = definition.ExplicitSeriesName(series.Count) ?? SeriesName(grid, range, definition, lane);
+            var name = definition.ExplicitSeriesName(ordinal) ?? SeriesName(grid, range, definition, lane);
 
-            series.Add(new ChartSeries(string.IsNullOrWhiteSpace(name) ? names.Fallback(series.Count + 1) : name, values)
+            series.Add(new ChartSeries(string.IsNullOrWhiteSpace(name) ? names.Fallback(ordinal + 1) : name, values)
             {
-                ColorHex = definition.SeriesColor(series.Count),
+                ColorHex = definition.SeriesColor(ordinal),
             });
         }
 

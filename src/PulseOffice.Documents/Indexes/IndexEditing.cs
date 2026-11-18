@@ -174,12 +174,7 @@ public sealed class IndexEditing(IStoryCatalog stories, IBlockTree tree, IIndexC
         if (Locate(document, sectionId) is not { } location) return recorder.Commit(history);
         var old = (SectionBlock)location.Container[location.Index];
         recorder.Touch(location.Container);
-        var section = new SectionBlock(old.Id, old.Name, new BlockContainer(composer.Compose(document, definition, facts)))
-        {
-            Index = definition,
-            Protected = old.Protected,
-            Columns = old.Columns,
-        };
+        var section = old.WithContent(new BlockContainer(composer.Compose(document, definition, facts)), definition);
         location.Container.RemoveAt(location.Index);
         location.Container.Insert(location.Index, section);
         return recorder.Commit(history);

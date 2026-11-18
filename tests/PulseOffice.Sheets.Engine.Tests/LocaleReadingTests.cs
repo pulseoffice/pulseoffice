@@ -89,7 +89,7 @@ public sealed class LocaleReadingTests : IDisposable
         var sheet = Workbook.CreateDefault().Sheets[0];
         sheet.SetValue(CellAddress.First, CellValue.Text("1,5;x"));
 
-        var plan = new TextToColumns(new DelimitedText(), new FixedSpreadsheetLocale(Italian))
+        var plan = new TextToColumns(new DelimitedText(), new FixedSpreadsheetLocale(Italian), new PulseOffice.Sheets.Addressing.SelectionWorkArea())
             .Plan(sheet, new TextToColumnsRequest(new CellRange(CellAddress.First, CellAddress.First)));
 
         Assert.Equal(1.5, plan.Values[CellAddress.First].AsNumber(), 10);

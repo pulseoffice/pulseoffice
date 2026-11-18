@@ -8120,6 +8120,7 @@
   "diagnostic.odf273": "Some headers or footers carry Excel formatting codes (font, size, bold, colour, picture): ODS keeps the text and fields, the formatting is lost.",
   "diagnostic.odp107": "ODF has one page layout per layout type: further layouts of the same type, such as custom layouts read from PowerPoint files, are written as the first of that type.",
   "diagnostic.docx223": "Word SET fields never show their value: variables set with a visible value keep the value in DOCX but no longer show it in the text.",
+  "diagnostic.docx224": "Moved text is imported as a tracked deletion where it was and a tracked insertion where it went: accepting or rejecting one side no longer settles the other, and the move is written back as a deletion and an insertion.",
   "diagnostic.odf102": "Above/below average conditional rules with a number of standard deviations do not exist in ODS: they are written as plain above or below average rules.",
   "diagnostic.xlsx231": "A filtered column with two conditions and also excluding blank cells cannot be written to XLSX: the blank exclusion is lost. ODS keeps it.",
   "diagnostic.xlsx232": "A standard filter is written to XLSX as an AutoFilter: the range shows filter buttons when the file is opened again. ODS keeps the standard filter.",

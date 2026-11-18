@@ -9,7 +9,7 @@ public enum HeaderFooterTokenKind
     Formatting,
 }
 
-public readonly record struct HeaderFooterToken(HeaderFooterTokenKind Kind, string Value);
+public readonly record struct HeaderFooterToken(HeaderFooterTokenKind Kind, string Value, int Offset = 0);
 
 public interface IHeaderFooterCodes
 {
@@ -66,6 +66,13 @@ public sealed class HeaderFooterCodes : IHeaderFooterCodes
             }
 
             Flush(tokens, literal);
+            if (upper == 'P' && PageOffset(pattern, end) is { } adjusted)
+            {
+                tokens.Add(new HeaderFooterToken(HeaderFooterTokenKind.Field, "P", adjusted.Offset));
+                index = adjusted.End;
+                continue;
+            }
+
             tokens.Add(Fields.Contains(upper)
                 ? new HeaderFooterToken(HeaderFooterTokenKind.Field, upper.ToString())
                 : new HeaderFooterToken(HeaderFooterTokenKind.Formatting, pattern[index..end]));
@@ -74,6 +81,16 @@ public sealed class HeaderFooterCodes : IHeaderFooterCodes
 
         Flush(tokens, literal);
         return tokens;
+    }
+
+    private (int Offset, int End)? PageOffset(string pattern, int start)
+    {
+        if (start >= pattern.Length || (pattern[start] != '+' && pattern[start] != '-')) return null;
+        var end = Digits(pattern, start + 1);
+        if (end == start + 1) return null;
+        if (!int.TryParse(pattern.AsSpan(start + 1, end - start - 1), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var amount)) return null;
+        return (pattern[start] == '-' ? -amount : amount, end);
     }
 
     private int Quoted(string pattern, int start)

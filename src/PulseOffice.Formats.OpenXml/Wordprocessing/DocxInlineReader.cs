@@ -12,7 +12,7 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed record DocxInlineContent(IReadOnlyList<TextRun> Runs, IReadOnlyList<InlineMark> Marks);
 
-public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacterCodec characters, DocxFieldInstructions fields, DocxDrawingCodec drawings, DocxVmlReader vml, DocxObjectCodecs objects, DocxContentControls controls, DocxLegacyFormFields forms, DocxParagraphMarkChanges paragraphMarks, DocxFieldRangeReader ranges)
+public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacterCodec characters, DocxFieldInstructions fields, DocxDrawingCodec drawings, DocxVmlReader vml, DocxObjectCodecs objects, DocxContentControls controls, DocxLegacyFormFields forms, DocxParagraphMarkChanges paragraphMarks, DocxFieldRangeReader ranges, DocxIndexEntryReader indexEntries)
 {
     private sealed class OpenFormat(string id, string key)
     {
@@ -166,7 +166,7 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
 
     private void ReadSimpleField(W.SimpleField simple, Collector collector)
     {
-        if (Entry(simple.Instruction?.Value, collector) is { } indexEntry)
+        if (indexEntries.Read(simple.Instruction?.Value, collector.Length, collector.Context) is { } indexEntry)
         {
             collector.Marks.Add(indexEntry);
             return;
@@ -517,7 +517,7 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
                                 collector.Field = Locked(fields.WithNativeData(fields.Parse(resolved.Text), collector.NativeData), collector.FieldLocked);
                                 collector.FieldEmitted = false;
                             }
-                            if (Entry(resolved.Text, collector) is { } complexEntry)
+                            if (indexEntries.Read(resolved.Text, collector.Length, collector.Context) is { } complexEntry)
                                 collector.Marks.Add(complexEntry);
                             EmptyField(collector);
                             collector.Instruction.Clear();
@@ -617,59 +617,6 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         collector.Marks.Add(new NoteMark(collector.Length, noteId));
         if (custom && collector.Context.Document.Notes.Find(noteId) is { } note)
             note.Citation = string.Concat(run.Elements<W.Text>().Select(text => text.Text));
-    }
-
-    private IndexEntryMark? Entry(string? instruction, Collector collector)
-    {
-        if (EntryPath(instruction) is not { } path) return null;
-        var levels = Levels(path);
-        if (levels.Count == 0) return null;
-        var leaf = levels.Count > 3 ? string.Join(", ", levels.Skip(2)) : levels[^1];
-        var entry = new IndexEntryMark(collector.Length, leaf, MarkEdge.Point)
-        {
-            Key1 = levels.Count > 1 ? levels[0] : null,
-            Key2 = levels.Count > 2 ? levels[1] : null,
-        };
-        if (System.Text.RegularExpressions.Regex.Match(instruction!, @"(?<=\s)\\r\s+""?([^\s""\\]+)") is { Success: true } range)
-            collector.Context.IndexRanges.Add((entry, range.Groups[1].Value));
-        return entry;
-    }
-
-    private List<string> Levels(string path)
-    {
-        var levels = new List<string>();
-        var current = new System.Text.StringBuilder();
-        for (var index = 0; index < path.Length; index++)
-        {
-            if (path[index] == '\\' && index + 1 < path.Length && path[index + 1] == ':')
-            {
-                current.Append(':');
-                index++;
-            }
-            else if (path[index] == ':')
-            {
-                levels.Add(current.ToString().Trim());
-                current.Clear();
-            }
-            else current.Append(path[index]);
-        }
-        levels.Add(current.ToString().Trim());
-        return [.. levels.Where(level => level.Length > 0)];
-    }
-
-    private string? EntryPath(string? instruction)
-    {
-        var text = instruction?.Trim();
-        if (text is null || !text.StartsWith("XE ", StringComparison.OrdinalIgnoreCase)) return null;
-        var rest = text[3..].Trim();
-        if (rest.StartsWith('"'))
-        {
-            var end = rest.IndexOf('"', 1);
-            while (end > 0 && rest[end - 1] == '\\') end = rest.IndexOf('"', end + 1);
-            rest = end > 0 ? rest[1..end] : rest[1..];
-        }
-
-        return rest.Replace("\\\"", "\"", StringComparison.Ordinal);
     }
 
     private void Alternate(AlternateContent alternate, Collector collector) =>

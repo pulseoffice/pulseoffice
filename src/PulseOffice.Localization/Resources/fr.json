@@ -8120,6 +8120,7 @@
   "diagnostic.odf273": "Certains en-têtes ou pieds de page contiennent des codes de mise en forme Excel (police, taille, gras, couleur, image) : ODS conserve le texte et les champs, la mise en forme est perdue.",
   "diagnostic.odp107": "ODF n'a qu'une mise en page par type : les autres mises en page du même type, comme les mises en page personnalisées lues depuis PowerPoint, sont écrites comme la première de ce type.",
   "diagnostic.docx223": "Les champs SET de Word n'affichent jamais leur valeur : les variables définies avec une valeur visible la conservent en DOCX mais ne l'affichent plus dans le texte.",
+  "diagnostic.docx224": "Le texte déplacé est importé comme une suppression suivie à son ancien emplacement et une insertion suivie à son nouvel emplacement : accepter ou refuser un côté ne règle plus l'autre, et le déplacement est réécrit comme une suppression et une insertion.",
   "diagnostic.odf102": "Les règles conditionnelles « au-dessus/en dessous de la moyenne » avec un nombre d'écarts types n'existent pas en ODS : elles sont écrites comme de simples règles au-dessus ou en dessous de la moyenne.",
   "diagnostic.xlsx231": "Une colonne filtrée avec deux conditions et l'exclusion des cellules vides ne peut pas être écrite en XLSX : l'exclusion des cellules vides est perdue. ODS la conserve.",
   "diagnostic.xlsx232": "Un filtre standard est écrit en XLSX comme filtre automatique : à la réouverture, la plage affiche des boutons de filtre. ODS conserve le filtre standard.",

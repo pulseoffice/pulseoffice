@@ -92,6 +92,8 @@ public sealed record IndexEntryMark(int Offset, string Entry, MarkEdge Edge) : I
 
     public string? Key2 { get; init; }
 
+    public int? Level { get; init; }
+
     public IReadOnlyList<string> Path => [.. new[] { Key1, Key2 }.OfType<string>(), Entry];
 
     public override string Key => "index:" + Index + ":" + string.Join("\u001F", Path);

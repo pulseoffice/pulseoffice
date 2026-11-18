@@ -26,16 +26,16 @@ public sealed class HeaderFooterFields(IFormatProvider? culture = null, IHeaderF
             result.Append(token.Kind switch
             {
                 HeaderFooterTokenKind.Text => token.Value,
-                HeaderFooterTokenKind.Field => Field(token.Value, context),
+                HeaderFooterTokenKind.Field => Field(token, context),
                 _ => string.Empty,
             });
 
         return result.ToString();
     }
 
-    private string Field(string code, PageContext context) => code switch
+    private string Field(HeaderFooterToken token, PageContext context) => token.Value switch
     {
-        "P" => context.PageNumber.ToString(_culture),
+        "P" => (context.PageNumber + token.Offset).ToString(_culture),
         "N" => context.PageCount.ToString(_culture),
         "D" => context.PrintedAt.ToString("d", _culture),
         "T" => context.PrintedAt.ToString("t", _culture),

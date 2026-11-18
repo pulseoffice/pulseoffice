@@ -389,10 +389,22 @@ internal sealed class OdtChangeWriter(IOdfParagraphText paragraphs) : OdtXml
         {
             Insertion => new XElement(Text + "insertion", info),
             Deletion deletion => Deletion(deletion, info, styles, session, blocks),
-            ParagraphFormatChange => new XElement(Text + "format-change", new XAttribute(Pt + "kind", "paragraph"), info),
+            ParagraphFormatChange layout => Previous(new XElement(Text + "format-change", new XAttribute(Pt + "kind", "paragraph"), info),
+                change.Id, layout.PreviousKnown ? layout.Previous : null, styles, session, blocks),
+            FormatChange format => Previous(new XElement(Text + "format-change", info),
+                change.Id, format.PreviousKnown ? new PulseOffice.Text.Rich.TextParagraph(string.Empty).WithRuns(format.PreviousRuns) : null, styles, session, blocks),
             _ => new XElement(Text + "format-change", info),
         };
         return new XElement(Text + "changed-region", new XAttribute(Text + "id", change.Id), new XAttribute(Xml + "id", change.Id), body);
+    }
+
+    private XElement Previous(XElement element, string changeId, PulseOffice.Text.Rich.TextParagraph? previous, OdtStyleSink styles, OdtWriteSession session, IOdtBlockWriter blocks)
+    {
+        if (previous is null) return element;
+        var holder = new XElement(Pt + "previous-formatting");
+        blocks.Write(holder, [new PulseOffice.Documents.Blocks.ParagraphBlock(changeId + "-previous", previous)], styles, session);
+        element.Add(holder);
+        return element;
     }
 
     private XElement Deletion(Deletion deletion, XElement info, OdtStyleSink styles, OdtWriteSession session, IOdtBlockWriter blocks)
@@ -419,8 +431,8 @@ internal sealed class OdtFidelityRules
     private FidelityRuleSet<TextDocument> Create() => new(
     [
         new FidelityRule<TextDocument>(
-            document => document.Changes.All.Any(change => change is FormatChange or ParagraphFormatChange),
-            Diagnostic.Info("ODT002", "ODF does not keep the previous formatting of a tracked format change: the change is kept, the former formatting is not.")),
+            document => document.Changes.All.Any(change => change is FormatChange { PreviousKnown: false } or ParagraphFormatChange { PreviousKnown: false }),
+            Diagnostic.Info("ODT002", "A tracked format change whose previous formatting is unknown keeps only the change: rejecting it cannot restore the former formatting.")),
         new FidelityRule<TextDocument>(
             document => document.Objects.All.Any(item => item.Content is EmbeddedContent { Value: PulseOffice.Drawing.Assets.RasterImageObject image }
                 && image.Filter is not (PulseOffice.Drawing.Assets.ImageFilter.None or PulseOffice.Drawing.Assets.ImageFilter.Grayscale)),

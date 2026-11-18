@@ -513,13 +513,23 @@ internal sealed class OdtChangeReader(OdtCommentReader comments, PulseOffice.For
                         return list;
                     })))
                 { WithinInsertion = (string?)body.Attribute(Pt + "within-insertion") },
-                "format-change" when (string?)body.Attribute(Pt + "kind") == "paragraph" => new ParagraphFormatChange(id, author, date, new PulseOffice.Text.Rich.TextParagraph(string.Empty)) { PreviousKnown = false },
-                "format-change" => new FormatChange(id, author, date, []),
+                "format-change" when (string?)body.Attribute(Pt + "kind") == "paragraph" => Previous(body, context, blocks) is { } layout
+                    ? new ParagraphFormatChange(id, author, date, layout)
+                    : new ParagraphFormatChange(id, author, date, new PulseOffice.Text.Rich.TextParagraph(string.Empty)) { PreviousKnown = false },
+                "format-change" => new FormatChange(id, author, date, Previous(body, context, blocks)?.EffectiveRuns() ?? []),
                 _ => null,
             };
             if (change is null) continue;
             change.Comment = note;
             log.Add(change);
         }
+    }
+
+    private PulseOffice.Text.Rich.TextParagraph? Previous(XElement body, OdtReadContext context, OdtBlockReader blocks)
+    {
+        if (body.Element(Pt + "previous-formatting") is not { } holder) return null;
+        var list = new List<Block>();
+        foreach (var child in holder.Elements()) blocks.Read(child, context, null, list);
+        return list.OfType<ParagraphBlock>().FirstOrDefault()?.Content;
     }
 }

@@ -8120,6 +8120,7 @@
   "diagnostic.odf273": "Algunos encabezados o pies de página contienen códigos de formato de Excel (fuente, tamaño, negrita, color, imagen): ODS conserva el texto y los campos, el formato se pierde.",
   "diagnostic.odp107": "ODF tiene un solo diseño de página por tipo: otros diseños del mismo tipo, como los diseños personalizados leídos de PowerPoint, se escriben como el primero de ese tipo.",
   "diagnostic.docx223": "Los campos SET de Word nunca muestran su valor: las variables con un valor visible lo conservan en DOCX pero ya no lo muestran en el texto.",
+  "diagnostic.docx224": "El texto movido se importa como una eliminación registrada donde estaba y una inserción registrada donde fue: aceptar o rechazar una parte ya no resuelve la otra, y el movimiento se vuelve a escribir como una eliminación y una inserción.",
   "diagnostic.odf102": "Las reglas condicionales «por encima/debajo del promedio» con un número de desviaciones estándar no existen en ODS: se escriben como reglas simples por encima o por debajo del promedio.",
   "diagnostic.xlsx231": "Una columna filtrada con dos condiciones y además la exclusión de celdas vacías no se puede escribir en XLSX: la exclusión de celdas vacías se pierde. ODS la conserva.",
   "diagnostic.xlsx232": "Un filtro estándar se escribe en XLSX como autofiltro: al volver a abrir el archivo el rango muestra botones de filtro. ODS conserva el filtro estándar.",

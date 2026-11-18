@@ -133,13 +133,17 @@ public sealed class ContentControlEditing(ILiveContentControlCatalog catalog, IS
     {
         var recorder = new EditRecorder(document, "refill-content-control");
         var touched = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var span in catalog.All(document).Where(span => span.IsEmpty && !span.Control.ShowingPlaceholder && !HasObject(document, span)).ToList())
+        var paragraphs = new Dictionary<string, ParagraphBlock>(StringComparer.Ordinal);
+        foreach (var paragraph in stories.Paragraphs(document)) paragraphs.TryAdd(paragraph.Id, paragraph);
+        foreach (var span in catalog.All(document).Where(span => span.IsEmpty && !span.Control.ShowingPlaceholder && !HasObject(paragraphs[span.Start.ParagraphId], span)).ToList())
         {
             var control = span.Control;
             var value = control.Kind == ContentControlKind.CheckBox ? control.CurrentSymbol : control.PlaceholderText ?? fallbackPlaceholder;
             if (value.Length == 0) continue;
-            if ((touched.Add(span.Start.ParagraphId) ? span : Reread(document, span)) is not { } current) continue;
-            Replace(document, recorder, current, value, refilled => refilled with { ShowingPlaceholder = refilled.Kind != ContentControlKind.CheckBox });
+            var paragraph = paragraphs[span.Start.ParagraphId];
+            if ((touched.Add(span.Start.ParagraphId) ? span : Reread(document, paragraph, span)) is not { } current) continue;
+            if (current.Start.ParagraphId != paragraph.Id || !current.InOneParagraph) Replace(document, recorder, current, value, Refilled);
+            else ReplaceWithin(recorder, document, paragraph, current, value, Refilled);
         }
         return recorder.Commit(history);
     }
@@ -189,12 +193,14 @@ public sealed class ContentControlEditing(ILiveContentControlCatalog catalog, IS
 
     private bool Belongs(InlineMark mark, string controlId) => mark is ContentControlMark control && control.ControlId == controlId;
 
-    private bool HasObject(TextDocument document, ContentControlSpan span) =>
-        stories.Find(document, span.Start.ParagraphId).Paragraph.Marks.OfType<ObjectMark>().Any(mark => mark.Offset == span.Start.Offset);
+    private ContentControl Refilled(ContentControl control) => control with { ShowingPlaceholder = control.Kind != ContentControlKind.CheckBox };
 
-    private ContentControlSpan? Reread(TextDocument document, ContentControlSpan span)
+    private bool HasObject(ParagraphBlock paragraph, ContentControlSpan span) =>
+        paragraph.Marks.OfType<ObjectMark>().Any(mark => mark.Offset == span.Start.Offset);
+
+    private ContentControlSpan? Reread(TextDocument document, ParagraphBlock paragraph, ContentControlSpan span)
     {
-        var marks = stories.Find(document, span.Start.ParagraphId).Paragraph.Marks.OfType<ContentControlMark>().Where(mark => mark.ControlId == span.Id).ToList();
+        var marks = paragraph.Marks.OfType<ContentControlMark>().Where(mark => mark.ControlId == span.Id).ToList();
         if (marks.FirstOrDefault(mark => mark.Edge == MarkEdge.Start) is not { } start || marks.FirstOrDefault(mark => mark.Edge == MarkEdge.End) is not { } end)
             return catalog.Find(document, span.Id);
         return span with { Start = span.Start with { Offset = start.Offset }, End = span.End with { Offset = end.Offset } };
@@ -222,7 +228,11 @@ public sealed class ContentControlEditing(ILiveContentControlCatalog catalog, IS
             deletion.Delete(document, recorder, trails.Point(document, span.Start), trails.Point(document, span.End));
             span = catalog.Find(document, span.Id) ?? throw new InvalidOperationException("The content control was lost while clearing it.");
         }
-        var paragraph = stories.Find(document, span.Start.ParagraphId).Paragraph;
+        ReplaceWithin(recorder, document, stories.Find(document, span.Start.ParagraphId).Paragraph, span, value, change);
+    }
+
+    private void ReplaceWithin(EditRecorder recorder, TextDocument document, ParagraphBlock paragraph, ContentControlSpan span, string value, Func<ContentControl, ContentControl> change)
+    {
         if (span.End.Offset > span.Start.Offset) deletion.RemoveText(document, recorder, paragraph, span.Start.Offset, span.End.Offset);
         recorder.Touch(paragraph);
         var offset = span.Start.Offset;

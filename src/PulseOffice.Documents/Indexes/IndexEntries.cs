@@ -50,8 +50,8 @@ public sealed class ContentsEntrySource(IIndexScope scope, IDocumentOutline outl
             if (definition.FromOutline && outline.LevelOf(document, paragraph) is { } level && level <= definition.Levels && paragraph.Text.Trim() is { Length: > 0 } text)
                 entries.Add(new IndexEntry(text, level, [paragraph.Id]) { Link = "#" + text + "|outline" });
             if (!definition.FromMarks) continue;
-            foreach (var mark in paragraph.Marks.OfType<IndexEntryMark>().Where(mark => mark.Index is "toc" && mark.Edge != MarkEdge.End))
-                entries.Add(new IndexEntry(mark.Entry, 1, [paragraph.Id]));
+            foreach (var mark in paragraph.Marks.OfType<IndexEntryMark>().Where(mark => mark.Index is "toc" && mark.Edge != MarkEdge.End && (mark.Level ?? 1) <= definition.Levels))
+                entries.Add(new IndexEntry(mark.Entry, mark.Level ?? 1, [paragraph.Id]));
         }
         return entries;
     }
