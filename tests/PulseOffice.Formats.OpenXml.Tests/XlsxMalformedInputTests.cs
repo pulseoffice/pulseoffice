@@ -31,20 +31,27 @@ public sealed class XlsxMalformedInputTests
         return buffer.ToArray();
     }
 
-    private byte[] Replace(byte[] package, string entryName, XDocument document)
+    private static IReadOnlyList<(string Name, byte[] Bytes)> Entries(byte[] package)
     {
         using var source = new ZipArchive(new MemoryStream(package), ZipArchiveMode.Read);
+        return source.Entries.Select(entry =>
+        {
+            using var from = entry.Open();
+            using var bytes = new MemoryStream();
+            from.CopyTo(bytes);
+            return (entry.FullName, bytes.ToArray());
+        }).ToList();
+    }
+
+    private byte[] Replace(IReadOnlyList<(string Name, byte[] Bytes)> entries, string entryName, XDocument document)
+    {
         using var output = new MemoryStream();
         using (var target = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
-            foreach (var entry in source.Entries)
+            foreach (var (name, bytes) in entries)
             {
-                using var to = target.CreateEntry(entry.FullName, CompressionLevel.NoCompression).Open();
-                if (entry.FullName == entryName) document.Save(to);
-                else
-                {
-                    using var from = entry.Open();
-                    from.CopyTo(to);
-                }
+                using var to = target.CreateEntry(name, CompressionLevel.NoCompression).Open();
+                if (name == entryName) document.Save(to);
+                else to.Write(bytes);
             }
 
         return output.ToArray();
@@ -78,21 +85,24 @@ public sealed class XlsxMalformedInputTests
     public void GarbageAttributesNeverRejectTheWorkbook(string entryName)
     {
         var package = RichPackage();
+        var entries = Entries(package);
         var original = Entry(package, entryName);
         var count = original.Descendants().SelectMany(e => e.Attributes()).Count(a => !a.IsNamespaceDeclaration);
-        var failures = new List<string>();
+        var failures = new System.Collections.Concurrent.ConcurrentBag<string>();
 
-        for (var index = 0; index < count; index++)
+        Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, index =>
+        {
             foreach (var value in Garbage)
             {
                 var document = new XDocument(original);
                 var attribute = document.Descendants().SelectMany(e => e.Attributes()).Where(a => !a.IsNamespaceDeclaration).ElementAt(index);
                 if (attribute.Name.LocalName == "id" && attribute.Name.Namespace != XNamespace.None) continue;
                 attribute.Value = value;
-                if (Failure(Replace(package, entryName, document)) is { } failure) failures.Add($"{attribute.Name}={value}: {failure}");
+                if (Failure(Replace(entries, entryName, document)) is { } failure) failures.Add($"{attribute.Name}={value}: {failure}");
             }
+        });
 
-        Assert.True(failures.Count == 0, string.Join("\n", failures.Distinct()));
+        Assert.True(failures.IsEmpty, string.Join("\n", failures.Distinct()));
     }
 
     [Theory]
@@ -101,6 +111,7 @@ public sealed class XlsxMalformedInputTests
     public void MissingElementsNeverRejectTheWorkbook(string entryName)
     {
         var package = RichPackage();
+        var entries = Entries(package);
         var original = Entry(package, entryName);
         var count = original.Descendants().Count();
         var failures = new List<string>();
@@ -111,7 +122,7 @@ public sealed class XlsxMalformedInputTests
             var element = document.Descendants().ElementAt(index);
             var name = element.Name;
             element.Remove();
-            if (Failure(Replace(package, entryName, document)) is { } failure) failures.Add($"{name}: {failure}");
+            if (Failure(Replace(entries, entryName, document)) is { } failure) failures.Add($"{name}: {failure}");
         }
 
         Assert.True(failures.Count == 0, string.Join("\n", failures.Distinct()));

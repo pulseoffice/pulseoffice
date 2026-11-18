@@ -11,7 +11,35 @@ public sealed record CellComment
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.Now;
 
     public bool IsAlwaysVisible { get; init; }
+
+    public IReadOnlyList<CommentReply> Replies { get; init; } = [];
+
+    public bool IsResolved { get; init; }
+
+    public CommentBox? Box { get; init; }
+
+    public CommentTextSpan? AnnotatedText { get; init; }
+
+    public bool IsThread => Replies.Count > 0 || IsResolved;
+
+    public IEnumerable<string> Texts => new[] { Text }.Concat(Replies.Select(reply => reply.Text));
 }
+
+public sealed record CommentReply
+{
+    public required string Text { get; init; }
+
+    public string? Author { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.Now;
+}
+
+public sealed record CommentBox(double OffsetX, double OffsetY, double Width, double Height)
+{
+    public static CommentBox Default { get; } = new(10, -7, 108, 60);
+}
+
+public sealed record CommentTextSpan(int Start, int Length);
 
 public sealed record OutlineSummary(bool Below = true, bool Right = true)
 {

@@ -37,7 +37,8 @@ public sealed class LedgerShapeCommands(
     PulseOffice.UI.Controls.Objects.IChosenFileReader reader,
     IDimensionLineTemplate dimensions,
     PulseOffice.UI.Controls.Drawing.IDrawingToolState drawing,
-    IShapeChooser shapes) : LedgerCommandSet(context)
+    IShapeChooser shapes,
+    IConnectorSitesDialog connectorSites) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() => ShapeCommands();
 
@@ -115,6 +116,16 @@ public sealed class LedgerShapeCommands(
             EnabledWhen = _ => ObjectsEditable && Context.SelectedObject?.Content
                 is ShapeObject or Drawing.Freeform.FreeformObject,
             Execute = (_, ct) => EditShapeAsync(ct),
+        },
+
+        Prototype("ledger.connector.sites") with
+        {
+            ContextPaths = ["cell/object"],
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen | DocumentState.ObjectSelected,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => ObjectsEditable && Context.SelectedObject?.Content is ConnectorObject,
+            Execute = (_, ct) => ResiteConnectorAsync(ct),
         },
 
         Prototype("ledger.object.group") with
@@ -259,6 +270,31 @@ public sealed class LedgerShapeCommands(
             return Task.CompletedTask;
         },
     };
+
+    private async Task ResiteConnectorAsync(CancellationToken ct)
+    {
+        if (Context.Workbook is not { } workbook || Context.SelectedObject is not { Content: ConnectorObject connector } placed) return;
+        if (await connectorSites.AskAsync(connector.Start.Site, connector.End.Site, ct).ConfigureAwait(true) is not { } choice) return;
+        if (choice.Start == connector.Start.Site && choice.End == connector.End.Site) return;
+
+        var sheet = workbook.Sheets[Context.SheetIndex];
+        var index = sheet.Objects.IndexOf(placed);
+        if (index < 0 || connectors.Resite(sheet, placed, choice.Start, choice.End) is not { } resited) return;
+
+        sheet.Objects[index] = resited;
+        Context.History?.Push(new Document.Commands.DelegateAction(
+            texts["history.connector.sites"],
+            redo: () => Swap(sheet, placed, resited),
+            undo: () => Swap(sheet, resited, placed)));
+        Context.SelectObject(resited);
+        Context.RequestRefresh();
+    }
+
+    private void Swap(Worksheet sheet, PlacedObject from, PlacedObject to)
+    {
+        var at = sheet.Objects.IndexOf(from);
+        if (at >= 0) sheet.Objects[at] = to;
+    }
 
     private CommandDefinition Align(string id, ObjectAlignmentEdge edge) =>
         ObjectLayout(id, sheet => alignment.Align(sheet, Context.SelectedObjects, edge));

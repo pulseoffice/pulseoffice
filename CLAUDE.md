@@ -222,10 +222,13 @@ Central package management in `Directory.Packages.props`: **versions are never w
     (permissions to insert rows and columns, filter). The sweep of all commands in several contexts is split per module into
     `tests/PulseOffice.Desktop.Sweep.{Sheets,Documents,Presentations}.Tests`, which compile the shared
     `tests/PulseOffice.Desktop.Sweep.Shared/CommandSweepTests.cs` and run only the module of their `<SweepModule>`
-    (watchdog with `TestProcessLifetimeMinutes`: 10 minutes). Since 2026-11-17 each sweep is six shard classes
-    (`CommandSweepShard1..6`) over the abstract `CommandSweepTests`, each its own chunk; a test is one slice of one
-    context (the typical, protected sheet and protected section contexts in twelve slices, the others in four), well
-    under the 60 s hang limit. A command starts from the prepared state reused while no command has run on it (disabled
+    (watchdog with `TestProcessLifetimeMinutes`: 10 minutes). Since 2026-11-18 (round 222) each sweep is ten shard classes
+    (`CommandSweepShard1..10`) over the abstract `CommandSweepTests`, each its own chunk; a test is one slice of one
+    context, and the slice count of each module and context comes from its recorded run time (`RecordedSeconds`, the
+    summed slice durations of the last join run) times a growth headroom of 1.25 divided by a 6 s slice target
+    (contexts without a record get four slices), so a slice stays near 6 s of work and well under 15 s even in the
+    first, JIT-warming test of a process. The table is refreshed from the summed `whole` times of the
+    `*.timings.tsv` files (or the xUnit result times) when commands are added. A command starts from the prepared state reused while no command has run on it (disabled
     commands cost nothing) or restored by undoing back to the prepared history point and dropping the redo steps
     (`UndoStack.DiscardRedo`), accepted only if a fingerprint (documents, read-only, redo, dialog, panel, focus,
     Ledger selection, Folio selection, objects, pending shape-text formats, enabled and checked state of every command

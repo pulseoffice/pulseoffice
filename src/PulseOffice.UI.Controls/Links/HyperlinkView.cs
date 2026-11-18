@@ -27,6 +27,7 @@ public sealed class HyperlinkView : UserControl, IDialogContent, IDialogFooterOw
     private readonly ExclusiveChoices _kinds = new();
     private readonly Dictionary<LinkKind, Control> _pages = [];
     private readonly TextBox? _text;
+    private readonly TextBox? _tip;
     private readonly TextBox _web;
     private readonly TextBox _file;
     private readonly TextBox _mailTo;
@@ -84,6 +85,12 @@ public sealed class HyperlinkView : UserControl, IDialogContent, IDialogFooterOw
             AutomationProperties.SetName(_text, _texts["link.text"]);
         }
 
+        if (request.ShowsTip)
+        {
+            _tip = new TextBox { Text = request.Tip ?? string.Empty, PlaceholderText = _texts["link.tip.placeholder"] };
+            AutomationProperties.SetName(_tip, _texts["link.tip"]);
+        }
+
         _target = new TextBlock { FontSize = metrics.FontSizeSmall, TextTrimming = TextTrimming.CharacterEllipsis }
             .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
 
@@ -109,7 +116,14 @@ public sealed class HyperlinkView : UserControl, IDialogContent, IDialogFooterOw
         {
             var textSection = new DialogSection(null, metrics);
             textSection.Add(_texts["link.text"], _text, editorWidth: 320);
+            if (_tip is not null) textSection.Add(_texts["link.tip"], _tip, editorWidth: 320);
             right.Children.Add(textSection);
+        }
+        else if (_tip is not null)
+        {
+            var tipSection = new DialogSection(null, metrics);
+            tipSection.Add(_texts["link.tip"], _tip, editorWidth: 320);
+            right.Children.Add(tipSection);
         }
         right.Children.Add(pageHost);
         right.Children.Add(_target);
@@ -188,6 +202,8 @@ public sealed class HyperlinkView : UserControl, IDialogContent, IDialogFooterOw
 
     public TextBox? TextBox => _text;
 
+    public TextBox? TipBox => _tip;
+
     public TextBox WebBox => _web;
 
     public TextBox FileBox => _file;
@@ -221,7 +237,7 @@ public sealed class HyperlinkView : UserControl, IDialogContent, IDialogFooterOw
         var address = Address;
         if (!_services.Addresses.IsComplete(Kind, address)) return null;
         var shown = _text?.Text is { Length: > 0 } typed ? typed : Fallback(address);
-        return new LinkChoice(Kind, address, shown);
+        return new LinkChoice(Kind, address, shown) { Tip = _tip?.Text is { Length: > 0 } tip ? tip.Trim() : null };
     }
 
     private string Fallback(string address) => Kind switch

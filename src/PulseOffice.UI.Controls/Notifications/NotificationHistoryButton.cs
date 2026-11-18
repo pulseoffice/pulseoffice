@@ -34,10 +34,9 @@ public sealed class NotificationHistoryButton : Button
         {
             FontSize = 9,
             FontWeight = FontWeight.Bold,
-            Foreground = Brushes.White,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-        };
+        }.Themed(TextBlock.ForegroundProperty, Palette.Keys.OnDanger);
 
         _badge = new Border
         {

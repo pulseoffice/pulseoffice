@@ -20,7 +20,7 @@ public sealed class DeckTextFrameCommands(
 
     private static readonly TextAutofit[] Fits = [TextAutofit.None, TextAutofit.ShrinkText, TextAutofit.ResizeShape];
 
-    private static readonly TextFlow[] Flows = [TextFlow.Horizontal, TextFlow.Vertical, TextFlow.Vertical270, TextFlow.Stacked];
+    private static readonly TextFlow[] Flows = [TextFlow.Horizontal, TextFlow.Vertical, TextFlow.Vertical270, TextFlow.Stacked, TextFlow.EastAsianVertical, TextFlow.MongolianVertical, TextFlow.StackedRightToLeft];
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [

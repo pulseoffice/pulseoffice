@@ -35,6 +35,21 @@ public sealed class LedgerSheetToolsCommands(
             sheet.ColumnBreaks.Remove(Context.Selection.Start.Column),
             sheet => sheet.ColumnBreaks.Contains(Context.Selection.Start.Column)),
 
+        Change("ledger.comment.toggleShown", "sheet/comments", sheet =>
+        {
+            var address = Context.Selection.Start;
+            if (!sheet.Comments.TryGetValue(address, out var comment)) return false;
+            sheet.Comments[address] = comment with { IsAlwaysVisible = !comment.IsAlwaysVisible };
+            return true;
+        }, sheet => sheet.Comments.ContainsKey(Context.Selection.Start)) with
+        {
+            ContextPaths = ["cell/notes"],
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            CheckedWhen = _ => Context.Workbook is { } workbook
+                && workbook.Sheets[Context.SheetIndex].Comments.TryGetValue(Context.Selection.Start, out var shown)
+                && shown.IsAlwaysVisible,
+        },
+
         Change("ledger.comment.showAll", "sheet/comments", sheet =>
         {
             foreach (var address in sheet.Comments.Keys.ToList())

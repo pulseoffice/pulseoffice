@@ -57,6 +57,7 @@ public sealed class IconCatalog : IIconCatalog
         ["ledger.connector.elbow"] = new("M4 6h6v12h10 M17 15l3 3-3 3"),
         ["ledger.connector.straight"] = new("M4 19L17 6 M12 6h5v5"),
         ["ledger.connector.curved"] = new("M4 18c6 0 10-4 10-12 M11 4h3v3"),
+        ["ledger.connector.sites"] = new("M5 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M19 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M7 5h5v14h5"),
         ["ledger.object.alignLeft"] = new("M3 3v18 M6 7h12 M6 13h7"),
         ["ledger.object.alignCentre"] = new("M12 3v18 M6 7h12 M8 13h8"),
         ["ledger.object.alignRight"] = new("M21 3v18 M6 7h12 M11 13h7"),

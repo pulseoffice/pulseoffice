@@ -9,18 +9,21 @@ the round that fixes it is joined and the join run is green.
 - Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
   reference suite have not opened such a file here. (194)
 - The built-in media player has not run live on any system (Windows and macOS cannot be tested here). (193)
-- East Asian, Mongolian and left-to-right vertical modes are shown as plain vertical text (PPTX226, ODP217). (214)
-- Shape text columns are cut at a line height measured on the base font, so runs of other sizes can be split at a
-  column edge; stacked shape text is edited in the plain overlay text box, whose caret does not follow the stacked
-  glyphs; up and down keys in stacked text boxes move one character. (218)
+- East Asian vertical text keeps its East Asian characters turned with the line instead of upright (PPTX226, ODP217,
+  declared only when such characters are present); Mongolian lines are mirrored in single-column shape text and text
+  boxes but not inside shape text columns; right-to-left stacked text is mirrored in text boxes only. Not seen live. (225)
+- Stacked shape text is edited in the plain overlay text box, whose caret does not follow the stacked glyphs; up and
+  down keys in stacked text boxes move one character; up and down keys in Mongolian text boxes follow the stored line
+  order, not the mirrored one. Shape text column breaks are probed per character on the composed text, which costs a
+  geometry per character for long texts. (218, 225)
 - ODF has no native 270-degree flow, upright text or text box rotation: they use our `urn:pulseoffice:shape-text`
   extension; shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
   standard `draw:text-rotate-angle`. The sign of `draw:text-rotate-angle` follows the ODF counter-clockwise convention
   and has not been checked against another application. (214)
 - Connector glue output (`p:cxnSp`, `draw:connector`, the automatic-end extension) has not been opened in PowerPoint,
   Excel or the reference suite here. (213, 214)
-- Ledger has no command to choose a connector's sites: `SheetConnectors.Connect` takes them, but the insert command
-  always creates automatic ends. (218)
+- Deck has no command to choose a connector's sites after creation (Ledger's Connector Ends dialog is shared in
+  `PulseOffice.UI.Controls.Shapes` but wired only into Ledger); the dialog has not been seen live. (225)
 
 ## Charts
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
@@ -38,14 +41,14 @@ the round that fixes it is joined and the join run is green.
   value), inside tables, frames, notes and comments, on a paragraph that defers a page style change, and any restart
   when numbering restarts on every page (DOCX248). Not yet opened in Word. (204, 209, reviewed again in 212: the remaining cases have no Word
   section form)
-- Folio notes: footnotes placed below the text or collected at the document or section end, and endnotes at each
-  section end, have no model and are read at the page bottom and document end (declared ODT290, DOCX272). (219)
-- Folio notes: continuation notices are kept in both formats but not drawn when a footnote continues on the next page;
-  the footnote separator line (ODT `style:footnote-sep`, DOCX separator note content) is fixed and not read. (219)
-- Folio notes: removing a note reference with Backspace while changes are recorded removes the note directly instead
-  of recording a tracked deletion. (219)
+- Folio notes: "section end" placement collects at the end of each top-level text section (ODT `text:section`), not of
+  each Word section (page style run); endnote collection is one setting for the whole document, while ODT can set it per
+  section; the separator line is one document setting, while ODT stores it per page layout; continuation notices are not
+  selectable text and use the footnote paragraph style. (223)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
+
+- `FolioCanvas.cs` (about 1,150 lines) and `Paginator.cs` (about 1,300 lines) are over the 800-line cap: split them along coherent responsibilities. (223, 225 join)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
@@ -59,14 +62,16 @@ the round that fixes it is joined and the join run is green.
   is not announced, only drawn as the placeholder. (220)
 - XLSX table-reference rule forms are matched by priority and ordinal within range and priority, then by range and
   flat formula; a rule Excel renumbered and edited keeps the flat form (by design). Not opened in Excel. (220)
-- Round 221 (Ledger comments and cell links), open: comments have no threads, replies, resolved state or mentions
-  (XLSX threaded comments are flattened with XLSX235, and only legacy notes are written); notes have no size or
-  position of their own (XLSX VML box is fixed, ODS `svg:x/y/width/height` of the annotation are ignored); there is no
-  show/hide command for a single note, only for all of them; find and replace does not search comment text; printing
-  of comments (at end of sheet or as displayed) is kept in the page setup and both formats but is neither offered in
-  the page setup dialog nor rendered by the print document; the link dialog cannot edit a cell hyperlink's screen tip
-  (kept in both formats, shown on hover); cell hyperlinks open from the context command only, not with a click;
-  the fill handle does not copy comments; ODS `office:annotation-end` ranges are not read.
+- Round 221 (Ledger comments and cell links), open: cell hyperlinks open from the context command or Ctrl+click
+  only, not with a plain click. (221)
+- Round 224 (Ledger comments), open: note boxes cannot be moved or resized with the mouse (they come from files and are
+  drawn and printed where the model says); mentions are plain names in the text (XLSX `mentions` elements are neither
+  written nor read, so the person link is lost); ODS replies are extra `office:annotation` elements of the same cell,
+  which other readers either ignore or show as separate notes; the annotated text range of `office:annotation-end`
+  is kept only within the cell's first paragraph and is not shown in the grid; Fill down/right/up/left commands do not
+  copy comments (only the fill handle does); the single-note show command has no ribbon placement; comments printed at
+  the end are not wrapped to the page width; only Ledger's use of the shared link dialog shows the ScreenTip field
+  (Folio and Deck links have no tip in the model). Not opened in Excel or the reference suite. (224)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
@@ -76,9 +81,10 @@ the round that fixes it is joined and the join run is green.
   ribbon's own popovers (menus, galleries, split-button lists, collapsed and overflow groups) but not combo box
   drop-downs, the font family list, the submenus of the title-bar menus, or a popover opened outside the ribbon; badges
   outside the ribbon sit in the adorner layer, which was not checked live inside separate popup windows. (208, 211)
-- A settings store does not reload values another running instance wrote until restart (writes no longer overwrite
-  them). (217)
-- The high-contrast theme has not been seen live; drawn surfaces that hard-code colours instead of Palette tokens, and
-  module accent fills behind white text, were not audited for it. The theme does not follow the operating system's
+- Settings written by another running instance are reloaded through a file watcher; this was not run with two live
+  instances, and whether an open settings dialog refreshes its editors on such a change was not checked. (225)
+- The high-contrast theme has not been seen live. Colour literals in interface code are frozen at their round 225
+  counts by `Round225HardCodedColourTests`; the remaining ones (document paper, previews of document content, shape
+  shades) were not each reviewed for high contrast. The theme does not follow the operating system's
   own high-contrast setting. The cell edit is translated to the new formula separators on a language switch only for
   formulas; plain entries keep the text as typed. Not run live. (220)

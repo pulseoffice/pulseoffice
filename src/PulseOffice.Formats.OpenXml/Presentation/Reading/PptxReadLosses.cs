@@ -79,12 +79,15 @@ internal sealed class PptxMixedTableRuns : IPptxReadLoss
 
 internal sealed class PptxShapeTextLayout : IPptxReadLoss
 {
+    private readonly PulseOffice.Text.Rich.EastAsianUprightText _upright = new();
+
     public Diagnostic Loss { get; } = Diagnostic.Warning("PPTX226",
-        "Some shapes have East Asian or Mongolian vertical text or right-to-left stacked text: Deck shows it as plain vertical or stacked text.");
+        "Some shapes have East Asian vertical text: Deck turns its East Asian characters with the line instead of keeping them upright.");
 
     public bool Present(PresentationPart presentation) =>
         presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.BodyProperties>().Any(Approximated) == true);
 
     private bool Approximated(DocumentFormat.OpenXml.Drawing.BodyProperties body) =>
-        body.Vertical?.InnerText is "eaVert" or "mongolianVert" or "wordArtVertRtl";
+        body.Vertical?.InnerText == "eaVert"
+        && _upright.Contains(body.Parent?.InnerText);
 }

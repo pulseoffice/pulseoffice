@@ -23,7 +23,7 @@ public sealed class TextFlowFrame : ITextFlowFrame
     public Rect Box(Rect bounds, TextLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        if (layout.Upright || layout.Flow is not (TextFlow.Vertical or TextFlow.Vertical270)) return bounds;
+        if (layout.Upright || !layout.IsVertical) return bounds;
         var centre = bounds.Center;
         return new Rect(centre.X - bounds.Height / 2, centre.Y - bounds.Width / 2, bounds.Height, bounds.Width);
     }
@@ -31,7 +31,7 @@ public sealed class TextFlowFrame : ITextFlowFrame
     public bool Stacks(TextLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        return layout.Flow == TextFlow.Stacked || (layout.Upright && layout.Flow != TextFlow.Horizontal);
+        return layout.IsStacked || (layout.Upright && layout.Flow != TextFlow.Horizontal);
     }
 
     public double Degrees(TextLayout layout, double textRotation, double containerRotation)

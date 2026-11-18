@@ -35,7 +35,7 @@ public sealed class Round219DocxNoteSettingsTests
             "<w:footnotePr><w:numFmt w:val=\"lowerLetter\"/><w:numStart w:val=\"3\"/><w:numRestart w:val=\"eachPage\"/></w:footnotePr>"
             + "<w:endnotePr><w:numFmt w:val=\"upperRoman\"/><w:numStart w:val=\"2\"/><w:numRestart w:val=\"eachSect\"/></w:endnotePr>", string.Empty);
         Assert.Equal(new NoteSettings { FormatName = "a", StartAt = 3, Restart = NoteNumbering.Page }, document.Notes.FootnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
-        Assert.Equal(new NoteSettings { FormatName = "I", StartAt = 2, Restart = NoteNumbering.Chapter }, document.Notes.EndnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
+        Assert.Equal(new NoteSettings { FormatName = "I", StartAt = 2, Restart = NoteNumbering.Chapter, Placement = NotePlacement.DocumentEnd }, document.Notes.EndnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
 
         var written = new MemoryStream();
         Assert.True(_composer.Writer(DocxFlavour.Document).Write(document, written).Succeeded);
@@ -90,25 +90,5 @@ public sealed class Round219DocxNoteSettingsTests
 
         Assert.Equal("Continued overleaf", read.Notes.FootnoteSettings.ContinuationForward);
         Assert.Single(read.Notes.All);
-    }
-
-    [Theory]
-    [InlineData("<w:footnotePr><w:pos w:val=\"beneathText\"/></w:footnotePr>", "", true)]
-    [InlineData("", "<w:endnotePr><w:pos w:val=\"sectEnd\"/></w:endnotePr>", true)]
-    [InlineData("<w:footnotePr><w:pos w:val=\"pageBottom\"/></w:footnotePr>", "", false)]
-    public void Note_placements_other_than_page_bottom_are_declared(string settings, string section, bool declared)
-    {
-        var stream = new MemoryStream();
-        using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
-        {
-            var main = package.AddMainDocumentPart();
-            main.AddNewPart<DocumentSettingsPart>().Settings = new W.Settings($"<w:settings {Namespace}>{settings}</w:settings>");
-            main.Document = new W.Document($"<w:document {Namespace}><w:body><w:p/><w:sectPr>{section}</w:sectPr></w:body></w:document>");
-        }
-        stream.Position = 0;
-
-        var read = _composer.Reader(DocxFlavour.Document).Read(stream);
-
-        Assert.Equal(declared, read.Diagnostics.Any(diagnostic => diagnostic.Code == "DOCX272"));
     }
 }

@@ -29,7 +29,7 @@ public sealed class LedgerPanelSourcesTests
     {
         var (context, _) = Context();
         var history = context.History!;
-        var review = new LedgerReviewSource(context, null!, new PulseOffice.Foundation.Review.AuthorPalette(), null!);
+        var review = new LedgerReviewSource(context, null!, new PulseOffice.Foundation.Review.AuthorPalette(), null!, null!);
 
         review.Edit("-1:A1", "testo");
         review.Delete(["-1:A1"]);

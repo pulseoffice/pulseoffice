@@ -11,6 +11,8 @@ public interface ISheetConnectors
     PlacedObject? Connect(
         Worksheet sheet, PlacedObject from, PlacedObject to, string id, ConnectorKind kind,
         ConnectorSite fromSite = ConnectorSite.Automatic, ConnectorSite toSite = ConnectorSite.Automatic);
+
+    PlacedObject? Resite(Worksheet sheet, PlacedObject placed, ConnectorSite startSite, ConnectorSite endSite);
 }
 
 public sealed class SheetConnectors : ISheetConnectors
@@ -53,6 +55,20 @@ public sealed class SheetConnectors : ISheetConnectors
         };
 
         return Reroute(sheet, placed, connector);
+    }
+
+    public PlacedObject? Resite(Worksheet sheet, PlacedObject placed, ConnectorSite startSite, ConnectorSite endSite)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        ArgumentNullException.ThrowIfNull(placed);
+        if (placed.Content is not ConnectorObject connector) return null;
+
+        var resited = connector with
+        {
+            Start = connector.Start with { Site = startSite },
+            End = connector.End with { Site = endSite },
+        };
+        return Reroute(sheet, placed with { Content = resited }, resited) ?? placed with { Content = resited };
     }
 
     public bool Refresh(Worksheet sheet)

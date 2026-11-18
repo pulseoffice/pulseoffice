@@ -18,6 +18,16 @@ public sealed record PaginationRequest(
 {
     public Func<string, double, ComposedStory?> Note { get; init; } = (_, _) => null;
 
+    public Func<string, double, ComposedStory?> Notice { get; init; } = (_, _) => null;
+
+    public PulseOffice.Documents.Annotations.NoteSeparator Separator { get; init; } = new();
+
+    public bool FootnotesBelowText { get; init; }
+
+    public string? ContinuationForward { get; init; }
+
+    public string? ContinuationBackward { get; init; }
+
     public Func<string, AnchoredObject?> Object { get; init; } = _ => null;
 
     public Func<int, IReadOnlyList<AnchoredObject>> PageObjects { get; init; } = _ => [];
@@ -66,7 +76,14 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
 
     public IReadOnlyList<PageBox> Paginate(PaginationRequest request) => new PaginationRun(this, request).Run();
 
-    private sealed record PlacedNote(string NoteId, ComposedStory Story, int From, int To, int Area, double Left, double Width);
+    private sealed record PlacedNote(string NoteId, ComposedStory Story, int From, int To, int Area, double Left, double Width)
+    {
+        public ComposedStory? Backward { get; init; }
+
+        public ComposedStory? Forward { get; init; }
+
+        public double Height(double slice) => (Backward?.Height ?? 0) + slice + (Forward?.Height ?? 0);
+    }
 
     private sealed record DynamicRow(int Lines, double Y, int Line, int Offset);
 
@@ -923,7 +940,9 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
             return line.Height + separator + story.Atoms[0].Bottom <= remaining + Epsilon;
         }
 
-        private double Separator => _owner.Options.SeparatorBefore + _owner.Options.SeparatorWidth + _owner.Options.SeparatorAfter;
+        private double Separator => _request.Separator.SpaceBefore + _request.Separator.Thickness + _request.Separator.SpaceAfter;
+
+        private ComposedStory? Notice(string? text, double width) => text is { Length: > 0 } ? _request.Notice(text, width) : null;
 
         private void Reserve(string noteId, double contentBottom)
         {
@@ -940,8 +959,10 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
             var used = area >= 0 ? _columnNotes[area] : _noteHeight;
             var limit = _geometry.Body.Height - _geometry.Content.Height * _owner.Options.BodyReserve - used - separator;
             var space = Math.Min(_geometry.Body.Bottom - _noteHeight - (area >= 0 ? _columnNotes[area] : 0) - separator - contentBottom, limit);
+            var backward = from > 0 ? Notice(_request.ContinuationBackward, width) : null;
+            var lead = backward?.Height ?? 0;
             var to = from;
-            while (to < story.Atoms.Count && Slice(story, from, to + 1) <= space + Epsilon) to++;
+            while (to < story.Atoms.Count && lead + Slice(story, from, to + 1) <= space + Epsilon) to++;
             to = Kept(story, from, to);
             if (to == from && contentBottom <= _geometry.Body.Y + Epsilon) to = from + 1;
             if (to == from)
@@ -949,9 +970,12 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
                 _pending.Add(new PendingNote(noteId, from));
                 return;
             }
-            _notes.Add(new PlacedNote(noteId, story, from, to, area, left, width));
-            if (area >= 0) _columnNotes[area] += separator + Slice(story, from, to);
-            else _noteHeight += separator + Slice(story, from, to);
+            var forward = to < story.Atoms.Count ? Notice(_request.ContinuationForward, width) : null;
+            while (forward is not null && to > from + 1 && lead + Slice(story, from, to) + forward.Height > space + Epsilon) to = Math.Max(from + 1, Kept(story, from, to - 1));
+            var placed = new PlacedNote(noteId, story, from, to, area, left, width) { Backward = backward, Forward = forward };
+            _notes.Add(placed);
+            if (area >= 0) _columnNotes[area] += separator + placed.Height(Slice(story, from, to));
+            else _noteHeight += separator + placed.Height(Slice(story, from, to));
             if (to < story.Atoms.Count) _pending.Add(new PendingNote(noteId, to));
         }
 
@@ -1217,6 +1241,13 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
             Open(style, notes);
         }
 
+        private double EmitNotice(List<LayoutBox> content, ComposedStory? notice, double left, double y, double width)
+        {
+            if (notice is null || notice.Atoms.Count == 0) return 0;
+            content.AddRange(_owner.Stories.Emit(notice, 0, notice.Atoms.Count, left, y, width, StoryKind.Footnote, null));
+            return notice.Height;
+        }
+
         private void Close()
         {
             CloseRegion();
@@ -1233,16 +1264,20 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
                 {
                     var height = group.Key >= 0 ? _columnNotes[group.Key] : _noteHeight;
                     var top = _geometry.Body.Bottom - _noteHeight - (group.Key >= 0 ? height : 0);
+                    if (_request.FootnotesBelowText && group.Key < 0) top = Math.Min(top, Math.Max(_geometry.Body.Y, _y));
                     var left = group.First().Left;
                     var width = group.First().Width;
-                    content.Add(new DecorationBox(DecorationKind.FootnoteSeparator, new LayoutRect(left, top + _owner.Options.SeparatorBefore, width * _owner.Options.SeparatorRelativeWidth, _owner.Options.SeparatorWidth), null, _owner.Options.SeparatorWidth));
+                    var rule = _request.Separator;
+                    content.Add(new DecorationBox(DecorationKind.FootnoteSeparator, new LayoutRect(left, top + rule.SpaceBefore, width * rule.RelativeLength, rule.Thickness), null, rule.Thickness));
                     var y = top + Separator;
                     foreach (var note in group)
                     {
+                        y += EmitNotice(content, note.Backward, left, y, width);
                         var origin = note.From == 0 ? 0 : note.Story.Atoms[note.From].Top;
                         var first = note.Story.Atoms[note.From].Top - origin;
                         content.AddRange(_owner.Stories.Emit(note.Story, note.From, note.To, left, y + first, width, StoryKind.Footnote, note.NoteId));
                         y += Slice(note.Story, note.From, note.To);
+                        y += EmitNotice(content, note.Forward, left, y, width);
                     }
                     bounds.Add(new LayoutRect(left, top, width, height));
                 }

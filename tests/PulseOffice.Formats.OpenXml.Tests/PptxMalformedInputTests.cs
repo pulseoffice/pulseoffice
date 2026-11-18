@@ -44,22 +44,29 @@ public sealed class PptxMalformedInputTests
         return buffer.ToArray();
     }
 
-    private byte[] Replace(byte[] package, string entryName, XDocument document)
+    private static IReadOnlyList<(string Name, byte[] Bytes)> Entries(byte[] package)
     {
         using var source = new ZipArchive(new MemoryStream(package), ZipArchiveMode.Read);
+        return source.Entries.Select(entry =>
+        {
+            using var from = entry.Open();
+            using var bytes = new MemoryStream();
+            from.CopyTo(bytes);
+            return (entry.FullName, bytes.ToArray());
+        }).ToList();
+    }
+
+    private byte[] Replace(IReadOnlyList<(string Name, byte[] Bytes)> entries, string entryName, XDocument document)
+    {
         using var output = new MemoryStream();
         using (var target = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
         {
-            foreach (var entry in source.Entries)
+            foreach (var (name, bytes) in entries)
             {
-                var copy = target.CreateEntry(entry.FullName, CompressionLevel.NoCompression);
+                var copy = target.CreateEntry(name, CompressionLevel.NoCompression);
                 using var to = copy.Open();
-                if (entry.FullName == entryName) document.Save(to);
-                else
-                {
-                    using var from = entry.Open();
-                    from.CopyTo(to);
-                }
+                if (name == entryName) document.Save(to);
+                else to.Write(bytes);
             }
         }
 
@@ -77,6 +84,7 @@ public sealed class PptxMalformedInputTests
     public void GarbageAttributesNeverCrashTheReader(string entryName)
     {
         var package = RichPackage();
+        var entries = Entries(package);
         XDocument original;
         using (var archive = new ZipArchive(new MemoryStream(package), ZipArchiveMode.Read))
         using (var stream = (archive.GetEntry(entryName) ?? throw new InvalidOperationException(string.Join(",", archive.Entries.Select(e => e.FullName)))).Open())
@@ -98,7 +106,7 @@ public sealed class PptxMalformedInputTests
                 var attribute = document.Descendants().SelectMany(e => e.Attributes()).Where(a => !a.IsNamespaceDeclaration).ElementAt(index);
                 attribute.Value = value;
 
-                using var stream = new MemoryStream(Replace(package, entryName, document));
+                using var stream = new MemoryStream(Replace(entries, entryName, document));
                 var exception = Record.Exception(() =>
                 {
                     var result = reader.Read(stream);
@@ -121,6 +129,7 @@ public sealed class PptxMalformedInputTests
     public void MissingElementsNeverCrashTheReader(string entryName)
     {
         var package = RichPackage();
+        var entries = Entries(package);
         XDocument original;
         using (var archive = new ZipArchive(new MemoryStream(package), ZipArchiveMode.Read))
         using (var stream = archive.GetEntry(entryName)!.Open())
@@ -142,7 +151,7 @@ public sealed class PptxMalformedInputTests
             var name = element.Name;
             element.Remove();
 
-            using var stream = new MemoryStream(Replace(package, entryName, document));
+            using var stream = new MemoryStream(Replace(entries, entryName, document));
             var exception = Record.Exception(() =>
             {
                 var result = reader.Read(stream);

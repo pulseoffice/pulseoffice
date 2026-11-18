@@ -17,6 +17,15 @@ public sealed class NoteNumbers(IReadOnlyDictionary<string, string> citations, I
     public IReadOnlyDictionary<string, string> Citations { get; } = citations;
 
     public IReadOnlyList<string> Endnotes { get; } = endnotes;
+
+    public IReadOnlyList<string> Footnotes { get; init; } = [];
+
+    public IReadOnlyDictionary<string, string> Sections { get; init; } = new Dictionary<string, string>();
+
+    public IEnumerable<string> InSection(string sectionId) =>
+        Footnotes.Concat(Endnotes).Where(id => Sections.TryGetValue(id, out var section) && section == sectionId);
+
+    public IEnumerable<string> AtDocumentEnd(IEnumerable<string> ids) => ids.Where(id => !Sections.ContainsKey(id));
 }
 
 public sealed record FlowContext(TextDocument Document, StoryKind Story, string? StoryId, bool Sections, IReadOnlyDictionary<string, ListPlacement?> Lists, NoteNumbers Notes)
@@ -130,11 +139,13 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         if (document.Notes.All.Count == 0) return NoteNumbers.None;
         var citations = new Dictionary<string, string>(StringComparer.Ordinal);
         var endnotes = new List<string>();
+        var footnotes = new List<string>();
+        var sections = new Dictionary<string, string>(StringComparer.Ordinal);
         var footnoteCount = 0;
         var endnoteCount = 0;
         var footnoteSettings = document.Notes.FootnoteSettings;
         var endnoteSettings = document.Notes.EndnoteSettings;
-        foreach (var paragraph in NoteOrder(document))
+        foreach (var (paragraph, section) in NoteOrder(document))
         {
             if ((footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
                 && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1)
@@ -151,20 +162,26 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
                 var value = settings.StartAt + (footnote ? footnoteCount++ : endnoteCount++);
                 if (footnote && settings.Restart == NoteNumbering.Page && onPage is not null && onPage.TryGetValue(note.Id, out var position)) value = settings.StartAt + position;
                 citations[note.Id] = note.Citation ?? Render(settings.FormatName, value);
-                if (!footnote) endnotes.Add(note.Id);
+                if (footnote) footnotes.Add(note.Id);
+                else endnotes.Add(note.Id);
+                if (section is not null && settings.Placement == NotePlacement.SectionEnd) sections[note.Id] = section;
             }
         }
-        return new NoteNumbers(citations, endnotes);
+        return new NoteNumbers(citations, endnotes) { Footnotes = footnotes, Sections = sections };
     }
 
-    private IEnumerable<ParagraphBlock> NoteOrder(TextDocument document)
+    private IEnumerable<(ParagraphBlock Paragraph, string? Section)> NoteOrder(TextDocument document)
     {
+        var sections = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var section in document.Body.Blocks.OfType<SectionBlock>().Where(section => !section.Hidden))
+            foreach (var paragraph in tree.Paragraphs(section.Content)) sections.TryAdd(paragraph.Id, section.Id);
         foreach (var paragraph in tree.Paragraphs(document.Body))
         {
-            yield return paragraph;
+            var section = sections.GetValueOrDefault(paragraph.Id);
+            yield return (paragraph, section);
             foreach (var item in document.Objects.AnchoredTo(paragraph.Id))
                 if (item.Content.Story is { } story)
-                    foreach (var inner in tree.Paragraphs(story)) yield return inner;
+                    foreach (var inner in tree.Paragraphs(story)) yield return (inner, section);
         }
     }
 
@@ -346,7 +363,10 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
             {
                 Shares = [.. section.Columns.Spans.Select(span => new ColumnShare(span.Width.ToPoints(), span.Gap.ToPoints()))],
             };
-            return [new SectionStartItem(section, columns), .. content, new SectionEndItem(section)];
+            var notes = context.Story == StoryKind.Body && context.Document.Body.Blocks.Contains(section)
+                ? context.Notes.InSection(section.Id).SelectMany(id => owner.Notes(id, context with { Lists = new Dictionary<string, ListPlacement?>() }))
+                : [];
+            return [new SectionStartItem(section, columns), .. content, .. notes, new SectionEndItem(section)];
         }
     }
 }

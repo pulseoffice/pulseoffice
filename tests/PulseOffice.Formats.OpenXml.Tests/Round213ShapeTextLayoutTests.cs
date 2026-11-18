@@ -38,7 +38,7 @@ public sealed class Round213ShapeTextLayoutTests
         using (var document = PresentationDocument.Open(buffer, true))
             document.PresentationPart!.SlideParts.First().Slide!.Descendants<D.BodyProperties>().First().Vertical = new D.TextVerticalValues("eaVert");
         buffer.Position = 0;
-        Assert.Contains(new PptxReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
+        Assert.DoesNotContain(new PptxReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
     }
 
     [Fact]
@@ -61,6 +61,6 @@ public sealed class Round213ShapeTextLayoutTests
                 "</draw:page></office:presentation></office:body></office:document-content>");
         }
         buffer.Position = 0;
-        Assert.Contains(new OdpReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "ODP217");
+        Assert.DoesNotContain(new OdpReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "ODP217");
     }
 }

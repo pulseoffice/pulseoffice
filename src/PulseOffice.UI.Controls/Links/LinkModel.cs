@@ -30,11 +30,17 @@ public sealed record LinkRequest(string TitleKey)
     public IReadOnlyList<LinkKind> Kinds { get; init; } = [LinkKind.Web, LinkKind.Place, LinkKind.File, LinkKind.Mail];
 
     public bool CanRemove { get; init; }
+
+    public bool ShowsTip { get; init; }
+
+    public string? Tip { get; init; }
 }
 
 public sealed record LinkChoice(LinkKind Kind, string Address, string Text)
 {
     public bool Remove { get; init; }
+
+    public string? Tip { get; init; }
 }
 
 public sealed record MailAddress(string To, string Subject);

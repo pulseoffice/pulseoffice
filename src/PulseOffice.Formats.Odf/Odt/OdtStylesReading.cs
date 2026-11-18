@@ -121,10 +121,9 @@ internal sealed class OdtStylesReader(
         foreach (var configuration in styles?.Elements(Text + "notes-configuration") ?? [])
         {
             var settings = Notes(configuration, context);
-            if ((string?)configuration.Attribute(Text + "footnotes-position") is { } position && position != "page") context.Losses.Add(OdtReadLosses.FootnotePosition);
             if (vocabulary.NoteClass.Value((string?)configuration.Attribute(Text + "note-class")) == NoteKind.Endnote)
-                context.Document.Notes.EndnoteSettings = settings;
-            else context.Document.Notes.FootnoteSettings = settings;
+                context.Document.Notes.EndnoteSettings = settings with { Placement = context.Document.Notes.EndnoteSettings.Placement };
+            else context.Document.Notes.FootnoteSettings = settings with { Placement = FootnotePlacement((string?)configuration.Attribute(Text + "footnotes-position")) };
         }
 
         Resolve(sheet, relative);
@@ -136,6 +135,8 @@ internal sealed class OdtStylesReader(
             .Where(layout => layout.Attribute(Style + "name") is not null)
             .GroupBy(layout => (string)layout.Attribute(Style + "name")!)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal) ?? [];
+        if (layouts.Values.Select(layout => layout.Element(Style + "page-layout-properties")?.Element(Style + "footnote-sep")).FirstOrDefault(separator => separator is not null) is { } rule)
+            context.Document.Notes.FootnoteSeparator = Separator(rule);
 
         foreach (var master in masters?.Elements(Style + "master-page") ?? [])
         {
@@ -376,6 +377,33 @@ internal sealed class OdtStylesReader(
         var label = measure.Points((string?)properties?.Attribute(Text + "min-label-width")) ?? 18;
         return (before, label);
     }
+
+    private NoteSeparator Separator(XElement rule)
+    {
+        var defaults = new NoteSeparator();
+        var relative = (string?)rule.Attribute(Style + "rel-width") is { } percent
+            && double.TryParse(percent.TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? Math.Clamp(value / 100, 0, 1) : defaults.RelativeLength;
+        var thickness = (string?)rule.Attribute(Style + "line-style") == "none" ? 0 : measure.Points((string?)rule.Attribute(Style + "width")) ?? defaults.Thickness;
+        return new NoteSeparator
+        {
+            RelativeLength = Settled(relative, defaults.RelativeLength),
+            Thickness = Settled(Math.Max(0, thickness), defaults.Thickness),
+            SpaceBefore = Settled(Math.Max(0, measure.Points((string?)rule.Attribute(Style + "distance-before-sep")) ?? defaults.SpaceBefore), defaults.SpaceBefore),
+            SpaceAfter = Settled(Math.Max(0, measure.Points((string?)rule.Attribute(Style + "distance-after-sep")) ?? defaults.SpaceAfter), defaults.SpaceAfter),
+        };
+    }
+
+    private double Settled(double value, double standard) => Math.Abs(value - standard) < SeparatorTolerance ? standard : value;
+
+    private const double SeparatorTolerance = 0.01;
+
+    private NotePlacement FootnotePlacement(string? position) => position switch
+    {
+        "text" => NotePlacement.BelowText,
+        "section" => NotePlacement.SectionEnd,
+        "document" => NotePlacement.DocumentEnd,
+        _ => NotePlacement.PageBottom,
+    };
 
     private NoteSettings Notes(XElement element, OdtReadContext context) => new()
     {

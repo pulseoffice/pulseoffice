@@ -21,6 +21,7 @@ public sealed class LedgerFindTarget(
     private const string Regex = "regex";
     private const string AllSheets = "allSheets";
     private const string ByFormat = "byFormat";
+    private const string InComments = "inComments";
 
     public IReadOnlyList<FindOption> Options { get; } =
     [
@@ -30,6 +31,7 @@ public sealed class LedgerFindTarget(
         new(Regex, "find.regex"),
         new(AllSheets, "find.allSheets"),
         new(ByFormat, "find.byFormat"),
+        new(InComments, "find.inComments"),
     ];
 
     public string InitialQuery => string.Empty;
@@ -65,7 +67,14 @@ public sealed class LedgerFindTarget(
         }
 
         var options = OptionsOf(request) with { HistoryLabel = texts["find.replaceAll"] };
-        var locked = search.FindAll(workbook, context.SheetIndex, request.Query, options)
+        var found = search.FindAll(workbook, context.SheetIndex, request.Query, options);
+        if (options.InComments && found.Any(match => workbook.Sheets[match.SheetIndex].Protection.IsEnabled))
+        {
+            status.Report(texts["status.protection.objects"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            return texts["status.protection.objects"];
+        }
+
+        var locked = !options.InComments && found
             .Any(match => !guard.CanWrite(workbook, workbook.Sheets[match.SheetIndex], new CellRange(match.Address, match.Address)));
         if (locked)
         {
@@ -91,6 +100,7 @@ public sealed class LedgerFindTarget(
         SearchFormulas = request.Has(InFormulas),
         UseRegex = request.Has(Regex),
         AllSheets = request.Has(AllSheets),
+        InComments = request.Has(InComments),
         Style = request.Has(ByFormat) ? CurrentFormat() : null,
     };
 

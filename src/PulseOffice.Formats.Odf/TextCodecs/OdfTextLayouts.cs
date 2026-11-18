@@ -12,12 +12,18 @@ internal sealed class OdfTextLayouts
 
     public IEnumerable<XObject> Write(TextLayout layout)
     {
-        if (layout.Flow is TextFlow.Vertical or TextFlow.Vertical270)
+        if (layout.Flow == TextFlow.MongolianVertical)
+            yield return new XAttribute(Namespaces.Style + "writing-mode", "tb-lr");
+        else if (layout.IsVertical)
             yield return new XAttribute(Namespaces.Style + "writing-mode", "tb-rl");
         if (layout.Flow == TextFlow.Vertical270)
             yield return new XAttribute(_pulse + "text-flow", "vertical-270");
-        if (layout.Flow == TextFlow.Stacked)
+        if (layout.Flow == TextFlow.EastAsianVertical)
+            yield return new XAttribute(_pulse + "text-flow", "east-asian");
+        if (layout.IsStacked)
             yield return new XAttribute(Namespaces.Style + "direction", "ttb");
+        if (layout.Flow == TextFlow.StackedRightToLeft)
+            yield return new XAttribute(_pulse + "text-flow", "stacked-rl");
         if (layout.Upright)
             yield return new XAttribute(_pulse + "upright", "true");
         if (layout.Columns > 1 || layout.ColumnSpacing > 0)
@@ -41,7 +47,9 @@ internal sealed class OdfTextLayouts
         return new TextLayout
         {
             Flow = flow == "vertical-270" || mode == "bt-lr" ? TextFlow.Vertical270
-                : direction == "ttb" ? TextFlow.Stacked
+                : direction == "ttb" ? flow == "stacked-rl" ? TextFlow.StackedRightToLeft : TextFlow.Stacked
+                : mode == "tb-lr" ? TextFlow.MongolianVertical
+                : flow == "east-asian" && mode?.StartsWith("tb", StringComparison.Ordinal) == true ? TextFlow.EastAsianVertical
                 : mode?.StartsWith("tb", StringComparison.Ordinal) == true ? TextFlow.Vertical
                 : TextFlow.Horizontal,
             Upright = upright == "true",

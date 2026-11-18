@@ -65,6 +65,38 @@ public sealed class CommandSweepShard6(HeadlessDesktopSession headless) : Comman
     public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
 }
 
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard7(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 6)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard8(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 7)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard9(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 8)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
+[Collection(HeadlessDesktopCollection.Name)]
+public sealed class CommandSweepShard10(HeadlessDesktopSession headless) : CommandSweepTests(headless)
+{
+    [Theory]
+    [MemberData(nameof(Slices), 9)]
+    public Task Ogni_comando_abilitato_fa_qualcosa_o_rifiuta_con_un_motivo(string module, string context, int part) => Sweep(module, context, part);
+}
+
 public abstract class CommandSweepTests : IDisposable
 {
     private readonly UiThreadSession Session;
@@ -197,8 +229,6 @@ public abstract class CommandSweepTests : IDisposable
         "shell.file.quit",
     };
 
-    private const int Parts = 4;
-
     private static readonly IReadOnlySet<string> VolatileParts = new HashSet<string>(StringComparer.Ordinal) { "settings.xml" };
 
     private static readonly System.Text.RegularExpressions.Regex VolatileMeta = new(
@@ -215,13 +245,41 @@ public abstract class CommandSweepTests : IDisposable
 
     private static readonly CommandId RepeatCommand = new("shell.edit.repeat");
 
-    private const int LargeParts = 12;
+    private const double SliceSeconds = 6;
+
+    private const double GrowthHeadroom = 1.25;
+
+    private const int UnrecordedParts = 4;
+
+    private static readonly IReadOnlyDictionary<string, double> RecordedSeconds = new Dictionary<string, double>(StringComparer.Ordinal)
+    {
+        ["sheets/typical"] = 187,
+        ["sheets/object"] = 22,
+        ["sheets/shapeText"] = 35,
+        ["sheets/cellEdit"] = 7,
+        ["sheets/readOnly"] = 46,
+        ["sheets/protectedSheet"] = 112,
+        ["documents/typical"] = 138,
+        ["documents/object"] = 18,
+        ["documents/readOnly"] = 33,
+        ["documents/protectedSection"] = 95,
+        ["presentations/typical"] = 100,
+        ["presentations/object"] = 20,
+        ["presentations/shapeText"] = 98,
+        ["presentations/readOnly"] = 22,
+        ["presentations/presenting"] = 3,
+    };
+
+    private static int PartsOf(string module, ISweepScenario scenario) =>
+        RecordedSeconds.TryGetValue($"{module}/{scenario.Name}", out var seconds)
+            ? Math.Max(1, (int)Math.Ceiling(seconds * GrowthHeadroom / SliceSeconds))
+            : UnrecordedParts;
 
     private const int RenderingNoise = 40;
 
     private static readonly ClipboardContent SweepClipboard = new() { Text = "sweep" };
 
-    private const int Shards = 6;
+    private const int Shards = 10;
 
     private static readonly IReadOnlyDictionary<string, string> AlreadyInThatState = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -279,7 +337,6 @@ public abstract class CommandSweepTests : IDisposable
 
         IReadOnlySet<string> Modules { get; }
 
-        int Parts { get; }
 
         Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry);
 
@@ -298,7 +355,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets", "documents", "presentations" };
 
-        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry) => Task.CompletedTask;
 
@@ -311,7 +367,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets", "documents", "presentations" };
 
-        public int Parts => CommandSweepTests.Parts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -327,7 +382,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets" };
 
-        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -346,7 +400,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "sheets" };
 
-        public int Parts => CommandSweepTests.Parts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -367,7 +420,6 @@ public abstract class CommandSweepTests : IDisposable
             ? new HashSet<string> { "sheets", "presentations" }
             : new HashSet<string> { "sheets", "documents", "presentations" };
 
-        public int Parts => CommandSweepTests.Parts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -415,7 +467,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "documents" };
 
-        public int Parts => CommandSweepTests.LargeParts;
 
         public Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -434,7 +485,6 @@ public abstract class CommandSweepTests : IDisposable
 
         public IReadOnlySet<string> Modules { get; } = new HashSet<string> { "presentations" };
 
-        public int Parts => CommandSweepTests.Parts;
 
         public async Task ArrangeAsync(SweepStage stage, CommandExecutor executor, CommandRegistry registry)
         {
@@ -467,7 +517,7 @@ public abstract class CommandSweepTests : IDisposable
             .Single(attribute => attribute.Key == "PulseOffice.SweepModule").Value;
         foreach (var scenario in Scenarios)
             foreach (var module in new[] { "sheets", "documents", "presentations" }.Where(scenario.Modules.Contains).Where(module => module == assemblyModule))
-                for (var part = 0; part < scenario.Parts; part++)
+                for (var part = 0; part < PartsOf(module, scenario); part++)
                     if (slice++ % Shards == shard) data.Add(module, scenario.Name, part);
         return data;
     }
@@ -759,7 +809,7 @@ public abstract class CommandSweepTests : IDisposable
             .Where(command => command.Module == kind || command.Module == ModuleKind.Shell)
             .Where(command => scenario.Covers(command, typical.Contains(command.Id)))
             .Select(command => command.Id)
-            .Where((_, index) => index % scenario.Parts == part)
+            .Where((_, index) => index % PartsOf(module, scenario) == part)
             .ToList();
         foreach (var id in ids)
         {

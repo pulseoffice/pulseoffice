@@ -52,8 +52,12 @@ public sealed class FolioRulers
     {
         var web = _services.Layout.Mode != FolioViewMode.Print;
         Horizontal.IsVisible = _services.Layout.HorizontalRuler;
-        Vertical.IsVisible = _services.Layout.VerticalRuler && !web;
-        if (_canvas.CaretPage() is not { } place || !Horizontal.IsAttachedToVisualTree()) return;
+        var vertical = _services.Layout.VerticalRuler && !web;
+        if (_canvas.CaretPage() is not { } place || !Horizontal.IsAttachedToVisualTree())
+        {
+            Vertical.IsVisible = vertical;
+            return;
+        }
         var (slot, page) = place;
         var scale = _canvas.Scale;
         var origin = _canvas.TranslatePoint(new Point(slot.X, slot.Y), Horizontal) ?? default;
@@ -71,7 +75,7 @@ public sealed class FolioRulers
         }
         Horizontal.Model = new RulerModel(RulerOrientation.Horizontal, origin.X, scale, page.Width, content.X, content.Right, markers, ruler.Unit);
         var top = _canvas.TranslatePoint(new Point(slot.X, slot.Y), Vertical) ?? default;
-        Vertical.IsVisible = Vertical.IsVisible && slot.CropTop == 0;
+        Vertical.IsVisible = vertical && slot.CropTop == 0;
         Vertical.Model = new RulerModel(RulerOrientation.Vertical, top.Y, scale, page.Height, content.Y, content.Bottom,
         [
             new(MarginTop, RulerMarkerKind.MarginStart, margins.Top.ToPoints()),

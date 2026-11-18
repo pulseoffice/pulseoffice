@@ -40,8 +40,8 @@ public static class FormValues
     public static double Number(this IReadOnlyDictionary<string, object> values, string key, double fallback) =>
         values.TryGetValue(key, out var value) && value is double number && double.IsFinite(number) ? number : fallback;
 
-    public static int Choice(this IReadOnlyDictionary<string, object> values, string key, int count) =>
-        values.TryGetValue(key, out var value) && value is int index && index >= 0 && index < count ? index : 0;
+    public static int Choice(this IReadOnlyDictionary<string, object> values, string key, int count, int fallback = 0) =>
+        values.TryGetValue(key, out var value) && value is int index && index >= 0 && index < count ? index : fallback;
 
     public static bool Flag(this IReadOnlyDictionary<string, object> values, string key) => values.TryGetValue(key, out var value) && value is true;
 }

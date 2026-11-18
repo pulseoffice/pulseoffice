@@ -266,11 +266,13 @@ internal sealed class GridPointerInput(
         }
 
         var text = sheet.Comments.GetValueOrDefault(address) is { } comment
-            ? comment.Author is { Length: > 0 } author ? $"{author}: {comment.Text}" : comment.Text
+            ? string.Join("\n", new[] { Line(comment.Author, comment.Text) }.Concat(comment.Replies.Select(reply => Line(reply.Author, reply.Text))))
             : sheet[address] is { Hyperlink: { Length: > 0 } link } cell ? cell.HyperlinkTip is { Length: > 0 } tip ? tip : link : null;
 
         surface.ShowTip(text);
     }
+
+    private string Line(string? author, string text) => author is { Length: > 0 } ? $"{author}: {text}" : text;
 
     private bool TryFilterButton(Point point)
     {

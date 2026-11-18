@@ -45,7 +45,6 @@ public sealed class DocxReader : ITextDocumentReader
         ["DOCX102"] = Diagnostic.Warning("DOCX102", "Some drawings or embedded objects in the DOCX file could not be imported."),
         ["DOCX108"] = Diagnostic.Warning("DOCX108", "Some content controls around tables are imported as their content, without the control."),
         ["DOCX104"] = Diagnostic.Warning("DOCX104", "VBA macros in the file are not imported."),
-        ["DOCX272"] = Diagnostic.Warning("DOCX272", "Footnotes placed right below the text or at the end of a section or of the document are imported at the bottom of each page, and endnotes at the end of each section are imported at the end of the document."),
         ["DOCX113"] = Diagnostic.Info("DOCX113", "Comments and notes that are not anchored anywhere in the text, which Word does not show, are not imported."),
         ["DOCX117"] = Diagnostic.Info("DOCX117", "Tracked changes inside field instructions are not imported: each field keeps its current instruction."),
         ["DOCX120"] = Diagnostic.Warning("DOCX120", "Tracked changes in the text of grouped shapes are imported as accepted."),
@@ -150,6 +149,7 @@ public sealed class DocxReader : ITextDocumentReader
             _indexRanges.Join(document, context.IndexRanges, referenced);
             _bibliography.Read(main, document);
             Sections(document, spans, main, context);
+            _annotations.ReadSeparator(main, context);
             _storedPages.Read(main, context);
             _blockProperties.Read(main, context);
             _threads.Settle(document);
@@ -157,7 +157,6 @@ public sealed class DocxReader : ITextDocumentReader
                 document.Body.Add(new ParagraphBlock(document.NextId("p"), string.Empty, DefaultStyleNames.Standard));
             Settings(main.DocumentSettingsPart?.Settings, document);
             _noteSettings.Read(main.Document?.Body?.Elements<W.SectionProperties>().LastOrDefault(), document);
-            if (!_noteSettings.Placed(main.DocumentSettingsPart?.Settings) || !_noteSettings.Placed(main.Document?.Body)) context.Losses.Add("DOCX272");
             document.Notes.ContinuousEndnotes = true;
             if (_unanchored.Remove(document).Any) context.Losses.Add("DOCX113");
             if (body.Descendants<W.DeletedFieldCode>().Any(code => !WholeDeletedField(code)) || body.Descendants<W.InsertedRun>().Concat<OpenXmlElement>(body.Descendants<W.MoveToRun>()).Any(run => run.Descendants<W.FieldCode>().Any())) context.Losses.Add("DOCX117");

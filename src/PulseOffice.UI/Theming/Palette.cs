@@ -34,6 +34,7 @@ public static class Palette
         public const string Info = "PulseInfo";
 
         public const string Danger = "PulseDanger";
+        public const string OnDanger = "PulseOnDanger";
         public const string Warning = "PulseWarning";
         public const string Success = "PulseSuccess";
 
@@ -44,6 +45,8 @@ public static class Palette
     }
 
     public const string HighContrastFocus = "#FFFF00";
+
+    public const string OnAccent = "#FFFFFF";
 
     public static void Apply(Application application, bool dark) =>
         Apply(application, dark ? PaletteVariant.Dark : PaletteVariant.Light);
@@ -109,6 +112,7 @@ public static class Palette
 
         (Keys.Info, "#2563EB"),
         (Keys.Danger, "#DC2626"),
+        (Keys.OnDanger, "#FFFFFF"),
         (Keys.Warning, "#D97706"),
         (Keys.Success, "#16A34A"),
 
@@ -140,6 +144,7 @@ public static class Palette
 
         (Keys.Info, "#60A5FA"),
         (Keys.Danger, "#F87171"),
+        (Keys.OnDanger, "#000000"),
         (Keys.Warning, "#FBBF24"),
         (Keys.Success, "#4ADE80"),
 
@@ -171,6 +176,7 @@ public static class Palette
 
         (Keys.Info, "#8AB4FF"),
         (Keys.Danger, "#FF8A8A"),
+        (Keys.OnDanger, "#000000"),
         (Keys.Warning, "#FFD60A"),
         (Keys.Success, "#5CF08A"),
 

@@ -28,8 +28,29 @@ public enum NoteNumbering
     Page,
 }
 
+public enum NotePlacement
+{
+    PageBottom,
+    BelowText,
+    SectionEnd,
+    DocumentEnd,
+}
+
+public sealed record NoteSeparator
+{
+    public double RelativeLength { get; init; } = 0.25;
+
+    public double Thickness { get; init; } = 0.018 * 72 / 2.54;
+
+    public double SpaceBefore { get; init; } = 0.101 * 72 / 2.54;
+
+    public double SpaceAfter { get; init; } = 0.101 * 72 / 2.54;
+}
+
 public sealed record NoteSettings
 {
+    public NotePlacement Placement { get; init; } = NotePlacement.PageBottom;
+
     public string FormatName { get; init; } = "1";
 
     public int StartAt { get; init; } = 1;
@@ -63,7 +84,9 @@ public sealed class NoteCollection
 
     public NoteSettings FootnoteSettings { get; set; } = new() { ParagraphStyleName = "Footnote" };
 
-    public NoteSettings EndnoteSettings { get; set; } = new() { FormatName = "i", ParagraphStyleName = "Endnote" };
+    public NoteSettings EndnoteSettings { get; set; } = new() { FormatName = "i", ParagraphStyleName = "Endnote", Placement = NotePlacement.DocumentEnd };
+
+    public NoteSeparator FootnoteSeparator { get; set; } = new();
 
     public bool ContinuousEndnotes { get; set; }
 
@@ -99,5 +122,6 @@ public sealed class NoteCollection
         FootnoteSettings = other.FootnoteSettings;
         EndnoteSettings = other.EndnoteSettings;
         ContinuousEndnotes = other.ContinuousEndnotes;
+        FootnoteSeparator = other.FootnoteSeparator;
     }
 }

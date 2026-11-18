@@ -19,11 +19,12 @@ public sealed class DocxNoteSettingsCodec
     public IEnumerable<OpenXmlElement> Write(TextDocument document)
     {
         var notes = document.Notes;
-        var footnote = new W.FootnoteDocumentWideProperties(Common(notes.FootnoteSettings, NoteKind.Footnote));
+        var footnote = new W.FootnoteDocumentWideProperties(new OpenXmlElement[] { FootnotePosition(notes.FootnoteSettings.Placement) }
+            .Concat(Common(notes.FootnoteSettings, NoteKind.Footnote)));
         if (notes.OfKind(NoteKind.Footnote).Any())
             footnote.Append(new W.FootnoteSpecialReference { Id = -1 }, new W.FootnoteSpecialReference { Id = 0 });
         yield return footnote;
-        var endnote = new W.EndnoteDocumentWideProperties(new OpenXmlElement[] { new W.EndnotePosition { Val = W.EndnotePositionValues.DocumentEnd } }
+        var endnote = new W.EndnoteDocumentWideProperties(new OpenXmlElement[] { new W.EndnotePosition { Val = notes.EndnoteSettings.Placement == NotePlacement.SectionEnd ? W.EndnotePositionValues.SectionEnd : W.EndnotePositionValues.DocumentEnd } }
             .Concat(Common(notes.EndnoteSettings, NoteKind.Endnote)));
         if (notes.OfKind(NoteKind.Endnote).Any())
             endnote.Append(new W.EndnoteSpecialReference { Id = -1 }, new W.EndnoteSpecialReference { Id = 0 });
@@ -38,11 +39,6 @@ public sealed class DocxNoteSettingsCodec
             && (!notes.OfKind(NoteKind.Footnote).Any() || Known(notes.FootnoteSettings.FormatName) || notes.OfKind(NoteKind.Footnote).All(note => note.Citation is not null))
             && (!notes.OfKind(NoteKind.Endnote).Any() || Known(notes.EndnoteSettings.FormatName) && notes.EndnoteSettings.Restart != NoteNumbering.Page);
     }
-
-    public bool Placed(OpenXmlCompositeElement? container) =>
-        container is null
-        || container.Descendants<W.FootnotePosition>().All(position => position.Val is null || position.Val.Value == W.FootnotePositionValues.PageBottom)
-            && container.Descendants<W.EndnotePosition>().All(position => position.Val is null || position.Val.Value == W.EndnotePositionValues.DocumentEnd);
 
     public void Read(W.Settings settings, TextDocument document)
     {
@@ -78,6 +74,9 @@ public sealed class DocxNoteSettingsCodec
 
     private NoteSettings Read(OpenXmlCompositeElement properties, NoteSettings settings)
     {
+        if (properties.GetFirstChild<W.FootnotePosition>()?.Val?.InnerText is { } footnote) settings = settings with { Placement = Placement(footnote) };
+        if (properties.GetFirstChild<W.EndnotePosition>()?.Val?.Value is { } endnote)
+            settings = settings with { Placement = endnote == W.EndnotePositionValues.SectionEnd ? NotePlacement.SectionEnd : NotePlacement.DocumentEnd };
         if (properties.GetFirstChild<W.NumberingFormat>()?.Val?.Value is { } format) settings = settings with { FormatName = Odf(format) };
         if (properties.GetFirstChild<W.NumberingStart>()?.Val?.Value is { } start) settings = settings with { StartAt = start };
         if (properties.GetFirstChild<W.NumberingRestart>()?.Val?.Value is { } restart)
@@ -89,6 +88,26 @@ public sealed class DocxNoteSettingsCodec
             };
         return settings;
     }
+
+    private W.FootnotePosition FootnotePosition(NotePlacement placement)
+    {
+        var position = new W.FootnotePosition { Val = new EnumValue<W.FootnotePositionValues> { InnerText = placement switch
+        {
+            NotePlacement.BelowText => "beneathText",
+            NotePlacement.SectionEnd => "sectEnd",
+            NotePlacement.DocumentEnd => "docEnd",
+            _ => "pageBottom",
+        } } };
+        return position;
+    }
+
+    private NotePlacement Placement(string position) => position switch
+    {
+        "beneathText" => NotePlacement.BelowText,
+        "sectEnd" => NotePlacement.SectionEnd,
+        "docEnd" => NotePlacement.DocumentEnd,
+        _ => NotePlacement.PageBottom,
+    };
 
     private W.NumberFormatValues Word(string odf)
     {

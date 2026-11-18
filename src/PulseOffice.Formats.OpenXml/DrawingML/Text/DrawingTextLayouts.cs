@@ -12,11 +12,11 @@ internal sealed class DrawingTextLayouts
     [
         ("horz", TextFlow.Horizontal),
         ("vert", TextFlow.Vertical),
-        ("eaVert", TextFlow.Vertical),
-        ("mongolianVert", TextFlow.Vertical),
+        ("eaVert", TextFlow.EastAsianVertical),
+        ("mongolianVert", TextFlow.MongolianVertical),
         ("vert270", TextFlow.Vertical270),
         ("wordArtVert", TextFlow.Stacked),
-        ("wordArtVertRtl", TextFlow.Stacked),
+        ("wordArtVertRtl", TextFlow.StackedRightToLeft),
     ];
 
     public TextLayout? Read(OpenXmlElement? body)
@@ -44,12 +44,7 @@ internal sealed class DrawingTextLayouts
     {
         if (Math.Abs(rotation) > 0.001) body.Rotation = (int)Math.Round(rotation * 60000);
         if (layout.Flow != TextFlow.Horizontal)
-            body.Vertical = new D.TextVerticalValues(layout.Flow switch
-            {
-                TextFlow.Vertical270 => "vert270",
-                TextFlow.Stacked => "wordArtVert",
-                _ => "vert",
-            });
+            body.Vertical = new D.TextVerticalValues(_flows.First(entry => entry.Flow == layout.Flow).Token);
         if (layout.Upright) body.UpRight = true;
         if (layout.Columns > 1) body.ColumnCount = layout.Columns;
         if (layout.ColumnSpacing > 0) body.ColumnSpacing = (int)Math.Round(layout.ColumnSpacing * PulseOffice.Foundation.Units.Emu.PerPoint);

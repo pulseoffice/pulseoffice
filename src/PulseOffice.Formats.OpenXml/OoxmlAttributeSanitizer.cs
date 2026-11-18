@@ -42,7 +42,10 @@ internal sealed class OoxmlAttributeSanitizer
                 property.SetValue(element, null);
     }
 
-    private bool Repaired(OpenXmlSimpleType value) => value is EnumValue<DocumentFormat.OpenXml.Wordprocessing.OnOffOnlyValues> ? RepairedSwitch(value) : RepairedPercent(value);
+    private bool Repaired(OpenXmlSimpleType value) => Specified(value) || (value is EnumValue<DocumentFormat.OpenXml.Wordprocessing.OnOffOnlyValues> ? RepairedSwitch(value) : RepairedPercent(value));
+
+    private bool Specified(OpenXmlSimpleType value) =>
+        value is EnumValue<DocumentFormat.OpenXml.Wordprocessing.FootnotePositionValues> && value.InnerText == "docEnd";
 
     private bool RepairedSwitch(OpenXmlSimpleType value)
     {

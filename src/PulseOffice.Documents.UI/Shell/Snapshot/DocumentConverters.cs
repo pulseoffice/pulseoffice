@@ -66,6 +66,7 @@ public sealed class TextDocumentConverter : SnapshotConverter<TextDocument>
         document.Notes.Replace(node.Get<List<Note>>("notes", []));
         document.Notes.FootnoteSettings = node.Get("footnoteSettings", document.Notes.FootnoteSettings);
         document.Notes.EndnoteSettings = node.Get("endnoteSettings", document.Notes.EndnoteSettings);
+        document.Notes.FootnoteSeparator = node.Get("footnoteSeparator", document.Notes.FootnoteSeparator);
         document.Changes.Replace(node.Get<List<TrackedChange>>("changes", []));
         document.Changes.IsRecording = node.Get("recording", false);
         document.Changes.ProtectionKey = node.Get<byte[]>("protectionKey");
@@ -82,7 +83,7 @@ public sealed class TextDocumentConverter : SnapshotConverter<TextDocument>
         node.Put("styles", value.Styles).Put("initialPageStyle", value.InitialPageStyle).Put("macroSignature", value.MacroSignature)
             .Put("formSettings", value.FormSettings).Put("fonts", value.Fonts).Put("fileName", value.FileName).Put("protection", value.Protection).Put("body", value.Body)
             .Put("objects", value.Objects.All).Put("comments", value.Comments.All).Put("notes", value.Notes.All)
-            .Put("footnoteSettings", value.Notes.FootnoteSettings).Put("endnoteSettings", value.Notes.EndnoteSettings)
+            .Put("footnoteSettings", value.Notes.FootnoteSettings).Put("endnoteSettings", value.Notes.EndnoteSettings).Put("footnoteSeparator", value.Notes.FootnoteSeparator)
             .Put("changes", value.Changes.All).Put("recording", value.Changes.IsRecording).Put("protectionKey", value.Changes.ProtectionKey)
             .Put("showChanges", value.Changes.ShowChanges).Put("variables", value.Variables).Put("properties", value.Properties)
             .Put("macros", value.Macros.All).Put("versions", value.Versions.All).Put("ids", Ids(value))

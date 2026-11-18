@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace PulseOffice.Settings;
 
-public sealed class JsonSettingsStore : ISettingsStore, IDisposable
+public sealed class JsonSettingsStore : IReloadingSettingsStore, IDisposable
 {
     private readonly ConcurrentDictionary<string, JsonElement> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _changed = new(StringComparer.Ordinal);
@@ -12,12 +12,24 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
     private readonly ILogger<JsonSettingsStore> _logger;
     private readonly Lock _gate = new();
     private readonly ITimer _timer;
+    private readonly IDisposable _watch;
     private volatile bool _disposed;
 
     private static readonly TimeSpan WriteDelay = TimeSpan.FromMilliseconds(600);
 
     public JsonSettingsStore(SettingScope scope, string path, TimeProvider time, ILogger<JsonSettingsStore> logger)
+        : this(scope, path, time, logger, new NoSettingsFileMonitor())
     {
+    }
+
+    public JsonSettingsStore(
+        SettingScope scope,
+        string path,
+        TimeProvider time,
+        ILogger<JsonSettingsStore> logger,
+        ISettingsFileMonitor monitor)
+    {
+        ArgumentNullException.ThrowIfNull(monitor);
         ArgumentNullException.ThrowIfNull(time);
         Scope = scope;
         _path = path ?? throw new ArgumentNullException(nameof(path));
@@ -25,9 +37,68 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
 
         _timer = time.CreateTimer(_ => FlushScheduled(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         Load();
+        _watch = monitor.Watch(_path, Reload);
     }
 
     public SettingScope Scope { get; }
+
+    public event EventHandler<SettingsReloadedEventArgs>? Reloaded;
+
+    public IReadOnlyList<string> Reload()
+    {
+        if (_disposed) return [];
+
+        List<string> changed = [];
+        lock (_gate)
+        {
+            if (OnDiskQuietly() is not { } stored) return [];
+
+            foreach (var (key, value) in stored)
+            {
+                if (_changed.Contains(key)) continue;
+                if (_values.TryGetValue(key, out var current) && current.GetRawText() == value.GetRawText()) continue;
+                _values[key] = value;
+                changed.Add(key);
+            }
+
+            foreach (var key in _values.Keys)
+            {
+                if (_changed.Contains(key) || stored.ContainsKey(key)) continue;
+                if (_values.TryRemove(key, out _)) changed.Add(key);
+            }
+        }
+
+        if (changed.Count > 0)
+        {
+            _logger.LogInformation("Reloaded {Count} settings another instance wrote to {Path}", changed.Count, _path);
+            Reloaded?.Invoke(this, new SettingsReloadedEventArgs(changed));
+        }
+
+        return changed;
+    }
+
+    private Dictionary<string, JsonElement>? OnDiskQuietly()
+    {
+        try
+        {
+            if (!File.Exists(_path)) return null;
+            return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText(_path)) is { } stored
+                ? new Dictionary<string, JsonElement>(stored, StringComparer.Ordinal)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     public IReadOnlyCollection<string> Keys => _values.Keys.ToList();
 
@@ -203,6 +274,7 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
         if (_disposed) return;
 
         _disposed = true;
+        _watch.Dispose();
         _timer.Dispose();
         Flush();
     }

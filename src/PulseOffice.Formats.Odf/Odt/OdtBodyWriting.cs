@@ -773,6 +773,8 @@ internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec in
     {
         var properties = new XElement(Style + "section-properties", columns.Write(section.Columns));
         if (!section.Columns.Balanced) properties.Add(new XAttribute(Text + "dont-balance-text-columns", "true"));
+        if (session.Document.Notes.EndnoteSettings.Placement == NotePlacement.SectionEnd && section.Index is null && session.Document.Body.Blocks.Contains(section))
+            properties.Add(new XElement(Text + "notes-configuration", new XAttribute(Text + "note-class", "endnote")));
         if (section.Index is { } index) return indexes.Write(section, index, sink.Register("section", null, [properties], "Sect"), sink, session, blocks);
         var element = new XElement(Text + "section",
             new XAttribute(Text + "style-name", sink.Register("section", null, [properties], "Sect")),

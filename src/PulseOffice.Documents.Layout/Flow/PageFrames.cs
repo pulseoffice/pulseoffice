@@ -10,14 +10,6 @@ public sealed record PageFlowOptions
 {
     public double TableCellPadding { get; init; } = 0.097 * 72 / 2.54;
 
-    public double SeparatorBefore { get; init; } = 0.101 * 72 / 2.54;
-
-    public double SeparatorAfter { get; init; } = 0.101 * 72 / 2.54;
-
-    public double SeparatorWidth { get; init; } = 0.018 * 72 / 2.54;
-
-    public double SeparatorRelativeWidth { get; init; } = 0.25;
-
     public double MinimumWrapWidth { get; init; } = 0.5 * 72 / 2.54;
 
     public int BalanceIterations { get; init; } = 40;

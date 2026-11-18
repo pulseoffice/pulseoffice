@@ -10,10 +10,6 @@ namespace PulseOffice.Sheets.UI.GridParts.Painting;
 internal sealed class GridOverlayPainter(
     GridViewport viewport, SheetSelection selection, GridDisplayOptions options, IGridTheme theme)
 {
-    private static readonly IPen PrecedentPen = new Pen(new SolidColorBrush(Color.FromRgb(37, 99, 235)), 1.4);
-    private static readonly IPen DependentPen = new Pen(new SolidColorBrush(Color.FromRgb(22, 163, 74)), 1.4);
-    private static readonly IPen ErrorPen = new Pen(new SolidColorBrush(Color.FromRgb(220, 38, 38)), 1.4);
-
     public Rect ChoiceButtonBounds()
     {
         var cell = viewport.CellRect(viewport.AnchorOf(selection.Active));
@@ -108,7 +104,7 @@ internal sealed class GridOverlayPainter(
 
     private void PaintPageBreaks(DrawingContext context, Worksheet sheet, VisibleRange visible)
     {
-        var pen = new Pen(Brushes.MediumBlue, 1.5) { DashStyle = DashStyle.Dash };
+        var pen = new Pen(theme.Brush(Palette.Keys.Info, theme.Accent), 1.5) { DashStyle = DashStyle.Dash };
         var area = viewport.GridArea();
 
         foreach (var row in sheet.RowBreaks)
@@ -162,12 +158,12 @@ internal sealed class GridOverlayPainter(
             var start = new Point(from.X + from.Width / 2, from.Y + from.Height / 2);
             var end = new Point(to.X + to.Width / 2, to.Y + to.Height / 2);
 
-            var pen = arrow.Kind switch
+            var pen = new Pen(theme.Brush(arrow.Kind switch
             {
-                TraceKind.Dependent => DependentPen,
-                TraceKind.Error => ErrorPen,
-                _ => PrecedentPen,
-            };
+                TraceKind.Dependent => Palette.Keys.Success,
+                TraceKind.Error => Palette.Keys.Danger,
+                _ => Palette.Keys.Info,
+            }, theme.Accent), 1.4);
 
             context.DrawLine(pen, start, end);
             PaintArrowHead(context, pen, start, end);

@@ -58,6 +58,8 @@ public sealed record SearchOptions
 
     public bool AllSheets { get; init; }
 
+    public bool InComments { get; init; }
+
     public StyleFilter? Style { get; init; }
 
     public string HistoryLabel { get; init; } = "Replace";
@@ -79,6 +81,7 @@ public interface ISheetSearch
 public sealed class SheetSearch : ISheetSearch
 {
     private readonly TextMatchers _matchers = new();
+    private readonly CommentSearch _comments = new();
 
     public IReadOnlyList<SearchMatch> FindAll(
         Worksheet sheet, string query, SearchOptions? options = null, CellRange? scope = null,
@@ -87,6 +90,7 @@ public sealed class SheetSearch : ISheetSearch
         ArgumentNullException.ThrowIfNull(sheet);
 
         options ??= SearchOptions.Default;
+        if (options.InComments) return _comments.FindAll(sheet, query, options, scope, _matchers);
 
         var byStyle = options.Style is { IsEmpty: false } && styles is not null;
         if (string.IsNullOrEmpty(query) && !byStyle) return [];
@@ -121,6 +125,7 @@ public sealed class SheetSearch : ISheetSearch
         if (string.IsNullOrEmpty(query)) return 0;
 
         options ??= SearchOptions.Default;
+        if (options.InComments) return _comments.ReplaceAll(sheet, query, replacement, options, scope, history, _matchers);
 
         var matches = FindAll(sheet, query, options, scope);
         if (matches.Count == 0) return 0;

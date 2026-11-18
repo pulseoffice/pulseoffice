@@ -1023,6 +1023,8 @@ internal sealed class OdtSectionReader(OdtColumnsCodec columns, OdtIndexCodec in
         var id = context.Id(element, "sec");
         var properties = context.Automatic.Find("section", (string?)element.Attribute(Text + "style-name"))?.Element(Style + "section-properties");
         var display = (string?)element.Attribute(Text + "display");
+        if (properties?.Elements(Text + "notes-configuration").Any(configuration => (string?)configuration.Attribute(Text + "note-class") == "endnote") == true)
+            context.Document.Notes.EndnoteSettings = context.Document.Notes.EndnoteSettings with { Placement = NotePlacement.SectionEnd };
         var content = new BlockContainer(blocks.Read(element, context));
         return new SectionBlock(id, (string?)element.Attribute(Text + "name") ?? id, content)
         {

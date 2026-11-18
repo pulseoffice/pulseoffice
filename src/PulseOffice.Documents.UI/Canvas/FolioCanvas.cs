@@ -299,7 +299,7 @@ public sealed class FolioCanvas : Control
                 PaintControls(context, page, controls);
                 PaintSelection(context, page, selection);
                 _services.Renderer.Paint(_services.Surfaces.Screen(context, _editor.Document.Language), page, Content, marks);
-                PaintGrids(context, page);
+                PaintGrids(context, page, (top - slot.Y) / Scale, (bottom - slot.Y) / Scale);
                 if (cells is not null) PaintCells(context, page, cells);
                 PaintColumnDrag(context, slot);
                 PaintWaves(context, page);
@@ -857,10 +857,14 @@ public sealed class FolioCanvas : Control
         return _services.Snapping.Snap(session, lines, step / 2);
     }
 
-    private void PaintGrids(DrawingContext context, PageBox page)
+    private double FirstLine(double start, double step, double visibleTop) =>
+        visibleTop <= start ? start : start + Math.Floor((visibleTop - start) / step) * step;
+
+    private void PaintGrids(DrawingContext context, PageBox page, double visibleTop, double visibleBottom)
     {
         var view = _services.ViewLayout;
         var content = page.Content;
+        var last = Math.Min(content.Bottom, visibleBottom);
         if (view.Grid)
         {
             var dot = new SolidColorBrush(Color.FromArgb(150, 100, 116, 139));
@@ -868,7 +872,7 @@ public sealed class FolioCanvas : Control
             var dots = new StreamGeometry();
             using (var pen = dots.Open())
             {
-                for (var y = content.Y; y <= content.Bottom + 0.01; y += view.GridSpacing)
+                for (var y = FirstLine(content.Y, view.GridSpacing, visibleTop); y <= last + 0.01; y += view.GridSpacing)
                     for (var x = content.X; x <= content.Right + 0.01; x += view.GridSpacing)
                     {
                         pen.BeginFigure(new Point(x - size / 2, y - size / 2), true);
@@ -884,7 +888,7 @@ public sealed class FolioCanvas : Control
         {
             var pen = new Pen(new SolidColorBrush(Color.FromArgb(90, 37, 99, 235)), 0.5 / Scale);
             var spacing = Math.Max(6, (_editor.Document.Styles.DefaultCharacter.FontSize ?? 12) * 1.17);
-            for (var y = content.Y + spacing; y <= content.Bottom; y += spacing)
+            for (var y = FirstLine(content.Y + spacing, spacing, visibleTop); y <= last; y += spacing)
                 context.DrawLine(pen, new Point(content.X, y), new Point(content.Right, y));
         }
         if (view.Helplines && _gesture is { Moved: true } gesture && gesture.Slot.Index == page.Index)

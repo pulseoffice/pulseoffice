@@ -167,6 +167,7 @@ public sealed class DocumentLayoutEngine(
     private PaginationRequest Request(TextDocument document, IReadOnlyList<FlowItem> flow, FlowContext notes, FlowContext body, IReadOnlyList<PageBox> prefix, PageStart resume, IConvergenceProbe? probe, int count)
     {
         var noteStories = new Dictionary<(string, double), ComposedStory?>();
+        var notices = new Dictionary<(string, double), ComposedStory>();
         var frameStories = new Dictionary<string, ComposedStory?>(StringComparer.Ordinal);
         var memberStories = new Dictionary<string, IReadOnlyList<MemberFrame>>(StringComparer.Ordinal);
         var pageObjects = document.Objects.All.Where(item => item.Anchor is PageAnchor).ToList();
@@ -176,10 +177,21 @@ public sealed class DocumentLayoutEngine(
             {
                 if (noteStories.TryGetValue((id, width), out var story)) return story;
                 var note = document.Notes.Find(id);
-                story = note is null || note.Kind != NoteKind.Footnote ? null : stories.Compose(builder.Notes(id, notes), width);
+                story = note is null || note.Kind != NoteKind.Footnote || Collected(document.Notes.FootnoteSettings) ? null : stories.Compose(builder.Notes(id, notes), width);
                 noteStories[(id, width)] = story;
                 return story;
             },
+            Notice = (text, width) =>
+            {
+                if (notices.TryGetValue((text, width), out var notice)) return notice;
+                notice = Notice(document, notes, text, width);
+                notices[(text, width)] = notice;
+                return notice;
+            },
+            Separator = document.Notes.FootnoteSeparator,
+            FootnotesBelowText = document.Notes.FootnoteSettings.Placement == NotePlacement.BelowText,
+            ContinuationForward = document.Notes.FootnoteSettings.ContinuationForward,
+            ContinuationBackward = document.Notes.FootnoteSettings.ContinuationBackward,
             Object = document.Objects.Find,
             PageObjects = number => [.. pageObjects.Where(item => ((PageAnchor)item.Anchor).PageNumber == number)],
             PerPage = (entry, number) => builder.PerPage(entry, number, body),
@@ -304,13 +316,29 @@ public sealed class DocumentLayoutEngine(
         var flow = builder.Build(document.Body, context).ToList();
         body = context;
         notes = context with { Lists = new Dictionary<string, ListPlacement?>() };
-        if (numbers.Endnotes.Count > 0)
+        if (Collected(document.Notes.FootnoteSettings))
+            foreach (var id in numbers.AtDocumentEnd(numbers.Footnotes)) flow.AddRange(builder.Notes(id, notes));
+        var endnotes = numbers.AtDocumentEnd(numbers.Endnotes).ToList();
+        if (endnotes.Count > 0)
         {
             if (!document.Notes.ContinuousEndnotes) flow.Add(new EndnotesItem(document.Styles.Page.Find(DefaultStyleNames.Endnote)?.Name));
-            foreach (var id in numbers.Endnotes) flow.AddRange(builder.Notes(id, notes));
+            foreach (var id in endnotes) flow.AddRange(builder.Notes(id, notes));
         }
         return flow;
     }
+
+    private bool Collected(NoteSettings footnotes) => footnotes.Placement is NotePlacement.SectionEnd or NotePlacement.DocumentEnd;
+
+    private ComposedStory Notice(TextDocument document, FlowContext notes, string text, double width) =>
+        stories.Compose(builder.Build(new BlockContainer([new ParagraphBlock(NoticeParagraph, text)]), notes with
+        {
+            Story = StoryKind.Footnote,
+            StoryId = null,
+            Sections = false,
+            DefaultStyle = document.Notes.FootnoteSettings.ParagraphStyleName,
+        }), width);
+
+    private const string NoticeParagraph = "note-continuation-notice";
 
     private sealed class SuffixProbe : IConvergenceProbe
     {

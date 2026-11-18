@@ -10,6 +10,8 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader reader)
 {
+    private readonly DocxNoteSeparatorCodec _separator = new();
+
     public void WriteNotes(MainDocumentPart main, DocxWriteContext context)
     {
         var footnotes = context.Document.Notes.All.Where(note => note.Kind == NoteKind.Footnote).ToList();
@@ -20,7 +22,7 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
             var previous = context.Part;
             context.Part = part;
             var root = new W.Footnotes(
-                new W.Footnote(new W.Paragraph(new W.Run(new W.SeparatorMark()))) { Type = W.FootnoteEndnoteValues.Separator, Id = -1 },
+                new W.Footnote(_separator.Write(context.Document)) { Type = W.FootnoteEndnoteValues.Separator, Id = -1 },
                 new W.Footnote(new W.Paragraph(new W.Run(new W.ContinuationSeparatorMark()))) { Type = W.FootnoteEndnoteValues.ContinuationSeparator, Id = 0 });
             foreach (var note in footnotes)
             {
@@ -62,6 +64,10 @@ public sealed class DocxAnnotationsCodec(DocxBlockWriter writer, DocxBlockReader
     private string? NoticeText(IEnumerable<W.FootnoteEndnoteType> notes) =>
         notes.FirstOrDefault(note => note.Type?.Value == W.FootnoteEndnoteValues.ContinuationNotice) is { } notice
             && string.Concat(notice.Descendants<W.Text>().Select(text => text.Text)) is { Length: > 0 } text ? text : null;
+
+    public void ReadSeparator(MainDocumentPart main, DocxReadContext context) =>
+        context.Document.Notes.FootnoteSeparator = _separator.Read(
+            main.FootnotesPart?.Footnotes?.Elements<W.Footnote>().FirstOrDefault(note => note.Type?.Value == W.FootnoteEndnoteValues.Separator), context.Document);
 
     public void ReadNotes(MainDocumentPart main, DocxReadContext context)
     {

@@ -619,7 +619,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                             Namespaces.Table + "content-validation-name", validation));
 
                     if (owner.Comments.TryGetValue(address, out var comment))
-                        element.AddFirst(_annotations.Build(comment));
+                        _annotations.Place(element, comment, owner, address);
                 }
 
                 if (frames.TryGetValue(address, out var anchored))

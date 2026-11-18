@@ -23,6 +23,7 @@ public sealed class StartView : UserControl
     private readonly IIconCatalog _icons;
     private readonly DesignTokens.Metrics _metrics = DesignTokens.For(InterfaceDensity.Compact);
     private readonly Grid _recentList = new();
+    private readonly WcagColorContrast _contrast = new();
 
     public event EventHandler<string>? CommandRequested;
 
@@ -67,12 +68,12 @@ public sealed class StartView : UserControl
 
     private IBrush TileBackground(Color accent) => new SolidColorBrush(accent, Dark ? 0.24 : 0.12);
 
-    private IBrush TileGlyph(Color accent) => new SolidColorBrush(Dark ? Lighter(accent) : accent);
+    private IBrush TileGlyph(Color accent) => new SolidColorBrush(_contrast.Readable(accent, [Surface()], ReadableAccentPalette.TextContrast));
 
-    private Color Lighter(Color accent) => Color.FromRgb(
-        (byte)(accent.R + (255 - accent.R) * 0.45),
-        (byte)(accent.G + (255 - accent.G) * 0.45),
-        (byte)(accent.B + (255 - accent.B) * 0.45));
+    private Color Surface() =>
+        this.FindResource(Palette.Keys.Surface) is ISolidColorBrush surface ? surface.Color : Palette.Colors(Dark)[Palette.Keys.Surface];
+
+    private IBrush CreateFill(Color accent) => new SolidColorBrush(_contrast.Readable(accent, [Color.Parse(Palette.OnAccent)], ReadableAccentPalette.TextContrast));
 
     private Control Build()
     {
@@ -523,7 +524,6 @@ public sealed class StartView : UserControl
     private Control ModuleCard(ModuleIdentity identity)
     {
         var accentColor = Color.Parse(identity.AccentHex);
-        var accent = new SolidColorBrush(accentColor);
         var module = identity.Kind.ToString().ToLowerInvariant();
 
         var content = new StackPanel { Spacing = 2 };
@@ -571,10 +571,10 @@ public sealed class StartView : UserControl
         {
             Content = new Border
             {
-                Background = accent,
+                Background = CreateFill(accentColor),
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(_metrics.SpacingMedium + 4, _metrics.SpacingSmall),
-                Child = new TextBlock { Text = _texts["start.create"], FontSize = _metrics.FontSize, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White },
+                Child = new TextBlock { Text = _texts["start.create"], FontSize = _metrics.FontSize, FontWeight = FontWeight.SemiBold, Foreground = new SolidColorBrush(Color.Parse(Palette.OnAccent)) },
             },
             Background = Brushes.Transparent,
             BorderThickness = default,

@@ -90,7 +90,7 @@ public sealed class XlsxWriter
             new PartSection((part, sheet, context) => _drawings.Write(part, sheet, context.Workbook)),
             new PartSection((part, sheet, context) =>
             {
-                _comments.Write(part, sheet);
+                _comments.Write(part, sheet, IndexOf(context.Workbook, sheet));
                 var shapes = new XlsxVmlShapes(IndexOf(context.Workbook, sheet) + 1);
                 var controls = _controls.Assign(sheet, shapes);
                 _vml.Write(part, shapes, vml => _comments.Shapes(sheet, shapes).Concat(_signatures.Shapes(vml, sheet, shapes)).Concat(_controls.Shapes(sheet, controls, shapes)));

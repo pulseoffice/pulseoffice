@@ -11,9 +11,11 @@ public sealed class LedgerReviewSource : IReviewSource
     private readonly ILedgerChangeResolution _resolution;
     private readonly PulseOffice.Foundation.Review.IAuthorPalette _palette;
     private readonly ITextCatalog _texts;
+    private readonly PulseOffice.Foundation.Identity.IUserIdentity _identity;
 
-    public LedgerReviewSource(IActiveSheetContext context, ILedgerChangeResolution resolution, PulseOffice.Foundation.Review.IAuthorPalette palette, ITextCatalog texts)
+    public LedgerReviewSource(IActiveSheetContext context, ILedgerChangeResolution resolution, PulseOffice.Foundation.Review.IAuthorPalette palette, ITextCatalog texts, PulseOffice.Foundation.Identity.IUserIdentity identity)
     {
+        _identity = identity;
         _context = context;
         _resolution = resolution;
         _palette = palette;
@@ -24,7 +26,7 @@ public sealed class LedgerReviewSource : IReviewSource
     public event EventHandler? Changed;
 
     public ReviewAbilities Abilities => _context.Workbook is { } workbook
-        ? new ReviewAbilities(!workbook.Changes.IsProtected, true, false, false) { Edit = true }
+        ? new ReviewAbilities(!workbook.Changes.IsProtected, true, true, true) { Edit = true }
         : ReviewAbilities.None;
 
     public IReadOnlyList<ReviewItem> Changes
@@ -49,12 +51,23 @@ public sealed class LedgerReviewSource : IReviewSource
         {
             if (_context.Workbook is not { } workbook) return [];
             var all = workbook.Sheets.SelectMany((sheet, index) => sheet.Comments.OrderBy(pair => pair.Key).Select(pair => (Index: index, Address: pair.Key, Comment: pair.Value))).ToList();
-            var colors = _palette.For(all.Select(item => item.Comment.Author ?? string.Empty));
-            return [.. all.Select(item => new ReviewItem(Key(item.Index, item.Address), ReviewItemKind.Comment, item.Comment.Author ?? string.Empty, item.Comment.CreatedAt,
-                item.Comment.Text, colors[item.Comment.Author ?? string.Empty])
+            var colors = _palette.For(all.SelectMany(item => new[] { item.Comment.Author }.Concat(item.Comment.Replies.Select(reply => reply.Author))).Select(author => author ?? string.Empty));
+            return [.. all.SelectMany(item => new[]
             {
+                new ReviewItem(Key(item.Index, item.Address), ReviewItemKind.Comment, item.Comment.Author ?? string.Empty, item.Comment.CreatedAt,
+                    item.Comment.Text, colors[item.Comment.Author ?? string.Empty])
+                {
+                    Place = Place(workbook, item.Index, item.Address),
+                    Resolved = item.Comment.IsResolved,
+                },
+            }.Concat(item.Comment.Replies.Select((reply, position) => new ReviewItem(
+                Key(item.Index, item.Address) + "#" + position.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ReviewItemKind.Comment, reply.Author ?? string.Empty, reply.CreatedAt, reply.Text, colors[reply.Author ?? string.Empty])
+            {
+                Depth = 1,
                 Place = Place(workbook, item.Index, item.Address),
-            })];
+                Resolved = item.Comment.IsResolved,
+            })))];
         }
     }
 
@@ -71,7 +84,7 @@ public sealed class LedgerReviewSource : IReviewSource
             Select(change.SheetIndex, change.Address);
             return;
         }
-        if (Parse(id) is { } cell) Select(cell.Index, cell.Address);
+        if (Parse(Root(id)) is { } cell) Select(cell.Index, cell.Address);
     }
 
     public void Accept(IReadOnlyList<string> ids)
@@ -88,34 +101,51 @@ public sealed class LedgerReviewSource : IReviewSource
 
     public void Reply(string id, string text)
     {
+        if (text.Trim() is not { Length: > 0 } trimmed) return;
+        Change(id, "command.ledger.comment.edit.title", (comment, _) =>
+            comment with { Replies = [.. comment.Replies, new CommentReply { Text = trimmed, Author = _identity.Name }] });
     }
 
-    public void Edit(string id, string text)
+    public void Edit(string id, string text) => Change(id, "command.ledger.comment.edit.title", (comment, reply) => reply is { } position
+        ? position < comment.Replies.Count && !string.Equals(comment.Replies[position].Text, text, StringComparison.Ordinal)
+            ? comment with { Replies = [.. comment.Replies.Select((item, index) => index == position ? item with { Text = text } : item)] }
+            : comment
+        : string.Equals(comment.Text, text, StringComparison.Ordinal) ? comment : comment with { Text = text });
+
+    public void ToggleResolved(string id) =>
+        Change(id, "history.comment.resolve", (comment, _) => comment with { IsResolved = !comment.IsResolved });
+
+    private void Change(string id, string titleKey, Func<CellComment, int?, CellComment> change)
     {
-        if (_context.Workbook is not { } workbook || Parse(id) is not { } cell) return;
+        if (_context.Workbook is not { } workbook || Parse(Root(id)) is not { } cell) return;
         if (cell.Index >= workbook.Sheets.Count) return;
         var sheet = workbook.Sheets[cell.Index];
         if (sheet.Protection.IsEnabled || !sheet.Comments.TryGetValue(cell.Address, out var before)) return;
-        if (string.Equals(before.Text, text, StringComparison.Ordinal)) return;
-        var after = before with { Text = text };
+        var after = change(before, ReplyIndex(id));
+        if (ReferenceEquals(after, before)) return;
         void Set(CellComment comment)
         {
             sheet.Comments[cell.Address] = comment;
             _context.RequestRefresh();
         }
         Set(after);
-        _context.History?.Push(new DelegateAction(_texts["command.ledger.comment.edit.title"], redo: () => Set(after), undo: () => Set(before)));
+        _context.History?.Push(new DelegateAction(_texts[titleKey], redo: () => Set(after), undo: () => Set(before)));
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void ToggleResolved(string id)
-    {
-    }
+    private string Root(string id) => id.Split('#', 2)[0];
+
+    private int? ReplyIndex(string id) =>
+        id.Split('#', 2) is [_, var position] && int.TryParse(position, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var index) ? index : null;
 
     public void Delete(IReadOnlyList<string> ids)
     {
         if (_context.Workbook is not { } workbook) return;
-        var removed = ids.Select(Parse).OfType<(int Index, CellAddress Address)>()
+        foreach (var reply in ids.Where(id => ReplyIndex(id) is not null && !ids.Contains(Root(id))).OrderByDescending(id => ReplyIndex(id)))
+            Change(reply, "command.ledger.comment.delete.title", (comment, position) => position is { } index && index < comment.Replies.Count
+                ? comment with { Replies = [.. comment.Replies.Where((_, item) => item != index)] }
+                : comment);
+        var removed = ids.Where(id => ReplyIndex(id) is null).Select(Parse).OfType<(int Index, CellAddress Address)>()
             .Where(cell => cell.Index < workbook.Sheets.Count && !workbook.Sheets[cell.Index].Protection.IsEnabled && workbook.Sheets[cell.Index].Comments.ContainsKey(cell.Address))
             .Select(cell => (cell.Index, cell.Address, Comment: workbook.Sheets[cell.Index].Comments[cell.Address]))
             .ToList();

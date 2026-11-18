@@ -188,11 +188,32 @@ internal sealed class LedgerCellOperations(
             writer.WriteValidated(target, previous with { Formula = cell.Formula, Value = cell.Value });
         }
 
+        if (!sheet.Protection.IsEnabled) CopyComments(sheet, Fill.Comments(sheet, lanes.Source, lanes.Target, direction));
+
         selection.MoveTo(request.Target.Start);
         selection.ExtendTo(request.Target.End);
 
         grid.Refresh();
         status.Report(texts.Format("status.fill.done", produced.Count));
+    }
+
+    private void CopyComments(Worksheet sheet, IReadOnlyList<(CellAddress Address, CellComment? Comment)> comments)
+    {
+        if (comments.Count == 0) return;
+        var previous = comments.Select(pair => (pair.Address, Comment: sheet.Comments.GetValueOrDefault(pair.Address))).ToList();
+
+        void Set(IEnumerable<(CellAddress Address, CellComment? Comment)> values)
+        {
+            foreach (var (address, comment) in values)
+                if (comment is null) sheet.Comments.Remove(address);
+                else sheet.Comments[address] = comment;
+        }
+
+        Set(comments);
+        history.Push(new PulseOffice.Document.Commands.DelegateAction(
+            texts["history.fill"],
+            redo: () => Set(comments),
+            undo: () => Set(previous)));
     }
 
     private (CellRange Source, CellRange Target)? LanesInUse(Worksheet sheet, SheetGridView.FillRequest request, FillDirection direction)

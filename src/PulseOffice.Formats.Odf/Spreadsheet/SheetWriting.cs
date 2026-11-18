@@ -99,19 +99,6 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
     private XElement Paragraph(string text) => new(Namespaces.Text + "p", text);
 }
 
-internal sealed class OdsAnnotationBuilder(IOdfParagraphText paragraphs)
-{
-    public XElement Build(CellComment comment)
-    {
-        var annotation = new XElement(Namespaces.Office + "annotation",
-            new XAttribute(Namespaces.Office + "display", comment.IsAlwaysVisible ? "true" : "false"));
-        if (comment.Author is { Length: > 0 } author) annotation.Add(new XElement(Namespaces.Dc + "creator", author));
-        annotation.Add(new XElement(Namespaces.Dc + "date", comment.CreatedAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)));
-        annotation.Add(paragraphs.Paragraphs(comment.Text));
-        return annotation;
-    }
-}
-
 internal sealed class OutlineNesting
 {
     public IEnumerable<XElement> Nest(IReadOnlyList<XElement> elements, IReadOnlyList<OutlineGroup> groups, string groupName)

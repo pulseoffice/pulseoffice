@@ -266,6 +266,9 @@ public sealed class FolioFieldCommands(
             new ChoiceField(prefix + "restart", texts["folio.note.restart"],
                 footnote ? [texts["folio.note.restart.document"], texts["folio.note.restart.chapter"], texts["folio.note.restart.page"]] : [texts["folio.note.restart.document"], texts["folio.note.restart.chapter"]],
                 (int)settings.Restart),
+            new ChoiceField(prefix + "position", texts["folio.note.position"],
+                [.. Placements(footnote).Select(placement => texts[PlacementKey(placement)])],
+                Math.Max(0, Array.IndexOf(Placements(footnote), settings.Placement))),
         ];
         var tabs = new List<FormTab>
         {
@@ -278,6 +281,7 @@ public sealed class FolioFieldCommands(
             FormatName = _numberFormats[values.Choice(prefix + "format", _numberFormats.Count)],
             StartAt = (int)Math.Round(values.Number(prefix + "start", settings.StartAt)),
             Restart = (NoteNumbering)values.Choice(prefix + "restart", restarts),
+            Placement = Placements(prefix == "foot.")[values.Choice(prefix + "position", Placements(prefix == "foot.").Length, Math.Max(0, Array.IndexOf(Placements(prefix == "foot."), settings.Placement)))],
         };
         var footnotes = Read("foot.", notes.FootnoteSettings, 3);
         var endnotes = Read("end.", notes.EndnoteSettings, 2);
@@ -293,6 +297,18 @@ public sealed class FolioFieldCommands(
             recorder.Commit(editor.History);
         });
     }
+
+    private NotePlacement[] Placements(bool footnote) => footnote
+        ? [NotePlacement.PageBottom, NotePlacement.BelowText, NotePlacement.SectionEnd, NotePlacement.DocumentEnd]
+        : [NotePlacement.SectionEnd, NotePlacement.DocumentEnd];
+
+    private string PlacementKey(NotePlacement placement) => placement switch
+    {
+        NotePlacement.BelowText => "folio.note.position.belowText",
+        NotePlacement.SectionEnd => "folio.note.position.sectionEnd",
+        NotePlacement.DocumentEnd => "folio.note.position.documentEnd",
+        _ => "folio.note.position.pageBottom",
+    };
 
     private Task OpenLink()
     {

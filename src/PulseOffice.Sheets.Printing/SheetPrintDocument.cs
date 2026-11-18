@@ -43,8 +43,10 @@ public sealed class SheetPrintDocument : IPrintableDocument
         IObjectPathBuilder? paths = null,
         ISheetObjectImages? images = null,
         IJobPageNumbering? numbering = null,
-        ISheetCellTextPainter? cellText = null)
+        ISheetCellTextPainter? cellText = null,
+        ISheetCommentPrinter? comments = null)
     {
+        _comments = comments ?? new SheetCommentPrinter();
         _cellText = cellText ?? new SheetCellTextPainter();
         _numbering = numbering ?? new OwnPageNumbering(options?.Setup.FirstPageNumber);
         _images = images ?? new NoSheetObjectImages();
@@ -62,7 +64,14 @@ public sealed class SheetPrintDocument : IPrintableDocument
         _area = ResolvedArea();
         _scale = EffectiveScale();
         Paginate();
+        _commentPages = Setup.PrintComments == CommentPrinting.AtEnd && _sheet.Comments.Count > 0
+            ? _comments.EndPages(_sheet, Area, Setup.ContentArea)
+            : [];
     }
+
+    private readonly ISheetCommentPrinter _comments;
+
+    private readonly IReadOnlyList<IReadOnlyList<string>> _commentPages;
 
     private readonly double _scale = 1;
 
@@ -100,7 +109,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     public PageSetup Setup => _options.Setup;
 
-    public int PageCount => _pages.Count;
+    public int PageCount => _pages.Count + _commentPages.Count;
 
     public IReadOnlyList<SheetPage> Pages => _pages;
 
@@ -202,10 +211,18 @@ public sealed class SheetPrintDocument : IPrintableDocument
         ArgumentNullException.ThrowIfNull(canvas);
         ArgumentOutOfRangeException.ThrowIfNegative(index);
 
-        if (index >= _pages.Count) return;
+        if (index >= PageCount) return;
+
+        var numbered = _numbering.For(this, index);
+        if (index >= _pages.Count)
+        {
+            PaintBand(canvas, Setup.HeaderArea, Setup.HeaderOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Top);
+            PaintBand(canvas, Setup.FooterArea, Setup.FooterOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Bottom);
+            _comments.PaintEndPage(canvas, _commentPages[index - _pages.Count], Setup.ContentArea);
+            return;
+        }
 
         var page = _pages[index];
-        var numbered = _numbering.For(this, index);
 
         PaintBand(canvas, Setup.HeaderArea, Setup.HeaderOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Top);
         PaintBand(canvas, Setup.FooterArea, Setup.FooterOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Bottom);
@@ -272,6 +289,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
         }
 
         PaintObjects(canvas, page, rows, columns, rowTops, columnLefts, origin);
+
+        if (Setup.PrintComments == CommentPrinting.AsDisplayed) _comments.PaintDisplayed(canvas, _sheet, rowTops, columnLefts);
     }
 
     private DocumentPoint Centring(SheetPage page)

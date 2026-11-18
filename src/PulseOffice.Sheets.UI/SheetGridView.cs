@@ -354,6 +354,7 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
             _parts.Overlay.PaintViewAids(context, visible, lineBrush, foreground);
             _parts.ObjectsPainter.PaintObjects(context, _parts.Pointer.Gesture);
             _parts.ObjectsPainter.PaintFreeformOverlay(context, _parts.Pointer.Gesture);
+            _parts.Notes.PaintNotes(context);
             _parts.Overlay.PaintTraceArrows(context);
         }
 

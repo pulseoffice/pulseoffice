@@ -10,24 +10,32 @@ namespace PulseOffice.Formats.OpenXml;
 
 public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
 {
-    public void Write(WorksheetPart part, Sheet sheet)
+    private readonly XlsxThreadedComments _threads = new(new OoxmlTextEscape());
+    private readonly CommentBoxGeometry _geometry = new();
+
+    public void Write(WorksheetPart part, Sheet sheet, int sheetIndex)
     {
         if (sheet.Comments.Count == 0) return;
 
         var ordered = Ordered(sheet);
-        var authors = ordered.Select(pair => pair.Value.Author ?? string.Empty).Distinct(StringComparer.Ordinal).ToList();
+        string LegacyAuthor(CellComment comment, CellAddress address) =>
+            comment.IsThread ? XlsxThreadedComments.LegacyAuthorPrefix + _threads.ThreadId(sheetIndex, address) : comment.Author ?? string.Empty;
+        string LegacyText(CellComment comment) => comment.IsThread ? _threads.LegacyText(comment) : comment.Text;
+
+        var authors = ordered.Select(pair => LegacyAuthor(pair.Value, pair.Key)).Distinct(StringComparer.Ordinal).ToList();
         var authorIds = authors.Select((author, index) => (author, index)).ToDictionary(pair => pair.author, pair => (uint)pair.index, StringComparer.Ordinal);
 
         var commentsPart = part.AddNewPart<WorksheetCommentsPart>();
         commentsPart.Comments = new Comments(
             new Authors(authors.Select(author => new Author(author))),
             new CommentList(ordered.Select(pair => new Comment(
-                new CommentText(new Run(new DocumentFormat.OpenXml.Spreadsheet.Text(new OoxmlTextEscape().Encode(pair.Value.Text)) { Space = DocumentFormat.OpenXml.SpaceProcessingModeValues.Preserve })))
+                new CommentText(new Run(new DocumentFormat.OpenXml.Spreadsheet.Text(new OoxmlTextEscape().Encode(LegacyText(pair.Value))) { Space = DocumentFormat.OpenXml.SpaceProcessingModeValues.Preserve })))
             {
                 Reference = pair.Key.ToA1(),
-                AuthorId = authorIds[pair.Value.Author ?? string.Empty],
+                AuthorId = authorIds[LegacyAuthor(pair.Value, pair.Key)],
             })));
         commentsPart.Comments.Save();
+        _threads.Write(part, sheet, sheetIndex);
     }
 
     public void Read(WorksheetPart part, Sheet sheet)
@@ -35,40 +43,61 @@ public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
         if (part.WorksheetCommentsPart?.Comments is not { } comments) return;
 
         var authors = comments.Authors?.Elements<Author>().Select(author => author.Text).ToList() ?? [];
-        var visible = VisibleNotes(part);
+        var notes = Notes(part, sheet);
         foreach (var comment in comments.CommentList?.Elements<Comment>() ?? [])
         {
             if (comment.Reference?.Value is not { } reference || !CellAddress.TryParseA1(reference, out var address)) continue;
 
             var index = comment.AuthorId?.Value ?? 0;
             var author = index < (uint)authors.Count && !string.IsNullOrWhiteSpace(authors[(int)index]) ? authors[(int)index] : null;
+            if (author?.StartsWith(XlsxThreadedComments.LegacyAuthorPrefix, StringComparison.Ordinal) == true) author = null;
+            var note = notes.GetValueOrDefault(address);
             sheet.Comments[address] = new CellComment
             {
                 Text = WithoutAuthorHeading(Text(comment.CommentText), author),
                 Author = author,
-                IsAlwaysVisible = visible.Contains(address),
+                IsAlwaysVisible = note.Visible,
+                Box = note.Box,
             };
         }
     }
 
-    private HashSet<CellAddress> VisibleNotes(WorksheetPart part)
+    private Dictionary<CellAddress, (bool Visible, CommentBox? Box)> Notes(WorksheetPart part, Sheet sheet)
     {
-        var excel = System.Xml.Linq.XNamespace.Get("urn:schemas-microsoft-com:office:excel");
-        var result = new HashSet<CellAddress>();
+        var excel = XNamespace.Get("urn:schemas-microsoft-com:office:excel");
+        var result = new Dictionary<CellAddress, (bool Visible, CommentBox? Box)>();
 
         foreach (var document in documents.Load(part))
         {
             foreach (var data in document.Descendants(excel + "ClientData"))
             {
-                if (data.Attribute("ObjectType")?.Value != "Note" || data.Element(excel + "Visible") is null) continue;
+                if (data.Attribute("ObjectType")?.Value != "Note") continue;
                 if (int.TryParse(data.Element(excel + "Row")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var row)
                     && int.TryParse(data.Element(excel + "Column")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var column)
-                    && row >= 0 && column >= 0)
-                    result.Add(new CellAddress(row, column));
+                    && row >= 0 && column >= 0 && row < CellAddress.MaxRows && column < CellAddress.MaxColumns)
+                {
+                    var address = new CellAddress(row, column);
+                    var box = Anchor(data.Element(excel + "Anchor")?.Value) is { } anchor
+                        ? _geometry.Relative(sheet.Layout, address, _geometry.FromAnchor(sheet.Layout, anchor))
+                        : null;
+                    result[address] = (data.Element(excel + "Visible") is not null, box);
+                }
             }
         }
 
         return result;
+    }
+
+    private NoteAnchor? Anchor(string? text)
+    {
+        if (text is null) return null;
+        var parts = text.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length != 8) return null;
+        var values = new int[8];
+        for (var index = 0; index < 8; index++)
+            if (!int.TryParse(parts[index], NumberStyles.Integer, CultureInfo.InvariantCulture, out values[index]) || values[index] < 0) return null;
+        if (values[0] >= CellAddress.MaxColumns || values[4] >= CellAddress.MaxColumns || values[2] >= CellAddress.MaxRows || values[6] >= CellAddress.MaxRows) return null;
+        return new NoteAnchor(values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7]);
     }
 
     private string WithoutAuthorHeading(string text, string? author)
@@ -97,10 +126,12 @@ public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
         foreach (var (address, comment) in ordered)
         {
             var visible = comment.IsAlwaysVisible;
+            var bounds = _geometry.Bounds(sheet.Layout, address, comment.Box);
+            var anchor = _geometry.Anchor(sheet.Layout, bounds);
             yield return new XElement(shapes.Vml + "shape",
                 new XAttribute("id", shapes.Next()),
                 new XAttribute("type", "#_x0000_t202"),
-                new XAttribute("style", $"position:absolute;margin-left:80pt;margin-top:2pt;width:108pt;height:60pt;z-index:1;visibility:{(visible ? "visible" : "hidden")}"),
+                new XAttribute("style", string.Create(CultureInfo.InvariantCulture, $"position:absolute;margin-left:{bounds.X:0.##}pt;margin-top:{bounds.Y:0.##}pt;width:{bounds.Width:0.##}pt;height:{bounds.Height:0.##}pt;z-index:1;visibility:{(visible ? "visible" : "hidden")}")),
                 new XAttribute("fillcolor", "#ffffe1"),
                 new XAttribute(shapes.Office + "insetmode", "auto"),
                 new XElement(shapes.Vml + "fill", new XAttribute("color2", "#ffffe1")),
@@ -110,7 +141,7 @@ public sealed class XlsxCommentMapper(XlsxVmlDocuments documents)
                 new XElement(shapes.Excel + "ClientData", new XAttribute("ObjectType", "Note"),
                     new XElement(shapes.Excel + "MoveWithCells"),
                     new XElement(shapes.Excel + "SizeWithCells"),
-                    new XElement(shapes.Excel + "Anchor", string.Create(CultureInfo.InvariantCulture, $"{address.Column + 1}, 15, {address.Row}, 2, {address.Column + 3}, 15, {address.Row + 4}, 16")),
+                    new XElement(shapes.Excel + "Anchor", string.Create(CultureInfo.InvariantCulture, $"{anchor.LeftColumn}, {anchor.LeftOffset}, {anchor.TopRow}, {anchor.TopOffset}, {anchor.RightColumn}, {anchor.RightOffset}, {anchor.BottomRow}, {anchor.BottomOffset}")),
                     new XElement(shapes.Excel + "AutoFill", "False"),
                     new XElement(shapes.Excel + "Row", address.Row.ToString(CultureInfo.InvariantCulture)),
                     new XElement(shapes.Excel + "Column", address.Column.ToString(CultureInfo.InvariantCulture)),

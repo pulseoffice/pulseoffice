@@ -60,7 +60,8 @@ public sealed class SettingsService : ISettingsService
         IEnumerable<ISettingsProvider> providers,
         IEnumerable<ISettingsStore> stores,
         ITextCatalog texts,
-        ILogger<SettingsService> logger)
+        ILogger<SettingsService> logger,
+        ISettingsChangeDispatch? dispatch = null)
     {
         ArgumentNullException.ThrowIfNull(providers);
         ArgumentNullException.ThrowIfNull(stores);
@@ -75,6 +76,18 @@ public sealed class SettingsService : ISettingsService
                     throw new InvalidOperationException($"Duplicate setting: '{definition.Key}'.");
 
         _stores = [.. stores.OrderBy(s => SettingScopes.Precedence(s.Scope))];
+        _dispatch = dispatch ?? new InlineSettingsChangeDispatch();
+        foreach (var reloading in _stores.OfType<IReloadingSettingsStore>())
+            reloading.Reloaded += (_, args) => _dispatch.Post(() => NotifyReloaded(args.Keys));
+    }
+
+    private readonly ISettingsChangeDispatch _dispatch;
+
+    private void NotifyReloaded(IReadOnlyList<string> keys)
+    {
+        foreach (var key in keys)
+            if (_definitions.ContainsKey(key))
+                Changed?.Invoke(this, new SettingChangedEventArgs(key, Resolve(key), EffectiveScope(key)));
     }
 
     public IReadOnlyCollection<SettingDefinition> Definitions => _definitions.Values;

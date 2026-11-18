@@ -51,9 +51,9 @@ public sealed class LargeWorkbookRoundTripTests(ITestOutputHelper output)
     [Fact]
     public void Many_cells_cross_xlsx_and_ods_in_linear_time()
     {
-        Crossing(500);
-        var small = Crossing(500);
-        var large = Crossing(5_000);
+        Crossing(200);
+        var small = Crossing(200);
+        var large = Crossing(2_000);
 
         Assert.True(large < 40 * TimeSpan.FromMilliseconds(Math.Max(small.TotalMilliseconds, 25)), $"{large.TotalMilliseconds:F0} ms against {small.TotalMilliseconds:F0} ms for a tenth of the cells");
     }

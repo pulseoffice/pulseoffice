@@ -93,7 +93,7 @@ public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITracked
         inner.RemoveObject(document, history, objectId);
 
     public DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId) =>
-        inner.RemoveNote(document, history, noteId);
+        document.Changes.IsRecording ? tracked.RemoveNote(document, history, noteId, author.Sign()) : inner.RemoveNote(document, history, noteId);
 
     public DocumentEdit ChangeObject(TextDocument document, UndoStack history, string objectId, Action<AnchoredObject> change, DocumentPosition? markAt = null) =>
         inner.ChangeObject(document, history, objectId, change, markAt);

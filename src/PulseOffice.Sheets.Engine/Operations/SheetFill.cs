@@ -20,6 +20,8 @@ public interface ISheetFill
     IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 
     FillMergePlan Merges(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
+
+    IReadOnlyList<(CellAddress Address, CellComment? Comment)> Comments(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 }
 
 public sealed class SheetFill : ISheetFill
@@ -56,6 +58,36 @@ public sealed class SheetFill : ISheetFill
                 visible++;
                 var fill = new FillStep(seed, visible, address, axis.Origin(source, lane, visible), axis.Backwards);
                 result.Add((address, _rules.Select(rule => rule.Produce(fill)).First(cell => cell is not null)!));
+            }
+        }
+
+        return result;
+    }
+
+    public IReadOnlyList<(CellAddress Address, CellComment? Comment)> Comments(
+        Worksheet sheet, CellRange source, CellRange target, FillDirection direction)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+
+        var axis = _axes[direction];
+        var result = new List<(CellAddress, CellComment?)>();
+        var steps = axis.Steps(source, target);
+
+        for (var lane = 0; lane < axis.Lanes(source); lane++)
+        {
+            var seed = axis.Seed(source, lane).Select(address => sheet.Comments.GetValueOrDefault(address)).ToList();
+            if (seed.Count == 0) continue;
+
+            var visible = 0;
+            for (var position = 1; position <= steps; position++)
+            {
+                var address = axis.Target(source, lane, position);
+                if (!address.IsValid || axis.Hidden(sheet, address)) continue;
+
+                visible++;
+                var index = (visible - 1) % seed.Count;
+                var comment = seed[axis.Backwards ? seed.Count - 1 - index : index];
+                if (!Equals(sheet.Comments.GetValueOrDefault(address), comment)) result.Add((address, comment));
             }
         }
 

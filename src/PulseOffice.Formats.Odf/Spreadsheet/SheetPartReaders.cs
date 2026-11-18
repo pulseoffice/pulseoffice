@@ -94,27 +94,6 @@ internal sealed class AltTextPartReader(OdfAltTextMapper altText) : IOdsSheetPar
     }
 }
 
-internal sealed class CommentPartReader(TableCells cells, IOdfParagraphText paragraphs) : IOdsSheetPartReader
-{
-    public void Read(XElement table, Worksheet sheet, OdsReadContext context)
-    {
-        foreach (var cell in cells.In(table))
-        {
-            if (cell.Element.Element(Namespaces.Office + "annotation") is not { } annotation) continue;
-
-            var text = paragraphs.Read(annotation);
-            if (text.Length > 0)
-                sheet.Comments[cell.Address] = new CellComment
-                {
-                    Text = text,
-                    Author = annotation.Element(Namespaces.Dc + "creator")?.Value,
-                    IsAlwaysVisible = annotation.Attribute(Namespaces.Office + "display")?.Value == "true",
-                    CreatedAt = DateTimeOffset.TryParse(annotation.Element(Namespaces.Dc + "date")?.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created) ? created : DateTimeOffset.Now,
-                };
-        }
-    }
-}
-
 internal sealed class ArrayFormulaPartReader(TableCells cells, TableRows rows) : IOdsSheetPartReader
 {
     private readonly OdfDynamicArrays _dynamicArrays = new();

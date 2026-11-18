@@ -121,9 +121,12 @@ public sealed class CommentsRound113Tests
         var comment = result.Value!.Sheets[0].Comments[new CellAddress(0, 0)];
 
         Assert.Equal("Ada Lovelace", comment.Author);
-        Assert.Equal("Domanda\nCharles: Risposta\nCharles: Sé stesso", comment.Text);
+        Assert.Equal("Domanda", comment.Text);
+        Assert.Equal(["Risposta", "Sé stesso"], comment.Replies.Select(reply => reply.Text));
+        Assert.All(comment.Replies, reply => Assert.Equal("Charles", reply.Author));
+        Assert.True(comment.IsResolved);
         Assert.Equal(new DateTimeOffset(2026, 11, 7, 10, 30, 0, TimeSpan.Zero), comment.CreatedAt);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "XLSX235");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "XLSX235");
     }
 
     [Fact]

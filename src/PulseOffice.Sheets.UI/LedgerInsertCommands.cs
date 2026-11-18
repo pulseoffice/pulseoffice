@@ -117,6 +117,8 @@ public sealed class LedgerInsertCommands(
             Text = cell.Value.ToString(),
             Places = Places(workbook),
             CanRemove = cell.Hyperlink is not null,
+            ShowsTip = true,
+            Tip = cell.HyperlinkTip,
         };
 
         if (await hyperlinks.AskAsync(request, ct).ConfigureAwait(true) is not { } choice) return;
@@ -127,11 +129,13 @@ public sealed class LedgerInsertCommands(
         sheet[address] = choice.Remove
             ? cell with { Hyperlink = null, HyperlinkTip = null }
             : textChanged
-                ? cell with { Value = CellValue.Text(choice.Text), Formula = null, Hyperlink = choice.Address }
-                : cell with { Hyperlink = choice.Address };
+                ? cell with { Value = CellValue.Text(choice.Text), Formula = null, Hyperlink = choice.Address, HyperlinkTip = Tip(choice) }
+                : cell with { Hyperlink = choice.Address, HyperlinkTip = Tip(choice) };
 
         Record(texts["command.ledger.insert.hyperlink.title"], sheet, address, previous);
     }
+
+    private string? Tip(LinkChoice choice) => choice.Tip is { Length: > 0 } tip ? tip : null;
 
     private IReadOnlyList<LinkPlace> Places(Workbook workbook)
     {

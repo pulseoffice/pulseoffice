@@ -66,7 +66,10 @@ internal static class SettingsComposition
             SettingScope.User,
             paths.SettingsFile,
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILoggerFactory>().CreateLogger<JsonSettingsStore>()));
+            provider.GetRequiredService<ILoggerFactory>().CreateLogger<JsonSettingsStore>(),
+            provider.GetRequiredService<ISettingsFileMonitor>()));
+        services.AddSingleton<ISettingsFileMonitor, FileSystemSettingsFileMonitor>();
+        services.AddSingleton<ISettingsChangeDispatch, UiThreadSettingsChangeDispatch>();
         services.AddSingleton<ISettingsStore>(_ => new InMemorySettingsStore(SettingScope.Document));
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<PulseOffice.Settings.Navigation.ISettingsPageBuilder, PulseOffice.Settings.Navigation.SettingsPageBuilder>();

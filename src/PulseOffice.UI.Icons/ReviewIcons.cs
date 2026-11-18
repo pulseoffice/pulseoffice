@@ -13,6 +13,7 @@ public sealed class ReviewIcons() : DictionaryIconCatalog(Shapes)
         ("ledger.spelling.languageSelection", "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c2.5 3 2.5 15 0 18 M12 3c-2.5 3-2.5 15 0 18 M4 7h16"),
         ("ledger.spelling.languageAll", "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c2.5 3 2.5 15 0 18 M12 3c-2.5 3-2.5 15 0 18"),
         ("ledger.comment.showAll", "M4 5h16v11H9l-4 4v-4H4z M8 10h8"),
+        ("ledger.comment.toggleShown", "M4 5h16v11H9l-4 4v-4H4z M9 10.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0"),
         ("ledger.comment.hideAll", "M4 5h16v11H9l-4 4v-4H4z M3 3l18 18"),
         ("ledger.comment.deleteAll", "M4 4h13v10H9l-4 4v-4H4z M14 16l6 6 M20 16l-6 6"),
         ("ledger.changes.record", "M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12z M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"),

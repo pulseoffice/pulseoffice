@@ -26,6 +26,8 @@ public interface ITrackedEditing
     DocumentEdit ReplaceText(TextDocument document, UndoStack history, DocumentRange range, string description, Func<string, string> transform, RevisionSignature signature);
 
     DocumentEdit Paragraphs(TextDocument document, UndoStack history, DocumentRange range, RevisionSignature signature, Func<DocumentEdit> apply);
+
+    DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId, RevisionSignature signature);
 }
 
 public sealed class TrackedEditing(
@@ -104,6 +106,23 @@ public sealed class TrackedEditing(
         DocumentEdit? last = null;
         for (var index = pieces.Count - 1; index >= 0; index--) last = DeletePiece(document, history, pieces[index], signature);
         return last!;
+    }
+
+    public DocumentEdit RemoveNote(TextDocument document, UndoStack history, string noteId, RevisionSignature signature)
+    {
+        var paragraph = stories.Paragraphs(document).FirstOrDefault(candidate => candidate.Marks.OfType<NoteMark>().Any(mark => mark.NoteId == noteId));
+        if (paragraph is null || document.Notes.Find(noteId) is null) return inner.RemoveNote(document, history, noteId);
+        var reference = paragraph.Marks.OfType<NoteMark>().First(mark => mark.NoteId == noteId);
+        var at = new DocumentPosition(paragraph.Id, reference.Offset);
+        var map = regions.Map(document);
+        var covering = map.Regions.Where(region => region.Change is Insertion && map.Covers(region, at, at)).Select(region => region.Change).ToList();
+        if (covering.Any(change => change.Author == signature.Author)) return inner.RemoveNote(document, history, noteId);
+        var recorder = new EditRecorder(document, "track-note-deletion");
+        var held = new ParagraphBlock(document.NextId("p"), new TextParagraph(string.Empty) { StyleName = paragraph.Content.StyleName }) { Marks = [new NoteMark(0, noteId)] };
+        recorder.Touch(paragraph);
+        paragraph.State = paragraph.State with { Marks = [.. paragraph.Marks.Where(mark => !ReferenceEquals(mark, reference))] };
+        marking.AddDeletion(document, recorder, at, new BlockContainer([held]), signature, covering.FirstOrDefault()?.Id);
+        return recorder.Commit(history);
     }
 
     private List<DocumentRange> Pieces(ChangeMap map, DocumentRange range)

@@ -72,7 +72,7 @@ public sealed class ReadableAccentPalette(IColorContrast contrast) : IAccentPale
         var surfaces = Palette.Backgrounds.Select(key => backgrounds[key]).ToList();
         var level = variant == PaletteVariant.HighContrast ? HighContrastText : TextContrast;
         return new AccentShades(
-            contrast.Readable(brand, [Colors.White], TextContrast),
+            contrast.Readable(brand, [Color.Parse(Palette.OnAccent)], TextContrast),
             contrast.Readable(brand, surfaces, level));
     }
 }

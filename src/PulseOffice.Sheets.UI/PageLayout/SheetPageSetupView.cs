@@ -353,6 +353,19 @@ public sealed class SheetPageSetupView
         var print = layout.AddSection(_texts["page.section.print"]);
         print.Add(null, Check(_texts["page.printGridLines"], _setup.PrintGridLines, value => Change(_setup with { PrintGridLines = value })), DialogRowKind.Indented);
         print.Add(null, Check(_texts["page.printHeadings"], _setup.PrintHeadings, value => Change(_setup with { PrintHeadings = value })), DialogRowKind.Indented);
+        CommentPrinting[] commentChoices = [CommentPrinting.None, CommentPrinting.AtEnd, CommentPrinting.AsDisplayed];
+        var comments = new ComboBox
+        {
+            ItemsSource = new[] { _texts["page.printComments.none"], _texts["page.printComments.atEnd"], _texts["page.printComments.asDisplayed"] },
+            SelectedIndex = Math.Max(Array.IndexOf(commentChoices, _setup.PrintComments), 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        Avalonia.Automation.AutomationProperties.SetName(comments, _texts["page.printComments"]);
+        comments.SelectionChanged += (_, _) =>
+        {
+            if (comments.SelectedIndex >= 0) Change(_setup with { PrintComments = commentChoices[comments.SelectedIndex] });
+        };
+        print.Add(_texts["page.printComments"], comments, editorWidth: 240);
 
         var order = layout.AddSection(_texts["page.section.order"]);
         var choice = new IconChoiceGroup(

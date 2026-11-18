@@ -49,6 +49,7 @@ internal sealed record SheetGridParts(
     GridCellPainter Cells,
     GridOverlayPainter Overlay,
     GridObjectPainter ObjectsPainter,
+    GridNotePainter Notes,
     GridPointerInput Pointer,
     GridKeyboardInput Keyboard);
 
@@ -102,6 +103,6 @@ internal sealed class SheetGridPartsFactory
 
         return new SheetGridParts(
             viewport, notifications, services, options, objects, drawing,
-            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, pointer, keyboard);
+            new GridHeaderPainter(viewport, selection, new OutlineGutterPainter(viewport)), cells, overlay, objectPainter, new GridNotePainter(viewport, theme), pointer, keyboard);
     }
 }

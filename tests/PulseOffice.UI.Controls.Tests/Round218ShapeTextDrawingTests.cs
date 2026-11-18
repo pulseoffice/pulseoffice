@@ -39,7 +39,7 @@ public sealed class Round218ShapeTextDrawingTests
         var inner = new Rect(0, 0, 210, 100);
         Assert.Equal(100, _columns.Width(inner, 2, 10));
 
-        var placed = _columns.Place(inner, 2, 10, 30, 150);
+        var placed = _columns.Place(inner, 2, 10, [.. Enumerable.Range(0, 5).Select(i => new ShapeTextLine(i * 30, i * 30 + 30))]);
 
         Assert.Equal(2, placed.Count);
         Assert.Equal(new Rect(0, 0, 100, 90), placed[0].Clip);
@@ -51,7 +51,7 @@ public sealed class Round218ShapeTextDrawingTests
     [Fact]
     public void Short_shape_text_uses_one_column()
     {
-        Assert.Single(_columns.Place(new Rect(0, 0, 210, 100), 3, 10, 20, 40));
+        Assert.Single(_columns.Place(new Rect(0, 0, 210, 100), 3, 10, [new ShapeTextLine(0, 20), new ShapeTextLine(20, 40)]));
     }
 
     [Fact]

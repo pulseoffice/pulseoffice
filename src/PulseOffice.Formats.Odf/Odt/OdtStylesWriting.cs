@@ -70,7 +70,7 @@ internal sealed class OdtStylesWriter(
         foreach (var page in document.Styles.Page.All)
         {
             var layoutName = "pm" + (++index).ToString(CultureInfo.InvariantCulture);
-            automatic.Add(Layout(layoutName, page));
+            automatic.Add(Layout(layoutName, page, document.Notes.FootnoteSeparator));
 
             var master = new XElement(Style + "master-page",
                 new XAttribute(Style + "name", names.Encode(page.Name)),
@@ -131,7 +131,7 @@ internal sealed class OdtStylesWriter(
         return element;
     }
 
-    private XElement Layout(string name, PageStyle page)
+    private XElement Layout(string name, PageStyle page, NoteSeparator separator)
     {
         var properties = new XElement(Style + "page-layout-properties",
             new XAttribute(Fo + "page-width", measure.Length(page.Width)),
@@ -148,6 +148,14 @@ internal sealed class OdtStylesWriter(
         if (page.Background is { } background) properties.Add(new XAttribute(Fo + "background-color", measure.Fill(background)));
         if (page.Borders is { } box) borders.Write(properties, box);
         if (page.Columns.Count > 1 || page.Columns.Separator) properties.Add(columns.Write(page.Columns));
+        properties.Add(new XElement(Style + "footnote-sep",
+            new XAttribute(Style + "width", measure.Points(separator.Thickness)),
+            new XAttribute(Style + "rel-width", (separator.RelativeLength * 100).ToString("0.##", CultureInfo.InvariantCulture) + "%"),
+            new XAttribute(Style + "color", "#000000"),
+            new XAttribute(Style + "line-style", separator.Thickness > 0 ? "solid" : "none"),
+            new XAttribute(Style + "adjustment", "left"),
+            new XAttribute(Style + "distance-before-sep", measure.Points(separator.SpaceBefore)),
+            new XAttribute(Style + "distance-after-sep", measure.Points(separator.SpaceAfter))));
 
         return new XElement(Style + "page-layout",
             new XAttribute(Style + "name", name),
@@ -294,7 +302,15 @@ internal sealed class OdtStylesWriter(
             new XAttribute(Text + "start-numbering-at", vocabulary.Restart.Token(settings.Restart)),
             settings.CitationStyleName is { } citation ? new XAttribute(Text + "citation-style-name", names.Encode(citation)) : null,
             settings.ParagraphStyleName is { } paragraph ? new XAttribute(Text + "default-style-name", names.Encode(paragraph)) : null,
-            kind == NoteKind.Footnote ? new XAttribute(Text + "footnotes-position", "page") : null,
+            kind == NoteKind.Footnote ? new XAttribute(Text + "footnotes-position", FootnotesPosition(settings.Placement)) : null,
             settings.ContinuationForward is { } forward ? new XElement(Text + "note-continuation-notice-forward", forward) : null,
             settings.ContinuationBackward is { } backward ? new XElement(Text + "note-continuation-notice-backward", backward) : null);
+
+    private string FootnotesPosition(NotePlacement placement) => placement switch
+    {
+        NotePlacement.BelowText => "text",
+        NotePlacement.SectionEnd => "section",
+        NotePlacement.DocumentEnd => "document",
+        _ => "page",
+    };
 }

@@ -117,6 +117,7 @@ internal sealed class OdsRowCompactor(TableRows rows)
     private static readonly XName Covered = Namespaces.Table + "covered-table-cell";
     private static readonly XName Paragraph = Namespaces.Text + "p";
     private static readonly XName ColumnsRepeated = Namespaces.Table + "number-columns-repeated";
+    private static readonly XName Annotation = Namespaces.Office + "annotation";
 
     private static readonly HashSet<XName> ValueAttributes =
     [
@@ -160,5 +161,5 @@ internal sealed class OdsRowCompactor(TableRows rows)
 
     private bool Plain(XElement cell) =>
         cell.Attributes().All(attribute => ValueAttributes.Contains(attribute.Name))
-        && cell.Elements().All(child => child.Name == Paragraph);
+        && cell.Elements().All(child => child.Name == Paragraph && !child.Descendants(Annotation).Any());
 }

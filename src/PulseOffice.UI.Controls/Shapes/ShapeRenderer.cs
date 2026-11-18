@@ -37,6 +37,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly IShapeListText _listText;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
     private readonly ShapeTextColumns _columns = new();
+    private readonly FormattedShapeTextLines _lines = new();
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -376,8 +377,7 @@ public sealed class ShapeRenderer : IShapeRenderer
         {
             if (columns > 1)
             {
-                var line = new FormattedText("Ag", System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, size, brush).Height;
-                foreach (var column in _columns.Place(inner, columns, layout.ColumnSpacing, line, text.Height))
+                foreach (var column in _columns.Place(inner, columns, layout.ColumnSpacing, _lines.Measure(text, content)))
                     using (context.PushClip(column.Clip))
                         context.DrawText(text, column.Origin);
                 return;
@@ -389,6 +389,16 @@ public sealed class ShapeRenderer : IShapeRenderer
                 TextVerticalPlacement.Bottom => inner.Bottom - text.Height,
                 _ => bounds.Y + (bounds.Height - text.Height) / 2,
             };
+            if (layout.LinesLeftToRight && !stacked)
+            {
+                foreach (var band in _lines.Measure(text, content))
+                {
+                    var top = y + text.Height - band.Bottom;
+                    using (context.PushClip(new Rect(bounds.X, top, bounds.Width, band.Bottom - band.Top)))
+                        context.DrawText(text, new Point(inner.X, top - band.Top));
+                }
+                return;
+            }
             context.DrawText(text, new Point(inner.X, y));
         }
     }
