@@ -136,7 +136,7 @@ public sealed class FolioLiveAuditTests
     {
         var scene = new FolioScene();
         scene.Type("Prova");
-        var tables = new AnsweringTablePrompt(new PulseOffice.UI.Controls.Tables.Insert.TableInsertChoice(2, 2, new PulseOffice.Document.Tables.TableStylePresets().All[2], true, true));
+        var tables = new AnsweringTablePrompt(new PulseOffice.UI.Controls.Tables.Insert.TableInsertChoice(2, 2, new PulseOffice.Document.Tables.TableStylePresets().All[2], true, PulseOffice.Document.Tables.TableBanding.Standard));
         var insert = new FolioInsertCommands(scene.Services.GetRequiredService<IActiveFolioContext>(), null!, null!, null!, null!, tables, scene.Services.GetRequiredService<IFolioTableLooks>(), new PulseOffice.Localization.TextCatalog(), null!, null!, new PulseOffice.Foundation.Identity.SystemUserIdentity()).GetCommands()
             .Single(command => command.Id.Value == "folio.insert.table");
 
@@ -156,7 +156,7 @@ public sealed class FolioLiveAuditTests
     {
         var scene = new FolioScene();
         scene.Type("Prova");
-        var tables = new AnsweringTablePrompt(new PulseOffice.UI.Controls.Tables.Insert.TableInsertChoice(2, 2, new PulseOffice.Document.Tables.TableStylePresets().All[0], true, true));
+        var tables = new AnsweringTablePrompt(new PulseOffice.UI.Controls.Tables.Insert.TableInsertChoice(2, 2, new PulseOffice.Document.Tables.TableStylePresets().All[0], true, PulseOffice.Document.Tables.TableBanding.Standard));
         var insert = new FolioInsertCommands(scene.Services.GetRequiredService<IActiveFolioContext>(), null!, null!, null!, null!, tables, scene.Services.GetRequiredService<IFolioTableLooks>(), new PulseOffice.Localization.TextCatalog(), null!, null!, new PulseOffice.Foundation.Identity.SystemUserIdentity()).GetCommands()
             .Single(command => command.Id.Value == "folio.insert.table");
         Assert.IsType<PulseOffice.UI.Commands.TableGridSpec>(insert.RibbonControl);

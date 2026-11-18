@@ -68,37 +68,12 @@ public sealed class DocxListMap
     public string? NameOf(int? id) => id is { } key && _names.TryGetValue(key, out var name) ? name : null;
 }
 
-public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pictures)
+public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pictures, DocxNumberFormats formats)
 {
     public const int WordLevels = 9;
     private const int LargestStart = 32_767;
     private const string AbstractThread = "docx-abstract-";
     private const string InstanceThread = "docx-num-";
-
-    private readonly IReadOnlyDictionary<NumberFormat, W.NumberFormatValues> _formats = new Dictionary<NumberFormat, W.NumberFormatValues>
-    {
-        [NumberFormat.None] = W.NumberFormatValues.None,
-        [NumberFormat.Bullet] = W.NumberFormatValues.Bullet,
-        [NumberFormat.Arabic] = W.NumberFormatValues.Decimal,
-        [NumberFormat.LowerLetter] = W.NumberFormatValues.LowerLetter,
-        [NumberFormat.UpperLetter] = W.NumberFormatValues.UpperLetter,
-        [NumberFormat.LowerRoman] = W.NumberFormatValues.LowerRoman,
-        [NumberFormat.UpperRoman] = W.NumberFormatValues.UpperRoman,
-        [NumberFormat.DecimalZero] = W.NumberFormatValues.DecimalZero,
-        [NumberFormat.Ordinal] = W.NumberFormatValues.Ordinal,
-        [NumberFormat.OrdinalText] = W.NumberFormatValues.OrdinalText,
-        [NumberFormat.CardinalText] = W.NumberFormatValues.CardinalText,
-        [NumberFormat.Hebrew] = W.NumberFormatValues.Hebrew1,
-        [NumberFormat.ArabicAbjad] = W.NumberFormatValues.ArabicAbjad,
-        [NumberFormat.ArabicAlpha] = W.NumberFormatValues.ArabicAlpha,
-        [NumberFormat.Katakana] = W.NumberFormatValues.AiueoFullWidth,
-        [NumberFormat.KatakanaIroha] = W.NumberFormatValues.IrohaFullWidth,
-        [NumberFormat.IdeographDigital] = W.NumberFormatValues.IdeographDigital,
-        [NumberFormat.ChineseCounting] = W.NumberFormatValues.ChineseCounting,
-        [NumberFormat.ThaiLetters] = W.NumberFormatValues.ThaiLetters,
-        [NumberFormat.RussianLower] = W.NumberFormatValues.RussianLower,
-        [NumberFormat.RussianUpper] = W.NumberFormatValues.RussianUpper,
-    };
 
     private readonly IReadOnlyDictionary<NumberFormat, string> _customs = new Dictionary<NumberFormat, string>
     {
@@ -242,7 +217,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
     private W.NumberingFormat Numbering(NumberFormat format) =>
         _customs.TryGetValue(format, out var custom)
             ? new W.NumberingFormat { Val = W.NumberFormatValues.Custom, Format = custom }
-            : new W.NumberingFormat { Val = _formats.TryGetValue(format, out var known) ? known : W.NumberFormatValues.Decimal };
+            : new W.NumberingFormat { Val = formats.TryWord(format, out var known) ? known : W.NumberFormatValues.Decimal };
 
     private NumberFormat? FormatOf(W.NumberingFormat? element)
     {
@@ -254,9 +229,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
                 if (pattern.Length > 0 && custom.StartsWith(pattern[..1], StringComparison.Ordinal)) return format;
             return null;
         }
-        foreach (var (format, known) in _formats)
-            if (known == value) return format;
-        return null;
+        return formats.Model(value);
     }
 
     public bool LosesPictures(W.Numbering? numbering) =>

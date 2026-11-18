@@ -50,6 +50,10 @@ public sealed class FolioObjectLinkCommands(IActiveFolioContext context, IFolioO
             CanRemove = current is not null,
         };
         if (await prompt.AskAsync(request, ct).ConfigureAwait(true) is not { } choice || Editor is not { } after || !ReferenceEquals(after, editor)) return;
-        editor.Change(() => objectLinks.Set(editor, target, choice.Remove ? null : choice.Address));
+        using (editor.History.BeginTransaction("hyperlink"))
+        {
+            var address = choice.Remove ? null : places.Settle(editor.Document, editor.History, choice.Address);
+            editor.Change(() => objectLinks.Set(editor, target, address));
+        }
     }
 }

@@ -315,10 +315,15 @@ public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRe
                 surface.Line(x, y, x + run.Width, y, ink, thickness);
                 if (style.DoubleUnderline) surface.Line(x, y + thickness * 2, x + run.Width, y + thickness * 2, ink, thickness);
             }
-            if (style.Strikethrough)
+            if (style.Strikethrough || style.DoubleStrikethrough)
             {
                 var y = baseline - run.Font.Size * 0.28;
-                surface.Line(x, y, x + run.Width, y, ink, thickness);
+                if (style.DoubleStrikethrough)
+                {
+                    surface.Line(x, y - thickness, x + run.Width, y - thickness, ink, thickness);
+                    surface.Line(x, y + thickness, x + run.Width, y + thickness, ink, thickness);
+                }
+                else surface.Line(x, y, x + run.Width, y, ink, thickness);
             }
             if (style.Overline)
             {

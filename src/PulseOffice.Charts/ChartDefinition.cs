@@ -14,6 +14,19 @@ public sealed record ChartData(IReadOnlyList<string> Categories, IReadOnlyList<C
 
     public bool OrdinalCategories { get; init; }
 
+    public IReadOnlyList<IReadOnlyList<string>>? CategoryLevels { get; init; }
+
+    public bool HasCategoryLevels => CategoryLevels is { Count: > 0 };
+
+    public IReadOnlyList<ChartHiddenColumn>? HiddenColumns { get; init; }
+
+    public ChartData WithCategoryLevels(IReadOnlyList<IReadOnlyList<string>>? levels) =>
+        levels is { Count: > 0 } && levels.All(level => level.Count == Categories.Count)
+            ? this with { CategoryLevels = levels }
+            : this with { CategoryLevels = null };
+
+    public ChartHiddenColumn? HiddenColumn(int column) => HiddenColumns?.FirstOrDefault(hidden => hidden.Column == column);
+
     public bool IsEmpty => Series.Count == 0 || Series.All(s => s.Values.Count == 0);
 
     public ChartData WithoutGaps() =>
@@ -24,6 +37,8 @@ public sealed record ChartData(IReadOnlyList<string> Categories, IReadOnlyList<C
     public double Minimum => IsEmpty ? 0 : Series.SelectMany(s => s.Values).Where(double.IsFinite).DefaultIfEmpty(0).Min();
     public double Maximum => IsEmpty ? 0 : Series.SelectMany(s => s.Values).Where(double.IsFinite).DefaultIfEmpty(0).Max();
 }
+
+public sealed record ChartHiddenColumn(int Column, IReadOnlyList<double> Values);
 
 public sealed record ChartSeriesSource(string? Name, string? Values, string? Categories);
 
@@ -48,6 +63,8 @@ public sealed record ChartDefinition : EmbeddedObject
     public IReadOnlyList<ChartSeriesSource>? SeriesSources { get; init; }
 
     public ChartPivotSource? PivotSource { get; init; }
+
+    public IReadOnlyList<IReadOnlyList<string>>? CategoryLevels { get; init; }
 
     public bool IsPivotChart => PivotSource is not null;
 

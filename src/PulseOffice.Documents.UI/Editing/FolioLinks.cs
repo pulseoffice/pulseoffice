@@ -1,3 +1,4 @@
+using PulseOffice.Document.Commands;
 using PulseOffice.Documents.Blocks;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Documents.Fields;
@@ -11,10 +12,25 @@ public interface IFolioLinks
     IReadOnlyList<LinkPlace> Places(TextDocument document);
 
     DocumentRange Range(FolioEditor editor);
+
+    string Settle(TextDocument document, UndoStack history, string address);
 }
 
-public sealed class FolioLinks(IDocumentOutline outline, IBookmarkCatalog bookmarks, IBlockTree tree, ITextCatalog texts) : IFolioLinks
+public sealed class FolioLinks(IDocumentOutline outline, IBookmarkCatalog bookmarks, IBlockTree tree, ITextCatalog texts, IReferenceTargets targets) : IFolioLinks
 {
+    public string Settle(TextDocument document, UndoStack history, string address)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(history);
+        if (!address.StartsWith('#') || address[1..] is not { Length: > 0 } name || bookmarks.Find(document, name) is not null) return address;
+        var heading = outline.Headings(document).FirstOrDefault(entry => targets.HeadingAnchor(document, entry.Paragraph) == name);
+        if (heading is null) return address;
+        var recorder = new EditRecorder(document, "heading-bookmark");
+        var prepared = targets.Prepare(document, recorder, new ReferenceTarget(ReferenceTargetKind.Headings, heading.Paragraph.Id, heading.Text));
+        recorder.Commit(history);
+        return "#" + prepared;
+    }
+
     public IReadOnlyList<LinkPlace> Places(TextDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -67,7 +83,7 @@ public sealed class FolioLinks(IDocumentOutline outline, IBookmarkCatalog bookma
         {
             if (heading.Text.Trim().Length == 0) continue;
             while (stack.Count > 0 && stack[^1].Level >= heading.Level) Close(stack, roots);
-            stack.Add((heading.Level, [], new LinkPlace(heading.Text.Trim(), "#" + heading.Text + "|outline", "link.place.heading")));
+            stack.Add((heading.Level, [], new LinkPlace(heading.Text.Trim(), "#" + targets.HeadingAnchor(document, heading.Paragraph), "link.place.heading")));
         }
         while (stack.Count > 0) Close(stack, roots);
         return roots;

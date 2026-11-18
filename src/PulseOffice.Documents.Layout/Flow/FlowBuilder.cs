@@ -119,7 +119,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
     private IReadOnlyDictionary<string, ListPlacement?> Place(TextDocument document, List<ParagraphBlock> blocks)
     {
         var effective = blocks.Select(block => entries.Effective(document.Styles, block, block.Content)).ToList();
-        var lists = labeling.Place(document.Styles, effective);
+        var lists = labeling.Place(document.Styles, effective, document.Language);
         var result = new Dictionary<string, ListPlacement?>(StringComparer.Ordinal);
         for (var i = 0; i < blocks.Count; i++) result[blocks[i].Id] = lists[i];
         return result;

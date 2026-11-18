@@ -71,6 +71,7 @@ internal static class SharedControlsComposition
         services.AddSingleton<PulseOffice.UI.Controls.Preview.IDebounceTimerFactory, PulseOffice.UI.Controls.Preview.DispatcherDebounceTimerFactory>();
         services.AddSingleton<PulseOffice.Document.Pages.IPageSketchLayout, PulseOffice.Document.Pages.PageSketchLayout>();
         services.AddSingleton<PulseOffice.UI.Controls.Tables.ITableStyleGallery, PulseOffice.UI.Controls.Tables.TableStyleGallery>();
+        services.AddSingleton<PulseOffice.UI.Controls.Tables.ITableLookOptionsDialog, PulseOffice.UI.Controls.Tables.TableLookOptionsDialog>();
         services.AddSingleton<PulseOffice.UI.Controls.Tables.Insert.ITableInsertPrompt, PulseOffice.UI.Controls.Tables.Insert.TableInsertPrompt>();
         services.AddSingleton<PulseOffice.UI.Controls.Links.ILinkAddresses, PulseOffice.UI.Controls.Links.LinkAddresses>();
         services.AddSingleton<PulseOffice.UI.Controls.Review.IReviewPanelRequests, PulseOffice.UI.Controls.Review.ReviewPanelRequests>();

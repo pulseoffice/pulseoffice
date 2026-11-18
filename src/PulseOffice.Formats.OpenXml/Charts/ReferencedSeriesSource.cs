@@ -21,15 +21,12 @@ internal sealed class ReferencedSeriesSource(ChartDefinition definition, IChartS
             })
             : _literals.Name(index, name);
 
-    public OpenXmlElement Categories(IReadOnlyList<string> categories)
-    {
-        if (Formula(_sources.Select(source => source.Categories).FirstOrDefault(text => references.Areas(text).Count > 0)) is not { } formula)
-            return _literals.Categories(categories);
+    private readonly OoxmlCategoryLevels _levels = new();
 
-        var cache = new C.StringCache(new C.PointCount { Val = (uint)categories.Count });
-        for (var i = 0; i < categories.Count; i++) cache.AppendChild(new C.StringPoint(new C.NumericValue(categories[i])) { Index = (uint)i });
-        return new C.CategoryAxisData(new C.StringReference { Formula = new C.Formula(formula), StringCache = cache });
-    }
+    public OpenXmlElement Categories(ChartData data) =>
+        Formula(_sources.Select(source => source.Categories).FirstOrDefault(text => references.Areas(text).Count > 0)) is { } formula
+            ? _levels.Referenced(formula, data)
+            : _literals.Categories(data);
 
     public OpenXmlElement Values(int index, IReadOnlyList<double> values)
     {

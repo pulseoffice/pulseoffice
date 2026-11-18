@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Avalonia.Media;
 using PulseOffice.Document.Tables;
 using PulseOffice.Localization;
@@ -59,12 +58,7 @@ public sealed class TableStyleGalleryView : UserControl, IDialogContent, IDialog
 
     private readonly IReadOnlyList<TableLook> _looks;
     private readonly ThumbnailGallery<int> _gallery;
-    private readonly CheckBox _header;
-    private readonly CheckBox _banded;
-    private readonly CheckBox _firstColumn;
-    private readonly CheckBox _lastColumn;
-    private readonly CheckBox _lastRow;
-    private readonly CheckBox _bandedColumns;
+    private readonly TableLookOptions _options;
     private readonly DialogFooter _footer;
     private TableLook _selected;
 
@@ -81,14 +75,7 @@ public sealed class TableStyleGalleryView : UserControl, IDialogContent, IDialog
         _looks = looks;
         _selected = looks.FirstOrDefault(look => look.Key == current) ?? looks[0];
 
-        _header = new CheckBox { IsChecked = headerRow, Content = new TextBlock { Text = texts["table.style.header"], FontSize = metrics.FontSize } };
-        ArgumentNullException.ThrowIfNull(banding);
-        CheckBox Option(bool value, string key) => new() { IsChecked = value, Content = new TextBlock { Text = texts[key], FontSize = metrics.FontSize } };
-        _banded = Option(banding.BandedRows, "table.style.banded");
-        _firstColumn = Option(banding.FirstColumn, "table.style.firstColumn");
-        _lastColumn = Option(banding.LastColumn, "table.style.lastColumn");
-        _lastRow = Option(banding.LastRow, "table.style.lastRow");
-        _bandedColumns = Option(banding.BandedColumns, "table.style.bandedColumns");
+        _options = new TableLookOptions(texts, headerRow, banding, metrics.FontSize, new Thickness(0, 0, metrics.SpacingLarge, metrics.SpacingSmall));
 
         _gallery = new ThumbnailGallery<int>(
             [.. Enumerable.Range(0, looks.Count).Select(index => new ThumbnailGalleryItem<int>(index, names.Name(looks[index])))],
@@ -116,11 +103,7 @@ public sealed class TableStyleGalleryView : UserControl, IDialogContent, IDialog
             () => _gallery.TileOf(_gallery.SelectedIndex)?.Focus(Avalonia.Input.NavigationMethod.Directional),
             Avalonia.Threading.DispatcherPriority.Input);
 
-        foreach (var option in new[] { _header, _banded, _firstColumn, _lastColumn, _lastRow, _bandedColumns })
-        {
-            option.Margin = new Thickness(0, 0, metrics.SpacingLarge, metrics.SpacingSmall);
-            option.IsCheckedChanged += (_, _) => _gallery.RefreshThumbnails();
-        }
+        _options.Changed += (_, _) => _gallery.RefreshThumbnails();
 
         _footer = new DialogFooter(density)
             .WithCancel(texts["prompt.cancel"], () => Completed?.Invoke(this, null))
@@ -138,7 +121,7 @@ public sealed class TableStyleGalleryView : UserControl, IDialogContent, IDialog
                     TextWrapping = TextWrapping.Wrap,
                 }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary),
                 _gallery,
-                new WrapPanel { Orientation = Orientation.Horizontal, Children = { _header, _banded, _bandedColumns, _firstColumn, _lastColumn, _lastRow } },
+                _options,
             },
         };
     }
@@ -149,18 +132,13 @@ public sealed class TableStyleGalleryView : UserControl, IDialogContent, IDialog
 
     public TableLook Selected => _selected;
 
-    public bool HeaderRow => _header.IsChecked == true;
+    public TableLookOptions Options => _options;
 
-    public bool BandedRows => _banded.IsChecked == true;
+    public bool HeaderRow => _options.HeaderRow;
 
-    public TableBanding Banding => new()
-    {
-        BandedRows = BandedRows,
-        BandedColumns = _bandedColumns.IsChecked == true,
-        FirstColumn = _firstColumn.IsChecked == true,
-        LastColumn = _lastColumn.IsChecked == true,
-        LastRow = _lastRow.IsChecked == true,
-    };
+    public bool BandedRows => _options.Banding.BandedRows;
+
+    public TableBanding Banding => _options.Banding;
 
     private int IndexOfSelected()
     {

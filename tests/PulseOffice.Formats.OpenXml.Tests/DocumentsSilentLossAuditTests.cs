@@ -57,7 +57,7 @@ public sealed class DocumentsSilentLossAuditTests
             ParentName = DefaultStyleNames.Standard,
             Paragraph = new ParagraphProperties { PageNumberRestart = 1, Hyphenation = ParagraphHyphenation.On with { MinimumWordLength = 8 } },
         });
-        document.Styles.Page.Find(DefaultStyleNames.Standard)!.Usage = PageUsage.Mirrored;
+        document.Styles.Page.Find(DefaultStyleNames.Standard)!.Usage = PageUsage.Left;
         document.Styles.Page.Find(DefaultStyleNames.Standard)!.Columns = new SectionColumns(2, PulseOffice.Foundation.Units.Twip.FromCentimeters(1)) { Balanced = false };
         var list = document.Styles.List.All.First();
         list.Levels = [.. list.Levels.Select(level => level with { CharacterStyleName = "Numerazione" })];

@@ -39,6 +39,8 @@ public sealed class AudioQueueOutput : IAudioOutput
     private readonly Queue<IntPtr> _idle = new();
     private readonly OutputCallback _callback;
     private readonly IntPtr _queue;
+    private readonly int _bytesPerSecond;
+    private long _playedBytes;
     private bool _started;
     private volatile bool _disposed;
 
@@ -46,6 +48,7 @@ public sealed class AudioQueueOutput : IAudioOutput
     {
         ArgumentNullException.ThrowIfNull(format);
         _callback = Released;
+        _bytesPerSecond = format.BytesPerSecond;
         var description = new StreamDescription(format.SampleRate, FormatLinearPcm, SignedPackedFlags,
             (uint)(format.Channels * 2), 1, (uint)(format.Channels * 2), (uint)format.Channels, 16);
         IsOpen = AudioQueueNewOutput(ref description, Marshal.GetFunctionPointerForDelegate(_callback),
@@ -60,6 +63,8 @@ public sealed class AudioQueueOutput : IAudioOutput
     private delegate void OutputCallback(IntPtr user, IntPtr queue, IntPtr buffer);
 
     public bool IsOpen { get; }
+
+    public TimeSpan Played => TimeSpan.FromSeconds((double)Interlocked.Read(ref _playedBytes) / _bytesPerSecond);
 
     public void Write(ReadOnlySpan<byte> pcm)
     {
@@ -102,6 +107,7 @@ public sealed class AudioQueueOutput : IAudioOutput
     private void Released(IntPtr user, IntPtr queue, IntPtr buffer)
     {
         if (_disposed) return;
+        Interlocked.Add(ref _playedBytes, Marshal.ReadInt32(buffer, AudioDataByteSizeOffset));
         lock (_gate) _idle.Enqueue(buffer);
         _free.Release();
     }

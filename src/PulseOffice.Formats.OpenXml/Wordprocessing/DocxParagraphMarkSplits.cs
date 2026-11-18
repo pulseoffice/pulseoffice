@@ -115,6 +115,7 @@ public sealed class DocxParagraphMarkSplits(IParagraphText text)
         var piece = new Deletion(deletion.Id + "\u0001" + segment.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\u0001" + removed.Id, deletion.Author, deletion.Date, new BlockContainer([removed]))
         {
             WithinInsertion = deletion.WithinInsertion,
+            MoveId = deletion.MoveId,
         };
         context.SplitChanges[piece.Id] = piece;
         builder.Marks.Add(new ChangeMark(builder.Length, piece.Id, MarkEdge.Point));

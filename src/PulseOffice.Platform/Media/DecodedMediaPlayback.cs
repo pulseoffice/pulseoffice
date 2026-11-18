@@ -34,6 +34,8 @@ public interface IMediaDecoder
 
 public interface IAudioOutput : IDisposable
 {
+    TimeSpan Played { get; }
+
     void Write(ReadOnlySpan<byte> pcm);
 }
 
@@ -58,11 +60,13 @@ public sealed class DecodedMediaPlayback(IMediaDecoder decoder, IAudioOutputFact
 
     private readonly Lock _gate = new();
     private readonly Stopwatch _clock = new();
+    private readonly MediaTimeline _timeline = new();
     private string? _path;
     private TimeSpan _origin;
     private CancellationTokenSource? _run;
     private Timer? _ticker;
     private IAudioOutput? _output;
+    private IAudioOutput? _audible;
     private double _volume = 1;
     private bool _ended;
 
@@ -74,7 +78,7 @@ public sealed class DecodedMediaPlayback(IMediaDecoder decoder, IAudioOutputFact
     {
         get
         {
-            var position = _origin + _clock.Elapsed;
+            var position = _clock.IsRunning ? _timeline.Position(_clock.Elapsed, Volatile.Read(ref _audible)?.Played) : _origin;
             return Duration > TimeSpan.Zero && position > Duration ? Duration : position;
         }
     }
@@ -193,6 +197,7 @@ public sealed class DecodedMediaPlayback(IMediaDecoder decoder, IAudioOutputFact
         var run = new CancellationTokenSource();
         _run = run;
         var start = _origin;
+        _timeline.Restart(start);
         if (info.HasAudio && audio.IsAvailable)
         {
             _output = audio.Open(PcmFormat.Standard);
@@ -208,6 +213,7 @@ public sealed class DecodedMediaPlayback(IMediaDecoder decoder, IAudioOutputFact
         _run?.Cancel();
         _run?.Dispose();
         _run = null;
+        Volatile.Write(ref _audible, null);
         _output?.Dispose();
         _output = null;
     }
@@ -226,11 +232,16 @@ public sealed class DecodedMediaPlayback(IMediaDecoder decoder, IAudioOutputFact
                 var chunk = buffer.AsSpan(0, read - read % 2);
                 Scale(chunk, Volume);
                 output.Write(chunk);
+                if (!ct.IsCancellationRequested) Interlocked.CompareExchange(ref _audible, output, null);
             }
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
         {
             logger.LogWarning("Media audio stopped: {Reason}", ex.GetType().Name);
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _audible, null, output);
         }
     }
 

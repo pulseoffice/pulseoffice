@@ -115,7 +115,6 @@ public sealed class DeckExchange(
                 return true;
             case ExchangePasteMode.UnformattedText when package.TextOf(ExchangeFlavor.Text) is { Length: > 0 } text:
                 var lines = text.ReplaceLineEndings("\n").Split('\n');
-                if (target.IsTyping() && target.TypeAtCaret(string.Join("\n", lines))) return true;
                 if (lines.Length == 1) insertion.Insert(target, new TextRun(lines[0]), FreeFontSize, PasteLabel);
                 else insertion.Insert(target, [.. lines.Select(line => new TextParagraph(line))], FreeFontSize, PasteLabel);
                 return true;

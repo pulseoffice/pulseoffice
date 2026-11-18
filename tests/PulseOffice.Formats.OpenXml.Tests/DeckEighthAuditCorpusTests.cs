@@ -424,11 +424,8 @@ public sealed class DeckEighthAuditCorpusTests
 
     private void IsPlay(Presentation deck)
     {
-        var effect = Assert.Single(deck.Slides[0].Animations);
-        Assert.Equal(AnimationCategory.Media, effect.Category);
-        Assert.Equal("play", effect.Preset);
-        Assert.Equal(AnimationTrigger.AfterPrevious, effect.Trigger);
-        Assert.IsType<MediaElement>(deck.Slides[0].Elements.Single(element => element.Id == effect.TargetId));
+        Assert.Empty(deck.Slides[0].Animations);
+        Assert.True(Assert.Single(deck.Slides[0].Elements.OfType<MediaElement>()).AutoPlay);
     }
 
     [Fact]

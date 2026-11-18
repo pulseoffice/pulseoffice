@@ -24,6 +24,7 @@ public sealed class MediaOptionsDialog(IActiveDeckContext context, IDialogServic
             new FormPromptView(
                 Texts["deck.media.options.explanation"],
                 [
+                    new CheckField("autoPlay", Texts["deck.media.options.autoPlay"], media.AutoPlay),
                     new CheckField("loop", Texts["deck.media.options.loop"], media.Loop),
                     new CheckField("mute", Texts["deck.media.options.mute"], media.Muted),
                     new NumberField("volume", Texts["deck.media.options.volume"], Math.Round(media.Volume * 100), 0, 100, 1) { Unit = "%", Integer = true, ShowSlider = true },
@@ -40,6 +41,7 @@ public sealed class MediaOptionsDialog(IActiveDeckContext context, IDialogServic
 
         return media with
         {
+            AutoPlay = Convert.ToBoolean(values["autoPlay"], CultureInfo.InvariantCulture),
             Loop = Convert.ToBoolean(values["loop"], CultureInfo.InvariantCulture),
             Muted = Convert.ToBoolean(values["mute"], CultureInfo.InvariantCulture),
             Volume = Math.Clamp(Number(values["volume"]) / 100, 0, 1),

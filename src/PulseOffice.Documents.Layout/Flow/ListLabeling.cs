@@ -19,6 +19,8 @@ public interface INumberFormatter
     NumberFormat Format { get; }
 
     string Render(int value);
+
+    string Render(int value, string? language) => Render(value);
 }
 
 public sealed class ArabicNumbers : INumberFormatter
@@ -74,11 +76,13 @@ public sealed class SystemNumbers(NumberFormat format, NumberSystem system, INum
     public NumberFormat Format => format;
 
     public string Render(int value) => systems.Render(system, value);
+
+    public string Render(int value, string? language) => systems.Render(system, value, language);
 }
 
 public interface IListLabeling
 {
-    IReadOnlyList<ListPlacement?> Place(StyleSheet sheet, IReadOnlyList<TextParagraph> paragraphs);
+    IReadOnlyList<ListPlacement?> Place(StyleSheet sheet, IReadOnlyList<TextParagraph> paragraphs, string? language = null);
 }
 
 public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberFormatter> formatters, LayoutOptions options) : IListLabeling
@@ -87,7 +91,7 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
 
     private readonly IReadOnlyDictionary<NumberFormat, INumberFormatter> _formatters = formatters.ToDictionary(formatter => formatter.Format);
 
-    public IReadOnlyList<ListPlacement?> Place(StyleSheet sheet, IReadOnlyList<TextParagraph> paragraphs)
+    public IReadOnlyList<ListPlacement?> Place(StyleSheet sheet, IReadOnlyList<TextParagraph> paragraphs, string? language = null)
     {
         var flags = flagLabels.For(paragraphs);
         var counters = new Dictionary<string, int?[]>(StringComparer.Ordinal);
@@ -98,13 +102,13 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
             var style = sheet.List.Find(paragraph.ListStyleName);
             if (style is not null)
             {
-                result[i] = paragraph.ListHeader ? Header(style, paragraph) : Styled(style, paragraph, counters);
+                result[i] = paragraph.ListHeader ? Header(style, paragraph) : Styled(style, paragraph, counters, Language(paragraph, language));
                 continue;
             }
             if (!paragraph.IsListItem && paragraph.OutlineLevel is { } outline && outline is > 0 and <= ListStyle.LevelCount
                 && sheet.Outline.Level(outline - 1).Format != NumberFormat.None)
             {
-                result[i] = Styled(sheet.Outline, paragraph with { BulletLevel = outline - 1 }, counters);
+                result[i] = Styled(sheet.Outline, paragraph with { BulletLevel = outline - 1 }, counters, Language(paragraph, language));
                 continue;
             }
             if (!paragraph.IsListItem) continue;
@@ -114,7 +118,10 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         return result;
     }
 
-    private ListPlacement Styled(ListStyle style, TextParagraph paragraph, Dictionary<string, int?[]> counters)
+    private string? Language(TextParagraph paragraph, string? fallback) =>
+        paragraph.Runs.Select(run => run.Language).FirstOrDefault(value => value is not null) ?? fallback;
+
+    private ListPlacement Styled(ListStyle style, TextParagraph paragraph, Dictionary<string, int?[]> counters, string? language)
     {
         var level = Math.Clamp(paragraph.BulletLevel, 0, Math.Max(0, Math.Min(style.Levels.Count, ListStyle.LevelCount) - 1));
         var definition = style.Level(level);
@@ -131,7 +138,7 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         {
             NumberFormat.None => string.Empty,
             NumberFormat.Bullet => definition.Bullet,
-            _ => definition.Prefix + Numbers(style, counts, level, definition.DisplayLevels) + definition.Suffix,
+            _ => definition.Prefix + Numbers(style, counts, level, definition.DisplayLevels, language) + definition.Suffix,
         };
         return new ListPlacement(label, definition.Indent + definition.Hanging, -definition.Hanging)
         {
@@ -145,7 +152,7 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         return new ListPlacement(string.Empty, definition.Indent + definition.Hanging, 0);
     }
 
-    private string Numbers(ListStyle style, int?[] counts, int level, int display)
+    private string Numbers(ListStyle style, int?[] counts, int level, int display, string? language)
     {
         var first = Math.Max(0, level - Math.Max(1, display) + 1);
         var parts = new List<string>();
@@ -155,7 +162,7 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         {
             var format = legal ? NumberFormat.Arabic : style.Level(l).Format;
             var value = counts[l] ?? style.Level(l).StartAt;
-            parts.Add(_formatters.TryGetValue(format, out var formatter) ? formatter.Render(value) : value.ToString(CultureInfo.InvariantCulture));
+            parts.Add(_formatters.TryGetValue(format, out var formatter) ? formatter.Render(value, language) : value.ToString(CultureInfo.InvariantCulture));
         }
         var label = new StringBuilder();
         for (var part = 0; part < parts.Count; part++)

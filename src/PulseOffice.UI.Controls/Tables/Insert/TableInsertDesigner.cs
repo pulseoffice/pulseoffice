@@ -2,7 +2,10 @@ using PulseOffice.Document.Tables;
 
 namespace PulseOffice.UI.Controls.Tables.Insert;
 
-public sealed record TableInsertChoice(int Rows, int Columns, TableLook Look, bool HeaderRow, bool BandedRows);
+public sealed record TableInsertChoice(int Rows, int Columns, TableLook Look, bool HeaderRow, TableBanding Banding)
+{
+    public bool BandedRows => Banding.BandedRows;
+}
 
 public sealed record TableInsertRequest(string TitleKey)
 {
@@ -14,7 +17,7 @@ public sealed record TableInsertRequest(string TitleKey)
 
     public bool HeaderRow { get; init; } = true;
 
-    public bool BandedRows { get; init; } = true;
+    public TableBanding Banding { get; init; } = TableBanding.Standard;
 
     public string? LookKey { get; init; }
 
@@ -30,7 +33,7 @@ public sealed class TableInsertDesigner : ITableLookBanding
 
     private int _look;
     private bool _headerRow;
-    private bool _bandedRows;
+    private TableBanding _banding;
 
     public TableInsertDesigner(IReadOnlyList<TableLook> looks, TableInsertRequest request)
     {
@@ -41,7 +44,7 @@ public sealed class TableInsertDesigner : ITableLookBanding
         Size = new TableSizeModel(request.Limits, TableGridExtent.Dialog, request.Rows, request.Columns);
         _look = Math.Max(0, looks.ToList().FindIndex(look => look.Key == request.LookKey));
         _headerRow = request.HeaderRow;
-        _bandedRows = request.BandedRows;
+        _banding = request.Banding;
         Size.Changed += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -55,7 +58,17 @@ public sealed class TableInsertDesigner : ITableLookBanding
 
     public TableLook Look => Looks[_look];
 
-    public PulseOffice.Document.Tables.TableBanding Banding => PulseOffice.Document.Tables.TableBanding.Standard with { BandedRows = BandedRows };
+    public TableBanding Banding
+    {
+        get => _banding;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (_banding == value) return;
+            _banding = value;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public bool HeaderRow
     {
@@ -70,13 +83,8 @@ public sealed class TableInsertDesigner : ITableLookBanding
 
     public bool BandedRows
     {
-        get => _bandedRows;
-        set
-        {
-            if (_bandedRows == value) return;
-            _bandedRows = value;
-            Changed?.Invoke(this, EventArgs.Empty);
-        }
+        get => _banding.BandedRows;
+        set => Banding = _banding with { BandedRows = value };
     }
 
     public int PreviewRows => Math.Min(Size.ShownRows, PreviewRowLimit);
@@ -94,5 +102,5 @@ public sealed class TableInsertDesigner : ITableLookBanding
 
     public void MoveLook(int delta) => ChooseLook(Math.Clamp(_look + delta, 0, Looks.Count - 1));
 
-    public TableInsertChoice Choice() => new(Size.Rows, Size.Columns, Look, _headerRow, _bandedRows);
+    public TableInsertChoice Choice() => new(Size.Rows, Size.Columns, Look, _headerRow, _banding);
 }

@@ -36,6 +36,9 @@ public sealed class WaveOutAudioOutput : IAudioOutput
     private readonly IntPtr[] _headers = new IntPtr[BufferCount];
     private readonly IntPtr[] _data = new IntPtr[BufferCount];
     private readonly int _headerSize = Marshal.SizeOf<WaveHeader>();
+    private const uint TimeSamples = 0x0002;
+
+    private readonly int _sampleRate;
     private int _next;
     private volatile bool _disposed;
 
@@ -44,6 +47,7 @@ public sealed class WaveOutAudioOutput : IAudioOutput
         ArgumentNullException.ThrowIfNull(format);
         var wave = new WaveFormat(1, (ushort)format.Channels, (uint)format.SampleRate,
             (uint)format.BytesPerSecond, (ushort)(format.Channels * 2), 16, 0);
+        _sampleRate = format.SampleRate;
         IsOpen = waveOutOpen(out var device, WaveMapper, ref wave, IntPtr.Zero, IntPtr.Zero, 0) == 0;
         _device = device;
         for (var index = 0; index < BufferCount; index++)
@@ -55,6 +59,17 @@ public sealed class WaveOutAudioOutput : IAudioOutput
     }
 
     public bool IsOpen { get; }
+
+    public TimeSpan Played
+    {
+        get
+        {
+            if (!IsOpen || _disposed) return TimeSpan.Zero;
+            var time = new MultimediaTime(TimeSamples, 0, 0);
+            if (waveOutGetPosition(_device, ref time, (uint)Marshal.SizeOf<MultimediaTime>()) != 0 || time.Type != TimeSamples) return TimeSpan.Zero;
+            return TimeSpan.FromSeconds((double)time.Value / _sampleRate);
+        }
+    }
 
     public void Write(ReadOnlySpan<byte> pcm)
     {
@@ -140,6 +155,17 @@ public sealed class WaveOutAudioOutput : IAudioOutput
 
     [DllImport("winmm.dll")]
     private static extern int waveOutWrite(IntPtr device, IntPtr header, uint size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct MultimediaTime(uint type, uint value, uint padding)
+    {
+        public readonly uint Type = type;
+        public readonly uint Value = value;
+        public readonly uint Padding = padding;
+    }
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutGetPosition(IntPtr device, ref MultimediaTime time, uint size);
 
     [DllImport("winmm.dll")]
     private static extern int waveOutReset(IntPtr device);

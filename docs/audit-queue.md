@@ -4,40 +4,39 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- The shared table style gallery offers only header row and banded rows; first/last column, last row and banded
-  columns exist only in Deck's own dialog; Folio and Ledger tables lack them. (173)
-- Text pasted at the caret while typing is recorded under the typing step's name, not "Paste". (189)
-- The table insert dialog offers only heading row and banded rows; Deck's own table style options dialog duplicates
-  the four options now in the shared gallery. (190)
-- Slide show: a link or action pointing to a hidden slide does nothing (hidden slides are left out of the playlist). (187)
-- mp4 export is one still image per slide: transitions and animations take time but are not drawn. (187)
-- Slide show keys: B/W black or white screen, number + Enter jump, black screen at the end of the show. (187)
-- PDF export: option to include hidden slides. (187)
-- Paste into Deck is recorded in the history under the "insert symbol" name. (188)
-- In-app media player for loop, volume, trim and fades in the show (needs a PulseOffice.Platform media interface). (173, 187)
+- The pipe audio players on Linux (paplay, pw-cat, aplay, ffplay) report no device position: the played time is
+  estimated from the bytes written less the pipe capacity and the requested player latency, not measured. (194)
+- Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
+  reference suite have not opened such a file here. (194)
+- The built-in media player has not run live on any system (Windows and macOS cannot be tested here). (193)
 
 ## Charts
-- Pivot charts: multi-level category labels are not modelled (leaf labels only); the XLSX and ODS links are not yet
-  checked in other applications. (182, 190)
-
-## Ledger
+- Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
+  `loext:data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
+  labels for other readers. (182, 190, 195)
+- Multi-level category labels of a compact sheet chart whose levels come only from the model (not from a category
+  range of several columns) are written to XLSX with a one-column formula, so another application refreshing the
+  formula keeps only the leaves. (195)
+- Inline chart category levels in ODF live in our extension columns of the local table (`pulseoffice:category-level-*`);
+  other readers show leaf labels only. (195)
 
 ## Folio
-- Paragraph marks moved with a Word tracked move are still a separate deletion and insertion (DOCX224). (191)
-- Spelled-out list numbers (cardinal and ordinal text) are English only; RTF and HTML export the new number formats as Arabic. (191)
-- The hyperlink dialog's heading places still link by heading text (`#text|outline`). (191)
-- The review panel and the change markup do not tell a move apart from a plain deletion and insertion. (191)
-- DOCX tblLook noHBand is not read: a Word table that turns banding off over a banded style still shows bands. (186)
-- List level text with different separators between placeholder pairs keeps only the first. (183)
-- The list dialog cannot edit the per-level separator. (183)
-- Word number formats not in the model (zero-padded, ordinal, spelled-out, non-Latin) are declared, not supported. (179)
-- DOCX moved text is declared (DOCX224), not modelled. (162)
-- Indexes and caption lists include text pending as a tracked deletion. (167)
-- Caption cross-references look at the first sequence field of a paragraph. (167)
-- Contents entries link to headings by text, so equal headings link to the first. (167)
-
-## Exchange
-
-## Macros and agent
+- Page-number parity after a section restart is taken from the displayed number, not the physical page, for even
+  headers and mirrored margins alike; renumbered pages keep the side they were laid out with. (197)
+- Columns of different widths are not modelled: DOCX declares them (DOCX245); ODT `style:column` relative widths are
+  read as equal columns without a diagnostic. (197)
+- Word line numbering restarted per section and its start value are read as continuous numbering from 1. (197)
+- Word's gutter is folded into the left (or top) margin on reading; the model has no separate gutter, so it is not
+  written back as `w:gutter`. (197)
+- A table inserted on a page uses the document's first page style, not the page style where the caret is, and ignores
+  page columns. (197)
+- Hiragana page numbers have no Word page number format and are written as Arabic in DOCX without a diagnostic. (197)
+- Mirrored margins are written to DOCX only when every used page style is mirrored (Word has one document setting). (197)
+- RTF import maps every numbered list to the default "1, 2, 3" style, so the extended number formats now written to
+  `\levelnfc` (ordinal, spelled-out, Hebrew, ...) are read back as Arabic; Hiragana has no RTF code and is written as
+  Arabic. (196)
+- The list dialog's preview spells cardinal and ordinal text in English whatever the document language. (196)
+- Tracked moves are always drawn in Word's default green; there is no option for the move colour. (196)
 
 ## Shell and formats
+- The Windows path of the private file spool has not run on a real Windows. (192)

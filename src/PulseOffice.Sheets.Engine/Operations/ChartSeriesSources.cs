@@ -183,7 +183,8 @@ internal sealed class SeriesSourceReader(IChartSourceReferences references, ICha
     {
         var sources = definition.SeriesSources!;
         var categorySource = sources.Select(source => source.Categories).FirstOrDefault(text => references.Areas(text).Count > 0);
-        var categories = categorySource is null ? null : Cells(workbook, categorySource, visibleOnly).Select(cell => cell.Text).ToList();
+        var levelled = categorySource is null ? null : Levelled(workbook, categorySource, definition.SeriesInColumns, visibleOnly);
+        var categories = categorySource is null ? null : levelled?.Leaves ?? Cells(workbook, categorySource, visibleOnly).Select(cell => cell.Text).ToList();
 
         var series = new List<ChartSeries>();
         foreach (var source in sources)
@@ -198,8 +199,41 @@ internal sealed class SeriesSourceReader(IChartSourceReferences references, ICha
 
         var length = series.Select(item => item.Values.Count).DefaultIfEmpty(0).Max();
         var labels = categories ?? [.. Enumerable.Range(1, length).Select(index => index.ToString(System.Globalization.CultureInfo.CurrentCulture))];
-        return new ChartData(labels, series) { OrdinalCategories = categories is null };
+        return new ChartData(labels, series) { OrdinalCategories = categories is null }.WithCategoryLevels(levelled?.Levels ?? definition.CategoryLevels);
     }
+
+    private (List<string> Leaves, IReadOnlyList<IReadOnlyList<string>> Levels)? Levelled(Workbook workbook, string text, bool seriesInColumns, bool visibleOnly)
+    {
+        var areas = references.Areas(text);
+        var depth = areas.Select(area => seriesInColumns ? area.Range.ColumnCount : area.Range.RowCount).DefaultIfEmpty(1).Max();
+        if (depth < 2) return null;
+
+        var leaves = new List<string>();
+        var levels = Enumerable.Range(0, depth - 1).Select(_ => new List<string>()).ToList();
+        foreach (var area in areas)
+        {
+            if (workbook.FindSheet(area.Sheet) is not { } sheet) continue;
+            if ((workArea.Bound(area.Range, null) ?? workArea.Bound(area.Range, sheet.UsedRange())) is not { } range) continue;
+            var first = seriesInColumns ? range.Start.Row : range.Start.Column;
+            var last = seriesInColumns ? range.End.Row : range.End.Column;
+            var outer = seriesInColumns ? range.Start.Column : range.Start.Row;
+            var inner = seriesInColumns ? range.End.Column : range.End.Row;
+            for (var position = first; position <= last && leaves.Count < MaximumPoints; position++)
+            {
+                if (visibleOnly && (seriesInColumns ? sheet.Layout.IsRowHidden(position) : sheet.Layout.IsColumnHidden(position))) continue;
+                leaves.Add(Text(workbook, sheet, seriesInColumns, position, inner));
+                for (var level = 0; level < levels.Count; level++)
+                {
+                    var lane = inner - levels.Count + level;
+                    levels[level].Add(lane >= outer ? Text(workbook, sheet, seriesInColumns, position, lane) : string.Empty);
+                }
+            }
+        }
+        return (leaves, levels);
+    }
+
+    private string Text(Workbook workbook, Worksheet sheet, bool seriesInColumns, int position, int lane) =>
+        cells.Text(workbook, sheet[seriesInColumns ? new CellAddress(position, lane) : new CellAddress(lane, position)]);
 
     private string? Name(Workbook workbook, string? text)
     {

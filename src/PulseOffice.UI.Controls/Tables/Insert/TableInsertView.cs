@@ -39,8 +39,7 @@ public sealed class TableInsertView : UserControl, IDialogContent, IDialogFooter
     private readonly TextBlock _truncated = new();
     private readonly NumberBox _rows;
     private readonly NumberBox _columns;
-    private readonly CheckBox _header = new();
-    private readonly CheckBox _banded = new();
+    private readonly TableLookOptions _options;
     private readonly TableLookPreview _preview;
     private readonly ThumbnailGallery<int> _gallery;
 
@@ -50,6 +49,12 @@ public sealed class TableInsertView : UserControl, IDialogContent, IDialogFooter
         _request = request ?? throw new ArgumentNullException(nameof(request));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _chrome = new DialogChrome(services.Icons, _metrics);
+        _options = new TableLookOptions(services.Texts, designer.HeaderRow, designer.Banding, _metrics.FontSize, new Thickness(0, 0, 0, 2), Orientation.Vertical);
+        _options.Changed += (_, _) =>
+        {
+            _designer.HeaderRow = _options.HeaderRow;
+            _designer.Banding = _options.Banding;
+        };
         _grid = new TableSizeGrid(designer.Size) { HorizontalAlignment = HorizontalAlignment.Center };
         _grid.Picked += (_, _) => _grid.Focus();
         _preview = new TableLookPreview(designer.Look) { Height = PreviewHeight, MaxRowHeight = PreviewRowHeight, Margin = new Thickness(_metrics.SpacingMedium) };
@@ -158,12 +163,6 @@ public sealed class TableInsertView : UserControl, IDialogContent, IDialogFooter
         numbers.Children.Add(columns);
         numbers.Children.Add(rows);
 
-        _header.Content = new TextBlock { Text = Texts["table.style.header"], TextWrapping = TextWrapping.Wrap };
-        _header.IsChecked = _designer.HeaderRow;
-        _header.IsCheckedChanged += (_, _) => _designer.HeaderRow = _header.IsChecked == true;
-        _banded.Content = new TextBlock { Text = Texts["table.style.banded"], TextWrapping = TextWrapping.Wrap };
-        _banded.IsChecked = _designer.BandedRows;
-        _banded.IsCheckedChanged += (_, _) => _designer.BandedRows = _banded.IsChecked == true;
 
         return new StackPanel
         {
@@ -175,8 +174,7 @@ public sealed class TableInsertView : UserControl, IDialogContent, IDialogFooter
                 new Border { Height = _metrics.SpacingSmall },
                 numbers,
                 _chrome.Caption(Texts["table.insert.options"], new Thickness(0, _metrics.SpacingMedium, 0, 0)),
-                _header,
-                _banded,
+                _options,
             },
         };
     }
@@ -253,7 +251,7 @@ public sealed class TableInsertView : UserControl, IDialogContent, IDialogFooter
         _preview.Rows = _designer.PreviewRows;
         _preview.Columns = _designer.PreviewColumns;
         _preview.HeaderRow = _designer.HeaderRow;
-        _preview.BandedRows = _designer.BandedRows;
+        _preview.Banding = _designer.Banding;
         _truncated.IsVisible = _designer.PreviewTruncated;
         _truncated.Text = Texts.Format("table.insert.truncated", TableInsertDesigner.PreviewColumnLimit, TableInsertDesigner.PreviewRowLimit);
     }

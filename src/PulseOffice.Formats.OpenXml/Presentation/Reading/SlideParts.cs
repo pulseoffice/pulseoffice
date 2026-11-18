@@ -180,6 +180,8 @@ internal sealed class GraphicFrameReader(
 
 internal sealed class PptxAnimationReader(PptxAnimationMapper animations, PptxSounds sounds) : IPptxSlidePartReader
 {
+    private readonly MediaAutoPlay _autoPlay = new();
+
     public void Read(PptxSlideSource source, SlideAssembly<uint> assembly)
     {
         IReadOnlyList<string> Resolve(uint spid) =>
@@ -190,6 +192,7 @@ internal sealed class PptxAnimationReader(PptxAnimationMapper animations, PptxSo
         foreach (var effect in animations.FromTiming(source.Slide.Slide?.GetFirstChild<P.Timing>(), Resolve, assembly.Slide.Id,
                      target => sounds.Read(target, source.Slide, source.Sounds)))
             assembly.Slide.AddAnimation(effect);
+        _autoPlay.Absorb(assembly.Slide);
     }
 }
 

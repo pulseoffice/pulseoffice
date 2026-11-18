@@ -23,7 +23,7 @@ public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsert
         ArgumentNullException.ThrowIfNull(run);
         if (target.CurrentSlide() is not { } slide) return;
 
-        if (run.Field == TextFieldKind.None && target.TypeAtCaret(run.Text)) return;
+        if (run.Field == TextFieldKind.None && (labelKey is null ? target.TypeAtCaret(run.Text) : target.IsTyping() && target.InsertParagraphsAtCaret([new TextParagraph(run.Text) { Runs = [run] }], labelKey))) return;
 
         if (target.Selected() is TextElement selected)
         {
@@ -53,7 +53,7 @@ public sealed class DeckTextInsertion(IRichTextInsertion rich) : IDeckTextInsert
         ArgumentNullException.ThrowIfNull(paragraphs);
         if (paragraphs.Count == 0 || target.CurrentSlide() is not { } slide) return;
 
-        if (target.IsTyping() && target.InsertParagraphsAtCaret(paragraphs)) return;
+        if (target.IsTyping() && target.InsertParagraphsAtCaret(paragraphs, labelKey)) return;
 
         if (target.Selected() is TextElement selected)
         {

@@ -14,6 +14,7 @@ namespace PulseOffice.Formats.OpenXml;
 
 public sealed class XlsxChartMapper
 {
+    private readonly ChartInlineErrorValues _inlineErrors = new();
     private readonly XlsxChartOrientation _orientation = new();
     private readonly ChartSpaceBuilder _builder;
     private readonly ChartSpaceReader _reader;
@@ -95,7 +96,7 @@ public sealed class XlsxChartMapper
             }), Sources(content.Series, pivot)));
             definition = definition with { PivotSource = _pivotLink.Read(space) };
             if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
-                definition = definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null };
+                definition = _inlineErrors.Refresh(definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null });
 
             placed.Add(anchors.Place(anchor, new PlacedObject
             {

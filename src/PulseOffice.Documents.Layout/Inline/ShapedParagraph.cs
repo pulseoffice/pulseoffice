@@ -82,6 +82,8 @@ public sealed record InlineInsertion(int Offset, InlineKind Kind, string Id, str
     public uint? Ink { get; init; }
 
     public bool Underlined { get; init; }
+
+    public bool Moved { get; init; }
 }
 
 public sealed record InlineGlyph(InlineKind Kind, string Id, string Text, FontKey Font, IReadOnlyList<double> Advances, double Ascent, double Descent, double Shift)

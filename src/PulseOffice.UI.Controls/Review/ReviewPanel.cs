@@ -325,7 +325,8 @@ public sealed class ReviewPanel : UserControl
             FontSize = _metrics.FontSize,
             TextWrapping = TextWrapping.Wrap,
             MaxLines = 4,
-            TextDecorations = entry.Kind == ReviewItemKind.Deletion ? TextDecorations.Strikethrough : null,
+            TextDecorations = entry.Kind is ReviewItemKind.Deletion or ReviewItemKind.MovedFrom ? TextDecorations.Strikethrough
+                : entry.Kind == ReviewItemKind.MovedTo ? TextDecorations.Underline : null,
             Opacity = entry.Resolved ? 0.55 : 1,
         }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary);
         var content = new StackPanel { Spacing = 2 };

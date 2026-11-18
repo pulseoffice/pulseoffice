@@ -33,6 +33,6 @@ public sealed class TableInsertPrompt(
     public TableInsertChoice Quick(int rows, int columns, TableInsertLimits limits)
     {
         ArgumentNullException.ThrowIfNull(limits);
-        return new TableInsertChoice(Math.Clamp(rows, 1, limits.MaxRows), Math.Clamp(columns, 1, limits.MaxColumns), presets.All[0], true, true);
+        return new TableInsertChoice(Math.Clamp(rows, 1, limits.MaxRows), Math.Clamp(columns, 1, limits.MaxColumns), presets.All[0], true, TableBanding.Standard);
     }
 }

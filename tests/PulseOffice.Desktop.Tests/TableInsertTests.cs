@@ -88,7 +88,7 @@ public sealed class TableInsertTests(HeadlessDesktopSession headless)
         designer.Size.Rows = 6;
 
         var choice = designer.Choice();
-        Assert.Equal(new TableInsertChoice(6, 5, _presets.All[2], false, false), choice);
+        Assert.Equal(new TableInsertChoice(6, 5, _presets.All[2], false, TableBanding.None), choice);
         Assert.Equal(4, changes);
 
         designer.MoveLook(-10);
@@ -147,7 +147,7 @@ public sealed class TableInsertTests(HeadlessDesktopSession headless)
         Assert.All(view.Thumbnails, thumbnail => Assert.True(thumbnail.HeaderRow));
 
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Assert.Equal(new TableInsertChoice(5, 3, _presets.All[5], true, true), result);
+        Assert.Equal(new TableInsertChoice(5, 3, _presets.All[5], true, TableBanding.Standard), result);
         window.Close();
     }, CancellationToken.None);
 

@@ -25,16 +25,29 @@ public sealed class DocxRevisionWriter(IDirectFormatting formatting, DocxCharact
         Date = change.Date.UtcDateTime,
     }, context);
 
-    private T Moving<T>(TrackedChange change, T element, DocxWriteContext context) where T : OpenXmlCompositeElement
+    private T Moving<T>(TrackedChange change, T element, DocxWriteContext context) where T : OpenXmlElement
     {
-        var move = change switch
-        {
-            Insertion insertion => insertion.MoveId,
-            Deletion deletion => deletion.MoveId,
-            _ => null,
-        };
-        if (move is not null) context.Moves.Add((element, move));
+        if (MoveOf(change) is { } move) context.Moves.Add((element, move));
         return element;
+    }
+
+    private string? MoveOf(TrackedChange change) => change switch
+    {
+        Insertion insertion => insertion.MoveId,
+        Deletion deletion => deletion.MoveId,
+        _ => null,
+    };
+
+    private void MarkRange(OpenXmlElement mark, OpenXmlElement start, OpenXmlElement end, string name)
+    {
+        if (mark.Ancestors<W.Paragraph>().FirstOrDefault() is not { } paragraph) return;
+        var named = mark is W.MoveFrom
+            ? paragraph.Descendants<W.MoveFromRangeStart>().Any(existing => existing.Name?.Value == name)
+            : paragraph.Descendants<W.MoveToRangeStart>().Any(existing => existing.Name?.Value == name);
+        if (named) return;
+        if (paragraph.ParagraphProperties is { } properties) properties.InsertAfterSelf(start);
+        else paragraph.PrependChild(start);
+        paragraph.Append(end);
     }
 
     public void WriteMoves(DocxWriteContext context)
@@ -52,6 +65,16 @@ public sealed class DocxRevisionWriter(IDirectFormatting formatting, DocxCharact
             OpenXmlCompositeElement moved;
             OpenXmlElement start;
             OpenXmlElement end;
+            if (element is W.MoveFrom markFrom)
+            {
+                MarkRange(markFrom, new W.MoveFromRangeStart { Id = range, Name = name, Author = markFrom.Author?.Value, Date = markFrom.Date!.Value }, new W.MoveFromRangeEnd { Id = range }, name);
+                continue;
+            }
+            if (element is W.MoveTo markTo)
+            {
+                MarkRange(markTo, new W.MoveToRangeStart { Id = range, Name = name, Author = markTo.Author?.Value, Date = markTo.Date!.Value }, new W.MoveToRangeEnd { Id = range }, name);
+                continue;
+            }
             if (element is W.DeletedRun deleted)
             {
                 moved = new W.MoveFromRun { Id = deleted.Id?.Value, Author = deleted.Author?.Value, Date = deleted.Date!.Value };
@@ -78,19 +101,13 @@ public sealed class DocxRevisionWriter(IDirectFormatting formatting, DocxCharact
         context.Moves.Clear();
     }
 
-    public W.Inserted InsertedMark(TrackedChange change, DocxWriteContext context) => new()
-    {
-        Id = Next(context),
-        Author = change.Author,
-        Date = change.Date.UtcDateTime,
-    };
+    public W.TrackChangeType InsertedMark(TrackedChange change, DocxWriteContext context) => MoveOf(change) is null
+        ? new W.Inserted { Id = Next(context), Author = change.Author, Date = change.Date.UtcDateTime }
+        : Moving(change, new W.MoveTo { Id = Next(context), Author = change.Author, Date = change.Date.UtcDateTime }, context);
 
-    public W.Deleted DeletedMark(TrackedChange change, DocxWriteContext context) => new()
-    {
-        Id = Next(context),
-        Author = change.Author,
-        Date = change.Date.UtcDateTime,
-    };
+    public W.TrackChangeType DeletedMark(TrackedChange change, DocxWriteContext context) => MoveOf(change) is null
+        ? new W.Deleted { Id = Next(context), Author = change.Author, Date = change.Date.UtcDateTime }
+        : Moving(change, new W.MoveFrom { Id = Next(context), Author = change.Author, Date = change.Date.UtcDateTime }, context);
 
     public IReadOnlyList<(W.DeletedRun Element, string? Hyperlink)> Deleted(Deletion deletion, DocxWriteContext context, DocxInlineWriter inlines, DocxBlockSink blocks)
     {

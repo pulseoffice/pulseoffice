@@ -4,6 +4,8 @@ public enum ReviewItemKind
 {
     Insertion,
     Deletion,
+    MovedFrom,
+    MovedTo,
     Format,
     ParagraphFormat,
     Cell,

@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed class DocxParagraphMarkJoins(DocxParagraphMarkChanges paragraphMarks, IParagraphText text)
 {
-    private sealed record Signature(string Author, DateTimeOffset Date);
+    private sealed record Signature(string Author, DateTimeOffset Date, string? MoveId);
 
     public bool MarkDeleted(W.Paragraph element) => paragraphMarks.Deletion(element) is not null;
 
@@ -34,7 +34,7 @@ public sealed class DocxParagraphMarkJoins(DocxParagraphMarkChanges paragraphMar
                 parts.Add(state);
                 continue;
             }
-            var deletion = new Deletion(context.Document.NextId("change"), signature.Author, signature.Date, new BlockContainer(pieces));
+            var deletion = new Deletion(context.Document.NextId("change"), signature.Author, signature.Date, new BlockContainer(pieces)) { MoveId = signature.MoveId };
             context.Document.Changes.Add(deletion);
             var joint = new ChangeMark(0, deletion.Id, MarkEdge.Point);
             if (last)
@@ -63,7 +63,7 @@ public sealed class DocxParagraphMarkJoins(DocxParagraphMarkChanges paragraphMar
     {
         var mark = paragraphMarks.Deletion(element)!;
         var date = mark.Date?.Value is { } when ? new DateTimeOffset(DateTime.SpecifyKind(when, DateTimeKind.Utc)) : DateTimeOffset.UnixEpoch;
-        return new Signature(mark.Author?.Value ?? string.Empty, date);
+        return new Signature(mark.Author?.Value ?? string.Empty, date, paragraphMarks.MarkMoveId(element, mark));
     }
 
     private (ParagraphState State, ParagraphBlock? Removed) Trailing(ParagraphState state, Signature signature, DocxReadContext context) =>
@@ -75,7 +75,7 @@ public sealed class DocxParagraphMarkJoins(DocxParagraphMarkChanges paragraphMar
     private bool Absorbable(InlineMark mark, Signature signature, DocxReadContext context) =>
         mark is ChangeMark { Edge: MarkEdge.Point } change
         && context.Document.Changes.Find(change.ChangeId) is Deletion { WithinInsertion: null, Removed.Blocks: [ParagraphBlock] } deletion
-        && deletion.Author == signature.Author;
+        && deletion.Author == signature.Author && deletion.MoveId == signature.MoveId;
 
     private (ParagraphState State, ParagraphBlock? Removed) Absorb(ParagraphState state, InlineMark? mark, DocxReadContext context)
     {

@@ -38,23 +38,26 @@ public sealed class PptxAnimationMapper
 
     private readonly PptxMediaTiming _media = new();
 
+    private readonly MediaAutoPlay _autoPlay = new();
+
     private readonly PptxAnimationSound _sound = new();
 
     public P.Timing? ToTiming(Slide slide, IReadOnlyDictionary<string, uint> spidByElement, Func<string?, PptxSoundReference?>? sounds = null)
     {
         sounds ??= _ => null;
         var media = _media.Nodes(slide, spidByElement, 200000);
-        if (slide.Animations.Count == 0)
+        var animations = _autoPlay.Animations(slide);
+        if (animations.Count == 0)
             return media.Length == 0 ? null : new P.Timing(
                 $"<p:timing xmlns:p=\"{PNs}\" xmlns:a=\"{ANs}\"><p:tnLst>" +
                 "<p:par><p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\"><p:childTnLst>" +
                 media + "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>");
 
         var id = 2;
-        var triggered = slide.Animations
+        var triggered = animations
             .Where(effect => effect.IsTriggered && spidByElement.ContainsKey(effect.TriggerShapeId!))
             .ToList();
-        var mainSeq = Groups([.. slide.Animations.Except(triggered)], spidByElement, sounds, ref id, "indefinite");
+        var mainSeq = Groups([.. animations.Except(triggered)], spidByElement, sounds, ref id, "indefinite");
         var interactive = new StringBuilder();
         foreach (var sequence in triggered.GroupBy(effect => effect.TriggerShapeId!))
         {

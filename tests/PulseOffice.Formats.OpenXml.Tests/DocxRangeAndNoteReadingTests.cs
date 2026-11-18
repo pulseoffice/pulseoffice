@@ -332,7 +332,7 @@ public sealed class DocxRangeAndNoteReadingTests
     }
 
     [Fact]
-    public void I_segni_di_paragrafo_spostati_si_leggono_come_eliminati_e_inseriti()
+    public void I_segni_di_paragrafo_spostati_si_leggono_come_eliminati_e_inseriti_dello_spostamento()
     {
         var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
@@ -357,7 +357,7 @@ public sealed class DocxRangeAndNoteReadingTests
         written.Position = 0;
         using var again = WordprocessingDocument.Open(written, false);
         var first = again.MainDocumentPart!.Document!.Body!.Elements<W.Paragraph>().First();
-        Assert.NotNull(first.ParagraphProperties?.ParagraphMarkRunProperties?.GetFirstChild<W.Inserted>());
+        Assert.NotNull(first.ParagraphProperties?.ParagraphMarkRunProperties?.GetFirstChild<W.MoveTo>());
     }
 
     [Fact]

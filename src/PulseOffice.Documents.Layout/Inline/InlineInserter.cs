@@ -64,7 +64,7 @@ public sealed class InlineInserter(ITextMeasurer measurer, IRunFonts fonts) : II
         }
         if (item.Kind == InlineKind.Deleted)
         {
-            var struck = run.Style with { Strikethrough = true, Underline = item.Underlined, Color = item.Ink ?? run.Style.Color, FontSize = run.Style.FontSize ?? run.Font.Size };
+            var struck = run.Style with { Strikethrough = !item.Moved, DoubleStrikethrough = item.Moved, Underline = item.Underlined, Color = item.Ink ?? run.Style.Color, FontSize = run.Style.FontSize ?? run.Font.Size };
             var face = fonts.FontOf(struck, run.Font.Family);
             var measured = measurer.Metrics(face);
             return new InlineGlyph(item.Kind, item.Id, item.Text, face, measurer.Advances(face, item.Text), measured.Ascent + measured.LineGap, measured.Descent, fonts.ShiftOf(struck)) { Style = struck };

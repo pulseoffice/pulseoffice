@@ -8,6 +8,7 @@ public sealed class InlineChartParts
     private readonly ChartSpaceBuilder _builder;
     private readonly ChartSpaceReader _reader;
     private readonly LiteralSeriesSource _literals = new();
+    private readonly ChartInlineErrorValues _errors = new();
 
     public InlineChartParts()
     {
@@ -28,13 +29,13 @@ public sealed class InlineChartParts
     {
         if (relationshipId is null || !owner.TryGetPartById(relationshipId, out var part) || part is not ChartPart { ChartSpace: { } space }) return null;
         if (_reader.Read(space) is not { } content) return null;
-        return content.Decorate(new ChartDefinition
+        return _errors.Refresh(content.Decorate(new ChartDefinition
         {
             Id = id,
             Type = content.Type,
             SourceSheet = string.Empty,
             SourceRange = string.Empty,
             InlineData = _reader.Literals(content.Series),
-        });
+        }));
     }
 }

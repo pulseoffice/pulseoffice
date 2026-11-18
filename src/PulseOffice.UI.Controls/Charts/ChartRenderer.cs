@@ -101,7 +101,8 @@ public sealed class ChartRenderer
         var items = painter.Legend(definition, data);
         var area = ContentArea(definition, bounds);
         var thumbnail = mode == ChartRenderMode.Thumbnail;
-        var plot = thumbnail ? area : PlotArea(definition, painter, scene.Legend.Reserve(definition.Legend, items, area));
+        var groups = painter.HasCategoryAxis(definition.Type) ? _categoryGroups.Groups(data) : [];
+        var plot = thumbnail ? area : PlotArea(definition, painter, scene.Legend.Reserve(definition.Legend, items, area), groups.Count);
 
         DrawTitle(scene.Text, context, definition, bounds);
         scene.Legend.Paint(context, definition.Legend, items, area, plot, bounds);
@@ -140,14 +141,21 @@ public sealed class ChartRenderer
 
         if (painter.DrawsAxes && !thumbnail)
         {
-            if (painter.HasCategoryAxis(definition.Type)) scene.Axes.Categories(context, data.Categories, Categories(data, plot, horizontal, painter.DrawsReversedCategories && definition.CategoryAxis.Reversed), plot, horizontal, categoryLine);
-            scene.Axes.Titles(context, definition.CategoryAxisTitle, definition.ValueAxisTitle, plot, horizontal);
+            if (painter.HasCategoryAxis(definition.Type))
+            {
+                var scale = Categories(data, plot, horizontal, painter.DrawsReversedCategories && definition.CategoryAxis.Reversed);
+                scene.Axes.Categories(context, data.Categories, scale, plot, horizontal, categoryLine);
+                if (groups.Count > 0) scene.Axes.Groups(context, groups, scale, plot, horizontal, categoryLine);
+            }
+            scene.Axes.Titles(context, definition.CategoryAxisTitle, definition.ValueAxisTitle, plot, horizontal, groups.Count);
         }
 
         if (definition.ShowDataLabels) DrawDataLabels(scene.Text, context, definition, data, painter.DataLabels(frame));
     }
 
     private readonly ChartAxisScaling _axisScaling = new();
+
+    private readonly ChartCategoryGroups _categoryGroups = new();
 
     private readonly ChartInlineErrorValues _inlineErrorValues = new();
 
@@ -191,13 +199,15 @@ public sealed class ChartRenderer
         return new Rect(bounds.X + Padding, top, Math.Max(bounds.Width - Padding * 2, 10), Math.Max(bounds.Bottom - Padding - top, 10));
     }
 
-    private Rect PlotArea(ChartDefinition definition, Plots.IChartPlot painter, Rect area)
+    private Rect PlotArea(ChartDefinition definition, Plots.IChartPlot painter, Rect area, int groupLevels)
     {
         if (!painter.DrawsAxes) return area;
 
-        var left = area.X + ValueLabelWidth + (Has(definition.ValueAxisTitle) || Has(definition.CategoryAxisTitle) ? AxisTitleSpace : 0);
-        var bottom = area.Bottom - AxisLabelHeight - (Has(definition.CategoryAxisTitle) || Has(definition.ValueAxisTitle) ? AxisTitleSpace : 0);
         var horizontal = painter.HorizontalAxis(definition.Type);
+        var left = area.X + ValueLabelWidth + (Has(definition.ValueAxisTitle) || Has(definition.CategoryAxisTitle) ? AxisTitleSpace : 0)
+            + (horizontal ? groupLevels * ChartAxisPainter.GroupColumnWidth : 0);
+        var bottom = area.Bottom - AxisLabelHeight - (Has(definition.CategoryAxisTitle) || Has(definition.ValueAxisTitle) ? AxisTitleSpace : 0)
+            - (horizontal ? 0 : groupLevels * ChartAxisPainter.GroupRowHeight);
         var right = area.Right - (definition.HasSecondaryAxis && !horizontal ? ValueLabelWidth : 0);
         var top = area.Y + (definition.HasSecondaryAxis && horizontal ? AxisLabelHeight : 0);
         return new Rect(left, top, Math.Max(right - left, 10), Math.Max(bottom - top, 10));

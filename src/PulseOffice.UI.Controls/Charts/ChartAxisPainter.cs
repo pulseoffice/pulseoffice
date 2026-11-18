@@ -121,17 +121,61 @@ public sealed class ChartAxisPainter(ChartText text)
         }
     }
 
-    public void Titles(DrawingContext context, string? category, string? value, Rect plot, bool horizontal)
+    public const double GroupRowHeight = 16;
+
+    public const double GroupColumnWidth = 48;
+
+    private const double LeafColumnWidth = 34;
+
+    public void Groups(DrawingContext context, IReadOnlyList<IReadOnlyList<ChartCategoryGroup>> levels, CategoryScale scale, Rect plot, bool horizontal, double? line)
+    {
+        var pen = new Pen(new SolidColorBrush(Colors.Gray, 0.6), 1);
+        for (var level = 0; level < levels.Count; level++)
+        {
+            var ring = levels.Count - level;
+            foreach (var group in levels[level])
+            {
+                if (group.First >= scale.Count) continue;
+                var last = Math.Min(group.Last, scale.Count - 1);
+                var from = Math.Min(scale.Start(group.First), scale.Start(last));
+                var to = Math.Max(scale.Start(group.First), scale.Start(last)) + Math.Abs(scale.Width);
+                var label = text.Layout(group.Label, _labels, LabelSize);
+                label.MaxLineCount = 1;
+                label.Trimming = TextTrimming.CharacterEllipsis;
+                if (horizontal)
+                {
+                    var right = (line ?? plot.X) - LeafColumnWidth - (ring - 1) * GroupColumnWidth;
+                    label.MaxTextWidth = GroupColumnWidth - 4;
+                    context.DrawLine(pen, new Point(right - GroupColumnWidth, from), new Point(right, from));
+                    context.DrawLine(pen, new Point(right - GroupColumnWidth, to), new Point(right, to));
+                    context.DrawText(label, new Point(right - label.Width - 4, (from + to - label.Height) / 2));
+                }
+                else
+                {
+                    var top = (line ?? plot.Bottom) + ring * GroupRowHeight;
+                    label.MaxTextWidth = Math.Max(to - from, 1);
+                    context.DrawLine(pen, new Point(from, top - GroupRowHeight), new Point(from, top + GroupRowHeight));
+                    context.DrawLine(pen, new Point(to, top - GroupRowHeight), new Point(to, top + GroupRowHeight));
+                    context.DrawText(label, new Point((from + to - label.Width) / 2, top + 2));
+                }
+            }
+        }
+    }
+
+    public void Titles(DrawingContext context, string? category, string? value, Rect plot, bool horizontal) =>
+        Titles(context, category, value, plot, horizontal, 0);
+
+    public void Titles(DrawingContext context, string? category, string? value, Rect plot, bool horizontal, int groupLevels)
     {
         var below = horizontal ? value : category;
         var beside = horizontal ? category : value;
 
         if (below is { Length: > 0 })
-            text.Centred(context, text.Layout(below, Brushes.Black, 10, bold: true), new Point(plot.Center.X, plot.Bottom + 28));
+            text.Centred(context, text.Layout(below, Brushes.Black, 10, bold: true), new Point(plot.Center.X, plot.Bottom + 28 + (horizontal ? 0 : groupLevels * GroupRowHeight)));
 
         if (beside is not { Length: > 0 }) return;
         var label = text.Layout(beside, Brushes.Black, 10, bold: true);
-        var centre = new Point(plot.X - 44, plot.Center.Y);
+        var centre = new Point(plot.X - 44 - (horizontal ? groupLevels * GroupColumnWidth : 0), plot.Center.Y);
         using (context.PushTransform(Matrix.CreateTranslation(-centre.X, -centre.Y) * Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(centre.X, centre.Y)))
             text.Centred(context, label, centre);
     }

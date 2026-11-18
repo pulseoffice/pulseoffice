@@ -98,7 +98,7 @@ public interface IPageFrames
 
 public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBlockTree tree, IPageFieldText fields, IPageNumberText numbers, IContinuousLayout continuous) : IPageFrames
 {
-    private readonly Dictionary<(string Style, bool First, bool Even, string Number, string Count), PageGeometry> _geometries = [];
+    private readonly Dictionary<(string Style, bool First, bool Even, string Number, string Count, bool Mirrored), PageGeometry> _geometries = [];
     private readonly Dictionary<(BlockContainer Container, string Number, string Count, double Width), (FlowKey Key, ComposedStory Story)> _stories = [];
 
     public void Clear()
@@ -138,10 +138,12 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
     public PageGeometry Geometry(TextDocument document, PageGeometry basis, PageSide side)
     {
         var style = document.Styles.Page.Find(basis.StyleName);
-        if (continuous.Page is not null || style is null || !style.Header.Enabled && !style.Footer.Enabled) return basis;
+        if (continuous.Page is not null || style is null) return basis;
+        var mirrored = style.Usage == PageUsage.Mirrored && side.Even;
+        if (!style.Header.Enabled && !style.Footer.Enabled) return mirrored ? Mirror(basis) : basis;
         var rendered = numbers.Render(style.NumberFormat, side.Number);
         var number = style.NumberFormat == NumberFormat.Arabic ? new string('0', rendered.Length) : rendered;
-        var key = (basis.StyleName, side.First && style.FirstPageDifferent, side.Even && style.EvenPagesDifferent, number, side.Count);
+        var key = (basis.StyleName, side.First && style.FirstPageDifferent, side.Even && style.EvenPagesDifferent, number, side.Count, mirrored);
         if (_geometries.TryGetValue(key, out var cached)) return cached;
         var count = style.NumberFormat != NumberFormat.Arabic && int.TryParse(side.Count, System.Globalization.CultureInfo.InvariantCulture, out var total) ? numbers.Render(style.NumberFormat, total) : side.Count;
         var header = Height(document, style, style.Header, side, number, count, basis.Content.Width);
@@ -149,9 +151,19 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
         var content = basis.Content;
         var body = new LayoutRect(content.X, content.Y + header, content.Width, Math.Max(1, content.Height - header - footer));
         cached = basis with { Body = body, HeaderHeight = header, FooterHeight = footer };
+        if (mirrored) cached = Mirror(cached);
         _geometries[key] = cached;
         return cached;
     }
+
+    private PageGeometry Mirror(PageGeometry geometry) => geometry with
+    {
+        Content = Mirror(geometry.Content, geometry.Width),
+        Body = Mirror(geometry.Body, geometry.Width),
+        Decor = geometry.Decor with { Frame = Mirror(geometry.Decor.Frame, geometry.Width) },
+    };
+
+    private LayoutRect Mirror(LayoutRect rect, double pageWidth) => rect with { X = pageWidth - rect.X - rect.Width };
 
     public PageStories Stories(TextDocument document, PageBox page, int pageCount, bool first)
     {

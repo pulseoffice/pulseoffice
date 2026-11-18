@@ -238,12 +238,17 @@ public sealed class FolioReviewSource : IReviewSource
         string.Join("\n", comment.Content.Blocks.OfType<ParagraphBlock>().Select(paragraph => paragraph.Text));
 
     private ReviewItem Item(TrackedChange change, string text, IReadOnlyDictionary<string, uint> palette) =>
-        new(change.Id, change.Kind switch
+        new(change.Id, change switch
         {
-            ChangeKind.Insertion => ReviewItemKind.Insertion,
-            ChangeKind.Deletion => ReviewItemKind.Deletion,
-            ChangeKind.Format => ReviewItemKind.Format,
-            _ => ReviewItemKind.ParagraphFormat,
+            Insertion { MoveId: not null } => ReviewItemKind.MovedTo,
+            Deletion { MoveId: not null } => ReviewItemKind.MovedFrom,
+            _ => change.Kind switch
+            {
+                ChangeKind.Insertion => ReviewItemKind.Insertion,
+                ChangeKind.Deletion => ReviewItemKind.Deletion,
+                ChangeKind.Format => ReviewItemKind.Format,
+                _ => ReviewItemKind.ParagraphFormat,
+            },
         }, change.Author, change.Date, text, palette.TryGetValue(change.Author, out var color) ? color : 0xFF808080)
         {
             Note = change.Comment,

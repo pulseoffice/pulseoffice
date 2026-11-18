@@ -69,7 +69,7 @@ public sealed class DocxWriteContext(TextDocument document, OpenXmlPart part)
 
     public string? OpenInsertion { get; set; }
 
-    public List<(DocumentFormat.OpenXml.OpenXmlCompositeElement Element, string MoveId)> Moves { get; } = [];
+    public List<(DocumentFormat.OpenXml.OpenXmlElement Element, string MoveId)> Moves { get; } = [];
 
     public Dictionary<string, PulseOffice.Documents.Annotations.TrackedChange> SplitChanges { get; } = new(StringComparer.Ordinal);
 

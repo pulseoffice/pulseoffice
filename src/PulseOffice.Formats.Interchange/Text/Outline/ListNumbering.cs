@@ -6,20 +6,20 @@ public sealed class ListNumbering
 {
     private readonly PulseOffice.Text.Rich.NumberSystems _systems = new();
 
-    public string Label(ListPlacement placement, int value) => placement.Kind switch
+    public string Label(ListPlacement placement, int value, string? language = null) => placement.Kind switch
     {
         ListKind.None => string.Empty,
         ListKind.Bullet => "\u2022",
-        _ => Format(value, placement.Format) + ".",
+        _ => Format(value, placement.Format, language) + ".",
     };
 
-    private string Format(int value, NumberFormat format) => format switch
+    public string Format(int value, NumberFormat format, string? language = null) => format switch
     {
         NumberFormat.LowerLetter => Letters(value).ToLowerInvariant(),
         NumberFormat.UpperLetter => Letters(value),
         NumberFormat.LowerRoman => Roman(value).ToLowerInvariant(),
         NumberFormat.UpperRoman => Roman(value),
-        _ when Enum.TryParse<PulseOffice.Text.Rich.NumberSystem>(format.ToString(), out var system) => _systems.Render(system, value),
+        _ when Enum.TryParse<PulseOffice.Text.Rich.NumberSystem>(format.ToString(), out var system) => _systems.Render(system, value, language),
         _ => value.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 

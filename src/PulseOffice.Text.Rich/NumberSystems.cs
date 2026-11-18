@@ -24,25 +24,18 @@ public enum NumberSystem
 
 public interface INumberSystems
 {
-    string Render(NumberSystem system, int value);
+    string Render(NumberSystem system, int value, string? language = null);
 }
 
-public sealed class NumberSystems : INumberSystems
+public sealed class NumberSystems(INumberSpellers spellers) : INumberSystems
 {
     private const int LongestRepetition = 30;
-    private const int LargestSpelled = 999_999;
     private const int LargestCounted = 9_999;
 
-    private readonly string[] _units = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-
-    private readonly string[] _tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-
-    private readonly Dictionary<string, string> _ordinalWords = new(StringComparer.Ordinal)
+    public NumberSystems()
+        : this(new NumberSpellers())
     {
-        ["one"] = "first", ["two"] = "second", ["three"] = "third", ["five"] = "fifth", ["eight"] = "eighth",
-        ["nine"] = "ninth", ["twelve"] = "twelfth",
-    };
+    }
 
     private readonly (int Value, string Letter)[] _hebrew =
     [
@@ -65,45 +58,17 @@ public sealed class NumberSystems : INumberSystems
 
     private readonly string _ideographs = "〇一二三四五六七八九";
 
-    public string Render(NumberSystem system, int value) => system switch
+    public string Render(NumberSystem system, int value, string? language = null) => system switch
     {
         NumberSystem.DecimalZero => value is >= 0 and < 10 ? "0" + value.ToString(CultureInfo.InvariantCulture) : value.ToString(CultureInfo.InvariantCulture),
-        NumberSystem.Ordinal => value.ToString(CultureInfo.InvariantCulture) + OrdinalSuffix(value),
-        NumberSystem.OrdinalText => Capitalized(OrdinalWords(value)),
-        NumberSystem.CardinalText => Capitalized(Words(value)),
+        NumberSystem.Ordinal => value.ToString(CultureInfo.InvariantCulture) + spellers.For(language).OrdinalSuffix(value),
+        NumberSystem.OrdinalText => Capitalized(spellers.For(language).Ordinal(value)),
+        NumberSystem.CardinalText => Capitalized(spellers.For(language).Cardinal(value)),
         NumberSystem.Hebrew => Hebrew(value),
         NumberSystem.IdeographDigital => Digital(value),
         NumberSystem.ChineseCounting => Counting(value),
         _ => Alphabetic(_alphabets[system], value),
     };
-
-    private string OrdinalSuffix(int value)
-    {
-        var lastTwo = Math.Abs(value) % 100;
-        if (lastTwo is >= 11 and <= 13) return "th";
-        return (Math.Abs(value) % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
-    }
-
-    private string Words(int value)
-    {
-        if (value < 0 || value > LargestSpelled) return value.ToString(CultureInfo.InvariantCulture);
-        if (value < 20) return _units[value];
-        if (value < 100) return _tens[value / 10] + (value % 10 == 0 ? string.Empty : "-" + _units[value % 10]);
-        if (value < 1000) return _units[value / 100] + " hundred" + (value % 100 == 0 ? string.Empty : " " + Words(value % 100));
-        return Words(value / 1000) + " thousand" + (value % 1000 == 0 ? string.Empty : " " + Words(value % 1000));
-    }
-
-    private string OrdinalWords(int value)
-    {
-        var words = Words(value);
-        if (value < 0 || value > LargestSpelled) return words + OrdinalSuffix(value);
-        var cut = Math.Max(words.LastIndexOf(' '), words.LastIndexOf('-')) + 1;
-        var last = words[cut..];
-        var ordinal = _ordinalWords.TryGetValue(last, out var irregular) ? irregular
-            : last.EndsWith('y') ? last[..^1] + "ieth"
-            : last + "th";
-        return words[..cut] + ordinal;
-    }
 
     private string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 

@@ -114,6 +114,8 @@ public sealed record TextRun(string Text)
 
     public bool DoubleUnderline { get; init; }
 
+    public bool DoubleStrikethrough { get; init; }
+
     public bool Overline { get; init; }
 
     public bool Shadow { get; init; }

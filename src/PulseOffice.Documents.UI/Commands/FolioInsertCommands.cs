@@ -128,7 +128,7 @@ public sealed class FolioInsertCommands(
         {
             editor.Insert((documents, at) => documents.InsertTable(editor.Document, editor.History, at, choice.Rows, choice.Columns), "insert-table");
             if (container.Blocks.OfType<PulseOffice.Documents.Blocks.TableBlock>().FirstOrDefault(table => !existing.Contains(table.Id)) is not { } created) return;
-            looks.Apply(editor, created, choice.Look, choice.HeaderRow, new PulseOffice.Document.Tables.TableBanding { BandedRows = choice.BandedRows });
+            looks.Apply(editor, created, choice.Look, choice.HeaderRow, choice.Banding);
             if (created.Cell(0, 0).Content.Blocks.OfType<PulseOffice.Documents.Blocks.ParagraphBlock>().FirstOrDefault() is { } first)
                 editor.Select(new PulseOffice.Documents.Editing.DocumentPosition(first.Id, 0), new PulseOffice.Documents.Editing.DocumentPosition(first.Id, 0));
         }
@@ -188,17 +188,21 @@ public sealed class FolioInsertCommands(
             target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "remove-hyperlink", run => run with { Hyperlink = null }), links.Range(target));
             return;
         }
-        if (target.HasSelection || current is not null)
+        using (target.History.BeginTransaction("hyperlink"))
         {
-            target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "hyperlink", run => run with { Hyperlink = choice.Address }), links.Range(target));
-            return;
+            var address = links.Settle(target.Document, target.History, choice.Address);
+            if (target.HasSelection || current is not null)
+            {
+                target.Apply((documents, range) => documents.MapRuns(target.Document, target.History, range, "hyperlink", run => run with { Hyperlink = address }), links.Range(target));
+                return;
+            }
+            var shown = choice.Text.ReplaceLineEndings(" ");
+            target.Insert((documents, at) =>
+            {
+                documents.InsertText(target.Document, target.History, at, shown);
+                documents.MapRuns(target.Document, target.History, DocumentRange.In(at.ParagraphId, at.Offset, at.Offset + shown.Length), "hyperlink",
+                    run => run with { Hyperlink = address });
+            }, "hyperlink");
         }
-        var shown = choice.Text.ReplaceLineEndings(" ");
-        target.Insert((documents, at) =>
-        {
-            documents.InsertText(target.Document, target.History, at, shown);
-            documents.MapRuns(target.Document, target.History, DocumentRange.In(at.ParagraphId, at.Offset, at.Offset + shown.Length), "hyperlink",
-                run => run with { Hyperlink = choice.Address });
-        }, "hyperlink");
     }
 }

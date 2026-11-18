@@ -115,7 +115,7 @@ internal abstract class SeriesLayout
             });
         }
 
-        return new ChartData(categories, series) { OrdinalCategories = !CategoriesFromCells(definition) };
+        return new ChartData(categories, series) { OrdinalCategories = !CategoriesFromCells(definition) }.WithCategoryLevels(definition.CategoryLevels);
     }
 
     public abstract ChartDefinition Fit(ChartDefinition definition, CellRange range);

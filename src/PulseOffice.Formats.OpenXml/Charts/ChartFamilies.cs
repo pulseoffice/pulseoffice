@@ -50,7 +50,7 @@ internal abstract class ChartFamily
     public virtual int Lead(IReadOnlyList<int> bundle) => bundle[0];
 
     public virtual IEnumerable<OpenXmlElement> Data(ISeriesSource source, ChartData data, IReadOnlyList<int> bundle) =>
-        [Categories(source.Categories(data.Categories)), Values(source.Values(bundle[0], data.Series[bundle[0]].Values))];
+        [Categories(source.Categories(data)), Values(source.Values(bundle[0], data.Series[bundle[0]].Values))];
 
     public virtual OpenXmlElement Values(OpenXmlElement values) => values;
 
@@ -339,7 +339,7 @@ internal sealed class BubbleFamily : ChartFamily
 
     public override IEnumerable<OpenXmlElement> Data(ISeriesSource source, ChartData data, IReadOnlyList<int> bundle)
     {
-        var x = bundle.Count > 1 ? Moved(new C.XValues(), source.Values(bundle[0], data.Series[bundle[0]].Values)) : Moved(new C.XValues(), source.Categories(data.Categories));
+        var x = bundle.Count > 1 ? Moved(new C.XValues(), source.Values(bundle[0], data.Series[bundle[0]].Values)) : Moved(new C.XValues(), source.Categories(data));
         var y = Lead(bundle);
         var size = bundle.Count > 2 ? bundle[2] : y;
         return [x, Moved(new C.YValues(), source.Values(y, data.Series[y].Values)), Moved(new C.BubbleSize(), source.Values(size, data.Series[size].Values))];

@@ -158,6 +158,7 @@ internal sealed class HtmlWriteSession(TextDocument document, IParagraphSemantic
     private readonly StringBuilder _html = new();
     private readonly List<(ListKind Kind, NumberFormat Format, string Thread, int Next)> _lists = [];
     private readonly ListThreadCounters _counters = new(document.Styles);
+    private readonly ListNumbering _numbering = new();
     private readonly List<bool> _items = [];
     private readonly List<(Note Note, string Name)> _notes = [];
     private readonly HashSet<string> _paragraphStyles = new(StringComparer.Ordinal);
@@ -292,8 +293,9 @@ internal sealed class HtmlWriteSession(TextDocument document, IParagraphSemantic
         var heading = semantics.HeadingLevel(document.Styles, content);
         var list = semantics.List(document.Styles, content);
         int? itemValue = null;
+        var itemNumber = 0;
         if (list.Kind == ListKind.None) CloseLists(html, 0);
-        else itemValue = OpenLists(html, list, content with { ListStyleName = list.StyleName });
+        else (itemValue, itemNumber) = OpenLists(html, list, content with { ListStyleName = list.StyleName });
 
         var tag = list.Kind != ListKind.None ? "li" : heading > 0 ? "h" + Math.Min(heading, 6).ToString(CultureInfo.InvariantCulture) : "p";
         var frames = document.Objects.All.Where(item => item.Content is TextBoxContent && item.Anchor is ParagraphAnchor or CharacterAnchor && item.Anchor.Accept(new AnchorParagraph()) == block.Id).ToList();
@@ -321,6 +323,11 @@ internal sealed class HtmlWriteSession(TextDocument document, IParagraphSemantic
         {
             html.Append(" data-list-header=\"true\"");
             css += "list-style-type:none;counter-increment:list-item 0;";
+        }
+        else if (tag == "li" && list.Kind == ListKind.Numbered && ListStyleKeyword(list.Format) is null && ListTypeAttribute(list.Format) is null && list.Format != NumberFormat.Arabic)
+        {
+            var label = _numbering.Format(itemNumber, list.Format, content.Runs.Select(run => run.Language).FirstOrDefault(language => language is not null) ?? document.Language);
+            css += "list-style-type:'" + WebUtility.HtmlEncode(label.Replace("'", "\\'", StringComparison.Ordinal)) + ". ';";
         }
         if (content.Text.Contains("  ", StringComparison.Ordinal) || content.Text.Contains('\t') || content.Text.StartsWith(' ') || content.Text.EndsWith(' '))
             css += "white-space:pre-wrap;";
@@ -500,7 +507,28 @@ internal sealed class HtmlWriteSession(TextDocument document, IParagraphSemantic
     private bool Safe(string link) =>
         link.StartsWith('#') || Uri.TryCreate(link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" or "mailto" or "ftp" or "file";
 
-    private int? OpenLists(StringBuilder html, ListPlacement list, TextParagraph paragraph)
+    private string? ListTypeAttribute(NumberFormat format) => format switch
+    {
+        NumberFormat.LowerLetter => "a",
+        NumberFormat.UpperLetter => "A",
+        NumberFormat.LowerRoman => "i",
+        NumberFormat.UpperRoman => "I",
+        _ => null,
+    };
+
+    private string? ListStyleKeyword(NumberFormat format) => format switch
+    {
+        NumberFormat.DecimalZero => "decimal-leading-zero",
+        NumberFormat.Hebrew => "hebrew",
+        NumberFormat.Hiragana => "hiragana",
+        NumberFormat.Katakana => "katakana",
+        NumberFormat.KatakanaIroha => "katakana-iroha",
+        NumberFormat.IdeographDigital => "cjk-decimal",
+        NumberFormat.ChineseCounting => "simp-chinese-informal",
+        _ => null,
+    };
+
+    private (int? ItemValue, int Value) OpenLists(StringBuilder html, ListPlacement list, TextParagraph paragraph)
     {
         var depth = list.Level + 1;
         var thread = _counters.Thread(paragraph);
@@ -529,21 +557,15 @@ internal sealed class HtmlWriteSession(TextDocument document, IParagraphSemantic
             var start = !numbered ? 1 : innermost ? value : _counters.Upcoming(paragraph, _lists.Count);
             html.Append('<').Append(tag);
             if (start != 1) html.Append(" start=\"").Append(start.ToString(CultureInfo.InvariantCulture)).Append('"');
-            var type = list.Format switch
-            {
-                NumberFormat.LowerLetter => "a",
-                NumberFormat.UpperLetter => "A",
-                NumberFormat.LowerRoman => "i",
-                NumberFormat.UpperRoman => "I",
-                _ => null,
-            };
+            var type = ListTypeAttribute(list.Format);
             if (list.Kind == ListKind.Numbered && type is not null) html.Append(" type=\"").Append(type).Append('"');
+            if (list.Kind == ListKind.Numbered && ListStyleKeyword(list.Format) is { } keyword) html.Append(" style=\"list-style-type:").Append(keyword).Append('"');
             html.Append('>');
             _lists.Add((list.Kind, list.Format, thread, innermost ? value + 1 : start));
             _items.Add(false);
         }
         _items[^1] = true;
-        return itemValue;
+        return (itemValue, value);
     }
 
     private void CloseLists(StringBuilder html, int depth)

@@ -120,7 +120,7 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         collector.Marks.AddRange(ranges.ParagraphEnd(context));
         CloseFormat(collector);
         UnclosedField(collector);
-        context.OpenInsertion = paragraphMarks.Insertion(paragraph) is { } mark ? Continue(mark, collector) : null;
+        context.OpenInsertion = paragraphMarks.Insertion(paragraph) is { } mark ? Continue(mark, paragraphMarks.MarkMoveId(paragraph, mark), collector) : null;
         var runs = Merge(collector.Runs);
         if (runs.Count == 0 && paragraph.ParagraphProperties?.ParagraphMarkRunProperties is { } markProperties && characters.Read(markProperties) is { FontSize: not null } sized)
             runs = [formatting.Set(new TextRun(string.Empty), sized)];
@@ -257,24 +257,12 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         Walk(sdt.SdtContentRun?.ChildElements ?? Enumerable.Empty<OpenXmlElement>(), collector);
     }
 
-    private DateTimeOffset Date(DateTime? value) =>
-        value is { } date ? new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Utc)) : DateTimeOffset.MinValue;
+    private DateTimeOffset Date(DateTime? value) => paragraphMarks.Date(value);
 
-    private string MoveId(string? name, string? author, DateTime? date) =>
-        "move-" + (name is { Length: > 0 } ? name : (author ?? string.Empty) + "|" + Date(date).ToString("O", CultureInfo.InvariantCulture));
+    private string MoveId(string? name, string? author, DateTime? date) => paragraphMarks.MoveId(name, author, date);
 
-    private string? RangeName<TStart>(OpenXmlElement element, Func<TStart, string?> name) where TStart : OpenXmlElement
-    {
-        for (var node = element; node.Parent is not null; node = node.Parent)
-        {
-            foreach (var sibling in node.ElementsBefore().Reverse())
-            {
-                if (sibling is TStart start) return name(start);
-                if (sibling.Descendants<TStart>().LastOrDefault() is { } inner) return name(inner);
-            }
-        }
-        return null;
-    }
+    private string? RangeName<TStart>(OpenXmlElement element, Func<TStart, string?> name) where TStart : OpenXmlElement =>
+        paragraphMarks.RangeName(element, name);
 
     private void Inserted(string? author, DateTime? date, IEnumerable<OpenXmlElement> children, Collector collector, string? moveId)
     {
@@ -300,18 +288,18 @@ public sealed class DocxInlineReader(IDirectFormatting formatting, DocxCharacter
         collector.LastInsertion = change;
     }
 
-    private Insertion Continue(W.TrackChangeType mark, Collector collector)
+    private Insertion Continue(W.TrackChangeType mark, string? moveId, Collector collector)
     {
         var author = mark.Author?.Value ?? string.Empty;
         var when = Date(mark.Date?.Value);
         var change = collector.LastInsertion;
         var closing = change is null ? -1 : collector.Marks.FindLastIndex(found => found is ChangeMark { Edge: MarkEdge.End } end && end.ChangeId == change.Id && end.Offset == collector.Length);
-        if (change is not null && closing >= 0 && change.Author == author && change.Date == when)
+        if (change is not null && closing >= 0 && change.Author == author && change.Date == when && change.MoveId == moveId)
         {
             collector.Marks.RemoveAt(closing);
             return change;
         }
-        var created = new Insertion(collector.Context.Document.NextId("change"), author, when);
+        var created = new Insertion(collector.Context.Document.NextId("change"), author, when) { MoveId = moveId };
         collector.Context.Document.Changes.Add(created);
         collector.Marks.Add(new ChangeMark(collector.Length, created.Id, MarkEdge.Start));
         return created;

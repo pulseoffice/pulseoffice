@@ -36,9 +36,9 @@ public class Round190InlineErrorValueTests
     }
 
     [Fact]
-    public void References_outside_the_table_keep_their_cache()
+    public void References_below_the_table_keep_their_cache()
     {
-        var chart = Chart("Sheet1!$D$2:$D$3", 7, 7);
+        var chart = Chart("Sheet1!$D$5:$D$6", 7, 7);
 
         Assert.Same(chart, _refresh.Refresh(chart));
     }

@@ -70,7 +70,7 @@ internal sealed class DeckTextEditing(DeckViewState state, IDeckViewHost host, D
         return mapped.End > mapped.Start ? mapped : null;
     }
 
-    public bool InsertParagraphsAtCaret(IReadOnlyList<TextParagraph> paragraphs)
+    public bool InsertParagraphsAtCaret(IReadOnlyList<TextParagraph> paragraphs, string? labelKey = null)
     {
         if (_host.RichInsertion is not { } insertion || _editor is not { } editor || _state.Editing is not { } element || _state.Current is null) return false;
 
@@ -80,7 +80,7 @@ internal sealed class DeckTextEditing(DeckViewState state, IDeckViewHost host, D
         if (_state.Current.Find(element.Id) is not TextElement live) return false;
 
         var range = (map.Map(start), map.Map(end));
-        _actions.EditText(_state.Current, element.Id, insertion.Insert(live.Text, range, paragraphs));
+        _actions.EditText(_state.Current, element.Id, insertion.Insert(live.Text, range, paragraphs), labelKey ?? "deck.action.editText");
 
         _state.Selected = _state.Current.Find(element.Id);
         _state.SelectedText = _state.Selected as TextElement;

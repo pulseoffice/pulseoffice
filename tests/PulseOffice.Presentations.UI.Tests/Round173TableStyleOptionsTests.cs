@@ -32,13 +32,13 @@ public sealed class Round173TableStyleOptionsTests
     [Fact]
     public void First_column_emphasis_sets_the_flag_and_bolds_only_that_column_and_clearing_it_restores()
     {
-        var on = _options.Apply(Table(), new DeckTableEmphasis(true, false, false, false));
+        var on = _options.Apply(Table(), new PulseOffice.UI.Controls.Tables.TableLookOptionsChoice(true, new PulseOffice.Document.Tables.TableBanding { BandedRows = false, FirstColumn = true, LastColumn = false, LastRow = false, BandedColumns = false }));
 
         Assert.True(on.Style.FirstColumn);
         Assert.True(At(on, 0, 0).Bold);
         Assert.False(At(on, 0, 1).Bold);
 
-        var off = _options.Apply(on, new DeckTableEmphasis(false, false, false, false));
+        var off = _options.Apply(on, new PulseOffice.UI.Controls.Tables.TableLookOptionsChoice(true, new PulseOffice.Document.Tables.TableBanding { BandedRows = false, FirstColumn = false, LastColumn = false, LastRow = false, BandedColumns = false }));
         Assert.False(off.Style.FirstColumn);
         Assert.False(At(off, 1, 0).Bold);
     }
@@ -46,7 +46,7 @@ public sealed class Round173TableStyleOptionsTests
     [Fact]
     public void Banded_columns_fill_the_odd_columns()
     {
-        var banded = _options.Apply(Table(), new DeckTableEmphasis(false, false, false, true));
+        var banded = _options.Apply(Table(), new PulseOffice.UI.Controls.Tables.TableLookOptionsChoice(true, new PulseOffice.Document.Tables.TableBanding { BandedRows = false, FirstColumn = false, LastColumn = false, LastRow = false, BandedColumns = true }));
 
         Assert.True(banded.Style.BandedColumns);
         Assert.Null(At(banded, 0, 0).FillHex);

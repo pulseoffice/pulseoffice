@@ -113,6 +113,8 @@ public sealed class ChangeSpans(IChangeRegions regions, IAuthorColors colors) : 
 
 public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : IChangeMarkup
 {
+    private const uint MoveColor = 0xFF008A00;
+
     private readonly Dictionary<string, (TextParagraph Source, string Key, MarkedParagraph Result)> _cache = new(StringComparer.Ordinal);
 
     public MarkedParagraph? Mark(TextDocument document, ParagraphBlock block, TextParagraph content)
@@ -129,8 +131,15 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
         {
             var start = Math.Clamp(span.Start, 0, length);
             var end = Math.Clamp(span.End, start, length);
+            var moved = Moved(document, span);
             switch (span.Kind)
             {
+                case ChangeKind.Insertion when end > start && moved:
+                    state = text.Map(state, start, end, run => run with { DoubleUnderline = true, Color = MoveColor });
+                    break;
+                case ChangeKind.Deletion when end > start && moved:
+                    state = text.Map(state, start, end, run => run with { DoubleStrikethrough = true, Color = MoveColor });
+                    break;
                 case ChangeKind.Insertion when end > start:
                     state = text.Map(state, start, end, run => run with { Underline = true, Color = span.Color });
                     break;
@@ -141,7 +150,7 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
                     state = text.Map(state, start, end, run => run with { Bold = true, Color = span.Color });
                     break;
                 case ChangeKind.Deletion when document.Changes.Find(span.ChangeId) is Deletion { Removed.Count: > 0 } deletion:
-                    deletions.AddRange(Words(Removed(deletion)).Select(word => new InlineInsertion(start, InlineKind.Deleted, span.ChangeId, word, 0, 0) { Ink = span.Color, Underlined = Nested(document, deletion) }));
+                    deletions.AddRange(Words(Removed(deletion)).Select(word => new InlineInsertion(start, InlineKind.Deleted, span.ChangeId, word, 0, 0) { Ink = moved ? MoveColor : span.Color, Underlined = Nested(document, deletion), Moved = moved }));
                     break;
             }
         }
@@ -157,12 +166,20 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
         {
             builder.Append(span.ChangeId).Append(':').Append(span.Start.ToString(CultureInfo.InvariantCulture)).Append('-')
                 .Append(span.End.ToString(CultureInfo.InvariantCulture)).Append(':').Append(span.Color.ToString(CultureInfo.InvariantCulture));
+            if (Moved(document, span)) builder.Append(":m");
             if (span.Kind == ChangeKind.Deletion && document.Changes.Find(span.ChangeId) is Deletion deletion)
                 builder.Append(':').Append(RuntimeHelpers.GetHashCode(deletion).ToString(CultureInfo.InvariantCulture)).Append(Nested(document, deletion) ? ":n" : string.Empty);
             builder.Append(';');
         }
         return builder.ToString();
     }
+
+    private bool Moved(TextDocument document, ChangeSpan span) => document.Changes.Find(span.ChangeId) switch
+    {
+        Insertion insertion => insertion.MoveId is not null,
+        Deletion deletion => deletion.MoveId is not null,
+        _ => false,
+    };
 
     private bool Nested(TextDocument document, Deletion deletion) =>
         deletion.WithinInsertion is { } within && document.Changes.Find(within) is Insertion;

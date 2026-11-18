@@ -50,7 +50,7 @@ public sealed record DeckTarget(
 
     public Action<string> EditText { get; init; } = _ => { };
 
-    public Func<IReadOnlyList<TextParagraph>, bool> InsertParagraphsAtCaret { get; init; } = _ => false;
+    public Func<IReadOnlyList<TextParagraph>, string?, bool> InsertParagraphsAtCaret { get; init; } = (_, _) => false;
 
     public Func<RichText?> ShapeText { get; init; } = () => null;
 

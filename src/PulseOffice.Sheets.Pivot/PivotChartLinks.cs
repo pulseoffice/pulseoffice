@@ -13,9 +13,13 @@ public interface IPivotChartLinks
     int Detach(Workbook workbook, PivotDefinition pivot);
 }
 
-public sealed class PivotChartLinks(IChartSourceReferences references, IChartDataExtractor extractor) : IPivotChartLinks
+public sealed class PivotChartLinks(IChartSourceReferences references, IChartDataExtractor extractor, IChartCategoryGroups groups) : IPivotChartLinks
 {
     public PivotChartLinks() : this(new ChartSourceReferences(), new ChartDataExtractor())
+    {
+    }
+
+    public PivotChartLinks(IChartSourceReferences references, IChartDataExtractor extractor) : this(references, extractor, new ChartCategoryGroups())
     {
     }
 
@@ -68,6 +72,7 @@ public sealed class PivotChartLinks(IChartSourceReferences references, IChartDat
             FirstRowIsHeader = true,
             FirstColumnIsCategory = true,
             PivotSource = (chart.PivotSource ?? new ChartPivotSource(pivot.Name)) with { PivotName = pivot.Name },
+            CategoryLevels = rowFields > 1 ? groups.Compact([.. leafRows.Select(row => table.Rows[row].Path)], rowFields - 1) : null,
         };
     }
 
@@ -87,6 +92,7 @@ public sealed class PivotChartLinks(IChartSourceReferences references, IChartDat
             SourceRange = string.Empty,
             SeriesSources = null,
             PivotSource = null,
+            CategoryLevels = null,
         });
     }
 

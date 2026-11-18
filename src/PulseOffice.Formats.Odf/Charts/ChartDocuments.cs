@@ -319,23 +319,51 @@ internal sealed class InlineChartDocumentBuilder(OdfChartVocabulary vocabulary, 
     protected override string LabelAddress(ChartDefinition definition, int series) =>
         $"local-table.{new CellAddress(0, series + 1).ToA1().TrimEnd('1')}1";
 
+    private const int MostColumns = 1024;
+
     protected override IEnumerable<XElement> Supplement(ChartData data, CultureInfo culture)
     {
+        var hidden = (data.HiddenColumns ?? [])
+            .Where(column => column.Column > data.Series.Count && column.Column < MostColumns)
+            .GroupBy(column => column.Column)
+            .ToDictionary(group => group.Key, group => group.First());
+        IReadOnlyList<IReadOnlyList<string>> levels = data.CategoryLevels ?? [];
+        var levelColumn = Math.Max(data.Series.Count, hidden.Keys.DefaultIfEmpty(0).Max()) + 1;
+        var width = levelColumn + levels.Count;
+
         var table = new XElement(Table + "table", new XAttribute(Table + "name", "local-table"),
+            levels.Count > 0 ? new XAttribute(PulseChart + "category-level-column", levelColumn.ToString(CultureInfo.InvariantCulture)) : null,
+            levels.Count > 0 ? new XAttribute(PulseChart + "category-level-count", levels.Count.ToString(CultureInfo.InvariantCulture)) : null,
             new XElement(Table + "table-header-columns", new XElement(Table + "table-column")),
             new XElement(Table + "table-columns", new XElement(Table + "table-column",
-                new XAttribute(Table + "number-columns-repeated", Math.Max(1, data.Series.Count)))),
+                new XAttribute(Table + "number-columns-repeated", Math.Max(1, width - 1)))),
             new XElement(Table + "table-header-rows",
-                new XElement(Table + "table-row", TextCell(string.Empty), data.Series.Select(series => TextCell(series.Name)))));
+                new XElement(Table + "table-row", Enumerable.Range(0, width).Select(column =>
+                    TextCell(column >= 1 && column <= data.Series.Count ? data.Series[column - 1].Name : string.Empty)))));
 
         var rows = new XElement(Table + "table-rows");
         for (var row = 0; row < Rows(data); row++)
-            rows.Add(new XElement(Table + "table-row",
-                TextCell(row < data.Categories.Count ? data.Categories[row] : string.Empty),
-                data.Series.Select(series => NumberCell(row < series.Values.Count ? series.Values[row] : double.NaN, culture))));
+            rows.Add(new XElement(Table + "table-row", Enumerable.Range(0, width).Select(column => Cell(data, hidden, levels, levelColumn, row, column, culture))));
         table.Add(rows);
 
         yield return table;
+    }
+
+    private XElement Cell(ChartData data, IReadOnlyDictionary<int, ChartHiddenColumn> hidden, IReadOnlyList<IReadOnlyList<string>> levels, int levelColumn, int row, int column, CultureInfo culture)
+    {
+        if (column == 0) return TextCell(row < data.Categories.Count ? data.Categories[row] : string.Empty);
+        if (column <= data.Series.Count)
+        {
+            var values = data.Series[column - 1].Values;
+            return NumberCell(row < values.Count ? values[row] : double.NaN, culture);
+        }
+        if (hidden.TryGetValue(column, out var extra)) return NumberCell(row < extra.Values.Count ? extra.Values[row] : double.NaN, culture);
+        if (column >= levelColumn && column - levelColumn < levels.Count)
+        {
+            var level = levels[column - levelColumn];
+            return TextCell(row < level.Count ? level[row] : string.Empty);
+        }
+        return new XElement(Table + "table-cell");
     }
 
     private int Rows(ChartData data) => data.Series.Select(series => series.Values.Count).Append(data.Categories.Count).Max();

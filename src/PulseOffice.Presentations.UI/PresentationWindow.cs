@@ -188,6 +188,7 @@ public sealed class PresentationWindow : Window
             _ink.Children.Clear();
             _media.Clear();
             _inkSlideIndex = _controller.SlideIndex;
+            _media.StartAutomatic(_controller.Current);
         }
 
         if (_withoutAnimation)

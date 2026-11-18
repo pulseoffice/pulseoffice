@@ -67,7 +67,7 @@ public sealed class LedgerTableInsertCommands(
         {
             Context.SelectRange(range);
             if (choice.HeaderRow) Headings(engine, sheet, sheetIndex, range, title);
-            looks.ApplyToSelection(title, choice.Look, choice.HeaderRow, new PulseOffice.Document.Tables.TableBanding { BandedRows = choice.BandedRows });
+            looks.ApplyToSelection(title, choice.Look, choice.HeaderRow, choice.Banding);
             var definition = new DatabaseRange { Name = name, SheetIndex = sheetIndex, Range = range, HasHeader = choice.HeaderRow };
             workbook.DatabaseRanges.Define(definition);
             Context.History?.Push(new DelegateAction(title,

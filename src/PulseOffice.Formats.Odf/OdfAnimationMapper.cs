@@ -27,6 +27,7 @@ public sealed class OdfAnimationMapper
     private readonly OdfAnimationBehaviourCodec _codec = new();
 
     private readonly OdfAnimationParagraphs _paragraphs = new();
+    private readonly MediaAutoPlay _autoPlay = new();
 
     public void Identify(XElement page, Slide slide) => _paragraphs.Identify(page, slide);
 
@@ -38,7 +39,8 @@ public sealed class OdfAnimationMapper
 
     public XElement? Build(Slide slide, string pageId)
     {
-        if (slide.Animations.Count == 0 && slide.Transition.IsNone) return null;
+        var animations = _autoPlay.Animations(slide);
+        if (animations.Count == 0 && slide.Transition.IsNone) return null;
 
         var root = new XElement(Anim + "par", new XAttribute(Pres + "node-type", "timing-root"));
         if (!slide.Transition.IsNone)
@@ -52,10 +54,10 @@ public sealed class OdfAnimationMapper
             root.Add(new XElement(Anim + "par", new XAttribute(Smil + "begin", pageId + ".begin"), filter));
         }
 
-        if (slide.Animations.Count == 0) return root;
+        if (animations.Count == 0) return root;
 
-        var triggered = slide.Animations.Where(effect => effect.IsTriggered).ToList();
-        var main = slide.Animations.Except(triggered).ToList();
+        var triggered = animations.Where(effect => effect.IsTriggered).ToList();
+        var main = animations.Except(triggered).ToList();
         if (main.Count > 0 || triggered.Count == 0)
             root.Add(Sequence(new XElement(Anim + "seq", new XAttribute(Pres + "node-type", "main-sequence")), main, "indefinite"));
         foreach (var sequence in triggered.GroupBy(effect => effect.TriggerShapeId!))

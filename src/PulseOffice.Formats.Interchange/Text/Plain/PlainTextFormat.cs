@@ -89,7 +89,7 @@ public sealed class PlainTextWriter(IParagraphSemantics semantics, string? lineE
         try
         {
             using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true) { NewLine = _lineEnding };
-            Blocks(writer, document.Styles, document.Body, new ListThreadCounters(document.Styles));
+            Blocks(writer, document.Styles, document.Body, new ListThreadCounters(document.Styles), document.Language);
             writer.Flush();
             return OperationResult<bool>.Ok(true);
         }
@@ -99,7 +99,7 @@ public sealed class PlainTextWriter(IParagraphSemantics semantics, string? lineE
         }
     }
 
-    private void Blocks(StreamWriter writer, StyleSheet sheet, BlockContainer container, ListThreadCounters counters)
+    private void Blocks(StreamWriter writer, StyleSheet sheet, BlockContainer container, ListThreadCounters counters, string? language)
     {
         foreach (var block in container.Blocks)
         {
@@ -108,16 +108,16 @@ public sealed class PlainTextWriter(IParagraphSemantics semantics, string? lineE
                 case ParagraphBlock paragraph:
                     var placement = semantics.List(sheet, paragraph.Content);
                     var value = placement.Kind == ListKind.Numbered ? counters.Next(paragraph.Content with { ListStyleName = placement.StyleName }, placement.Level) : 0;
-                    var label = paragraph.Content.ListHeader ? string.Empty : _numbering.Label(placement, value);
+                    var label = paragraph.Content.ListHeader ? string.Empty : _numbering.Label(placement, value, paragraph.Content.Runs.Select(run => run.Language).FirstOrDefault(tag => tag is not null) ?? language);
                     var text = paragraph.Text.Replace("\n", _lineEnding, StringComparison.Ordinal);
                     writer.WriteLine(label.Length > 0 ? label + " " + text : text);
                     break;
                 case TableBlock table:
                     foreach (var cell in table.Rows.SelectMany(row => row.Cells).Where(cell => !cell.Covered))
-                        Blocks(writer, sheet, cell.Content, new ListThreadCounters(sheet));
+                        Blocks(writer, sheet, cell.Content, new ListThreadCounters(sheet), language);
                     break;
                 case SectionBlock section:
-                    Blocks(writer, sheet, section.Content, counters);
+                    Blocks(writer, sheet, section.Content, counters, language);
                     break;
             }
         }

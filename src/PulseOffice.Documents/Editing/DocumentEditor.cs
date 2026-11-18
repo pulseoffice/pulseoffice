@@ -323,7 +323,7 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
             return Math.Max(0, spanned - 2 * CellInset);
         }
         var page = document.Styles.Page.Find(document.InitialPageStyle);
-        return page is null ? DefaultTextWidth : Math.Max(0, page.Size.Width.Value - page.Margins.Left.Value - page.Margins.Right.Value);
+        return page is null ? DefaultTextWidth : Math.Max(0, page.Width.Value - page.Margins.Left.Value - page.Margins.Right.Value);
     }
 
     private const int DefaultTextWidth = 9638;

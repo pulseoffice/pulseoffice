@@ -99,27 +99,25 @@ public sealed class RtfVocabulary : IRtfVocabulary
         _ => 0,
     };
 
+    private readonly (NumberFormat Format, int Code)[] _listCodes =
+    [
+        (NumberFormat.Arabic, 0), (NumberFormat.Bullet, 23), (NumberFormat.None, 255), (NumberFormat.UpperRoman, 1),
+        (NumberFormat.LowerRoman, 2), (NumberFormat.UpperLetter, 3), (NumberFormat.LowerLetter, 4), (NumberFormat.Ordinal, 5),
+        (NumberFormat.CardinalText, 6), (NumberFormat.OrdinalText, 7), (NumberFormat.IdeographDigital, 10),
+        (NumberFormat.Katakana, 20), (NumberFormat.KatakanaIroha, 21), (NumberFormat.DecimalZero, 22),
+        (NumberFormat.ChineseCounting, 37), (NumberFormat.Hebrew, 45), (NumberFormat.ArabicAlpha, 46),
+        (NumberFormat.ArabicAbjad, 48), (NumberFormat.ThaiLetters, 53), (NumberFormat.RussianLower, 58),
+        (NumberFormat.RussianUpper, 59),
+    ];
+
     public NumberFormat ListFormat(int nfc) => nfc switch
     {
-        23 => NumberFormat.Bullet,
-        255 => NumberFormat.None,
-        1 => NumberFormat.UpperRoman,
-        2 => NumberFormat.LowerRoman,
-        3 => NumberFormat.UpperLetter,
-        4 => NumberFormat.LowerLetter,
-        _ => NumberFormat.Arabic,
+        12 => NumberFormat.Katakana,
+        13 => NumberFormat.KatakanaIroha,
+        _ => _listCodes.FirstOrDefault(entry => entry.Code == nfc, (Format: NumberFormat.Arabic, Code: 0)).Format,
     };
 
-    public int ListCode(NumberFormat format) => format switch
-    {
-        NumberFormat.Bullet => 23,
-        NumberFormat.None => 255,
-        NumberFormat.UpperRoman => 1,
-        NumberFormat.LowerRoman => 2,
-        NumberFormat.UpperLetter => 3,
-        NumberFormat.LowerLetter => 4,
-        _ => 0,
-    };
+    public int ListCode(NumberFormat format) => _listCodes.FirstOrDefault(entry => entry.Format == format, (Format: NumberFormat.Arabic, Code: 0)).Code;
 
     public string? ParagraphStyle(string name, StyleSheet sheet)
     {

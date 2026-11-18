@@ -242,6 +242,8 @@ internal sealed class GroupReader : OdpPageReader
 
 internal sealed class AnimationReader(OdfAnimationMapper animations) : OdpPageReader
 {
+    private readonly MediaAutoPlay _autoPlay = new();
+
     public override void Read(XElement page, SlideAssembly<string> assembly, OdpReadContext context)
     {
         var targets = new AnimationTargetResolver(page, assembly.ElementByFrame);
@@ -256,6 +258,7 @@ internal sealed class AnimationReader(OdfAnimationMapper animations) : OdpPageRe
                     ? effect with { TargetId = resolved[0], Paragraph = resolved.Count == 1 ? targets.Paragraph(effect.TargetId) : null }
                     : effect with { Id = $"{effect.Id}.{index}", TargetId = resolved[index], Trigger = AnimationTrigger.WithPrevious });
         }
+        _autoPlay.Absorb(assembly.Slide);
 
         if (!assembly.Slide.Transition.IsNone && animations.TransitionDuration(page) is { } duration)
             assembly.Slide.Transition = assembly.Slide.Transition with { DurationMs = duration };

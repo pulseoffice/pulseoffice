@@ -125,7 +125,7 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
         new(document => document.Styles.Paragraph.All.Select(style => style.Paragraph.Hyphenation).Concat(Paragraphs(document).Select(paragraph => paragraph.Hyphenation))
                 .Any(hyphenation => hyphenation is { Enabled: true } && hyphenation with { Enabled = true } != ParagraphHyphenation.On),
             Diagnostic.Info("DOCX036", "Word knows hyphenation only on or off per paragraph: minimum word length, characters before and after the break, consecutive hyphens and skipping capitalized words are lost in DOCX. ODT keeps them.")),
-        new(document => UsedPageStyles(document).Where(style => _starts.Mark(style, document) is null).Any(style => style.Usage != PageUsage.All
+        new(document => UsedPageStyles(document).Where(style => _starts.Mark(style, document) is null).Any(style => style.Usage != PageUsage.All && !(style.Usage == PageUsage.Mirrored && MirroredMargins(document))
                         || style.NextStyleName is { } next && next != style.Name && !(style.Name == DefaultStyleNames.FirstPage && next == DefaultStyleNames.Standard)),
             Diagnostic.Info("DOCX037", "Word sections have no left-only, right-only or mirrored page styles and no following page style: page usage and the next page style are lost in DOCX. ODT keeps them.")),
         new(document => Blocks(document.Body).OfType<SectionBlock>().Any(section => section.Columns.Count > 1 && !section.Columns.Balanced)
@@ -229,6 +229,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     private IEnumerable<TextRun> Runs(TextDocument document) => Paragraphs(document).SelectMany(paragraph => paragraph.Runs);
 
+    public bool MirroredMargins(TextDocument document) =>
+        UsedPageStyles(document).ToList() is { Count: > 0 } used && used.All(style => style.Usage == PageUsage.Mirrored);
+
     private IEnumerable<PageStyle> UsedPageStyles(TextDocument document) =>
         PageStyleNames(document).Distinct(StringComparer.Ordinal).Select(name => document.Styles.Page.Find(name)).OfType<PageStyle>();
 
@@ -251,6 +254,7 @@ public sealed class DocxWriter : ITextDocumentWriter
     private readonly DocxSectionCodec _sections;
     private readonly DocxAnnotationsCodec _annotations;
     private readonly FidelityRuleSet<TextDocument> _fidelity;
+    private readonly DocxFidelityRules _pageUsage;
     private readonly DocxEmbeddedFonts _fonts;
     private readonly DocxValues _values;
     private readonly DocxBibliography _bibliography;
@@ -273,6 +277,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         _sections = sections;
         _annotations = annotations;
         _fidelity = fidelity.Create();
+        _pageUsage = fidelity;
     }
 
     public TextDocumentFormat Format => _flavour.Format;
@@ -442,6 +447,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         }
     }
 
+
     private PageStyle PageStyle(TextDocument document, string name) => document.Styles.Page.Find(name) ?? new PageStyle(name);
 
     private string? Background(TextDocument document) =>
@@ -454,6 +460,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         var settings = new W.Settings();
         if (Background(document) is not null) settings.Append(new W.DisplayBackgroundShape());
         if (document.Fonts.EmbedSystemFonts || document.Fonts.HasFiles) settings.Append(new W.EmbedTrueTypeFonts());
+        if (_pageUsage.MirroredMargins(document)) settings.Append(new W.MirrorMargins());
         if (document.FormSettings.OpenInDesignMode) settings.Append(new W.FormsDesign());
         if (!document.Changes.ShowChanges) settings.Append(new W.RevisionView { Markup = false, DisplayRevision = false, Formatting = false });
         if (document.Changes.IsRecording) settings.Append(new W.TrackRevisions());

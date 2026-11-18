@@ -48,7 +48,6 @@ public sealed class DocxReader : ITextDocumentReader
         ["DOCX113"] = Diagnostic.Info("DOCX113", "Comments and notes that are not anchored anywhere in the text, which Word does not show, are not imported."),
         ["DOCX117"] = Diagnostic.Info("DOCX117", "Tracked changes inside field instructions are not imported: each field keeps its current instruction."),
         ["DOCX120"] = Diagnostic.Warning("DOCX120", "Tracked changes in the text of grouped shapes are imported as accepted."),
-        ["DOCX224"] = Diagnostic.Info("DOCX224", "Paragraph marks moved with tracked moves are imported as a separate tracked deletion and insertion: the moved text stays linked, but accepting or rejecting it does not settle the moved paragraph break."),
         ["DOCX121"] = Diagnostic.Warning("DOCX121", "Tracked insertions, deletions and merges of single table cells are imported as accepted: the table keeps its current cells."),
         ["DOCX160"] = Diagnostic.Info("DOCX160", "Fields nested inside the instruction of a Word field are imported as the value they last showed, except merge fields, document variables and references compared by an IF field, which become names in its condition."),
         ["DOCX161"] = Diagnostic.Info("DOCX161", "Fields nested inside the result of a Word form field or hyperlink field are imported as part of that result: the inner field is not kept on its own."),
@@ -63,6 +62,7 @@ public sealed class DocxReader : ITextDocumentReader
         ["DOCX170"] = Diagnostic.Info("DOCX170", "Hyperlinks without any text, which Word does not show, are not imported."),
         ["DOCX182"] = Diagnostic.Warning("DOCX182", "Footnote and endnote marks whose note is missing from the file are not imported: the note text cannot be found."),
         ["DOCX183"] = Diagnostic.Warning("DOCX183", "Shapes with a preset geometry name that is not part of the DrawingML standard are imported as rectangles."),
+        ["DOCX245"] = Diagnostic.Warning("DOCX245", "Word section columns of different widths are imported as columns of equal width with the first gap."),
         ["DOCX244"] = Diagnostic.Warning("DOCX244", "Word list numbers in formats PulseOffice does not have, such as hexadecimal, Korean or Hindi numbering, are imported as Arabic numbers."),
         ["DOCX173"] = Diagnostic.Info("DOCX173", "Picture bullets of Word lists whose picture is missing are imported as the character bullet Word keeps beside them."),
         ["DOCX172"] = Diagnostic.Warning("DOCX172", "Floating tables longer than a page are imported as ordinary tables in the text, not as floating frames: their position and the text wrapping around them are lost."),
@@ -131,6 +131,7 @@ public sealed class DocxReader : ITextDocumentReader
             foreach (var list in _numbering.Read(main.NumberingDefinitionsPart?.Numbering, context.Lists)) document.Styles.List.Replace(list);
             if (_numbering.LosesPictures(main.NumberingDefinitionsPart?.Numbering)) context.Losses.Add("DOCX173");
             if (_numbering.LosesFormats(main.NumberingDefinitionsPart?.Numbering)) context.Losses.Add("DOCX244");
+            if (main.Document?.Descendants<W.Columns>().Any(_sections.UnequalWidths) == true) context.Losses.Add("DOCX245");
             if (_unknownPresets.Present(main.Document) || main.HeaderParts.Any(part => _unknownPresets.Present(part.Header)) || main.FooterParts.Any(part => _unknownPresets.Present(part.Footer)))
                 context.Losses.Add("DOCX183");
             var styles = main.StyleDefinitionsPart?.Styles;
@@ -161,7 +162,6 @@ public sealed class DocxReader : ITextDocumentReader
             if (body.Descendants<W.DeletedFieldCode>().Any(code => !WholeDeletedField(code)) || body.Descendants<W.InsertedRun>().Concat<OpenXmlElement>(body.Descendants<W.MoveToRun>()).Any(run => run.Descendants<W.FieldCode>().Any())) context.Losses.Add("DOCX117");
             if (body.Descendants<DocumentFormat.OpenXml.Office2010.Word.DrawingGroup.WordprocessingGroup>().Concat<OpenXmlElement>(body.Descendants<DocumentFormat.OpenXml.Vml.Group>())
                 .Any(group => group.Descendants<W.InsertedRun>().Any() || group.Descendants<W.DeletedRun>().Any() || group.Descendants<W.MoveToRun>().Any() || group.Descendants<W.MoveFromRun>().Any())) context.Losses.Add("DOCX120");
-            if (body.Descendants<W.MoveFrom>().Any() || body.Descendants<W.MoveTo>().Any()) context.Losses.Add("DOCX224");
             if (body.Descendants<W.CellInsertion>().Any() || body.Descendants<W.CellDeletion>().Any() || body.Descendants<W.CellMerge>().Any()) context.Losses.Add("DOCX121");
             if (body.Descendants<W.Paragraph>().Any(paragraph => _paragraphMarks.Deletion(paragraph) is not null && paragraph.ParagraphProperties?.SectionProperties is not null)) context.Losses.Add("DOCX150");
             document.Fonts = _fonts.Read(main, main.DocumentSettingsPart?.Settings?.GetFirstChild<W.EmbedTrueTypeFonts>() is { } embed && (embed.Val?.Value ?? true), context.Losses);
@@ -352,6 +352,9 @@ public sealed class DocxReader : ITextDocumentReader
         new DocxProtectionCodec().Read(settings.GetFirstChild<W.DocumentProtection>(), document);
         if (settings.GetFirstChild<W.TrackRevisions>() is { } track && (track.Val?.Value ?? true)) document.Changes.IsRecording = true;
         if (settings.GetFirstChild<W.RevisionView>() is { DisplayRevision.Value: false }) document.Changes.ShowChanges = false;
+        if (settings.GetFirstChild<W.MirrorMargins>() is { } mirror && (mirror.Val?.Value ?? true))
+            foreach (var style in document.Styles.Page.All.Where(style => style.Usage == PageUsage.All))
+                style.Usage = PageUsage.Mirrored;
         if (settings.GetFirstChild<W.FormsDesign>() is { } design && (design.Val?.Value ?? true))
             document.FormSettings = document.FormSettings with { OpenInDesignMode = true };
         if (settings.GetFirstChild<W.EvenAndOddHeaders>() is { } even && (even.Val?.Value ?? true))
@@ -460,7 +463,8 @@ public sealed class DocxComposer
         var vmlPictures = new DocxVmlPictures(new PulseOffice.Drawing.Assets.ImageHeader());
         var reader = new DocxBlockReader(_formatting, paragraphs, new DocxInlineReader(_formatting, characters, fields, drawings, new DocxVmlReader(vmlStyles, objects.Signatures, vmlPictures, new DocxVmlShapes(vmlStyles, new VmlColors(), new PulseOffice.Documents.Objects.GroupStories(), vmlPictures, new VmlPathParser(), new VmlShapePresets(), new FontworkWarps())), objects, controls, new DocxLegacyFormFields(new PulseOffice.Documents.Controls.LegacyFormFieldConverter()), new DocxParagraphMarkChanges(), new DocxFieldRangeReader(new DocxFieldRangeScan(fields)), new DocxIndexEntryReader()), _values, dropCaps, new DocxPageBreaks(), borders, formulas, new TableAppearance(new StyleResolver()), indexes, controls, new DocxTableStyleParagraphs(), tableStyles, floatingTables, new DocxParagraphMarkJoins(new DocxParagraphMarkChanges(), new PulseOffice.Documents.Editing.ParagraphText()), new DocxParagraphFrames(), new DocxRowChanges(), cellGeometry);
         var fonts = new DocxEmbeddedFonts(new PulseOffice.Typography.OpenType.OpenTypeReader(), new PulseOffice.Typography.OpenType.EmbeddedOpenTypeCodec(), new DocxFontObfuscation());
-        return new Composition(new DocxStylesCodec(characters, paragraphs, tableStyles, tabPositions), new DocxNumberingCodec(_values, new DocxPictureBullets(new OoxmlImageTypes(), new VmlStyle())), writer, reader,
-            new DocxSectionCodec(writer, reader, _values, borders, new DocxWatermarks(_values), new DocxHeaderFooterExtent(new StyleResolver()), new DocxSectionStarts(), new UnusedHeaderVariants(new BlockTree())), new DocxAnnotationsCodec(writer, reader), drawings, fonts);
+        var numberFormats = new DocxNumberFormats();
+        return new Composition(new DocxStylesCodec(characters, paragraphs, tableStyles, tabPositions), new DocxNumberingCodec(_values, new DocxPictureBullets(new OoxmlImageTypes(), new VmlStyle()), numberFormats), writer, reader,
+            new DocxSectionCodec(writer, reader, _values, borders, new DocxWatermarks(_values), new DocxHeaderFooterExtent(new StyleResolver()), new DocxSectionStarts(), new UnusedHeaderVariants(new BlockTree()), numberFormats), new DocxAnnotationsCodec(writer, reader), drawings, fonts);
     }
 }

@@ -32,6 +32,8 @@ public interface IReferenceTargets
     string? Touches(TextDocument document, ReferenceTarget target);
 
     string? HeadingOf(TextDocument document, string bookmarkName);
+
+    string HeadingAnchor(TextDocument document, ParagraphBlock heading);
 }
 
 public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutline outline, IDocumentReadingOrder order, IStoryCatalog stories, IFieldRunRewriter rewriter) : IReferenceTargets
@@ -82,6 +84,18 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
         return -1;
     }
 
+    public string HeadingAnchor(TextDocument document, ParagraphBlock heading) =>
+        HeadingBookmark(heading) ?? FreeHeadingName(document, heading);
+
+    private string FreeHeadingName(TextDocument document, ParagraphBlock heading)
+    {
+        var used = bookmarks.Bookmarks(document).Select(bookmark => bookmark.Name).ToHashSet(StringComparer.Ordinal);
+        var name = HeadingPrefix + heading.Id;
+        for (var suffix = 1; used.Contains(name); suffix++)
+            name = HeadingPrefix + heading.Id + "_" + suffix.ToString(CultureInfo.InvariantCulture);
+        return name;
+    }
+
     private string? HeadingBookmark(ParagraphBlock heading) =>
         heading.Marks.OfType<BookmarkMark>().FirstOrDefault(mark => mark.Edge == MarkEdge.Start && mark.Offset == 0 && mark.Name.StartsWith(HeadingPrefix, StringComparison.Ordinal))?.Name;
 
@@ -92,10 +106,7 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
             case ReferenceTargetKind.Headings:
                 var heading = stories.Find(document, target.Key).Paragraph;
                 if (HeadingBookmark(heading) is { } existing) return existing;
-                var used = bookmarks.Bookmarks(document).Select(bookmark => bookmark.Name).ToHashSet(StringComparer.Ordinal);
-                var name = HeadingPrefix + heading.Id;
-                for (var suffix = 1; used.Contains(name); suffix++)
-                    name = HeadingPrefix + heading.Id + "_" + suffix.ToString(CultureInfo.InvariantCulture);
+                var name = FreeHeadingName(document, heading);
                 recorder.Touch(heading);
                 heading.State = heading.State with
                 {

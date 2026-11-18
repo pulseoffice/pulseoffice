@@ -97,6 +97,8 @@ public sealed record MediaElement : SlideElement
 
     public bool HasPlaybackSettings => Loop || Muted || Volume < 0.9995;
 
+    public bool AutoPlay { get; init; }
+
     public TimeSpan TrimStart { get; init; }
 
     public TimeSpan TrimEnd { get; init; }

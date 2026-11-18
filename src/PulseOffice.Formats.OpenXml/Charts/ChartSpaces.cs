@@ -11,7 +11,7 @@ internal interface ISeriesSource
 {
     OpenXmlElement Name(int index, string name);
 
-    OpenXmlElement Categories(IReadOnlyList<string> categories);
+    OpenXmlElement Categories(ChartData data);
 
     OpenXmlElement Values(int index, IReadOnlyList<double> values);
 }
@@ -20,13 +20,9 @@ internal sealed class LiteralSeriesSource : ISeriesSource
 {
     public OpenXmlElement Name(int index, string name) => new C.SeriesText(new C.NumericValue { Text = name });
 
-    public OpenXmlElement Categories(IReadOnlyList<string> categories)
-    {
-        var literal = new C.StringLiteral(new C.PointCount { Val = (uint)categories.Count });
-        for (var i = 0; i < categories.Count; i++)
-            literal.Append(new C.StringPoint { Index = (uint)i, NumericValue = new C.NumericValue(categories[i]) });
-        return new C.CategoryAxisData(literal);
-    }
+    private readonly OoxmlCategoryLevels _levels = new();
+
+    public OpenXmlElement Categories(ChartData data) => new C.CategoryAxisData(_levels.Literal(data));
 
     public OpenXmlElement Values(int index, IReadOnlyList<double> values)
     {
@@ -66,21 +62,16 @@ internal sealed class SheetSeriesSource : ISeriesSource
             StringCache = new C.StringCache(new C.PointCount { Val = 1u }, new C.StringPoint(new C.NumericValue(name)) { Index = 0u }),
         });
 
-    public OpenXmlElement Categories(IReadOnlyList<string> categories)
+    private readonly OoxmlCategoryLevels _levels = new();
+
+    public OpenXmlElement Categories(ChartData data)
     {
         if (!(definition.SeriesInColumns ? definition.FirstColumnIsCategory : definition.FirstRowIsHeader))
-            return _literals.Categories(categories);
+            return _literals.Categories(data);
 
-        var cache = new C.StringCache(new C.PointCount { Val = (uint)categories.Count });
-        for (var i = 0; i < categories.Count; i++) cache.AppendChild(new C.StringPoint(new C.NumericValue(categories[i])) { Index = (uint)i });
-
-        return new C.CategoryAxisData(new C.StringReference
-        {
-            Formula = new C.Formula(definition.SeriesInColumns
-                ? Reference(DataTop, _range.End.Row, _range.Start.Column, _range.Start.Column)
-                : Reference(_range.Start.Row, _range.Start.Row, DataLeft, _range.End.Column)),
-            StringCache = cache,
-        });
+        return _levels.Referenced(definition.SeriesInColumns
+            ? Reference(DataTop, _range.End.Row, _range.Start.Column, _range.Start.Column)
+            : Reference(_range.Start.Row, _range.Start.Row, DataLeft, _range.End.Column), data);
     }
 
     public OpenXmlElement Values(int index, IReadOnlyList<double> values)
@@ -508,16 +499,21 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
     {
         var budget = new PointBudget(MaximumTotalPoints);
         var categories = new List<string>();
+        OpenXmlElement? levelled = null;
         var read = new List<ChartSeries>();
         foreach (var element in series)
         {
             OpenXmlElement? axis = (OpenXmlElement?)element.GetFirstChild<C.CategoryAxisData>() ?? element.GetFirstChild<C.XValues>();
-            var names = Indexed(axis, axis?.Descendants<OpenXmlCompositeElement>()
+            var names = Indexed(axis, axis is null ? null : (axis.Descendants<C.MultiLevelStringCache>().Any() ? _categoryLevels.Leaves(axis) : axis.Descendants<OpenXmlCompositeElement>())
                 .Where(point => point is C.StringPoint or C.NumericPoint)
                 .Select(point => (point.GetAttributes().Where(attribute => attribute.LocalName == "idx")
                         .Select(attribute => uint.TryParse(attribute.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var i) ? i : (uint?)null).FirstOrDefault(),
                     point.GetFirstChild<C.NumericValue>()?.Text ?? string.Empty)), string.Empty, budget);
-            if (names.Count > categories.Count) categories = names;
+            if (names.Count > categories.Count)
+            {
+                categories = names;
+                levelled = axis;
+            }
 
             OpenXmlElement? numbers = (OpenXmlElement?)element.GetFirstChild<C.Values>() ?? element.GetFirstChild<C.YValues>();
             var values = Indexed(numbers, numbers?.Descendants<C.NumericPoint>()
@@ -532,8 +528,10 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
             }
             else read.Add(new ChartSeries(name, values));
         }
-        return new ChartData(categories, read);
+        return new ChartData(categories, read).WithCategoryLevels(_categoryLevels.Read(levelled, categories.Count));
     }
+
+    private readonly OoxmlCategoryLevels _categoryLevels = new();
 
     private List<double> Numbers(OpenXmlElement? numbers, PointBudget budget) =>
         Indexed(numbers, numbers?.Descendants<C.NumericPoint>()
