@@ -62,7 +62,6 @@ public sealed class DocxReader : ITextDocumentReader
         ["DOCX170"] = Diagnostic.Info("DOCX170", "Hyperlinks without any text, which Word does not show, are not imported."),
         ["DOCX182"] = Diagnostic.Warning("DOCX182", "Footnote and endnote marks whose note is missing from the file are not imported: the note text cannot be found."),
         ["DOCX183"] = Diagnostic.Warning("DOCX183", "Shapes with a preset geometry name that is not part of the DrawingML standard are imported as rectangles."),
-        ["DOCX245"] = Diagnostic.Warning("DOCX245", "Word section columns of different widths are imported as columns of equal width with the first gap."),
         ["DOCX244"] = Diagnostic.Warning("DOCX244", "Word list numbers in formats PulseOffice does not have, such as hexadecimal, Korean or Hindi numbering, are imported as Arabic numbers."),
         ["DOCX173"] = Diagnostic.Info("DOCX173", "Picture bullets of Word lists whose picture is missing are imported as the character bullet Word keeps beside them."),
         ["DOCX172"] = Diagnostic.Warning("DOCX172", "Floating tables longer than a page are imported as ordinary tables in the text, not as floating frames: their position and the text wrapping around them are lost."),
@@ -131,7 +130,6 @@ public sealed class DocxReader : ITextDocumentReader
             foreach (var list in _numbering.Read(main.NumberingDefinitionsPart?.Numbering, context.Lists)) document.Styles.List.Replace(list);
             if (_numbering.LosesPictures(main.NumberingDefinitionsPart?.Numbering)) context.Losses.Add("DOCX173");
             if (_numbering.LosesFormats(main.NumberingDefinitionsPart?.Numbering)) context.Losses.Add("DOCX244");
-            if (main.Document?.Descendants<W.Columns>().Any(_sections.UnequalWidths) == true) context.Losses.Add("DOCX245");
             if (_unknownPresets.Present(main.Document) || main.HeaderParts.Any(part => _unknownPresets.Present(part.Header)) || main.FooterParts.Any(part => _unknownPresets.Present(part.Footer)))
                 context.Losses.Add("DOCX183");
             var styles = main.StyleDefinitionsPart?.Styles;

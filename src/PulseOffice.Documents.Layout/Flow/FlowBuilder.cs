@@ -331,7 +331,10 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
             if (section.Hidden) return [];
             var content = section.Content.Blocks.SelectMany(block => block.Accept(this));
             if (!context.Sections) return [.. content];
-            var columns = new ColumnLayout(Math.Clamp(section.Columns.Count, 1, SectionColumns.LargestCount), section.Columns.Gap.ToPoints(), section.Columns.Balanced, section.Columns.Separator);
+            var columns = new ColumnLayout(Math.Clamp(section.Columns.Count, 1, SectionColumns.LargestCount), section.Columns.Gap.ToPoints(), section.Columns.Balanced, section.Columns.Separator)
+            {
+                Shares = [.. section.Columns.Spans.Select(span => new ColumnShare(span.Width.ToPoints(), span.Gap.ToPoints()))],
+            };
             return [new SectionStartItem(section, columns), .. content, new SectionEndItem(section)];
         }
     }

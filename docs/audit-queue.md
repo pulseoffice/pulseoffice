@@ -14,29 +14,40 @@ the round that fixes it is joined and the join run is green.
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   `loext:data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
-- Multi-level category labels of a compact sheet chart whose levels come only from the model (not from a category
-  range of several columns) are written to XLSX with a one-column formula, so another application refreshing the
-  formula keeps only the leaves. (195)
-- Inline chart category levels in ODF live in our extension columns of the local table (`pulseoffice:category-level-*`);
-  other readers show leaf labels only. (195)
+- Multi-level category labels of a compact sheet chart whose levels come only from the model (pivot charts, whose parent
+  items sit on their own rows) are written to XLSX with a one-column `c:multiLvlStrRef` formula: no cell range holds
+  the outer labels aligned with the leaves, so a wider formula would refresh to wrong labels. This matches the form
+  written for compact pivot layouts; whether other applications keep the cached levels has not been checked. (195, 199)
+- Inline chart category levels are now native ODF label columns before the leaf column; other applications have not
+  opened such a chart here. (199)
 
 ## Folio
-- Page-number parity after a section restart is taken from the displayed number, not the physical page, for even
-  headers and mirrored margins alike; renumbered pages keep the side they were laid out with. (197)
-- Columns of different widths are not modelled: DOCX declares them (DOCX245); ODT `style:column` relative widths are
-  read as equal columns without a diagnostic. (197)
-- Word line numbering restarted per section and its start value are read as continuous numbering from 1. (197)
-- Word's gutter is folded into the left (or top) margin on reading; the model has no separate gutter, so it is not
-  written back as `w:gutter`. (197)
-- A table inserted on a page uses the document's first page style, not the page style where the caret is, and ignores
-  page columns. (197)
-- Hiragana page numbers have no Word page number format and are written as Arabic in DOCX without a diagnostic. (197)
-- Mirrored margins are written to DOCX only when every used page style is mirrored (Word has one document setting). (197)
-- RTF import maps every numbered list to the default "1, 2, 3" style, so the extended number formats now written to
-  `\levelnfc` (ordinal, spelled-out, Hebrew, ...) are read back as Arabic; Hiragana has no RTF code and is written as
-  Arabic. (196)
-- The list dialog's preview spells cardinal and ordinal text in English whatever the document language. (196)
-- Tracked moves are always drawn in Word's default green; there is no option for the move colour. (196)
+- ODT carries the line numbering start value and the per-section restart only in our extension attributes on
+  `text:linenumbering-configuration`; other readers number continuously from 1. Line numbers restart where the page style
+  changes, so continuous Word sections with the same layout do not restart. (198)
+- The gutter is not in the page dialog (kept when the margins are edited); ODT stores it as our extension and folds it
+  into the margin for other readers. (198)
+- Columns of different widths have no editor: the page and section dialogs keep the widths only while the column count
+  is unchanged. (198)
+- A Word document mixing mirrored page styles with asymmetric non-mirrored ones still loses the mirroring (DOCX037);
+  reading `w:mirrorMargins` marks every page style mirrored, symmetric ones included. (198)
+- A change of the tracked-move colour or marks in the settings is drawn when a paragraph is laid out again; open
+  documents are not relaid out at once. (199)
+- RTF has no Hiragana list numbering: Hiragana lists are written with Katakana numbers (RTF007). (199)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
+
+## Ledger
+
+- Round 200 (formula engine), not yet reviewed: XLOOKUP with an array lookup value (per-element results), spill ranges
+  moving with row and column edits, A1# references across XLSX `cm`/metadata and ODS round trips, iteration settings
+  with circular references, structured table references.
+
+## Accessibility
+- The border dialog's schema and the chart previews paint a fixed white canvas with black text in dark and
+  high-contrast themes (they mimic the page, but are not themed). (201)
+- Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
+  the ribbon, dialogs or panels. (201)
+- Keyboard-only walk of every dialog (Tab order, focus on open and return to the editor) not yet done for this
+  round's area beyond the icon-only buttons. (201)

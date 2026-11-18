@@ -55,7 +55,9 @@ internal sealed class OdtStylesWriter(
                 new XAttribute(Text + "number-position", lines.Side == LineNumberSide.Right ? "right" : "left"),
                 new XAttribute(Text + "increment", lines.Increment),
                 new XAttribute(Text + "restart-on-page", lines.RestartEachPage ? "true" : "false"),
-                new XAttribute(Text + "count-empty-lines", lines.CountBlankLines ? "true" : "false")));
+                new XAttribute(Text + "count-empty-lines", lines.CountBlankLines ? "true" : "false"),
+                lines.Start > 1 ? new XAttribute(Pt + "start", lines.Start) : null,
+                lines.RestartEachSection ? new XAttribute(Pt + "restart-on-section", "true") : null));
         return styles;
     }
 
@@ -136,11 +138,13 @@ internal sealed class OdtStylesWriter(
             new XAttribute(Fo + "page-height", measure.Length(page.Height)),
             new XAttribute(Style + "num-format", page.NumberFormat == NumberFormat.Bullet ? string.Empty : numbers.Token(page.NumberFormat)),
             new XAttribute(Style + "print-orientation", page.Orientation == PageOrientation.Landscape ? "landscape" : "portrait"),
-            new XAttribute(Fo + "margin-top", measure.Length(page.Margins.Top)),
+            new XAttribute(Fo + "margin-top", measure.Length(page.BoundMargins.Top)),
             new XAttribute(Fo + "margin-bottom", measure.Length(page.Margins.Bottom)),
-            new XAttribute(Fo + "margin-left", measure.Length(page.Margins.Left)),
+            new XAttribute(Fo + "margin-left", measure.Length(page.BoundMargins.Left)),
             new XAttribute(Fo + "margin-right", measure.Length(page.Margins.Right)),
             new XAttribute(Style + "writing-mode", "lr-tb"));
+        if (page.Gutter.Value > 0)
+            properties.Add(new XAttribute(Pt + "gutter", measure.Length(page.Gutter)), page.GutterAtTop ? new XAttribute(Pt + "gutter-at-top", "true") : null);
         if (page.Background is { } background) properties.Add(new XAttribute(Fo + "background-color", measure.Fill(background)));
         if (page.Borders is { } box) borders.Write(properties, box);
         if (page.Columns.Count > 1 || page.Columns.Separator) properties.Add(columns.Write(page.Columns));

@@ -117,7 +117,11 @@ public sealed class RtfVocabulary : IRtfVocabulary
         _ => _listCodes.FirstOrDefault(entry => entry.Code == nfc, (Format: NumberFormat.Arabic, Code: 0)).Format,
     };
 
-    public int ListCode(NumberFormat format) => _listCodes.FirstOrDefault(entry => entry.Format == format, (Format: NumberFormat.Arabic, Code: 0)).Code;
+    public int ListCode(NumberFormat format)
+    {
+        var written = format == NumberFormat.Hiragana ? NumberFormat.Katakana : format;
+        return _listCodes.FirstOrDefault(entry => entry.Format == written, (Format: NumberFormat.Arabic, Code: 0)).Code;
+    }
 
     public string? ParagraphStyle(string name, StyleSheet sheet)
     {

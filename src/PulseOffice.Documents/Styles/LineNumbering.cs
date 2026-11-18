@@ -10,5 +10,9 @@ public sealed record LineNumbering(int Increment = 5)
 
     public bool RestartEachPage { get; init; }
 
+    public bool RestartEachSection { get; init; }
+
+    public int Start { get; init; } = 1;
+
     public bool CountBlankLines { get; init; } = true;
 }

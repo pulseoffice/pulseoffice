@@ -78,6 +78,8 @@ public sealed record ListFormatRequest(
     ListFeatures Features,
     ListSampleMode Mode = ListSampleMode.Items)
 {
+    public string? Language { get; init; }
+
     public bool Offers(ListFeatures feature) => (Features & feature) == feature;
 }
 
@@ -85,9 +87,9 @@ public sealed record ListLevelsAnswer(IReadOnlyList<ListLevelFormat> Levels, int
 
 public interface IListLabeler
 {
-    string Number(ListNumbering numbering, int value);
+    string Number(ListNumbering numbering, int value, string? language = null);
 
-    string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters);
+    string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters, string? language = null);
 }
 
 public sealed class ListLabeler(IListNumberFormats numbers, INumberSystems systems) : IListLabeler
@@ -96,7 +98,7 @@ public sealed class ListLabeler(IListNumberFormats numbers, INumberSystems syste
     {
     }
 
-    public string Number(ListNumbering numbering, int value) => numbering switch
+    public string Number(ListNumbering numbering, int value, string? language = null) => numbering switch
     {
         ListNumbering.Arabic => numbers.Number(ListNumberStyle.Arabic, value),
         ListNumbering.LowerLetter => numbers.Number(ListNumberStyle.LowerLetter, value),
@@ -104,10 +106,10 @@ public sealed class ListLabeler(IListNumberFormats numbers, INumberSystems syste
         ListNumbering.LowerRoman => numbers.Number(ListNumberStyle.LowerRoman, value),
         ListNumbering.UpperRoman => numbers.Number(ListNumberStyle.UpperRoman, value),
         ListNumbering.None or ListNumbering.Bullet => string.Empty,
-        _ => systems.Render(Enum.Parse<NumberSystem>(numbering.ToString()), value),
+        _ => systems.Render(Enum.Parse<NumberSystem>(numbering.ToString()), value, language),
     };
 
-    public string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters)
+    public string Label(IReadOnlyList<ListLevelFormat> levels, int level, IReadOnlyList<int> counters, string? language = null)
     {
         ArgumentNullException.ThrowIfNull(levels);
         ArgumentNullException.ThrowIfNull(counters);
@@ -117,7 +119,7 @@ public sealed class ListLabeler(IListNumberFormats numbers, INumberSystems syste
         var first = Math.Max(0, level - Math.Max(1, format.DisplayLevels) + 1);
         var parts = Enumerable.Range(first, level - first + 1)
             .Where(index => levels[index].Numbering is not (ListNumbering.None or ListNumbering.Bullet))
-            .Select(index => Number(levels[index].Numbering, counters[index]));
+            .Select(index => Number(levels[index].Numbering, counters[index], language));
         return format.Prefix + string.Join(format.Separator, parts) + format.Suffix;
     }
 }

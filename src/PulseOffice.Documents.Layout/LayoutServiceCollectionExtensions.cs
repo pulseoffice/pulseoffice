@@ -68,6 +68,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<IColumnBalancer, ColumnBalancer>();
         services.AddTransient<IParagraphEntries, ParagraphEntries>();
         services.AddSingleton<IChangeSpans, ChangeSpans>();
+        services.TryAddSingleton<IMoveDisplayOptions, StandardMoveDisplayOptions>();
         services.AddTransient<IChangeMarkup, ChangeMarkup>();
         services.AddTransient<IPlaceholderMarkup, PlaceholderMarkup>();
         services.AddSingleton<IHiddenParagraphs, HiddenParagraphs>();

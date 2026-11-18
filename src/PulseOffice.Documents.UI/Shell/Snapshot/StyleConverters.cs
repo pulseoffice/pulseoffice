@@ -84,7 +84,7 @@ public sealed class DocumentStyleConverter : SnapshotConverter<DocumentStyle>
                     .Put("usage", page.Usage).Put("next", page.NextStyleName).Put("background", page.Background)
                     .Put("header", page.Header).Put("footer", page.Footer).Put("firstPageDifferent", page.FirstPageDifferent)
                     .Put("evenPagesDifferent", page.EvenPagesDifferent).Put("numberFormat", page.NumberFormat)
-                    .Put("borders", page.Borders).Put("watermark", page.Watermark);
+                    .Put("borders", page.Borders).Put("watermark", page.Watermark).Put("gutter", page.Gutter).Put("gutterAtTop", page.GutterAtTop);
                 break;
             case FrameStyle frame:
                 node.Put("frame", frame.Frame);
@@ -109,6 +109,8 @@ public sealed class DocumentStyleConverter : SnapshotConverter<DocumentStyle>
             NumberFormat = node.Get("numberFormat", NumberFormat.Arabic),
             Borders = node.Get<PulseOffice.Text.Rich.BoxBorders>("borders"),
             Watermark = node.Get<PageWatermark>("watermark"),
+            Gutter = node.Get("gutter", Twip.Zero),
+            GutterAtTop = node.Get("gutterAtTop", false),
         };
         if (node.Get<DocumentSize?>("size") is { } size) page.Size = size;
         if (node.Get<Margins?>("margins") is { } margins) page.Margins = margins;

@@ -49,7 +49,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
             Right = (uint)(style.Margins.Right.Value + Twips(inset, PulseOffice.Text.Rich.BorderSide.Right)),
             Header = (uint)style.Margins.Top.Value,
             Footer = (uint)style.Margins.Bottom.Value,
-            Gutter = 0,
+            Gutter = (uint)Math.Max(0, style.Gutter.Value),
         });
         if (style.Borders is { HasLines: true } box)
             section.Append(borders.Write(new W.PageBorders { OffsetFrom = W.PageBorderOffsetValues.Text }, box));
@@ -58,10 +58,11 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
             {
                 CountBy = (short)Math.Clamp(lines.Increment, 1, 100),
                 Distance = values.Twips(lines.Distance),
-                Restart = lines.RestartEachPage ? W.LineNumberRestartValues.NewPage : W.LineNumberRestartValues.Continuous,
+                Restart = lines.RestartEachPage ? W.LineNumberRestartValues.NewPage : lines.RestartEachSection ? W.LineNumberRestartValues.NewSection : W.LineNumberRestartValues.Continuous,
+                Start = lines.Start > 1 ? new Int16Value((short)Math.Min(lines.Start - 1, short.MaxValue)) : null,
             });
         var numbering = new W.PageNumberType();
-        if (style.NumberFormat is not (NumberFormat.Arabic or NumberFormat.Bullet) && formats.TryWord(style.NumberFormat, out var format)) numbering.Format = format;
+        if (style.NumberFormat is not (NumberFormat.Arabic or NumberFormat.Bullet) && formats.TryWordPage(style.NumberFormat, out var format)) numbering.Format = format;
         if (restart is { } start) numbering.Start = start;
         if (numbering.HasAttributes) section.Append(numbering);
         var columns = new W.Columns { Space = values.Text(style.Columns.Gap.Value) };
@@ -69,6 +70,11 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
         {
             columns.ColumnCount = (short)style.Columns.Count;
             columns.Separator = style.Columns.Separator;
+            if (style.Columns.Uneven)
+            {
+                columns.EqualWidth = false;
+                columns.Append(ColumnWidths(style));
+            }
         }
 
         section.Append(columns);
@@ -101,23 +107,27 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
         var fromPage = pageBorders?.OffsetFrom?.Value == W.PageBorderOffsetValues.Page;
         var gutter = values.Bounded(margin?.Gutter?.Value ?? 0, 0, LargestPage);
         var gutterAtTop = main.DocumentSettingsPart?.Settings?.GetFirstChild<W.GutterAtTop>() is { } atTop && values.On(atTop);
-        var top = values.Bounded(Math.Abs((long)(margin?.Top?.Value ?? 1440)), 0, LargestPage) + (gutterAtTop ? gutter : 0) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Top));
+        var top = values.Bounded(Math.Abs((long)(margin?.Top?.Value ?? 1440)), 0, LargestPage) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Top));
         var bottom = values.Bounded(Math.Abs((long)(margin?.Bottom?.Value ?? 1440)), 0, LargestPage) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Bottom));
         var headerDistance = values.Bounded(margin?.Header?.Value ?? 720, 0, LargestPage);
         var footerDistance = values.Bounded(margin?.Footer?.Value ?? 720, 0, LargestPage);
         if (style.Header.Enabled) ReachBody(style.Header, Math.Abs(top) - headerDistance);
         if (style.Footer.Enabled) ReachBody(style.Footer, Math.Abs(bottom) - footerDistance);
         style.Margins = new Margins(
-            new Twip(values.Bounded(margin?.Left?.Value ?? 1440, 0, LargestPage) + (gutterAtTop ? 0 : gutter) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Left))),
+            new Twip(values.Bounded(margin?.Left?.Value ?? 1440, 0, LargestPage) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Left))),
             new Twip(style.Header.Enabled ? headerDistance : Math.Abs(top)),
             new Twip(values.Bounded(margin?.Right?.Value ?? 1440, 0, LargestPage) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Right))),
             new Twip(style.Footer.Enabled ? footerDistance : Math.Abs(bottom)));
         style.Columns = Columns(section);
+        style.Gutter = new Twip(gutter);
+        style.GutterAtTop = gutterAtTop;
         if (section.GetFirstChild<W.LineNumberType>() is { CountBy: not null } lineNumbers)
             context.Document.LineNumbering = new LineNumbering(Math.Max(1, (int)lineNumbers.CountBy.Value))
             {
                 Distance = values.Points(lineNumbers.Distance?.Value) ?? 0.5 * 72 / 2.54,
-                RestartEachPage = lineNumbers.Restart?.Value == W.LineNumberRestartValues.NewPage,
+                RestartEachPage = (lineNumbers.Restart?.Value ?? W.LineNumberRestartValues.NewPage) == W.LineNumberRestartValues.NewPage,
+                RestartEachSection = lineNumbers.Restart?.Value == W.LineNumberRestartValues.NewSection,
+                Start = values.Bounded((lineNumbers.Start?.Value ?? 0) + 1L, 1, LargestStart),
             };
         var numbering = section.GetFirstChild<W.PageNumberType>();
         if (numbering?.Format?.Value is { } format)
@@ -130,14 +140,32 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
     {
         var columns = section.GetFirstChild<W.Columns>();
         var count = values.Bounded(columns?.ColumnCount?.Value ?? 1, 1, LargestColumnCount);
-        return count > 1
-            ? new SectionColumns(count, new Twip(values.Bounded(values.Integer(columns!.Space?.Value) ?? 720, 0, LargestPage))) { Separator = columns.Separator?.Value ?? false }
-            : SectionColumns.Single;
+        if (count <= 1) return SectionColumns.Single;
+        var gap = new Twip(values.Bounded(values.Integer(columns!.Space?.Value) ?? 720, 0, LargestPage));
+        var result = new SectionColumns(count, gap) { Separator = columns.Separator?.Value ?? false };
+        var spans = columns.EqualWidth is { } equal && !equal.Value
+            ? columns.Elements<W.Column>().Take(count).Select(column => new ColumnSpan(
+                new Twip(values.Bounded(values.Integer(column.Width?.Value) ?? 0, 0, LargestPage)),
+                new Twip(values.Bounded(values.Integer(column.Space?.Value) ?? 0, 0, LargestPage)))).ToList()
+            : [];
+        var uneven = spans.Count == count && spans.Sum(span => span.Width.Value) > 0
+            && (spans.Select(span => span.Width).Distinct().Skip(1).Any() || spans.Take(count - 1).Any(span => span.Gap != gap));
+        return uneven ? result with { Gap = spans[0].Gap, Spans = spans } : result;
     }
 
-    public bool UnequalWidths(W.Columns columns) =>
-        columns.EqualWidth is { } equal && !equal.Value
-        && columns.Elements<W.Column>().Select(column => column.Width?.Value).Distinct().Skip(1).Any();
+    private IEnumerable<W.Column> ColumnWidths(PageStyle style)
+    {
+        var spans = style.Columns.Spans;
+        var text = Math.Max(spans.Count, style.Width.Value - style.BoundMargins.Left.Value - style.Margins.Right.Value);
+        var gaps = spans.Take(spans.Count - 1).Sum(span => (long)span.Gap.Value);
+        var room = Math.Max(spans.Count, text - gaps);
+        var weights = Math.Max(1L, spans.Sum(span => (long)Math.Max(0, span.Width.Value)));
+        return spans.Select((span, index) => new W.Column
+        {
+            Width = values.Text((int)(room * Math.Max(0, span.Width.Value) / weights)),
+            Space = index < spans.Count - 1 ? values.Text(span.Gap.Value) : null,
+        });
+    }
 
     public bool Continuous(W.SectionProperties section) =>
         section.GetFirstChild<W.SectionType>()?.Val?.Value == W.SectionMarkValues.Continuous;

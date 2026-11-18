@@ -38,12 +38,13 @@ internal sealed class InlineChartDocumentReader(OdfChartVocabulary vocabulary, I
         var taken = new HashSet<int>(series.Append(leaf).Concat(levels));
         var hidden = Enumerable.Range(0, width).Where(column => !taken.Contains(column) && rows.Any(row => column < row.Count && (row[column].HasElements || row[column].Attribute(Office + "value") is not null))).ToList();
 
+        var shift = levels.Count > 0 && levels[0] == 0 && leaf == levels.Count ? levels.Count : 0;
         var map = new Dictionary<int, int>();
         for (var index = 0; index < series.Count; index++) map[series[index]] = index + 1;
         var next = series.Count + 1;
         foreach (var column in hidden)
         {
-            next = Math.Max(next, column);
+            next = Math.Max(next, column - shift);
             map[column] = next++;
         }
 

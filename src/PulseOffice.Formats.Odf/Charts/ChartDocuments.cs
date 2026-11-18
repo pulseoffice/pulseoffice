@@ -58,6 +58,7 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     public XDocument Build(ChartDefinition definition, ChartData data, DocumentSize frame, CultureInfo culture)
     {
         ArgumentNullException.ThrowIfNull(culture);
+        definition = Prepared(definition, data);
         var size = frame.IsEmpty ? definition.NaturalSize : frame;
         var chartClass = vocabulary.ClassOf(definition.Type);
         var plot = new XElement(Chart + "plot-area", new XAttribute(Chart + "style-name", PlotStyleName), PlotAttributes(definition));
@@ -85,7 +86,7 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
                 ValuesAddress(definition, data, index) is { Length: > 0 } values ? new XAttribute(Chart + "values-cell-range-address", values) : null,
                 definition.ExplicitSeriesName(index) is { } explicitName
                     ? new XAttribute(Loext + "label-string", explicitName)
-                    : LabelAddress(definition, index) is { Length: > 0 } label ? new XAttribute(Chart + "label-cell-address", label) : null,
+                    : LabelAddress(definition, data, index) is { Length: > 0 } label ? new XAttribute(Chart + "label-cell-address", label) : null,
                 new XAttribute(Chart + "class", definition.IsLineSeries(index, data.Series.Count) ? "chart:line" : chartClass),
                 _formats.Children(SeriesStyleName(index), definition.SeriesFormat(index), extraStyles)));
 
@@ -142,7 +143,9 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
 
     protected abstract string? ValuesAddress(ChartDefinition definition, ChartData data, int series);
 
-    protected abstract string? LabelAddress(ChartDefinition definition, int series);
+    protected abstract string? LabelAddress(ChartDefinition definition, ChartData data, int series);
+
+    protected virtual ChartDefinition Prepared(ChartDefinition definition, ChartData data) => definition;
 
     protected virtual IEnumerable<XElement> Supplement(ChartData data, CultureInfo culture) => [];
 
@@ -259,7 +262,7 @@ internal sealed class SheetChartDocumentBuilder(OdfChartVocabulary vocabulary, O
     protected override string? ValuesAddress(ChartDefinition definition, ChartData data, int series) =>
         definition.HasSeriesSources ? _sources.Values(definition, series) : new SourceRange(definition).Values(series);
 
-    protected override string? LabelAddress(ChartDefinition definition, int series) =>
+    protected override string? LabelAddress(ChartDefinition definition, ChartData data, int series) =>
         definition.HasSeriesSources ? _sources.Label(definition, series) : new SourceRange(definition).Label(series);
 
     protected override string? CategoriesAddress(ChartDefinition definition, ChartData data) =>
@@ -310,59 +313,75 @@ internal sealed class InlineChartDocumentBuilder(OdfChartVocabulary vocabulary, 
 {
     protected override IEnumerable<XAttribute> PlotAttributes(ChartDefinition definition) => [];
 
+    private readonly ChartInlineErrorValues _errors = new();
+
+    protected override ChartDefinition Prepared(ChartDefinition definition, ChartData data)
+    {
+        var shift = Levels(data).Count;
+        if (shift == 0) return definition;
+        var columns = Enumerable.Range(1, Math.Max(data.Series.Count, (data.HiddenColumns ?? []).Select(column => column.Column).DefaultIfEmpty(0).Max()))
+            .ToDictionary(column => column, column => column + shift);
+        return _errors.Remap(definition, columns);
+    }
+
+    protected override string? CategoriesAddress(ChartDefinition definition, ChartData data)
+    {
+        var levels = Levels(data);
+        return levels.Count == 0 ? null : $"local-table.A2:.{Letters(levels.Count)}{Rows(data) + 1}";
+    }
+
     protected override string ValuesAddress(ChartDefinition definition, ChartData data, int series)
     {
-        var column = new CellAddress(0, series + 1).ToA1().TrimEnd('1');
+        var column = Letters(Levels(data).Count + series + 1);
         return $"local-table.{column}2:.{column}{Rows(data) + 1}";
     }
 
-    protected override string LabelAddress(ChartDefinition definition, int series) =>
-        $"local-table.{new CellAddress(0, series + 1).ToA1().TrimEnd('1')}1";
+    protected override string LabelAddress(ChartDefinition definition, ChartData data, int series) =>
+        $"local-table.{Letters(Levels(data).Count + series + 1)}1";
 
     private const int MostColumns = 1024;
 
     protected override IEnumerable<XElement> Supplement(ChartData data, CultureInfo culture)
     {
+        var levels = Levels(data);
+        var shift = levels.Count;
         var hidden = (data.HiddenColumns ?? [])
-            .Where(column => column.Column > data.Series.Count && column.Column < MostColumns)
-            .GroupBy(column => column.Column)
+            .Where(column => column.Column > data.Series.Count && column.Column + shift < MostColumns)
+            .GroupBy(column => column.Column + shift)
             .ToDictionary(group => group.Key, group => group.First());
-        IReadOnlyList<IReadOnlyList<string>> levels = data.CategoryLevels ?? [];
-        var levelColumn = Math.Max(data.Series.Count, hidden.Keys.DefaultIfEmpty(0).Max()) + 1;
-        var width = levelColumn + levels.Count;
+        var width = Math.Max(shift + data.Series.Count, hidden.Keys.DefaultIfEmpty(0).Max()) + 1;
 
         var table = new XElement(Table + "table", new XAttribute(Table + "name", "local-table"),
-            levels.Count > 0 ? new XAttribute(PulseChart + "category-level-column", levelColumn.ToString(CultureInfo.InvariantCulture)) : null,
-            levels.Count > 0 ? new XAttribute(PulseChart + "category-level-count", levels.Count.ToString(CultureInfo.InvariantCulture)) : null,
-            new XElement(Table + "table-header-columns", new XElement(Table + "table-column")),
-            new XElement(Table + "table-columns", new XElement(Table + "table-column",
-                new XAttribute(Table + "number-columns-repeated", Math.Max(1, width - 1)))),
+            new XElement(Table + "table-header-columns", new XElement(Table + "table-column", shift > 0 ? new XAttribute(Table + "number-columns-repeated", shift + 1) : null)),
+            new XElement(Table + "table-columns", new XElement(Table + "table-column", new XAttribute(Table + "number-columns-repeated", Math.Max(1, width - shift - 1)))),
             new XElement(Table + "table-header-rows",
                 new XElement(Table + "table-row", Enumerable.Range(0, width).Select(column =>
-                    TextCell(column >= 1 && column <= data.Series.Count ? data.Series[column - 1].Name : string.Empty)))));
+                    TextCell(column > shift && column <= shift + data.Series.Count ? data.Series[column - shift - 1].Name : string.Empty)))));
 
         var rows = new XElement(Table + "table-rows");
         for (var row = 0; row < Rows(data); row++)
-            rows.Add(new XElement(Table + "table-row", Enumerable.Range(0, width).Select(column => Cell(data, hidden, levels, levelColumn, row, column, culture))));
+            rows.Add(new XElement(Table + "table-row", Enumerable.Range(0, width).Select(column => Cell(data, hidden, levels, row, column, culture))));
         table.Add(rows);
 
         yield return table;
     }
 
-    private XElement Cell(ChartData data, IReadOnlyDictionary<int, ChartHiddenColumn> hidden, IReadOnlyList<IReadOnlyList<string>> levels, int levelColumn, int row, int column, CultureInfo culture)
+    private IReadOnlyList<IReadOnlyList<string>> Levels(ChartData data) =>
+        data.CategoryLevels is { } levels && levels.Count < MostColumns / 2 ? levels : [];
+
+    private string Letters(int column) => new CellAddress(0, column).ToA1().TrimEnd('1');
+
+    private XElement Cell(ChartData data, IReadOnlyDictionary<int, ChartHiddenColumn> hidden, IReadOnlyList<IReadOnlyList<string>> levels, int row, int column, CultureInfo culture)
     {
-        if (column == 0) return TextCell(row < data.Categories.Count ? data.Categories[row] : string.Empty);
-        if (column <= data.Series.Count)
+        var shift = levels.Count;
+        if (column < shift) return TextCell(row < levels[column].Count ? levels[column][row] : string.Empty);
+        if (column == shift) return TextCell(row < data.Categories.Count ? data.Categories[row] : string.Empty);
+        if (column <= shift + data.Series.Count)
         {
-            var values = data.Series[column - 1].Values;
+            var values = data.Series[column - shift - 1].Values;
             return NumberCell(row < values.Count ? values[row] : double.NaN, culture);
         }
         if (hidden.TryGetValue(column, out var extra)) return NumberCell(row < extra.Values.Count ? extra.Values[row] : double.NaN, culture);
-        if (column >= levelColumn && column - levelColumn < levels.Count)
-        {
-            var level = levels[column - levelColumn];
-            return TextCell(row < level.Count ? level[row] : string.Empty);
-        }
         return new XElement(Table + "table-cell");
     }
 

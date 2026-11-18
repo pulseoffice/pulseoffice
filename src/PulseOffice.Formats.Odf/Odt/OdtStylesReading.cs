@@ -114,6 +114,8 @@ internal sealed class OdtStylesReader(
                 Distance = measure.Points((string?)numbering.Attribute(Text + "offset")) ?? 0.5 * 72 / 2.54,
                 RestartEachPage = (string?)numbering.Attribute(Text + "restart-on-page") == "true",
                 CountBlankLines = (string?)numbering.Attribute(Text + "count-empty-lines") != "false",
+                RestartEachSection = (string?)numbering.Attribute(Pt + "restart-on-section") == "true",
+                Start = Math.Clamp(measure.Integer((string?)numbering.Attribute(Pt + "start")) ?? 1, 1, 32_767),
             };
 
         foreach (var configuration in styles?.Elements(Text + "notes-configuration") ?? [])
@@ -216,8 +218,14 @@ internal sealed class OdtStylesReader(
                 : width.Value > height.Value;
             page.Orientation = landscape ? PageOrientation.Landscape : PageOrientation.Portrait;
             page.Size = landscape ? new DocumentSize(height, width) : new DocumentSize(width, height);
+            var gutter = measure.Twips((string?)properties.Attribute(Pt + "gutter")) is { Value: > 0 } bound ? bound : Twip.Zero;
+            var atTop = (string?)properties.Attribute(Pt + "gutter-at-top") == "true";
+            var left = Margin(properties, "margin-left");
+            var top = Margin(properties, "margin-top");
+            page.Gutter = gutter;
+            page.GutterAtTop = atTop;
             page.Margins = new Margins(
-                Margin(properties, "margin-left"), Margin(properties, "margin-top"),
+                atTop ? left : new Twip(Math.Max(0, left.Value - gutter.Value)), atTop ? new Twip(Math.Max(0, top.Value - gutter.Value)) : top,
                 Margin(properties, "margin-right"), Margin(properties, "margin-bottom"));
             if (properties.Attribute(Style + "num-format") is { } format) page.NumberFormat = numbers.Value(format.Value);
             page.Background = measure.Fill((string?)properties.Attribute(Fo + "background-color"));

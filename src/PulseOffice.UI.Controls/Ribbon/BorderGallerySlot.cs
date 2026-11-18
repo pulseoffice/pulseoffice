@@ -51,6 +51,7 @@ public sealed class BorderGallerySlot : RibbonSlot
         _flyout = Context.Popover(() => Panel(inline: false));
         arrow.Click += (_, _) => Context.Dismissal.Toggle(_flyout!, main);
         ToolTip.SetTip(arrow, Item.Title);
+        Avalonia.Automation.AutomationProperties.SetName(arrow, Item.Title);
 
         return new StackPanel { Orientation = Orientation.Horizontal, Children = { main, arrow } };
     }

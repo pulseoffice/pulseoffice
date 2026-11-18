@@ -776,36 +776,6 @@ internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec in
     }
 }
 
-internal sealed class OdtColumnsCodec(OdtMeasure measure) : OdtXml
-{
-    public XElement Write(SectionColumns columns)
-    {
-        var element = new XElement(Style + "columns",
-            new XAttribute(Fo + "column-count", Math.Max(1, columns.Count)),
-            new XAttribute(Fo + "column-gap", measure.Length(columns.Gap)));
-        if (columns.Separator)
-            element.Add(new XElement(Style + "column-sep", new XAttribute(Style + "style", "solid"), new XAttribute(Style + "width", "0.5pt"), new XAttribute(Style + "color", "#000000")));
-        return element;
-    }
-
-    public SectionColumns Read(XElement? properties)
-    {
-        var element = properties?.Element(Style + "columns");
-        if (element is null) return SectionColumns.Single;
-        var count = Math.Clamp(measure.Integer((string?)element.Attribute(Fo + "column-count")) ?? 1, 1, SectionColumns.LargestCount);
-        var gap = measure.Twips((string?)element.Attribute(Fo + "column-gap"));
-        if (gap is null && element.Elements(Style + "column").Skip(1).FirstOrDefault() is { } second)
-            gap = (measure.Twips((string?)second.Attribute(Fo + "start-indent")) ?? PulseOffice.Foundation.Units.Twip.Zero) * 2;
-        var balanced = (string?)properties!.Attribute(Text + "dont-balance-text-columns") != "true";
-        if (count <= 1 && balanced && element.Element(Style + "column-sep") is null) return SectionColumns.Single;
-        return new SectionColumns(Math.Max(1, count), gap ?? PulseOffice.Foundation.Units.Twip.Zero)
-        {
-            Separator = element.Element(Style + "column-sep") is { } sep && (string?)sep.Attribute(Style + "style") != "none",
-            Balanced = balanced,
-        };
-    }
-}
-
 internal sealed class OdtCellNumbers(PulseOffice.Documents.Editing.Tables.ICellValueText values, ITextCultures cultures) : OdtXml
 {
     private const double OldestDate = -657435.0;

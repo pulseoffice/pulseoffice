@@ -30,7 +30,7 @@ public sealed class Round197FolioPageLayoutTests
     }
 
     [Fact]
-    public void A_word_gutter_widens_the_left_margin_instead_of_vanishing()
+    public void A_word_gutter_is_kept_beside_the_left_margin()
     {
         var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
@@ -42,13 +42,15 @@ public sealed class Round197FolioPageLayoutTests
 
         var read = _composer.Reader(DocxFlavour.Document).Read(stream).Value!;
 
-        Assert.Equal(2160, read.Styles.Page.Find(read.InitialPageStyle)!.Margins.Left.Value);
+        var style = read.Styles.Page.Find(read.InitialPageStyle)!;
+        Assert.Equal(1440, style.Margins.Left.Value);
+        Assert.Equal(2160, style.BoundMargins.Left.Value);
     }
 
     [Theory]
     [InlineData("<w:cols w:num=\"2\" w:space=\"720\" w:equalWidth=\"0\"><w:col w:w=\"2000\" w:space=\"720\"/><w:col w:w=\"6000\"/></w:cols>", true)]
     [InlineData("<w:cols w:num=\"2\" w:space=\"720\"/>", false)]
-    public void Word_columns_of_different_widths_are_declared(string columns, bool declared)
+    public void Word_columns_of_different_widths_are_kept(string columns, bool uneven)
     {
         var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
@@ -60,7 +62,7 @@ public sealed class Round197FolioPageLayoutTests
 
         var read = _composer.Reader(DocxFlavour.Document).Read(stream);
 
-        Assert.Equal(declared, read.Diagnostics.Any(diagnostic => diagnostic.Code == "DOCX245"));
+        Assert.Equal(uneven, read.Value!.Styles.Page.Find(read.Value.InitialPageStyle)!.Columns.Uneven);
     }
 
     [Fact]

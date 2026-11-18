@@ -46,13 +46,13 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         ];
     }
 
-    private SectionSettings Read(IReadOnlyDictionary<string, object> values, string fallback, byte[]? previous = null, string prefix = "")
+    private SectionSettings Read(IReadOnlyDictionary<string, object> values, string fallback, byte[]? previous = null, string prefix = "", SectionColumns? before = null)
     {
         var layout = values.TryGetValue(prefix + "columnLayout", out var chosen) && chosen is ColumnLayout picked ? picked : new ColumnLayout(1, 1.25, false);
         var balanced = values.Flag(prefix + "balanced");
         var sectionColumns = layout.Count <= 1 && !layout.Separator
             ? SectionColumns.Single with { Balanced = balanced }
-            : new SectionColumns(Math.Clamp(layout.Count, 1, 10), Twip.FromCentimeters(layout.Gap)) { Separator = layout.Separator, Balanced = balanced };
+            : new SectionColumns(Math.Clamp(layout.Count, 1, 10), Twip.FromCentimeters(layout.Gap)) { Separator = layout.Separator, Balanced = balanced }.KeepingSpansOf(before ?? SectionColumns.Single);
         return new SectionSettings(values.Text(prefix + "name").Trim() is { Length: > 0 } name ? name : fallback, sectionColumns, values.Flag(prefix + "protected"), values.Flag(prefix + "hidden"))
         {
             ProtectionKey = values.Text(prefix + "password") is { Length: > 0 } password ? keys.Digest(password) : previous,
@@ -94,7 +94,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
             var section = all[index];
             var prefix = Prefix(index);
             var before = new SectionSettings(section.Name, section.Columns, section.Protected, section.Hidden) { ProtectionKey = section.ProtectionKey };
-            var after = Read(values, section.Name, section.ProtectionKey, prefix);
+            var after = Read(values, section.Name, section.ProtectionKey, prefix, section.Columns);
             var remove = values.Flag(prefix + "remove");
             if (!remove && Same(before, after)) continue;
             if (section.ProtectionKey is { } key && !keys.Matches(key, values.Text(prefix + "unlock")))

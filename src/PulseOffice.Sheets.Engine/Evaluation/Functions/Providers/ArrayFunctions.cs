@@ -204,16 +204,12 @@ public sealed class ArrayFunctions(IRangeMaterializer ranges, IRandomSource rand
             if (!Allocatable(rows, columns)) return EvalValue.Error(CellError.Number);
 
             var result = new List<IReadOnlyList<CellValue>>(rows);
-            var current = start;
 
             for (var row = 0; row < rows; row++)
             {
                 var line = new List<CellValue>(columns);
                 for (var column = 0; column < columns; column++)
-                {
-                    line.Add(CellValue.Number(current));
-                    current += step;
-                }
+                    line.Add(CellValue.Number(SequenceTerm(start, step, (double)row * columns + column)));
                 result.Add(line);
             }
             return new ArrayValue(result);
@@ -778,6 +774,15 @@ public sealed class ArrayFunctions(IRangeMaterializer ranges, IRandomSource rand
             }
             return hash.ToHashCode();
         }
+    }
+
+    private static double SequenceTerm(double start, double step, double index)
+    {
+        const double DecimalLimit = 1e27;
+        if (Math.Abs(start) < DecimalLimit && Math.Abs(step) < DecimalLimit && index < DecimalLimit
+            && Math.Abs(step * index) < DecimalLimit)
+            return (double)((decimal)start + (decimal)step * (decimal)index);
+        return start + step * index;
     }
 }
 

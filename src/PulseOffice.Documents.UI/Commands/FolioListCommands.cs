@@ -11,11 +11,11 @@ namespace PulseOffice.Documents.UI.Commands;
 
 public interface IFolioListForms
 {
-    IReadOnlyList<FormTab> ListTabs(StyleSheet sheet, string listStyle, int level);
+    IReadOnlyList<FormTab> ListTabs(StyleSheet sheet, string listStyle, int level, string? language);
 
     (string Style, IReadOnlyList<ListLevel> Levels, int Index, bool Apply) ReadList(StyleSheet sheet, string listStyle, IReadOnlyDictionary<string, object> values);
 
-    IReadOnlyList<FormTab> OutlineTabs(ListStyle outline);
+    IReadOnlyList<FormTab> OutlineTabs(ListStyle outline, string? language);
 
     ListStyle ReadOutline(ListStyle outline, IReadOnlyDictionary<string, object> values);
 }
@@ -24,8 +24,8 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
 {
     private readonly ListNumbering[] _all = Enum.GetValues<ListNumbering>();
 
-    public IReadOnlyList<FormTab> ListTabs(StyleSheet sheet, string listStyle, int level) =>
-        [shared.Tab(ListRequest(sheet, listStyle, level), [new CheckField("apply", texts["folio.list.apply"], true)])];
+    public IReadOnlyList<FormTab> ListTabs(StyleSheet sheet, string listStyle, int level, string? language) =>
+        [shared.Tab(ListRequest(sheet, listStyle, level) with { Language = language }, [new CheckField("apply", texts["folio.list.apply"], true)])];
 
     public (string Style, IReadOnlyList<ListLevel> Levels, int Index, bool Apply) ReadList(StyleSheet sheet, string listStyle, IReadOnlyDictionary<string, object> values)
     {
@@ -34,7 +34,7 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
         return (style.Name, Merge(style.Levels, answer.Levels), answer.Level, values.Flag("apply"));
     }
 
-    public IReadOnlyList<FormTab> OutlineTabs(ListStyle outline) => [shared.Tab(OutlineRequest(outline), [])];
+    public IReadOnlyList<FormTab> OutlineTabs(ListStyle outline, string? language) => [shared.Tab(OutlineRequest(outline) with { Language = language }, [])];
 
     public ListStyle ReadOutline(ListStyle outline, IReadOnlyDictionary<string, object> values) =>
         new(outline.Name, Merge(outline.Levels, shared.Read(OutlineRequest(outline), values).Levels));
@@ -191,7 +191,7 @@ public sealed class FolioListCommands(IActiveFolioContext context, IListEditing 
         var current = editor.CurrentParagraph();
         var sheet = editor.Document.Styles;
         var style = current.ListStyleName ?? editor.EffectiveParagraph().ListStyleName ?? DefaultStyleNames.Numbering123;
-        if (await dialogs.AskAsync("command.folio.list.bulletsNumbering.title", forms.ListTabs(sheet, style, current.BulletLevel), ct).ConfigureAwait(true) is not { } values) return;
+        if (await dialogs.AskAsync("command.folio.list.bulletsNumbering.title", forms.ListTabs(sheet, style, current.BulletLevel, editor.Document.Language), ct).ConfigureAwait(true) is not { } values) return;
         var (name, levels, index, apply) = forms.ReadList(sheet, style, values);
         editor.Change(() =>
         {
@@ -206,7 +206,7 @@ public sealed class FolioListCommands(IActiveFolioContext context, IListEditing 
     {
         if (Editor is not { } editor) return;
         var outline = editor.Document.Styles.Outline;
-        if (await dialogs.AskAsync("command.folio.list.chapterNumbering.title", forms.OutlineTabs(outline), ct).ConfigureAwait(true) is not { } values) return;
+        if (await dialogs.AskAsync("command.folio.list.chapterNumbering.title", forms.OutlineTabs(outline, editor.Document.Language), ct).ConfigureAwait(true) is not { } values) return;
         var changed = forms.ReadOutline(outline, values);
         if (changed.Levels.SequenceEqual(outline.Levels)) return;
         editor.Change(() => styles.ChangeOutline(editor.Document, editor.History, changed, "chapter-numbering"));

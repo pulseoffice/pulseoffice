@@ -121,7 +121,11 @@ public sealed class SplitGallerySlot : RibbonSlot
     protected override void Update()
     {
         if (_main is not null) ToolTip.SetTip(_main, Context.Tooltip(Item));
-        if (_arrow is not null) ToolTip.SetTip(_arrow, Item.Title);
+        if (_arrow is not null)
+        {
+            ToolTip.SetTip(_arrow, Item.Title);
+            Avalonia.Automation.AutomationProperties.SetName(_arrow, Item.Title);
+        }
     }
 
     private void Choose(RibbonChoice choice)

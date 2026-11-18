@@ -111,10 +111,8 @@ public sealed class ChangeSpans(IChangeRegions regions, IAuthorColors colors) : 
     }
 }
 
-public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : IChangeMarkup
+public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text, IMoveDisplayOptions moves) : IChangeMarkup
 {
-    private const uint MoveColor = 0xFF008A00;
-
     private readonly Dictionary<string, (TextParagraph Source, string Key, MarkedParagraph Result)> _cache = new(StringComparer.Ordinal);
 
     public MarkedParagraph? Mark(TextDocument document, ParagraphBlock block, TextParagraph content)
@@ -122,7 +120,8 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
         if (!document.Changes.ShowChanges || document.Changes.All.Count == 0) return null;
         var found = spans.Of(document, block.Id);
         if (found.Count == 0) return null;
-        var key = Key(document, found);
+        var display = moves.Current;
+        var key = Key(document, found) + display;
         if (_cache.TryGetValue(block.Id, out var cached) && ReferenceEquals(cached.Source, content) && cached.Key == key) return cached.Result;
         var state = new ParagraphState(content, []);
         var length = content.Text.Length;
@@ -135,10 +134,10 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
             switch (span.Kind)
             {
                 case ChangeKind.Insertion when end > start && moved:
-                    state = text.Map(state, start, end, run => run with { DoubleUnderline = true, Color = MoveColor });
+                    state = text.Map(state, start, end, run => MovedTo(run, display.To) with { Color = display.Color ?? span.Color });
                     break;
                 case ChangeKind.Deletion when end > start && moved:
-                    state = text.Map(state, start, end, run => run with { DoubleStrikethrough = true, Color = MoveColor });
+                    state = text.Map(state, start, end, run => MovedFrom(run, display.From) with { Color = display.Color ?? span.Color });
                     break;
                 case ChangeKind.Insertion when end > start:
                     state = text.Map(state, start, end, run => run with { Underline = true, Color = span.Color });
@@ -150,7 +149,7 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
                     state = text.Map(state, start, end, run => run with { Bold = true, Color = span.Color });
                     break;
                 case ChangeKind.Deletion when document.Changes.Find(span.ChangeId) is Deletion { Removed.Count: > 0 } deletion:
-                    deletions.AddRange(Words(Removed(deletion)).Select(word => new InlineInsertion(start, InlineKind.Deleted, span.ChangeId, word, 0, 0) { Ink = moved ? MoveColor : span.Color, Underlined = Nested(document, deletion), Moved = moved }));
+                    deletions.AddRange(Words(Removed(deletion)).Select(word => new InlineInsertion(start, InlineKind.Deleted, span.ChangeId, word, 0, 0) { Ink = moved ? display.Color ?? span.Color : span.Color, Underlined = Nested(document, deletion), Moved = moved && display.From == MovedFromMark.DoubleStrikethrough }));
                     break;
             }
         }
@@ -158,6 +157,17 @@ public sealed class ChangeMarkup(IChangeSpans spans, IParagraphText text) : ICha
         _cache[block.Id] = (content, key, result);
         return result;
     }
+
+    private TextRun MovedTo(TextRun run, MovedToMark mark) => mark switch
+    {
+        MovedToMark.Underline => run with { Underline = true },
+        MovedToMark.Bold => run with { Bold = true },
+        _ => run with { DoubleUnderline = true },
+    };
+
+    private TextRun MovedFrom(TextRun run, MovedFromMark mark) => mark == MovedFromMark.Strikethrough
+        ? run with { Strikethrough = true }
+        : run with { DoubleStrikethrough = true };
 
     private string Key(TextDocument document, IReadOnlyList<ChangeSpan> found)
     {

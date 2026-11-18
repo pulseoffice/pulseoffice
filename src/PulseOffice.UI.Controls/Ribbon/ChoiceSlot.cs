@@ -90,6 +90,7 @@ public sealed class ChoiceSlot : RibbonSlot
         more.Padding = default;
         more.Click += (_, _) => Context.Dismissal.Toggle(_flyout!, this);
         ToolTip.SetTip(more, Item.Title);
+        Avalonia.Automation.AutomationProperties.SetName(more, Item.Title);
 
         return new StackPanel
         {

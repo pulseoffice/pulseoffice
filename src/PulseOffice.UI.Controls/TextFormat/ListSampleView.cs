@@ -14,7 +14,7 @@ public readonly record struct ListSampleRow(int Level, string Label, double Labe
 
 public interface IListSampleRows
 {
-    IReadOnlyList<ListSampleRow> Rows(IReadOnlyList<ListLevelFormat> levels, IReadOnlyList<int> pattern);
+    IReadOnlyList<ListSampleRow> Rows(IReadOnlyList<ListLevelFormat> levels, IReadOnlyList<int> pattern, string? language = null);
 
     IReadOnlyList<int> Pattern(ListSampleMode mode, int levelCount);
 }
@@ -27,7 +27,7 @@ public sealed class ListSampleRows(IListLabeler labeler) : IListSampleRows
     public IReadOnlyList<int> Pattern(ListSampleMode mode, int levelCount) =>
         [.. (mode == ListSampleMode.Headings ? _headings : _items).Select(level => Math.Min(level, Math.Max(0, levelCount - 1)))];
 
-    public IReadOnlyList<ListSampleRow> Rows(IReadOnlyList<ListLevelFormat> levels, IReadOnlyList<int> pattern)
+    public IReadOnlyList<ListSampleRow> Rows(IReadOnlyList<ListLevelFormat> levels, IReadOnlyList<int> pattern, string? language = null)
     {
         ArgumentNullException.ThrowIfNull(levels);
         ArgumentNullException.ThrowIfNull(pattern);
@@ -41,7 +41,7 @@ public sealed class ListSampleRows(IListLabeler labeler) : IListSampleRows
             var format = levels[level];
             var text = Math.Max(format.Indent, 0);
             var label = Math.Max(0, text - format.Hanging);
-            rows.Add(new ListSampleRow(level, labeler.Label(levels, level, counters), label, text) { Picture = format.Numbering == ListNumbering.Bullet ? format.Picture : null });
+            rows.Add(new ListSampleRow(level, labeler.Label(levels, level, counters, language), label, text) { Picture = format.Numbering == ListNumbering.Bullet ? format.Picture : null });
         }
         return rows;
     }
@@ -66,7 +66,9 @@ public sealed class ListSampleView : Control
         Height = height;
     }
 
-    public IReadOnlyList<ListSampleRow> Rows => _rows.Rows(_levels, _pattern);
+    public string? Language { get; set; }
+
+    public IReadOnlyList<ListSampleRow> Rows => _rows.Rows(_levels, _pattern, Language);
 
     public void Show(IReadOnlyList<ListLevelFormat> levels, IReadOnlyList<int> pattern, ListSampleMode mode, int highlight = -1)
     {

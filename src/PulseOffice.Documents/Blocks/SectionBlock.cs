@@ -11,7 +11,22 @@ public sealed record SectionColumns(int Count, Twip Gap)
     public bool Separator { get; init; }
 
     public bool Balanced { get; init; } = true;
+
+    public IReadOnlyList<ColumnSpan> Spans { get; init; } = [];
+
+    public bool Uneven => Count > 1 && Spans.Count == Count;
+
+    public SectionColumns KeepingSpansOf(SectionColumns previous) =>
+        previous.Uneven && previous.Count == Count && Spans.Count == 0 ? this with { Spans = previous.Spans } : this;
+
+    public bool Equals(SectionColumns? other) =>
+        other is not null && Count == other.Count && Gap == other.Gap && Separator == other.Separator && Balanced == other.Balanced
+        && Spans.SequenceEqual(other.Spans);
+
+    public override int GetHashCode() => HashCode.Combine(Count, Gap, Separator, Balanced, Spans.Count);
 }
+
+public sealed record ColumnSpan(Twip Width, Twip Gap);
 
 public sealed class SectionBlock(string id, string name, BlockContainer content) : Block(id)
 {

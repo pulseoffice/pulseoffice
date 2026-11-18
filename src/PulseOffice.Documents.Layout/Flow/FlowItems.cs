@@ -24,17 +24,60 @@ public interface IFlowItemVisitor<out T>
     T VisitEndnotes(EndnotesItem endnotes);
 }
 
+public sealed record ColumnShare(double Weight, double Gap);
+
 public sealed record ColumnLayout(int Count, double Gap, bool Balanced, bool Separator)
 {
     public static readonly ColumnLayout Single = new(1, 0, false, false);
 
     private const double NarrowestColumn = 1;
 
+    public IReadOnlyList<ColumnShare> Shares { get; init; } = [];
+
+    private bool Uneven => Count > 1 && Shares.Count == Count && Shares.Sum(share => Math.Max(0, share.Weight)) > 0;
+
     public double Spacing(double total) => Count <= 1 || !double.IsFinite(Gap) ? 0 : Math.Clamp(Gap, 0, Math.Max(0, (total - NarrowestColumn * Count) / (Count - 1)));
 
-    public double Width(double total) => Count <= 1 ? total : Math.Max(NarrowestColumn, (total - Spacing(total) * (Count - 1)) / Count);
+    public double Width(double total) => Uneven ? Width(total, 0) : EqualWidth(total);
 
-    public double Left(double x, double total, int index) => x + index * (Width(total) + Spacing(total));
+    public double Width(double total, int index)
+    {
+        if (!Uneven) return EqualWidth(total);
+        var gaps = Gaps(total);
+        var room = Math.Max(0, total - gaps.Sum());
+        var weights = Shares.Sum(share => Math.Max(0, share.Weight));
+        return Math.Max(NarrowestColumn, room * Math.Max(0, Shares[Math.Clamp(index, 0, Count - 1)].Weight) / weights);
+    }
+
+    public double GapBefore(double total, int index)
+    {
+        if (index <= 0) return 0;
+        return Uneven ? Gaps(total)[Math.Min(index, Count) - 1] : Spacing(total);
+    }
+
+    public double Left(double x, double total, int index)
+    {
+        if (!Uneven) return x + index * (EqualWidth(total) + Spacing(total));
+        var left = x;
+        for (var column = 0; column < Math.Min(index, Count); column++) left += Width(total, column) + GapBefore(total, column + 1);
+        return left;
+    }
+
+    public bool Equals(ColumnLayout? other) =>
+        other is not null && Count == other.Count && Gap.Equals(other.Gap) && Balanced == other.Balanced && Separator == other.Separator
+        && Shares.SequenceEqual(other.Shares);
+
+    public override int GetHashCode() => HashCode.Combine(Count, Gap, Balanced, Separator, Shares.Count);
+
+    private double EqualWidth(double total) => Count <= 1 ? total : Math.Max(NarrowestColumn, (total - Spacing(total) * (Count - 1)) / Count);
+
+    private double[] Gaps(double total)
+    {
+        var gaps = Shares.Take(Count - 1).Select(share => double.IsFinite(share.Gap) ? Math.Max(0, share.Gap) : 0).ToArray();
+        var limit = Math.Max(0, total - NarrowestColumn * Count);
+        var sum = gaps.Sum();
+        return sum <= limit || sum <= 0 ? gaps : [.. gaps.Select(gap => gap * limit / sum)];
+    }
 }
 
 public sealed class SectionStartItem(SectionBlock section, ColumnLayout columns) : FlowItem

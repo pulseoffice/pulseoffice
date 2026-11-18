@@ -64,7 +64,7 @@ public interface IDirectDocumentEditor : IDocumentEditor
 }
 
 public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, IDirectFormatting direct, IContentTrails trails, IRangeDeletion deletion, IBlockTree tree,
-    IObjectAnchoring anchoring, ISequenceFields sequences, ITableEditing tables, Clipboard.IFragmentPaster paster)
+    IObjectAnchoring anchoring, ISequenceFields sequences, ITableEditing tables, Clipboard.IFragmentPaster paster, IPageTextWidth pages)
     : IDirectDocumentEditor
 {
     public DocumentEdit Paste(TextDocument document, UndoStack history, DocumentPosition at, Clipboard.DocumentFragment fragment) =>
@@ -322,11 +322,8 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
             var spanned = cell.Table.Columns.Skip(cell.Column).Take(span).Sum(column => column.Value);
             return Math.Max(0, spanned - 2 * CellInset);
         }
-        var page = document.Styles.Page.Find(document.InitialPageStyle);
-        return page is null ? DefaultTextWidth : Math.Max(0, page.Width.Value - page.Margins.Left.Value - page.Margins.Right.Value);
+        return pages.At(document, paragraphId);
     }
-
-    private const int DefaultTextWidth = 9638;
 
     private const int CellInset = 108;
 

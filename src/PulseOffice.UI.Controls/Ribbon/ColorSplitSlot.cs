@@ -59,6 +59,8 @@ public sealed class ColorSplitSlot : RibbonSlot
         _arrow.Click += (_, _) => Context.Dismissal.Toggle(flyout!, _main);
 
         ToolTip.SetTip(_arrow, Item.Title);
+        Avalonia.Automation.AutomationProperties.SetName(_arrow, Item.Title);
+        Avalonia.Automation.AutomationProperties.SetName(_main, Item.Title);
 
         Control Palette()
         {

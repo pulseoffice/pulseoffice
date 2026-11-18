@@ -152,7 +152,7 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
 
         private bool PageEmpty => _lines.Count == 0 && _tables.Count == 0;
 
-        private double ColumnWidth => _region.Width(_geometry.Body.Width);
+        private double ColumnWidth => _region.Width(_geometry.Body.Width, _column);
 
         private double ColumnLeft => _region.Left(_geometry.Body.X, _geometry.Body.Width, _column);
 
@@ -1159,10 +1159,10 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
                 for (var c = 0; c < _region.Count; c++)
                 {
                     var x = _region.Left(_geometry.Body.X, _geometry.Body.Width, c);
-                    _columnAreas.Add(new AreaBox(AreaKind.Column, new LayoutRect(x, _regionTop, _region.Width(_geometry.Body.Width), bottom - _regionTop), []));
+                    _columnAreas.Add(new AreaBox(AreaKind.Column, new LayoutRect(x, _regionTop, _region.Width(_geometry.Body.Width, c), bottom - _regionTop), []));
                     if (_region.Separator && c > 0)
                     {
-                        var line = x - _region.Spacing(_geometry.Body.Width) / 2;
+                        var line = x - _region.GapBefore(_geometry.Body.Width, c) / 2;
                         _decorations.Add(new DecorationBox(DecorationKind.ColumnSeparator, new LayoutRect(line, _regionTop, 0, bottom - _regionTop), null, 0.5));
                     }
                 }
@@ -1176,7 +1176,7 @@ public sealed class Paginator(ITableComposer tables, IStoryComposer stories, IPa
         {
             var number = _pages.Count + 1;
             var first = _pages.Count == 0 || _pages[^1].StyleName != style;
-            var basis = _request.Geometry(style, new PageSide(_start.Number, first) { Count = _request.PageCount });
+            var basis = _request.Geometry(style, new PageSide(_start.Number, first) { Count = _request.PageCount, Physical = number });
             _geometry = basis;
             _noteHeight = 0;
             _columnNotes = new double[Math.Max(1, basis.Columns.Count)];

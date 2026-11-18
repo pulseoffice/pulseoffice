@@ -179,6 +179,7 @@ public sealed class RemoteBrowserView : UserControl, IDialogContent, IDialogFoot
 
         var up = _parts.Quiet(string.Empty, "ui.back", Up);
         ToolTip.SetTip(up, _texts["remote.up"]);
+        Avalonia.Automation.AutomationProperties.SetName(up, _texts["remote.up"]);
 
         _place.VerticalAlignment = VerticalAlignment.Center;
         _place.Margin = new Thickness(_metrics.SpacingSmall, 0, 0, 0);

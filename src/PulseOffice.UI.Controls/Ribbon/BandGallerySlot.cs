@@ -76,9 +76,9 @@ public sealed class BandGallerySlot : RibbonSlot
             Height = Context.ItemHeight * 3 - 8,
         };
 
-        _up = Arrow("ui.chevronUp", () => Scroll(-1));
-        _down = Arrow("ui.chevronDown", () => Scroll(1));
-        var more = Arrow("ui.galleryMore", () => Context.Dismissal.Toggle(_flyout!, this));
+        _up = Arrow("ui.chevronUp", Context.Texts["ribbon.gallery.previousRow"], () => Scroll(-1));
+        _down = Arrow("ui.chevronDown", Context.Texts["ribbon.gallery.nextRow"], () => Scroll(1));
+        var more = Arrow("ui.galleryMore", Item.Title, () => Context.Dismissal.Toggle(_flyout!, this));
         ToolTip.SetTip(more, Item.Title);
 
         var arrows = new Grid { RowDefinitions = new RowDefinitions("*,*,*"), Width = ArrowWidth };
@@ -118,9 +118,10 @@ public sealed class BandGallerySlot : RibbonSlot
         return box;
     }
 
-    private Button Arrow(string icon, Action run)
+    private Button Arrow(string icon, string name, Action run)
     {
         var button = Context.Flat(Context.Icon(icon, Context.Metrics.IconSize * 0.6), width: ArrowWidth, height: double.NaN);
+        Avalonia.Automation.AutomationProperties.SetName(button, name);
         button.Padding = default;
         button.CornerRadius = default;
         button.VerticalAlignment = VerticalAlignment.Stretch;

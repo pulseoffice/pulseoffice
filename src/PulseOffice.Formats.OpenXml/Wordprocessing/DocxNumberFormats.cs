@@ -32,6 +32,9 @@ public sealed class DocxNumberFormats
 
     public bool TryWord(NumberFormat format, out W.NumberFormatValues value) => _formats.TryGetValue(format, out value);
 
+    public bool TryWordPage(NumberFormat format, out W.NumberFormatValues value) =>
+        TryWord(format == NumberFormat.Hiragana ? NumberFormat.Katakana : format, out value);
+
     public NumberFormat? Model(W.NumberFormatValues value)
     {
         foreach (var (format, known) in _formats)

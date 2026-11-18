@@ -22,7 +22,8 @@ public sealed record FolioTableEditing(
     ITableFormulaEditing Formulas,
     ITableConversion Conversion,
     ITableMeasure Measure,
-    ITableGrid Grid);
+    ITableGrid Grid,
+    IPageTextWidth Pages);
 
 public sealed class FolioTableCommands(
     IActiveFolioContext context,
@@ -165,8 +166,7 @@ public sealed class FolioTableCommands(
 
     private double TextWidth(FolioEditor editor)
     {
-        var page = editor.Document.Styles.Page.Find(editor.Document.InitialPageStyle);
-        return page is null ? 450 : (page.Width - page.Margins.Left - page.Margins.Right).ToPoints();
+        return new PulseOffice.Foundation.Units.Twip(editing.Pages.At(editor.Document, editor.Caret.ParagraphId)).ToPoints();
     }
 
     private TableSelection Rows(TableSelection at) =>

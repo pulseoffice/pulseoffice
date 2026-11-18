@@ -22,6 +22,6 @@ public sealed class DocxSectionStarts
     public string StarterName(string name, PageUsage usage) => name + (usage == PageUsage.Right ? "Right" : "Left");
 
     private bool SameLayout(PageStyle style, PageStyle follow) =>
-        style.Size == follow.Size && style.Orientation == follow.Orientation && style.Margins == follow.Margins
+        style.Size == follow.Size && style.Orientation == follow.Orientation && style.Margins == follow.Margins && style.Gutter == follow.Gutter && style.GutterAtTop == follow.GutterAtTop
         && style.Columns == follow.Columns && style.NumberFormat == follow.NumberFormat && style.Background == follow.Background;
 }

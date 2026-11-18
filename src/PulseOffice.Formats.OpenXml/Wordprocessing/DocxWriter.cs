@@ -128,6 +128,10 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
         new(document => UsedPageStyles(document).Where(style => _starts.Mark(style, document) is null).Any(style => style.Usage != PageUsage.All && !(style.Usage == PageUsage.Mirrored && MirroredMargins(document))
                         || style.NextStyleName is { } next && next != style.Name && !(style.Name == DefaultStyleNames.FirstPage && next == DefaultStyleNames.Standard)),
             Diagnostic.Info("DOCX037", "Word sections have no left-only, right-only or mirrored page styles and no following page style: page usage and the next page style are lost in DOCX. ODT keeps them.")),
+        new(document => UsedPageStyles(document).Any(style => style.NumberFormat == NumberFormat.Hiragana),
+            Diagnostic.Info("DOCX247", "Word page numbers have no Hiragana format: Hiragana page numbers are written as full-width Katakana in DOCX. ODT keeps them.")),
+        new(document => GutterAtTop(document) && UsedPageStyles(document).Any(style => !style.GutterAtTop && style.Gutter.Value > 0),
+            Diagnostic.Info("DOCX246", "Word places the gutter of every section on the same side: a left gutter in a document that also has a top gutter is written at the top in DOCX. ODT keeps both.")),
         new(document => Blocks(document.Body).OfType<SectionBlock>().Any(section => section.Columns.Count > 1 && !section.Columns.Balanced)
                         || UsedPageStyles(document).Any(style => style.Columns.Count > 1 && !style.Columns.Balanced),
             Diagnostic.Info("DOCX038", "Word balances section columns: columns set not to balance are balanced in DOCX. ODT keeps the setting.")),
@@ -229,8 +233,16 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     private IEnumerable<TextRun> Runs(TextDocument document) => Paragraphs(document).SelectMany(paragraph => paragraph.Runs);
 
+    public bool GutterAtTop(TextDocument document) =>
+        UsedPageStyles(document).Any(style => style.GutterAtTop && style.Gutter.Value > 0);
+
     public bool MirroredMargins(TextDocument document) =>
-        UsedPageStyles(document).ToList() is { Count: > 0 } used && used.All(style => style.Usage == PageUsage.Mirrored);
+        UsedPageStyles(document).ToList() is { Count: > 0 } used && used.Any(style => style.Usage == PageUsage.Mirrored)
+        && used.All(style => style.Usage == PageUsage.Mirrored || style.Usage == PageUsage.All && Symmetric(style));
+
+    private bool Symmetric(PageStyle style) =>
+        style.Margins.Left == style.Margins.Right && style.Gutter.Value == 0
+        && (style.Borders is not { } borders || borders.Inset(BorderSide.Left).Equals(borders.Inset(BorderSide.Right)));
 
     private IEnumerable<PageStyle> UsedPageStyles(TextDocument document) =>
         PageStyleNames(document).Distinct(StringComparer.Ordinal).Select(name => document.Styles.Page.Find(name)).OfType<PageStyle>();
@@ -461,6 +473,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         if (Background(document) is not null) settings.Append(new W.DisplayBackgroundShape());
         if (document.Fonts.EmbedSystemFonts || document.Fonts.HasFiles) settings.Append(new W.EmbedTrueTypeFonts());
         if (_pageUsage.MirroredMargins(document)) settings.Append(new W.MirrorMargins());
+        if (_pageUsage.GutterAtTop(document)) settings.Append(new W.GutterAtTop());
         if (document.FormSettings.OpenInDesignMode) settings.Append(new W.FormsDesign());
         if (!document.Changes.ShowChanges) settings.Append(new W.RevisionView { Markup = false, DisplayRevision = false, Formatting = false });
         if (document.Changes.IsRecording) settings.Append(new W.TrackRevisions());

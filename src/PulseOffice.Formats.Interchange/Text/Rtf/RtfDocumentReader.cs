@@ -935,13 +935,7 @@ internal sealed class RtfReadSession(TextDocumentAssembler assembler, ICodePages
             {
                 bullet = format == NumberFormat.Bullet;
                 numbered = !bullet;
-                listStyle = format switch
-                {
-                    NumberFormat.Bullet => DefaultStyleNames.List1,
-                    NumberFormat.LowerLetter or NumberFormat.UpperLetter => DefaultStyleNames.NumberingAbc,
-                    NumberFormat.LowerRoman or NumberFormat.UpperRoman => DefaultStyleNames.NumberingIvx,
-                    _ => DefaultStyleNames.Numbering123,
-                };
+                listStyle = ListStyleFor(listId, format);
             }
         }
         else if (paragraph.LegacyBullet is { } legacy)
@@ -970,6 +964,28 @@ internal sealed class RtfReadSession(TextDocumentAssembler assembler, ICodePages
         if (paragraph.InTable && style is null) style = DefaultStyleNames.TableContents;
         return new ParagraphShape { StyleName = style, Properties = properties, ListStyleName = listStyle, Bullet = bullet, Numbered = numbered, Level = paragraph.ListLevel, ListId = thread, ListSegment = segment, ListSegmentStart = segmentStart };
     }
+
+    private string ListStyleFor(int listId, NumberFormat format)
+    {
+        var fallback = format switch
+        {
+            NumberFormat.Bullet => DefaultStyleNames.List1,
+            NumberFormat.LowerLetter or NumberFormat.UpperLetter => DefaultStyleNames.NumberingAbc,
+            NumberFormat.LowerRoman or NumberFormat.UpperRoman => DefaultStyleNames.NumberingIvx,
+            _ => DefaultStyleNames.Numbering123,
+        };
+        var styles = assembler.Document.Styles.List;
+        if (!_lists.TryGetValue(listId, out var formats) || formats.Count == 0 || styles.Find(fallback) is not { } known) return fallback;
+        if (formats.Select((read, index) => known.Level(index).Format == read).All(same => same)) return fallback;
+        var name = "RTF List " + listId.ToString(CultureInfo.InvariantCulture);
+        if (styles.Find(name) is null)
+            styles.Add(new ListStyle(name, Enumerable.Range(0, ListStyle.LevelCount).Select(index => ReadLevel(formats[Math.Min(index, formats.Count - 1)])).ToList()));
+        return name;
+    }
+
+    private static ListLevel ReadLevel(NumberFormat format) => format is NumberFormat.Bullet or NumberFormat.None
+        ? new ListLevel(format) { Suffix = string.Empty }
+        : new ListLevel(format);
 
     private CharacterProperties Own(CharacterProperties run, CharacterProperties inherited) => new()
     {

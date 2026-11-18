@@ -30,7 +30,7 @@ public sealed class ListFormatTabs(IListLevelsEditors editors, IListSampleRows r
                 values => Read(request, values),
                 answer =>
                 {
-                    var view = new ListSampleView(rows, 220, 170);
+                    var view = new ListSampleView(rows, 220, 170) { Language = request.Language };
                     view.Show(answer.Levels, rows.Pattern(request.Mode, answer.Levels.Count), request.Mode, answer.Level);
                     return view;
                 },

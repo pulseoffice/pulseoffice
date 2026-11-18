@@ -95,7 +95,6 @@ public sealed class ReduceForm(IRangeMaterializer ranges) : HigherOrderForm(rang
         foreach (var value in grid.InReadingOrder())
         {
             accumulator = services.Invoke(lambda, [accumulator, EvalValue.Scalar(value)], context);
-            if (accumulator is ScalarValue { Value.IsError: true }) return accumulator;
         }
 
         return accumulator;

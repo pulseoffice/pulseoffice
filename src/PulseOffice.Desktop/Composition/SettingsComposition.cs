@@ -56,6 +56,8 @@ internal static class SettingsComposition
         services.AddSingleton<ISettingsProvider, ShellSettings>();
         services.AddSingleton<ISettingsProvider, UserIdentitySettings>();
         services.AddSingleton<ISettingsProvider, PulseOffice.Updates.UpdateSettings>();
+        services.AddSingleton<ISettingsProvider, PulseOffice.Documents.UI.Editing.FolioChangeSettings>();
+        services.AddSingleton<PulseOffice.Documents.Layout.Flow.IMoveDisplayOptions, PulseOffice.Documents.UI.Editing.SettingsMoveDisplayOptions>();
         services.AddSingleton<PulseOffice.Foundation.Identity.SystemUserIdentity>();
         services.AddSingleton<PulseOffice.Foundation.Identity.IUserIdentity, SettingsUserIdentity>();
         services.AddSingleton<ISettingsStore>(_ => new InMemorySettingsStore(SettingScope.Policy));

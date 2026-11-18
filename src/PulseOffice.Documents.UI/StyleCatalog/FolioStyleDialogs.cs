@@ -108,7 +108,7 @@ public sealed class FolioStyleDialogs(
                 await CharacterAsync(editor, character, ct).ConfigureAwait(true);
                 break;
             case StyleFamily.List when sheet.List.Contains(name):
-                var values = await tabbed.AskAsync("command.folio.list.bulletsNumbering.title", lists.ListTabs(sheet, name, 0), ct).ConfigureAwait(true);
+                var values = await tabbed.AskAsync("command.folio.list.bulletsNumbering.title", lists.ListTabs(sheet, name, 0, editor.Document.Language), ct).ConfigureAwait(true);
                 if (values is null) return;
                 var (style, levels, _, _) = lists.ReadList(sheet, name, values);
                 Commit(editor, () => styles.Change(editor.Document, editor.History, sheet.List, style, list => list.Levels = levels, "list-style"));

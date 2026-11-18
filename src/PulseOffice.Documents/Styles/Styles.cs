@@ -224,6 +224,14 @@ public sealed class PageStyle(string name) : DocumentStyle(name)
 
     public SectionColumns Columns { get; set { field = value; Touch(); } } = SectionColumns.Single;
 
+    public Twip Gutter { get; set { field = value; Touch(); } } = Twip.Zero;
+
+    public bool GutterAtTop { get; set { field = value; Touch(); } }
+
+    public Margins BoundMargins => GutterAtTop
+        ? Margins with { Top = Margins.Top + Gutter }
+        : Margins with { Left = Margins.Left + Gutter };
+
     public PageUsage Usage { get; set { field = value; Touch(); } } = PageUsage.All;
 
     public string? NextStyleName { get; set { field = value; Touch(); } }
@@ -261,6 +269,8 @@ public sealed class PageStyle(string name) : DocumentStyle(name)
         Orientation = Orientation,
         Margins = Margins,
         Columns = Columns,
+        Gutter = Gutter,
+        GutterAtTop = GutterAtTop,
         Usage = Usage,
         NextStyleName = NextStyleName,
         Background = Background,

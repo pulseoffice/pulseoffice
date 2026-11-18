@@ -159,7 +159,7 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
         var columns = Columns(style, values);
         style.Columns = columns.Count <= 1 && !columns.Separator
             ? SectionColumns.Single
-            : new SectionColumns(Math.Clamp(columns.Count, 1, 10), Twip.FromCentimeters(columns.Gap)) { Separator = columns.Separator };
+            : new SectionColumns(Math.Clamp(columns.Count, 1, 10), Twip.FromCentimeters(columns.Gap)) { Separator = columns.Separator }.KeepingSpansOf(style.Columns);
         style.Watermark = values.Text("mark").Trim() is { Length: > 0 } text
             ? new PageWatermark(text)
             {

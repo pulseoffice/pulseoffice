@@ -53,6 +53,8 @@ public sealed class NumberBoxSlot : RibbonSlot
         var arrow = Context.Flat(Context.Chevron(0.6), width: 16);
         arrow.Classes.Add("field");
         arrow.Padding = default;
+        ToolTip.SetTip(arrow, Item.Title);
+        Avalonia.Automation.AutomationProperties.SetName(arrow, Item.Title);
         arrow.CornerRadius = new CornerRadius(0, Context.Metrics.RadiusTight, Context.Metrics.RadiusTight, 0);
 
         Flyout? flyout = null;

@@ -37,6 +37,8 @@ public sealed class RtfDocumentWriter(IParagraphSemantics semantics, IStyleResol
             losses.Add(Diagnostic.Warning("RTF005", "Macros are not written to RTF."));
         if (document.Notes.All.Any(note => note.Citation is { Length: > 0 }))
             losses.Add(Diagnostic.Info("RTF006", "Footnotes with a custom mark become automatically numbered in RTF."));
+        if (document.Styles.List.All.Any(style => style.Levels.Any(level => level.Format == NumberFormat.Hiragana)))
+            losses.Add(Diagnostic.Info("RTF007", "RTF has no Hiragana list numbering; Hiragana lists are written with Katakana numbers."));
         return new FidelityReport(losses);
     }
 

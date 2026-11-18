@@ -87,6 +87,7 @@ public static class DocumentsServiceCollectionExtensions
         services.AddSingleton<IMetadataRedaction, MetadataRedaction>();
         services.AddSingleton<Commenting.ICommentAnchors, Commenting.CommentAnchors>();
         services.AddSingleton<Commenting.ICommentEditing, Commenting.CommentEditing>();
+        services.AddSingleton<IPageTextWidth, PageTextWidth>();
         services.AddSingleton<IDirectDocumentEditor, DocumentEditor>();
         services.TryAddSingleton<PulseOffice.Foundation.Identity.IUserIdentity, PulseOffice.Foundation.Identity.SystemUserIdentity>();
         services.TryAddSingleton<Revisions.IRevisionAuthor, Revisions.IdentityRevisionAuthor>();

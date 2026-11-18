@@ -298,6 +298,8 @@ public sealed class FolioToolCommands(IActiveFolioContext context, FolioToolServ
             ], null, current?.Side == LineNumberSide.Right ? 1 : 0) { ShowLabels = true, ShownWhen = On },
             new PulseOffice.UI.Controls.NumberField("distance", services.Texts["folio.lineNumbers.distance"], Math.Round((current?.Distance ?? 0.5 * 72 / 2.54) * 2.54 / 72, 2), 0, 5, 0.1) { Unit = "cm", ShownWhen = On },
             new PulseOffice.UI.Controls.CheckField("restart", services.Texts["folio.lineNumbers.restart"], current?.RestartEachPage ?? false) { ShownWhen = On },
+            new PulseOffice.UI.Controls.CheckField("restartSection", services.Texts["folio.lineNumbers.restartSection"], current?.RestartEachSection ?? false) { ShownWhen = On },
+            new PulseOffice.UI.Controls.NumberField("start", services.Texts["folio.lineNumbers.start"], current?.Start ?? 1, 1, 32_767) { Integer = true, ShownWhen = On },
             new PulseOffice.UI.Controls.CheckField("blank", services.Texts["folio.lineNumbers.blank"], current?.CountBlankLines ?? true) { ShownWhen = On },
         ];
         if (await services.Forms.AskAsync("command.folio.tools.lineNumbering.title", "folio.lineNumbers.explanation", fields, LineNumberPreview, ct).ConfigureAwait(true) is not { } values
@@ -308,6 +310,8 @@ public sealed class FolioToolCommands(IActiveFolioContext context, FolioToolServ
                 Side = values.Choice("side", 2) == 1 ? LineNumberSide.Right : LineNumberSide.Left,
                 Distance = values.Number("distance", 0.5) * 72 / 2.54,
                 RestartEachPage = values.Flag("restart"),
+                RestartEachSection = values.Flag("restartSection"),
+                Start = (int)values.Number("start", 1),
                 CountBlankLines = values.Flag("blank"),
             }
             : null;

@@ -55,7 +55,7 @@ public sealed class PageGeometries : IPageGeometries
     public PageGeometry Of(StyleSheet sheet, string name)
     {
         var style = sheet.Page.Find(name) ?? new PageStyle(name);
-        var margins = style.Margins;
+        var margins = style.BoundMargins;
         var width = style.Width.ToPoints();
         var height = style.Height.ToPoints();
         var frame = new LayoutRect(
@@ -72,7 +72,10 @@ public sealed class PageGeometries : IPageGeometries
         var columns = style.Columns;
         return new PageGeometry(name, width, height, content, style.NextStyleName ?? name)
         {
-            Columns = new ColumnLayout(Math.Clamp(columns.Count, 1, SectionColumns.LargestCount), columns.Gap.ToPoints(), false, columns.Separator),
+            Columns = new ColumnLayout(Math.Clamp(columns.Count, 1, SectionColumns.LargestCount), columns.Gap.ToPoints(), false, columns.Separator)
+            {
+                Shares = [.. columns.Spans.Select(span => new ColumnShare(span.Width.ToPoints(), span.Gap.ToPoints()))],
+            },
             Decor = new PageDecor(style.Background, borders, frame, style.Watermark),
         };
     }
@@ -82,7 +85,9 @@ public sealed record PageSide(int Number, bool First)
 {
     public string Count { get; init; } = "00";
 
-    public bool Even => Number % 2 == 0;
+    public int Physical { get; init; }
+
+    public bool Even => (Physical > 0 ? Physical : Number) % 2 == 0;
 }
 
 public interface IPageFrames
@@ -169,7 +174,7 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
     {
         var style = document.Styles.Page.Find(page.StyleName);
         if (continuous.Page is not null || style is null || !style.Header.Enabled && !style.Footer.Enabled) return PageStories.None;
-        var side = new PageSide(page.Number, first);
+        var side = new PageSide(page.Number, first) { Physical = page.Index + 1 };
         var number = numbers.Render(style.NumberFormat, page.Number);
         var count = numbers.Render(style.NumberFormat, pageCount);
         var content = page.Content;
