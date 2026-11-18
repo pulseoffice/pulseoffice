@@ -216,8 +216,15 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
     {
         ArgumentNullException.ThrowIfNull(template);
         var master = deck.MasterOf(slide);
-        if (ReferenceEquals(master.Template(slide), template) || deck.IndexOf(slide) < 0) return;
-        var replacement = slides.Relayout(slide, master, template);
+        if (ReferenceEquals(master.Template(slide), template)) return;
+        Relayout(slide, template);
+    }
+
+    public void Relayout(Slide slide, SlideLayoutTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        if (deck.IndexOf(slide) < 0) return;
+        var replacement = slides.Relayout(slide, deck.MasterOf(slide), template);
 
         Do(texts["deck.action.layout"],
             () => { deck.ReplaceAt(deck.IndexOf(slide), replacement); Focus(replacement); },

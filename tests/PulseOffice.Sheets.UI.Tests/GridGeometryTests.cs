@@ -264,11 +264,18 @@ public class GridFrozenAndResizeTests
         var geometry = Standard();
         for (var row = 1; row <= 20000; row++) geometry.Layout.HideRow(row);
 
-        var watch = System.Diagnostics.Stopwatch.StartNew();
         Assert.Equal(0, geometry.RowAt(5));
         Assert.Equal(20001, geometry.RowAt(25));
         Assert.Equal(20002, geometry.RowAt(45));
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2));
+        new PulseOffice.Testing.GrowthCheck().Flat(hidden =>
+        {
+            var sized = Standard();
+            for (var row = 1; row <= hidden; row++) sized.Layout.HideRow(row);
+            return () =>
+            {
+                for (var probe = 0; probe < 200; probe++) sized.RowAt(25 + probe);
+            };
+        }, 2_000, 20_000);
     }
 
     [Fact]

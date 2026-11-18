@@ -110,12 +110,16 @@ public sealed class ChartRenderer
 
         if (painter.DrawsAxes && !thumbnail)
         {
-            var values = painter.ValueAxis(frame) ?? DefaultScale(data, plot, horizontal);
-            scene.Axes.Values(context, values, plot, horizontal, definition.ShowGridLines);
-            if (painter.CategoryValueAxis(frame) is { } across) scene.Axes.Values(context, across, plot, !horizontal, definition.ShowGridLines);
+            var values = painter.ValueAxis(frame) ?? _axisScaling.Apply(DefaultScale(data, plot, horizontal), definition.ValueAxis);
+            scene.Axes.Values(context, values, plot, horizontal, definition.ShowGridLines, definition.ValueAxis.NumberFormat);
+            if (painter.CategoryValueAxis(frame) is { } across) scene.Axes.Values(context, across, plot, !horizontal, definition.ShowGridLines, definition.CategoryAxis.NumberFormat);
+            if (!horizontal && painter.SecondaryValueAxis(frame) is { } secondary) scene.Axes.Secondary(context, secondary, plot, definition.SecondaryValueAxis.NumberFormat);
         }
 
         painter.Draw(frame);
+
+        if (!thumbnail && !horizontal && painter.DrawsAxes && HasAnalysis(definition, data))
+            _analysis.Paint(context, painter, frame, [.. painter.DataLabels(frame)]);
 
         if (painter.DrawsAxes && !thumbnail)
         {
@@ -123,14 +127,37 @@ public sealed class ChartRenderer
             scene.Axes.Titles(context, definition.CategoryAxisTitle, definition.ValueAxisTitle, plot, horizontal);
         }
 
-        if (definition.ShowDataLabels) DrawDataLabels(scene.Text, context, painter.DataLabels(frame));
+        if (definition.ShowDataLabels) DrawDataLabels(scene.Text, context, definition, data, painter.DataLabels(frame));
     }
 
-    private void DrawDataLabels(ChartText text, DrawingContext context, IEnumerable<Plots.ChartDataLabel> labels)
+    private readonly ChartAxisScaling _axisScaling = new();
+
+    private readonly ChartAnalysisPainter _analysis = new();
+
+    private bool HasAnalysis(ChartDefinition definition, ChartData data) =>
+        Enumerable.Range(0, data.Series.Count).Any(series => definition.SeriesFormat(series) is { Trendline: not null } or { ErrorBars: not null });
+
+    private string LabelText(ChartText text, ChartDefinition definition, ChartData data, Plots.ChartDataLabel label)
+    {
+        var options = definition.DataLabels;
+        if (options.IsValuesOnly) return text.Number(label.Value);
+        var parts = new List<string>();
+        if (options.ShowSeriesName && label.Series >= 0 && label.Series < data.Series.Count) parts.Add(data.Series[label.Series].Name);
+        if (options.ShowCategory && label.Index >= 0 && label.Index < data.Categories.Count) parts.Add(data.Categories[label.Index]);
+        if (options.ShowValue) parts.Add(text.Formatted(label.Value, options.NumberFormat));
+        if (options.ShowPercent && label.Series >= 0 && label.Series < data.Series.Count
+            && data.Series[label.Series].Values.Where(double.IsFinite).Sum(value => Math.Abs(value)) is > 0 and var total)
+            parts.Add(text.Number(label.Value / total, "0%"));
+        return string.Join("; ", parts);
+    }
+
+    private void DrawDataLabels(ChartText text, DrawingContext context, ChartDefinition definition, ChartData data, IEnumerable<Plots.ChartDataLabel> labels)
     {
         foreach (var label in labels)
         {
-            var layout = text.Layout(text.Number(label.Value), Brushes.Black, 9);
+            var caption = LabelText(text, definition, data, label);
+            if (caption.Length == 0) continue;
+            var layout = text.Layout(caption, Brushes.Black, 9);
             var origin = new Point(label.Anchor.X - layout.Width / 2, label.Anchor.Y - layout.Height - 2);
             context.FillRectangle(new SolidColorBrush(Colors.White, 0.7), new Rect(origin, new Size(layout.Width, layout.Height)));
             context.DrawText(layout, origin);
@@ -149,7 +176,8 @@ public sealed class ChartRenderer
 
         var left = area.X + ValueLabelWidth + (Has(definition.ValueAxisTitle) || Has(definition.CategoryAxisTitle) ? AxisTitleSpace : 0);
         var bottom = area.Bottom - AxisLabelHeight - (Has(definition.CategoryAxisTitle) || Has(definition.ValueAxisTitle) ? AxisTitleSpace : 0);
-        return new Rect(left, area.Y, Math.Max(area.Right - left, 10), Math.Max(bottom - area.Y, 10));
+        var right = area.Right - (definition.HasSecondaryAxis ? ValueLabelWidth : 0);
+        return new Rect(left, area.Y, Math.Max(right - left, 10), Math.Max(bottom - area.Y, 10));
     }
 
     private bool Has(string? text) => text is { Length: > 0 };

@@ -68,55 +68,16 @@ public sealed class LedgerRenderCostTests
         return clock.Elapsed / count;
     }
 
-    [Fact]
-    public Task Many_used_rows_paint_scroll_and_type_in_bounded_time() => Session.Dispatch(() =>
+    private sealed record Costs(TimeSpan Top, TimeSpan Bottom, TimeSpan Scroll, TimeSpan Typing);
+
+    private static readonly GrowthCheck Growth = new(TimeSpan.FromMilliseconds(10), 4);
+
+    private static Costs Measure(int usedRows, FrozenPanes? frozen, bool typeKeys)
     {
         var scene = new Scene();
-        for (var row = 0; row < UsedRows; row++) scene.Sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
-        for (var row = 0; row < UsedRows; row += 1000) scene.Sheet.SetValue(new CellAddress(row, 1), CellValue.Text("riga"));
-
-        var grid = scene.Grid;
-        grid.Measure(new Size(1200, 800));
-        grid.Arrange(new Rect(0, 0, 1200, 800));
-        using var bitmap = new RenderTargetBitmap(new PixelSize(1200, 800));
-        bitmap.Render(grid);
-
-        var top = Frames(grid, bitmap, 10);
-        grid.EnsureVisible(new CellAddress(UsedRows - 10, 0));
-        var bottom = Frames(grid, bitmap, 10);
-
-        var clock = Stopwatch.StartNew();
-        const int scrolls = 40;
-        for (var i = 0; i < scrolls; i++)
-        {
-            grid.EnsureVisible(new CellAddress(UsedRows / 2 + i * 37, 0));
-            bitmap.Render(grid);
-        }
-        var scroll = clock.Elapsed / scrolls;
-
-        clock.Restart();
-        const int keys = 20;
-        for (var i = 0; i < keys; i++)
-        {
-            scene.Writer.Write((i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), new CellAddress(UsedRows / 2, 2), 0);
-            bitmap.Render(grid);
-        }
-        var typing = clock.Elapsed / keys;
-
-        Record($"rows={UsedRows} frame top={top.TotalMilliseconds:0.0} bottom={bottom.TotalMilliseconds:0.0} scroll={scroll.TotalMilliseconds:0.0} typing={typing.TotalMilliseconds:0.0}");
-
-        Assert.Equal(20, scene.Sheet.GetValue(new CellAddress(UsedRows / 2, 2)).AsNumber());
-        Assert.True(bottom.TotalMilliseconds < 4 * Math.Max(top.TotalMilliseconds, 10), $"top {top}, bottom {bottom}");
-        Assert.True(scroll < TimeSpan.FromMilliseconds(150), $"scroll frame {scroll.TotalMilliseconds:0} ms");
-        Assert.True(typing < TimeSpan.FromMilliseconds(250), $"typing {typing.TotalMilliseconds:0} ms per key");
-    }, TestContext.Current.CancellationToken);
-
-    [Fact]
-    public Task Frozen_panes_over_many_rows_paint_and_scroll_like_the_plain_grid() => Session.Dispatch(() =>
-    {
-        var scene = new Scene();
-        for (var row = 0; row < UsedRows; row++) scene.Sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
-        scene.Sheet.Frozen = new FrozenPanes(3, 2);
+        for (var row = 0; row < usedRows; row++) scene.Sheet.SetValue(new CellAddress(row, 0), CellValue.Number(row));
+        for (var row = 0; row < usedRows; row += 1000) scene.Sheet.SetValue(new CellAddress(row, 1), CellValue.Text("riga"));
+        if (frozen is { } panes) scene.Sheet.Frozen = panes;
 
         var grid = scene.Grid;
         grid.Measure(new Size(1200, 800));
@@ -126,19 +87,57 @@ public sealed class LedgerRenderCostTests
         bitmap.Render(grid);
 
         var top = Frames(grid, bitmap, 10);
-        grid.EnsureVisible(new CellAddress(UsedRows - 10, 0));
+        grid.EnsureVisible(new CellAddress(usedRows - 10, 0));
         var bottom = Frames(grid, bitmap, 10);
+
         var clock = Stopwatch.StartNew();
         const int scrolls = 40;
         for (var i = 0; i < scrolls; i++)
         {
-            grid.EnsureVisible(new CellAddress(UsedRows / 2 + i * 37, 5));
+            grid.EnsureVisible(new CellAddress(usedRows / 2 + i * 37, 5));
             bitmap.Render(grid);
         }
         var scroll = clock.Elapsed / scrolls;
-        Record($"rows={UsedRows} frozen=3x2 frame top={top.TotalMilliseconds:0.0} bottom={bottom.TotalMilliseconds:0.0} scroll={scroll.TotalMilliseconds:0.0}");
 
-        Assert.True(bottom.TotalMilliseconds < 4 * Math.Max(top.TotalMilliseconds, 10), $"top {top}, bottom {bottom}");
-        Assert.True(scroll < TimeSpan.FromMilliseconds(150), $"scroll frame {scroll.TotalMilliseconds:0} ms");
+        if (!typeKeys) return new Costs(top, bottom, scroll, TimeSpan.Zero);
+
+        clock.Restart();
+        const int keys = 20;
+        for (var i = 0; i < keys; i++)
+        {
+            scene.Writer.Write((i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), new CellAddress(usedRows / 2, 2), 0);
+            bitmap.Render(grid);
+        }
+        var typing = clock.Elapsed / keys;
+
+        Assert.Equal(20, scene.Sheet.GetValue(new CellAddress(usedRows / 2, 2)).AsNumber());
+        return new Costs(top, bottom, scroll, typing);
+    }
+
+    [Fact]
+    public Task Many_used_rows_paint_scroll_and_type_in_bounded_time() => Session.Dispatch(() =>
+    {
+        Measure(UsedRows / 10, null, true);
+        var small = Measure(UsedRows / 10, null, true);
+        var large = Measure(UsedRows, null, true);
+
+        Record($"rows={UsedRows} frame top={large.Top.TotalMilliseconds:0.0} bottom={large.Bottom.TotalMilliseconds:0.0} scroll={large.Scroll.TotalMilliseconds:0.0} typing={large.Typing.TotalMilliseconds:0.0}");
+
+        Growth.Bounded(large.Top, large.Bottom, 1, $"top {large.Top}, bottom {large.Bottom}");
+        Growth.Bounded(small.Scroll, large.Scroll, 1, $"scroll frame {small.Scroll} at {UsedRows / 10} rows, {large.Scroll} at {UsedRows}");
+        Growth.Bounded(small.Typing, large.Typing, 1, $"typing {small.Typing} at {UsedRows / 10} rows, {large.Typing} at {UsedRows}");
+    }, TestContext.Current.CancellationToken);
+
+    [Fact]
+    public Task Frozen_panes_over_many_rows_paint_and_scroll_like_the_plain_grid() => Session.Dispatch(() =>
+    {
+        Measure(UsedRows / 10, new FrozenPanes(3, 2), false);
+        var small = Measure(UsedRows / 10, new FrozenPanes(3, 2), false);
+        var large = Measure(UsedRows, new FrozenPanes(3, 2), false);
+
+        Record($"rows={UsedRows} frozen=3x2 frame top={large.Top.TotalMilliseconds:0.0} bottom={large.Bottom.TotalMilliseconds:0.0} scroll={large.Scroll.TotalMilliseconds:0.0}");
+
+        Growth.Bounded(large.Top, large.Bottom, 1, $"top {large.Top}, bottom {large.Bottom}");
+        Growth.Bounded(small.Scroll, large.Scroll, 1, $"scroll frame {small.Scroll} at {UsedRows / 10} rows, {large.Scroll} at {UsedRows}");
     }, TestContext.Current.CancellationToken);
 }

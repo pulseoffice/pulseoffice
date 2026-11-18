@@ -372,12 +372,16 @@ public class SheetFormattingTests
         var layout = workbook.Sheets[0].Layout;
         var italic = workbook.Styles.Intern(CellStyle.Default with { Font = CellStyle.Default.Font with { Italic = true } });
         layout.SetRowStyles(0, CellAddress.MaxRows - 1, italic);
-        var clock = System.Diagnostics.Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Flat(lastRow =>
+        {
+            var (sized, sizedFormatting, _) = Build(new CellRange(new CellAddress(1, 0), new CellAddress(lastRow, CellAddress.MaxColumns - 1)));
+            var sizedItalic = sized.Styles.Intern(CellStyle.Default with { Font = CellStyle.Default.Font with { Italic = true } });
+            sized.Sheets[0].Layout.SetRowStyles(0, CellAddress.MaxRows - 1, sizedItalic);
+            return () => sizedFormatting.ApplyToSelection(style => style with { Font = style.Font with { Bold = true } });
+        }, 10_000, CellAddress.MaxRows - 1);
 
         formatting.ApplyToSelection(style => style with { Font = style.Font with { Bold = true } });
 
-        clock.Stop();
-        Assert.True(clock.ElapsedMilliseconds < 2000, $"took {clock.ElapsedMilliseconds} ms");
         Assert.Equal(2, layout.RowStyles.Runs.Count);
         var bold = workbook.Styles.Get(layout.RowStyle(CellAddress.MaxRows - 1)!.Value).Font;
         Assert.True(bold.Bold && bold.Italic);

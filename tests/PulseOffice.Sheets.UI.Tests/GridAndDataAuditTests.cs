@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,16 +95,15 @@ public sealed class GridAndDataAuditTests
         sheet.SetValue(new CellAddress(9, 0), CellValue.Text("x"));
         sheet.SetValue(new CellAddress(9, 1), CellValue.Number(100));
 
-        var watch = Stopwatch.StartNew();
         var totals = new SelectionSummary().Summarize(
             sheet, new CellRange(new CellAddress(0, 0), new CellAddress(CellAddress.MaxRows - 1, 0)));
-        watch.Stop();
+        new PulseOffice.Testing.GrowthCheck().Flat(lastRow => () => new SelectionSummary().Summarize(
+            sheet, new CellRange(new CellAddress(0, 0), new CellAddress(lastRow, 0))), 10_000, CellAddress.MaxRows - 1);
 
         Assert.Equal(3, totals.Filled);
         Assert.Equal(2, totals.Numbers);
         Assert.Equal(6, totals.Sum);
         Assert.Equal(3, totals.Average);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2));
     }
 
     [Fact]

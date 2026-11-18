@@ -50,6 +50,20 @@ public class RobustnessTests
     public void SegmentiCmapSovrappostiNonCostanoMiliardiDiPassi()
     {
         const int segments = 32000;
+        var reader = new PulseOffice.Typography.OpenType.Metrics.CharacterMapReader();
+        new PulseOffice.Testing.GrowthCheck().Linear(count =>
+        {
+            var sized = OverlappingCmap(count);
+            return () => reader.Read(new PulseOffice.Typography.OpenType.Metrics.FontTableData(sized));
+        }, segments);
+
+        var glyphs = reader.Read(new PulseOffice.Typography.OpenType.Metrics.FontTableData(OverlappingCmap(segments)));
+
+        Assert.Equal(1, glyphs[0]);
+    }
+
+    private static byte[] OverlappingCmap(int segments)
+    {
         var subtable = 14 + (8 * segments) + 2;
         var cmapLength = 12 + subtable;
         var data = new byte[28 + cmapLength];
@@ -65,18 +79,13 @@ public class RobustnessTests
         BinaryPrimitives.WriteUInt32BigEndian(cmap[8..], 12);
         var table = cmap[12..];
         BinaryPrimitives.WriteUInt16BigEndian(table, 4);
-        BinaryPrimitives.WriteUInt16BigEndian(table[6..], segments * 2);
+        BinaryPrimitives.WriteUInt16BigEndian(table[6..], (ushort)(segments * 2));
         for (var segment = 0; segment < segments; segment++)
         {
             BinaryPrimitives.WriteUInt16BigEndian(table[(14 + (segment * 2))..], 0xFFFE);
             BinaryPrimitives.WriteUInt16BigEndian(table[(14 + (segments * 4) + 2 + (segment * 2))..], 1);
         }
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-
-        var glyphs = new PulseOffice.Typography.OpenType.Metrics.CharacterMapReader().Read(new PulseOffice.Typography.OpenType.Metrics.FontTableData(data));
-
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), watch.Elapsed.ToString());
-        Assert.Equal(1, glyphs[0]);
+        return data;
     }
 
     [Fact]

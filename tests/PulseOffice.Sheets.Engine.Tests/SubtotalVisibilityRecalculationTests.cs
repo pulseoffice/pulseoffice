@@ -86,12 +86,24 @@ public class SubtotalVisibilityRecalculationTests(EngineFixture fixture) : IClas
         }
         var engine = fixture.CreateEngine(workbook);
         engine.RecalculateAll();
-        var clock = System.Diagnostics.Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Flat(subtotals =>
+        {
+            var sized = Workbook.CreateDefault();
+            for (var row = 0; row < subtotals; row++)
+            {
+                sized.Sheets[0].SetValue(new CellAddress(row, 0), CellValue.Number(row));
+                sized.Sheets[0][new CellAddress(row, 1)] = Cell.Blank with { Formula = $"=SUBTOTAL(109;A$1:A${subtotals})" };
+            }
+            var sizedEngine = fixture.CreateEngine(sized);
+            sizedEngine.RecalculateAll();
+            return () =>
+            {
+                for (var edit = 0; edit < 100; edit++) sizedEngine.SetValue(new SheetCell(0, new CellAddress(edit, 5)), CellValue.Number(edit));
+            };
+        }, 100, 1000);
 
         for (var edit = 0; edit < 100; edit++) engine.SetValue(new SheetCell(0, new CellAddress(edit, 5)), CellValue.Number(edit));
 
-        clock.Stop();
-        Assert.True(clock.ElapsedMilliseconds < 1500, $"took {clock.ElapsedMilliseconds} ms");
         sheet.Layout.HideRow(999);
         Assert.Equal(998d * 999 / 2, engine.GetValue(new SheetCell(0, new CellAddress(0, 1))).AsNumber());
     }

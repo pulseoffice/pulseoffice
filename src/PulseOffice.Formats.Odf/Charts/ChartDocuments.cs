@@ -27,6 +27,12 @@ internal abstract class OdfChartXml
 
     protected const string AxisStyleName = "pulseoffice-axis";
 
+    protected const string ValueAxisStyleName = "pulseoffice-axis-y";
+
+    protected const string SecondaryAxisStyleName = "pulseoffice-axis-y2";
+
+    protected const string SecondaryAxisName = "secondary-y";
+
     protected const string ChartStyleName = "pulseoffice-chart";
 
     protected const string WallStyleName = "pulseoffice-wall";
@@ -42,6 +48,10 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
 {
     protected IOdfParagraphText Paragraphs => paragraphs;
 
+    private readonly OdfChartAxisScales _scales = new();
+
+    private readonly OdfChartSeriesFormats _formats = new();
+
     public XDocument Build(ChartDefinition definition, ChartData data, DocumentSize frame) =>
         Build(definition, data, frame, CultureInfo.InvariantCulture);
 
@@ -52,24 +62,32 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
         var chartClass = vocabulary.ClassOf(definition.Type);
         var plot = new XElement(Chart + "plot-area", new XAttribute(Chart + "style-name", PlotStyleName), PlotAttributes(definition));
 
+        var extraStyles = new List<XElement>();
+        var circular = vocabulary.IsCircular(definition.Type);
+        var secondary = definition.HasSecondaryAxis && !circular;
         var categories = CategoriesAddress(definition, data);
-        var horizontal = Axis("x", definition.CategoryAxisTitle, false);
+        var horizontal = Axis("x", "primary-x", AxisStyleName, definition.CategoryAxisTitle, false);
         if (categories is not null)
             horizontal.Add(new XElement(Chart + "categories", new XAttribute(Table + "cell-range-address", categories)));
 
-        if (!vocabulary.IsCircular(definition.Type))
-            plot.Add(horizontal, Axis("y", definition.ValueAxisTitle, definition.ShowGridLines));
+        if (!circular)
+        {
+            plot.Add(horizontal, Axis("y", "primary-y", ValueAxisStyleName, definition.ValueAxisTitle, definition.ShowGridLines));
+            if (secondary) plot.Add(Axis("y", SecondaryAxisName, SecondaryAxisStyleName, null, false));
+        }
         else if (categories is not null)
             plot.Add(horizontal);
 
         for (var index = 0; index < data.Series.Count; index++)
             plot.Add(new XElement(Chart + "series",
                 new XAttribute(Chart + "style-name", SeriesStyleName(index)),
+                secondary && definition.SeriesFormat(index).SecondaryAxis ? new XAttribute(Chart + "attached-axis", SecondaryAxisName) : null,
                 ValuesAddress(definition, data, index) is { Length: > 0 } values ? new XAttribute(Chart + "values-cell-range-address", values) : null,
                 definition.ExplicitSeriesName(index) is { } explicitName
                     ? new XAttribute(Loext + "label-string", explicitName)
                     : LabelAddress(definition, index) is { Length: > 0 } label ? new XAttribute(Chart + "label-cell-address", label) : null,
-                new XAttribute(Chart + "class", definition.IsLineSeries(index, data.Series.Count) ? "chart:line" : chartClass)));
+                new XAttribute(Chart + "class", definition.IsLineSeries(index, data.Series.Count) ? "chart:line" : chartClass),
+                _formats.Children(SeriesStyleName(index), definition.SeriesFormat(index), extraStyles)));
 
         if (!vocabulary.IsCircular(definition.Type)) plot.Add(new XElement(Chart + "wall", new XAttribute(Chart + "style-name", WallStyleName)));
 
@@ -100,9 +118,11 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
             new XAttribute(XNamespace.Xmlns + "draw", Draw.NamespaceName),
             new XAttribute(XNamespace.Xmlns + "xlink", Xlink.NamespaceName),
             new XAttribute(XNamespace.Xmlns + "loext", Loext.NamespaceName),
+            new XAttribute(XNamespace.Xmlns + "number", OdfPackage.Namespaces.Number.NamespaceName),
             new XAttribute(XNamespace.Xmlns + "pulseoffice", PulseChart.NamespaceName),
             new XAttribute(Office + "version", "1.3"),
-            new XElement(Office + "automatic-styles", PlotStyle(definition), AxisStyle(), FrameStyles(), Enumerable.Range(0, data.Series.Count).Select(index => SeriesStyle(index, definition, vocabulary.IsCircular(definition.Type) ? null : definition.SeriesColor(index)))),
+            new XElement(Office + "automatic-styles", PlotStyle(definition), AxisStyles(definition, secondary, extraStyles), FrameStyles(),
+                Enumerable.Range(0, data.Series.Count).Select(index => SeriesStyle(index, definition, circular ? null : definition.SeriesColor(index), extraStyles)).ToList(), extraStyles),
             new XElement(Office + "body", new XElement(Office + "chart", chart))));
     }
 
@@ -116,22 +136,21 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
 
     protected virtual string? CategoriesAddress(ChartDefinition definition, ChartData data) => null;
 
-    private XElement Axis(string dimension, string? title, bool grid)
+    private XElement Axis(string dimension, string name, string style, string? title, bool grid)
     {
-        var axis = new XElement(Chart + "axis", new XAttribute(Chart + "dimension", dimension), new XAttribute(Chart + "name", $"primary-{dimension}"),
-            new XAttribute(Chart + "style-name", AxisStyleName));
+        var axis = new XElement(Chart + "axis", new XAttribute(Chart + "dimension", dimension), new XAttribute(Chart + "name", name),
+            new XAttribute(Chart + "style-name", style));
         if (title is { Length: > 0 }) axis.Add(new XElement(Chart + "title", paragraphs.Paragraphs(title)));
         if (grid) axis.Add(new XElement(Chart + "grid", new XAttribute(Chart + "style-name", GridStyleName), new XAttribute(Chart + "class", "major")));
         return axis;
     }
 
-    private XElement AxisStyle() =>
-        new(Style + "style",
-            new XAttribute(Style + "name", AxisStyleName),
-            new XAttribute(Style + "family", "chart"),
-            new XElement(Style + "chart-properties", new XAttribute(Chart + "display-label", "true")),
-            new XElement(Style + "graphic-properties", new XAttribute(Svg + "stroke-color", Hairline)),
-            TextSize());
+    private IEnumerable<XElement> AxisStyles(ChartDefinition definition, bool secondary, IList<XElement> numberStyles)
+    {
+        yield return _scales.AxisStyle(AxisStyleName, definition.CategoryAxis, definition.ValueAxis, numberStyles);
+        yield return _scales.AxisStyle(ValueAxisStyleName, definition.ValueAxis, definition.CategoryAxis, numberStyles);
+        if (secondary) yield return _scales.AxisStyle(SecondaryAxisStyleName, definition.SecondaryValueAxis, ChartAxisScale.Automatic with { Crossing = AxisCrossing.Maximum }, numberStyles);
+    }
 
     private XElement TextSize() =>
         new(Style + "text-properties", new XAttribute(OdfPackage.Namespaces.Fo + "font-size", "10pt"));
@@ -154,13 +173,14 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
 
     private string SeriesStyleName(int index) => $"{SeriesStylePrefix}{index + 1}";
 
-    private XElement SeriesStyle(int index, ChartDefinition definition, string? colour)
+    private XElement SeriesStyle(int index, ChartDefinition definition, string? colour, IList<XElement> numberStyles)
     {
-        var properties = new XElement(Style + "chart-properties", new XAttribute(Chart + "data-label-number", definition.ShowDataLabels ? "value" : "none"));
+        var format = definition.SeriesFormat(index);
+        var properties = new XElement(Style + "chart-properties", _formats.LabelProperties(definition.ShowDataLabels, definition.DataLabels), _formats.MarkerProperties(format));
         if (vocabulary.PieOffsetOf(definition.Type) is > 0 and var offset)
             properties.Add(new XAttribute(Chart + "pie-offset", offset.ToString(CultureInfo.InvariantCulture)));
 
-        if (vocabulary.ScatterLinesOf(definition.Type) is not null)
+        if (vocabulary.ScatterLinesOf(definition.Type) is not null && properties.Attribute(Chart + "symbol-type") is null)
             properties.Add(new XAttribute(Chart + "symbol-type", "automatic"));
 
         var graphic = new XElement(Style + "graphic-properties");
@@ -170,10 +190,12 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
                 new XAttribute(Svg + "stroke-color", colour.ToLowerInvariant()));
         if (vocabulary.ScatterLinesOf(definition.Type) is false)
             graphic.Add(new XAttribute(Draw + "stroke", "none"));
+        graphic.Add(_formats.LineProperties(format));
 
         return new XElement(Style + "style",
             new XAttribute(Style + "name", SeriesStyleName(index)),
             new XAttribute(Style + "family", "chart"),
+            _formats.LabelNumberStyle(SeriesStyleName(index), definition.ShowDataLabels, definition.DataLabels, numberStyles) is { } dataStyle ? new XAttribute(Style + "data-style-name", dataStyle) : null,
             properties,
             graphic.HasAttributes ? graphic : null);
     }

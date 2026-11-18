@@ -39,7 +39,7 @@ public sealed class DeckLayoutActions(
 
         using var transaction = history.BeginTransaction(texts["deck.action.layout"]);
         design.AssignMaster([slide], master);
-        slideActions.SetLayout(slide, template);
+        slideActions.Relayout(slide, template);
     }
 
     public void RenameLayout(SlideMaster master, string layoutId, string name)

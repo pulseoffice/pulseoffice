@@ -192,14 +192,15 @@ public sealed class FolioReviewTests
         marks.PrintComments = false;
     }, CancellationToken.None);
 
-    [Fact]
-    public Task MolteRevisioniEMoltiCommentiNonRallentanoLaScrittura() => FolioScene.Session.Dispatch(() =>
+    private sealed record ReviewCosts(double Typing, double Layout, double Render, double Panel);
+
+    private ReviewCosts MeasureReview(int paragraphs)
     {
         var when = new DateTimeOffset(2026, 10, 10, 9, 0, 0, TimeSpan.Zero);
         var scene = new FolioScene(document =>
         {
             var blocks = new List<Block>();
-            for (var i = 0; i < 300; i++)
+            for (var i = 0; i < paragraphs; i++)
             {
                 var id = "p" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 blocks.Add(new ParagraphBlock(id, new TextParagraph("Paragrafo con testo da rivedere numero " + i) { Runs = [new TextRun("Paragrafo con testo da rivedere numero " + i)] })
@@ -239,20 +240,29 @@ public sealed class FolioReviewTests
             Dispatcher.UIThread.RunJobs();
             renders.Add(watch.Elapsed.TotalMilliseconds);
         }
-        var typing = Median(keys);
-        var render = Median(renders);
-        var perKey = typing + render;
-        Assert.True(typing < 40 && perKey < 250, $"{perKey:F1} ms per tasto: typing {typing:F1} layout {Median(layouts):F1} render {render:F1}");
-        Assert.Equal(600, scene.Document.Changes.All.Count);
         var panel = Enumerable.Range(0, 3).Select(_ =>
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var source = Source(scene);
-            Assert.Equal(600, source.Changes.Count);
-            Assert.Equal(300, source.Comments.Count);
+            Assert.Equal(paragraphs * 2, source.Changes.Count);
+            Assert.Equal(paragraphs, source.Comments.Count);
             return watch.Elapsed.TotalMilliseconds;
         }).Min();
-        Assert.True(panel < 2000, $"pannello in {panel:F0} ms");
+        Assert.Equal(paragraphs * 2, scene.Document.Changes.All.Count);
+        return new ReviewCosts(Median(keys), Median(layouts), Median(renders), panel);
+    }
+
+    [Fact]
+    public Task MolteRevisioniEMoltiCommentiNonRallentanoLaScrittura() => FolioScene.Session.Dispatch(() =>
+    {
+        MeasureReview(30);
+        var small = MeasureReview(30);
+        var large = MeasureReview(300);
+        var growth = new PulseOffice.Testing.GrowthCheck(TimeSpan.FromMilliseconds(10), 4);
+        string Label(string what, double before, double after) => $"{what}: {before:F1} ms at 30 paragraphs, {after:F1} ms at 300 (layout {large.Layout:F1})";
+        growth.Bounded(TimeSpan.FromMilliseconds(small.Typing), TimeSpan.FromMilliseconds(large.Typing), 1, Label("typing", small.Typing, large.Typing));
+        growth.Bounded(TimeSpan.FromMilliseconds(small.Render), TimeSpan.FromMilliseconds(large.Render), 1, Label("render", small.Render, large.Render));
+        growth.Bounded(TimeSpan.FromMilliseconds(small.Panel), TimeSpan.FromMilliseconds(large.Panel), 10, Label("panel", small.Panel, large.Panel));
     }, CancellationToken.None);
 
     [Fact]

@@ -197,7 +197,7 @@ public sealed class PptxDeckTableMapper
                 var rowSpan = Math.Clamp(cellElements[c].RowSpan?.Value ?? 1, 1, rows.Count - displayed);
                 if (colSpan > 1 || rowSpan > 1) merges.Add(new TableMerge(r, c, rowSpan, colSpan));
 
-                if (r >= 0 && Format(cellElements[c], r, c) is { } format) cellFormats.Add(format);
+                if (Format(cellElements[c], r, c) is { } format) cellFormats.Add(format);
             }
         }
 

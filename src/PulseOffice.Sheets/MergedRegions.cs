@@ -4,29 +4,24 @@ namespace PulseOffice.Sheets;
 
 public sealed class MergedRegions
 {
-    private const int BandShift = 6;
-    private const int TallBandSpan = 64;
+    private const int ShiftStep = 2;
 
-    private readonly List<CellRange> _regions = [];
-    private readonly Dictionary<int, List<CellRange>> _bands = [];
-    private readonly HashSet<CellRange> _tall = [];
+    private readonly Dictionary<CellRange, long> _order = [];
+    private readonly Dictionary<int, TileLevel> _levels = [];
+    private List<CellRange>? _all;
+    private long _sequence;
 
-    public IReadOnlyList<CellRange> All => _regions;
+    public IReadOnlyList<CellRange> All =>
+        _all ??= _order.OrderBy(entry => entry.Value).Select(entry => entry.Key).ToList();
 
-    public int Count => _regions.Count;
+    public int Count => _order.Count;
 
     public event Action<MergedRegions>? Changed;
 
     public CellRange? At(CellAddress address)
     {
-        foreach (var region in _tall)
-            if (region.Contains(address))
-                return region;
-
-        if (!_bands.TryGetValue(address.Row >> BandShift, out var band)) return null;
-
-        foreach (var region in band)
-            if (region.Contains(address))
+        foreach (var level in _levels.Values)
+            if (level.At(address) is { } region)
                 return region;
 
         return null;
@@ -41,15 +36,11 @@ public sealed class MergedRegions
         if (region.IsSingleCell) return false;
 
         foreach (var existing in Overlapping(region).ToList()) Detach(existing);
-        _regions.Add(region);
-        if (IsTall(region))
-            _tall.Add(region);
-        else
-            for (var band = region.Start.Row >> BandShift; band <= region.End.Row >> BandShift; band++)
-            {
-                if (!_bands.TryGetValue(band, out var list)) _bands[band] = list = [];
-                list.Add(region);
-            }
+        _order[region] = _sequence++;
+        _all = null;
+        var key = LevelKey(region);
+        if (!_levels.TryGetValue(key, out var level)) _levels[key] = level = new TileLevel(key / 32, key % 32);
+        level.Add(region);
 
         Changed?.Invoke(this);
         return true;
@@ -80,34 +71,21 @@ public sealed class MergedRegions
 
     public void Clear()
     {
-        if (_regions.Count == 0) return;
+        if (_order.Count == 0) return;
 
-        _regions.Clear();
-        _bands.Clear();
-        _tall.Clear();
+        _order.Clear();
+        _all = null;
+        _levels.Clear();
         Changed?.Invoke(this);
     }
 
     public IEnumerable<CellRange> Overlapping(CellRange range)
     {
-        var first = range.Start.Row >> BandShift;
-        var last = range.End.Row >> BandShift;
-
-        if ((long)(last - first + 1) > _bands.Count)
-            return _regions.Where(region => region.IntersectsWith(range));
-
+        var found = new List<CellRange>();
         var seen = new HashSet<CellRange>();
-        var found = _tall.Where(region => region.IntersectsWith(range)).ToList();
-        for (var band = first; band <= last; band++)
-        {
-            if (!_bands.TryGetValue(band, out var list)) continue;
-
-            foreach (var region in list)
-                if (region.IntersectsWith(range) && seen.Add(region))
-                    found.Add(region);
-        }
-
-        return found;
+        foreach (var level in _levels.Values)
+            level.Collect(range, seen, found);
+        return found.OrderBy(region => _order[region]).ToList();
     }
 
     public CellRange Expand(CellRange selection)
@@ -133,22 +111,99 @@ public sealed class MergedRegions
         }
     }
 
-    private static bool IsTall(CellRange region) =>
-        (region.End.Row >> BandShift) - (region.Start.Row >> BandShift) >= TallBandSpan;
+    private static int LevelKey(CellRange region) =>
+        Shift(region.Start.Row, region.End.Row) * 32 + Shift(region.Start.Column, region.End.Column);
+
+    private static int Shift(int start, int end)
+    {
+        var shift = ShiftStep;
+        while ((end >> shift) - (start >> shift) > 1) shift += ShiftStep;
+        return shift;
+    }
 
     private bool Detach(CellRange region)
     {
-        if (!_regions.Remove(region)) return false;
-        if (_tall.Remove(region)) return true;
+        if (!_order.Remove(region)) return false;
 
-        for (var band = region.Start.Row >> BandShift; band <= region.End.Row >> BandShift; band++)
+        _all = null;
+        var key = LevelKey(region);
+        if (_levels.TryGetValue(key, out var level))
         {
-            if (!_bands.TryGetValue(band, out var list)) continue;
-
-            list.Remove(region);
-            if (list.Count == 0) _bands.Remove(band);
+            level.Remove(region);
+            if (level.IsEmpty) _levels.Remove(key);
         }
 
         return true;
+    }
+
+    private sealed class TileLevel(int rowShift, int columnShift)
+    {
+        private readonly Dictionary<long, List<CellRange>> _tiles = [];
+
+        public bool IsEmpty => _tiles.Count == 0;
+
+        public CellRange? At(CellAddress address)
+        {
+            if (!_tiles.TryGetValue(Tile(address.Row >> rowShift, address.Column >> columnShift), out var tile)) return null;
+
+            foreach (var region in tile)
+                if (region.Contains(address))
+                    return region;
+
+            return null;
+        }
+
+        public void Add(CellRange region)
+        {
+            foreach (var key in Tiles(region))
+            {
+                if (!_tiles.TryGetValue(key, out var list)) _tiles[key] = list = [];
+                list.Add(region);
+            }
+        }
+
+        public void Remove(CellRange region)
+        {
+            foreach (var key in Tiles(region))
+            {
+                if (!_tiles.TryGetValue(key, out var list)) continue;
+
+                list.Remove(region);
+                if (list.Count == 0) _tiles.Remove(key);
+            }
+        }
+
+        public void Collect(CellRange range, HashSet<CellRange> seen, List<CellRange> found)
+        {
+            var rows = (long)(range.End.Row >> rowShift) - (range.Start.Row >> rowShift) + 1;
+            var columns = (long)(range.End.Column >> columnShift) - (range.Start.Column >> columnShift) + 1;
+
+            if (rows * columns > _tiles.Count)
+            {
+                foreach (var list in _tiles.Values)
+                    Gather(list, range, seen, found);
+                return;
+            }
+
+            foreach (var key in Tiles(range))
+                if (_tiles.TryGetValue(key, out var list))
+                    Gather(list, range, seen, found);
+        }
+
+        private IEnumerable<long> Tiles(CellRange region)
+        {
+            for (var row = region.Start.Row >> rowShift; row <= region.End.Row >> rowShift; row++)
+                for (var column = region.Start.Column >> columnShift; column <= region.End.Column >> columnShift; column++)
+                    yield return Tile(row, column);
+        }
+
+        private static long Tile(int row, int column) => ((long)row << 20) | (uint)column;
+
+        private static void Gather(List<CellRange> list, CellRange range, HashSet<CellRange> seen, List<CellRange> found)
+        {
+            foreach (var region in list)
+                if (region.IntersectsWith(range) && seen.Add(region))
+                    found.Add(region);
+        }
     }
 }

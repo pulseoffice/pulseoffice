@@ -133,15 +133,22 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
 
     private const uint CategoryAxis = 111111111u;
     private const uint ValueAxis = 222222222u;
+    private const uint SecondaryCategoryAxis = 333333333u;
+    private const uint SecondaryValueAxis = 444444444u;
+
+    private readonly OoxmlAxisScales _scales = new();
+    private readonly OoxmlDataLabels _labels = new();
+    private readonly OoxmlSeriesFormats _formats = new();
 
     public C.ChartSpace Build(ChartDefinition definition, ChartData data, ISeriesSource source)
     {
         var plot = new C.PlotArea(new C.Layout());
         var axes = false;
+        var secondaryAxes = false;
         var valueCategories = false;
         C.View3D? view = null;
 
-        foreach (var (type, members) in Groups(definition, data.Series.Count))
+        foreach (var (type, members, secondary) in Groups(definition, data.Series.Count))
         {
             var family = families.For(type);
             var solid = definition.ThreeDimensional && definition.Type != ChartType.ColumnLine && family.WritesThreeDimensional(type);
@@ -157,24 +164,26 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
                 series.AppendChild(source.Name(index, definition.ExplicitSeriesName(index) ?? data.Series[index].Name));
                 series.AppendChild(family.ColoursPoints ? _palette.Fill(index) : _palette.Solid(definition.SeriesColor(index), family.DrawsLines(type) || definition.IsLineSeries(index, data.Series.Count), index));
                 if (family.ColoursPoints) series.Append(_palette.Points(data.Categories.Count));
-                if (definition.ShowDataLabels) series.AppendChild(Labels());
+                if (definition.ShowDataLabels) series.AppendChild(_labels.Write(definition.DataLabels, series));
                 series.Append(family.Data(source, data, bundle));
                 family.Finish(series, definition with { Type = type });
+                _formats.Apply(series, definition.SeriesFormat(index));
                 chart.AppendChild(series);
             }
 
             family.Close(chart, type, solid);
             if (family.HasAxes)
             {
-                chart.AppendChild(new C.AxisId { Val = CategoryAxis });
-                chart.AppendChild(new C.AxisId { Val = ValueAxis });
+                chart.AppendChild(new C.AxisId { Val = secondary ? SecondaryCategoryAxis : CategoryAxis });
+                chart.AppendChild(new C.AxisId { Val = secondary ? SecondaryValueAxis : ValueAxis });
                 axes = true;
+                secondaryAxes |= secondary;
                 valueCategories |= family.ValueCategoryAxis;
             }
             plot.AppendChild(chart);
         }
 
-        if (axes) plot.Append(Axes(definition, valueCategories));
+        if (axes) plot.Append(Axes(definition, valueCategories, secondaryAxes));
 
         var root = new C.Chart();
         if (definition.ChartTitle is { Length: > 0 } title) root.AppendChild(Title(title));
@@ -193,47 +202,72 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
 
     private readonly DeclaredChartType _declared = new();
 
-    private IEnumerable<(ChartType Type, IReadOnlyList<int> Series)> Groups(ChartDefinition definition, int count)
+    private IEnumerable<(ChartType Type, IReadOnlyList<int> Series, bool Secondary)> Groups(ChartDefinition definition, int count)
     {
         var all = Enumerable.Range(0, count).ToList();
-        if (definition.Type != ChartType.ColumnLine) return [(definition.Type, all)];
+        IReadOnlyList<(ChartType Type, IReadOnlyList<int> Series)> groups = definition.Type != ChartType.ColumnLine
+            ? [(definition.Type, all)]
+            :
+            [
+                (ChartType.Column, [.. all.Where(index => !definition.IsLineSeries(index, count))]),
+                (ChartType.Line, [.. all.Where(index => definition.IsLineSeries(index, count))]),
+            ];
 
-        return
-        [
-            (ChartType.Column, [.. all.Where(index => !definition.IsLineSeries(index, count))]),
-            (ChartType.Line, [.. all.Where(index => definition.IsLineSeries(index, count))]),
-        ];
+        foreach (var (type, members) in groups)
+        {
+            var family = families.For(type);
+            if (!family.HasAxes || family is BubbleFamily || !definition.HasSecondaryAxis)
+            {
+                yield return (type, members, false);
+                continue;
+            }
+            List<int> primary = [.. members.Where(index => !definition.SeriesFormat(index).SecondaryAxis)];
+            List<int> secondary = [.. members.Where(index => definition.SeriesFormat(index).SecondaryAxis)];
+            if (primary.Count > 0 || secondary.Count == 0) yield return (type, primary, false);
+            if (secondary.Count > 0) yield return (type, secondary, true);
+        }
     }
 
-    private IEnumerable<OpenXmlElement> Axes(ChartDefinition definition, bool valueCategories)
+    private IEnumerable<OpenXmlElement> Axes(ChartDefinition definition, bool valueCategories, bool secondary)
+    {
+        yield return Across(CategoryAxis, ValueAxis, valueCategories, definition.CategoryAxis, definition.ValueAxis, definition.CategoryAxisTitle, false);
+        yield return Upright(ValueAxis, CategoryAxis, definition.ValueAxis, definition.CategoryAxis, definition.ValueAxisTitle, definition.ShowGridLines, false);
+        if (!secondary) yield break;
+        yield return Across(SecondaryCategoryAxis, SecondaryValueAxis, valueCategories, ChartAxisScale.Automatic, definition.SecondaryValueAxis, null, true);
+        yield return Upright(SecondaryValueAxis, SecondaryCategoryAxis, definition.SecondaryValueAxis, ChartAxisScale.Automatic with { Crossing = AxisCrossing.Maximum }, null, false, true);
+    }
+
+    private OpenXmlCompositeElement Across(uint id, uint crossing, bool valueCategories, ChartAxisScale own, ChartAxisScale crossed, string? title, bool deleted)
     {
         OpenXmlCompositeElement category = valueCategories ? new C.ValueAxis() : new C.CategoryAxis();
         category.Append(
-            new C.AxisId { Val = CategoryAxis },
-            new C.Scaling(new C.Orientation { Val = C.OrientationValues.MinMax }),
-            new C.Delete { Val = false },
+            new C.AxisId { Val = id },
+            _scales.Scaling(own),
+            new C.Delete { Val = deleted },
             new C.AxisPosition { Val = C.AxisPositionValues.Bottom });
-        if (definition.CategoryAxisTitle is { Length: > 0 } categoryTitle) category.AppendChild(Title(categoryTitle));
-        category.AppendChild(new C.CrossingAxis { Val = ValueAxis });
-
-        var value = new C.ValueAxis(
-            new C.AxisId { Val = ValueAxis },
-            new C.Scaling(new C.Orientation { Val = C.OrientationValues.MinMax }),
-            new C.Delete { Val = false },
-            new C.AxisPosition { Val = C.AxisPositionValues.Left });
-        if (definition.ShowGridLines) value.AppendChild(new C.MajorGridlines());
-        if (definition.ValueAxisTitle is { Length: > 0 } valueTitle) value.AppendChild(Title(valueTitle));
-        value.AppendChild(new C.CrossingAxis { Val = CategoryAxis });
-        return [category, value];
+        if (title is { Length: > 0 }) category.AppendChild(Title(title));
+        category.Append(_scales.NumberFormat(own));
+        category.AppendChild(new C.CrossingAxis { Val = crossing });
+        category.AppendChild(_scales.Crossing(crossed));
+        if (valueCategories) category.Append(_scales.Units(own));
+        return category;
     }
 
-    private C.DataLabels Labels() => new(
-        new C.ShowLegendKey { Val = false },
-        new C.ShowValue { Val = true },
-        new C.ShowCategoryName { Val = false },
-        new C.ShowSeriesName { Val = false },
-        new C.ShowPercent { Val = false },
-        new C.ShowBubbleSize { Val = false });
+    private C.ValueAxis Upright(uint id, uint crossing, ChartAxisScale own, ChartAxisScale crossed, string? title, bool grid, bool right)
+    {
+        var value = new C.ValueAxis(
+            new C.AxisId { Val = id },
+            _scales.Scaling(own),
+            new C.Delete { Val = false },
+            new C.AxisPosition { Val = right ? C.AxisPositionValues.Right : C.AxisPositionValues.Left });
+        if (grid) value.AppendChild(new C.MajorGridlines());
+        if (title is { Length: > 0 }) value.AppendChild(Title(title));
+        value.Append(_scales.NumberFormat(own));
+        value.AppendChild(new C.CrossingAxis { Val = crossing });
+        value.AppendChild(_scales.Crossing(crossed));
+        value.Append(_scales.Units(own));
+        return value;
+    }
 
     private C.Title Title(string text) =>
         new(new C.ChartText(new C.RichText([new A.BodyProperties(), new A.ListStyle(),
@@ -268,6 +302,16 @@ internal sealed record ChartSpaceContent(
 
     public bool ThreeDimensional { get; init; }
 
+    public ChartDataLabelOptions DataLabels { get; init; } = ChartDataLabelOptions.ValuesOnly;
+
+    public ChartAxisScale CategoryAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartAxisScale ValueAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartAxisScale SecondaryValueAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public IReadOnlyList<ChartSeriesFormat?>? SeriesFormats { get; init; }
+
     public ChartDefinition Decorate(ChartDefinition definition) => definition with
     {
         LineSeriesCount = LineSeriesCount,
@@ -280,6 +324,11 @@ internal sealed record ChartSpaceContent(
         SeriesNames = SeriesNames,
         SeriesColors = SeriesColors,
         ThreeDimensional = ThreeDimensional,
+        DataLabels = DataLabels,
+        CategoryAxis = CategoryAxis,
+        ValueAxis = ValueAxis,
+        SecondaryValueAxis = SecondaryValueAxis,
+        SeriesFormats = SeriesFormats,
     };
 }
 
@@ -361,6 +410,9 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
     private readonly ExplicitSeriesNames _names = new();
     private readonly ExplicitSeriesColours _colours = new();
     private readonly ModelSeriesSlots _slots = new();
+    private readonly OoxmlAxisScales _scales = new();
+    private readonly OoxmlDataLabels _labels = new();
+    private readonly OoxmlSeriesFormats _formats = new();
 
     private const uint MaximumPoints = 100_000;
     private const int MaximumTotalPoints = 1_000_000;
@@ -373,13 +425,27 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
             ? read with { Type = declared }
             : read;
         var threeDimensional = found.ThreeDimensional;
+        found = found with { Series = Gathered(plot, found.Series) };
+        var primaryAxes = PrimaryAxes(plot);
 
         var legend = space.Descendants<C.Legend>().Any()
             ? Legend(space.Descendants<C.LegendPosition>().FirstOrDefault()?.Val?.Value)
             : LegendPosition.None;
         var chart = space.GetFirstChild<C.Chart>();
         var title = TextOf(chart?.GetFirstChild<C.Title>());
-        var valueAxis = found.Type is ChartType.Scatter or ChartType.ScatterWithLines or ChartType.Bubble ? plot.Elements<C.ValueAxis>().Skip(1).FirstOrDefault() : plot.GetFirstChild<C.ValueAxis>();
+        var valueCategories = found.Type is ChartType.Scatter or ChartType.ScatterWithLines or ChartType.Bubble;
+        var valueAxis = Axis<C.ValueAxis>(plot, primaryAxes, valueCategories ? 1 : 0) ?? (valueCategories ? plot.Elements<C.ValueAxis>().Skip(1).FirstOrDefault() : plot.GetFirstChild<C.ValueAxis>());
+        OpenXmlCompositeElement? categoryAxis = valueCategories
+            ? Axis<C.ValueAxis>(plot, primaryAxes, 0) ?? plot.Elements<C.ValueAxis>().FirstOrDefault()
+            : (OpenXmlCompositeElement?)plot.GetFirstChild<C.CategoryAxis>() ?? plot.GetFirstChild<C.DateAxis>();
+        var secondaryAxes = SecondaryAxes(plot, primaryAxes);
+        var secondaryValue = secondaryAxes.Count == 0 ? null
+            : plot.Elements<C.ValueAxis>().Where(axis => secondaryAxes.Contains(axis.GetFirstChild<C.AxisId>()?.Val?.Value ?? 0))
+                .OrderBy(axis => axis.GetFirstChild<C.AxisPosition>()?.Val?.Value == C.AxisPositionValues.Left || axis.GetFirstChild<C.AxisPosition>()?.Val?.Value == C.AxisPositionValues.Right ? 0 : 1)
+                .FirstOrDefault();
+        var labelOwner = found.Series.Select(series => series.GetFirstChild<C.DataLabels>()).FirstOrDefault(labels => labels is not null)
+            ?? (found.Series.FirstOrDefault()?.Parent as OpenXmlCompositeElement)?.GetFirstChild<C.DataLabels>();
+        var formats = _slots.Of(found.Series).Select(series => series is null ? null : _formats.Read(series, IsSecondary(series, primaryAxes))).ToList();
         return new ChartSpaceContent(found.Type, found.Series, title, legend)
         {
             ThreeDimensional = threeDimensional,
@@ -391,9 +457,43 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
             SeriesNames = _names.Explicit(_slots.Of(found.Series)),
             SeriesColors = _colours.Explicit(_slots.Of(found.Series)),
             ShowDataLabels = found.Series.Append(found.Series.FirstOrDefault()?.Parent as OpenXmlCompositeElement)
-                .Any(owner => owner?.GetFirstChild<C.DataLabels>()?.GetFirstChild<C.ShowValue>()?.Val?.Value == true),
+                .Any(owner => _labels.Shown(owner?.GetFirstChild<C.DataLabels>())),
+            DataLabels = _labels.Read(labelOwner),
+            CategoryAxis = _scales.Read(categoryAxis, plot),
+            ValueAxis = _scales.Read(valueAxis, plot),
+            SecondaryValueAxis = _scales.Read(secondaryValue, plot),
+            SeriesFormats = formats.Any(format => format is { IsPlain: false }) ? [.. formats.Select(format => format is { IsPlain: false } ? format : null)] : null,
         };
     }
+
+    private IReadOnlyList<OpenXmlCompositeElement> Gathered(C.PlotArea plot, IReadOnlyList<OpenXmlCompositeElement> series)
+    {
+        var groups = series.Select(element => element.Parent).OfType<OpenXmlCompositeElement>().Distinct().ToList();
+        var kinds = groups.Select(group => group.GetType()).ToHashSet();
+        var extra = plot.ChildElements.OfType<OpenXmlCompositeElement>().Where(group => kinds.Contains(group.GetType()) && !groups.Contains(group)).ToList();
+        if (extra.Count == 0) return series;
+        var seriesKinds = series.Select(element => element.GetType()).ToHashSet();
+        return [.. series.Concat(extra.SelectMany(group => group.ChildElements.OfType<OpenXmlCompositeElement>().Where(child => seriesKinds.Contains(child.GetType()))))
+            .OrderBy(element => element.GetFirstChild<C.Index>()?.Val?.Value ?? uint.MaxValue)];
+    }
+
+    private IReadOnlyList<uint> PrimaryAxes(C.PlotArea plot) =>
+        plot.ChildElements.OfType<OpenXmlCompositeElement>()
+            .Select(group => group.Elements<C.AxisId>().Select(id => id.Val?.Value ?? 0).ToList())
+            .FirstOrDefault(ids => ids.Count > 0) ?? new List<uint>();
+
+    private HashSet<uint> SecondaryAxes(C.PlotArea plot, IReadOnlyList<uint> primary) =>
+        [.. plot.ChildElements.OfType<OpenXmlCompositeElement>()
+            .Where(group => group.Elements<C.AxisId>().Any() && !group.Elements<C.AxisId>().Select(id => id.Val?.Value ?? 0).SequenceEqual(primary))
+            .SelectMany(group => group.Elements<C.AxisId>().Select(id => id.Val?.Value ?? 0))
+            .Where(id => !primary.Contains(id))];
+
+    private bool IsSecondary(OpenXmlCompositeElement series, IReadOnlyList<uint> primary) =>
+        series.Parent is OpenXmlCompositeElement group && group.Elements<C.AxisId>().Any()
+            && !group.Elements<C.AxisId>().Select(id => id.Val?.Value ?? 0).SequenceEqual(primary);
+
+    private T? Axis<T>(C.PlotArea plot, IReadOnlyList<uint> ids, int position) where T : OpenXmlCompositeElement =>
+        position < ids.Count ? plot.Elements<T>().FirstOrDefault(axis => axis.GetFirstChild<C.AxisId>()?.Val?.Value == ids[position]) : null;
 
     private string? TextOf(C.Title? title)
     {

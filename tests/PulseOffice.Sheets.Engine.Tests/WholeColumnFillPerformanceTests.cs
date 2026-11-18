@@ -43,12 +43,12 @@ public sealed class WholeColumnFillPerformanceTests(EngineFixture fixture) : ICl
             engine.SetValue(new SheetCell(0, new CellAddress(row, 0)), CellValue.Number(1));
         var cell = new SheetCell(0, new CellAddress(0, 4));
         engine.SetFormula(cell, "=SUM(A:A)");
-        var clock = Stopwatch.StartNew();
-        for (var row = 0; row < Rows; row++)
-            engine.SetValue(new SheetCell(0, new CellAddress(row, 2)), CellValue.Number(row));
-        clock.Stop();
+        new PulseOffice.Testing.GrowthCheck().Linear(rows => () =>
+        {
+            for (var row = 0; row < rows; row++)
+                engine.SetValue(new SheetCell(0, new CellAddress(row, 2)), CellValue.Number(row + rows));
+        }, Rows);
 
         Assert.Equal(Rows, engine.GetValue(cell).AsNumber());
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"unrelated edits took {clock.Elapsed}");
     }
 }

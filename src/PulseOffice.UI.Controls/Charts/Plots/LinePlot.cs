@@ -14,7 +14,17 @@ public sealed class LinePlot : ChartPlotBase
 
     public override bool KeepsGaps => true;
 
-    public override PlotScale? ValueAxis(ChartFrame frame) => ValueScale(Prepared(frame), frame.Plot);
+    public override PlotScale? ValueAxis(ChartFrame frame) => PrimaryScale(frame, Prepared(frame), Splits(frame));
+
+    public override PlotScale? SecondaryValueAxis(ChartFrame frame) => SecondaryScale(frame, Prepared(frame), Splits(frame));
+
+    public override PlotScale? SeriesScale(ChartFrame frame, int series) =>
+        ScaleOf(frame, series, PrimaryScale(frame, Prepared(frame), Splits(frame)), SecondaryValueAxis(frame));
+
+    private bool Splits(ChartFrame frame) =>
+        frame.Definition.HasSecondaryAxis && frame.Definition.Type is ChartType.Line or ChartType.SmoothLine or ChartType.SteppedLine or ChartType.Area;
+
+    private readonly ChartSeriesStroke _strokes = new();
 
     private ChartData Prepared(ChartFrame frame)
     {
@@ -32,12 +42,16 @@ public sealed class LinePlot : ChartPlotBase
         var filled = type is ChartType.Area or ChartType.StackedArea or ChartType.PercentStackedArea;
         var data = Prepared(frame);
 
-        var scale = ValueScale(data, frame.Plot);
+        var scale = PrimaryScale(frame, data, Splits(frame));
+        var secondary = SecondaryScale(frame, data, Splits(frame));
         var categories = Categories(data, frame.Plot);
 
         for (var series = data.Series.Count - 1; series >= 0; series--)
-            foreach (var points in Runs(data.Series[series], categories, scale, type is ChartType.SteppedLine))
-                DrawRun(frame, points, series, scale, data, filled, type);
+        {
+            var own = ScaleOf(frame, series, scale, secondary);
+            foreach (var points in Runs(data.Series[series], categories, own, type is ChartType.SteppedLine))
+                DrawRun(frame, points, series, own, data, filled, type);
+        }
 
         if (frame.Definition.Type is ChartType.ControlChart) DrawControlLimits(frame, data, scale);
     }
@@ -46,14 +60,16 @@ public sealed class LinePlot : ChartPlotBase
     {
         if (frame.Definition.Type is ChartType.ControlChart or ChartType.RunChart) yield break;
         var data = Prepared(frame);
-        var scale = ValueScale(data, frame.Plot);
+        var scale = PrimaryScale(frame, data, Splits(frame));
+        var secondary = SecondaryScale(frame, data, Splits(frame));
         var categories = Categories(data, frame.Plot);
         for (var series = 0; series < data.Series.Count; series++)
             for (var index = 0; index < data.Series[series].Values.Count; index++)
                 if (IsPlotted(frame.Data.Series[series], index) && IsPlotted(data.Series[series], index))
                     yield return new ChartDataLabel(
-                        new Point(categories.Centre(index), scale.Position(data.Series[series].Values[index])),
-                        frame.Data.Series[series].Values[index]);
+                        new Point(categories.Centre(index), ScaleOf(frame, series, scale, secondary).Position(data.Series[series].Values[index])),
+                        frame.Data.Series[series].Values[index])
+                    { Series = series, Index = index, Across = index + 1 };
     }
 
     private void DrawRun(ChartFrame frame, List<Point> points, int series, PlotScale scale, ChartData data, bool filled, ChartType type)
@@ -72,14 +88,11 @@ public sealed class LinePlot : ChartPlotBase
             sink.EndFigure(false);
         }
 
-        frame.Context.DrawGeometry(null, new Pen(Brush(data, series), 2)
-        {
-            LineJoin = PenLineJoin.Round,
-            LineCap = PenLineCap.Round,
-        }, geometry);
+        var format = frame.Definition.SeriesFormat(series);
+        frame.Context.DrawGeometry(null, _strokes.Pen(Brush(data, series), format, 2), geometry);
 
         foreach (var point in points)
-            frame.Context.DrawEllipse(Brush(data, series), null, point, 2.5, 2.5);
+            _strokes.Marker(frame.Context, Brush(data, series), format, point, 2.5);
     }
 
     private void DrawControlLimits(ChartFrame frame, ChartData data, PlotScale scale)

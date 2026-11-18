@@ -302,6 +302,10 @@ Central package management in `Directory.Packages.props`: **versions are never w
     `chart:values-cell-range-address`/`chart:label-cell-address` with the list in `table:cell-range-address`. References
     follow row/column insertion and deletion, sheet renaming, and become `#REF!` when their rows or sheet disappear; each
     change is one undo step. The shared chart editor edits each series' range. Log: docs/deep-audit/chart-series-sources.md.
+    Since round 168 the model also carries axis scales (`ChartAxisScale`: bounds, units, logarithmic, reversed, crossing,
+    number format) for the category, value and secondary value axes, per-series formats (`ChartSeriesFormat`: line,
+    marker, secondary axis, trendline, error bars) and data label options, mapped natively in XLSX and ODS (declared:
+    XLSX241, XLSX242, ODF287). Log: docs/deep-audit/round-168-chart-model.md.
 
 26. **Nothing changes under an open modal** (2026-11-06): the MCP agent's mutating calls are refused while a modal is
     open (`IAgentOperationGate.EditAsync`), and `DialogHost` admits a dialog's answer only if the state seen at opening

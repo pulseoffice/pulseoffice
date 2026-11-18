@@ -43,21 +43,28 @@ public class CompactTableTests
         Assert.Empty(new VdmxTableTranslator().Translate(font, font.Entries.Single(entry => entry.Tag == "VDMX")));
     }
 
+    private CtfFont EmptyGroupsVdmx(int groups)
+    {
+        var vdmx = new byte[6 + 4 + 2 + (6 * groups) + (512 * groups)];
+        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(0), 1);
+        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(2), (ushort)groups);
+        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(4), 1);
+        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(10), 12);
+        return Font(("VDMX", vdmx));
+    }
+
     [Fact]
     public void UnVdmxConMoltiGruppiVuotiNonRicopiaLaTabellaPerOgniGruppo()
     {
         const int groups = 16000;
-        var vdmx = new byte[6 + 4 + 2 + (6 * groups) + (8 * 1024 * 1024)];
-        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(0), 1);
-        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(2), groups);
-        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(4), 1);
-        BinaryPrimitives.WriteUInt16BigEndian(vdmx.AsSpan(10), 12);
-        var font = Font(("VDMX", vdmx));
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Linear(count =>
+        {
+            var sized = EmptyGroupsVdmx(count);
+            return () => Translate(new VdmxTableTranslator(), sized, "VDMX");
+        }, groups);
 
-        var table = Translate(new VdmxTableTranslator(), font, "VDMX");
+        var table = Translate(new VdmxTableTranslator(), EmptyGroupsVdmx(groups), "VDMX");
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), watch.Elapsed.ToString());
         Assert.Equal(groups, BinaryPrimitives.ReadUInt16BigEndian(table.AsSpan(2)));
     }
 

@@ -52,6 +52,24 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
     private readonly TextBox _range = new();
     private readonly TextBlock _rangeError = new() { TextWrapping = TextWrapping.Wrap, IsVisible = false };
     private readonly ChartSeriesRanges? _seriesRanges;
+    private readonly TextBox _minimum = new();
+    private readonly TextBox _maximum = new();
+    private readonly TextBox _majorUnit = new();
+    private readonly CheckBox _logarithmic = new();
+    private readonly CheckBox _reversed = new();
+    private readonly ComboBox _trendline = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly ComboBox _errorBars = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly TextBox _errorAmount = new();
+
+    private static readonly TrendlineKind?[] TrendlineChoices =
+    [
+        null, TrendlineKind.Linear, TrendlineKind.Exponential, TrendlineKind.Logarithmic, TrendlineKind.Polynomial, TrendlineKind.Power, TrendlineKind.MovingAverage,
+    ];
+
+    private static readonly ErrorBarKind?[] ErrorBarChoices =
+    [
+        null, ErrorBarKind.FixedValue, ErrorBarKind.Percentage, ErrorBarKind.StandardDeviation, ErrorBarKind.StandardError,
+    ];
 
     private static readonly LegendPosition[] LegendPositions =
     [
@@ -247,6 +265,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _legend.SelectionChanged += (_, _) => Refresh();
 
         Check(_labels, "chart.showDataLabels", settings.ShowDataLabels, Refresh);
+        ScaleOptions(settings);
         Check(_grid, "chart.showGridLines", settings.ShowGridLines, Refresh);
         Check(_header, "chart.firstRowIsHeader", settings.FirstRowIsHeader, Reload);
         _header.IsEnabled = _request.HeaderEditable;
@@ -278,6 +297,22 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
                 _legend,
                 _labels,
                 _grid,
+                Caption(Texts["chart.scale"]),
+                FieldLabel(Texts["chart.scale.minimum"]),
+                _minimum,
+                FieldLabel(Texts["chart.scale.maximum"]),
+                _maximum,
+                FieldLabel(Texts["chart.scale.majorUnit"]),
+                _majorUnit,
+                _logarithmic,
+                _reversed,
+                Caption(Texts["chart.analysis"]),
+                FieldLabel(Texts["chart.trendline"]),
+                _trendline,
+                FieldLabel(Texts["chart.errorBars"]),
+                _errorBars,
+                FieldLabel(Texts["chart.errorBars.amount"]),
+                _errorAmount,
                 Caption(Texts["chart.picker.data"]),
             },
         };
@@ -309,6 +344,68 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = stack,
         };
+    }
+
+    private void ScaleOptions(ChartSettings settings)
+    {
+        var scale = settings.ValueAxisScale;
+        Number(_minimum, scale.Minimum, "chart.scale.minimum");
+        Number(_maximum, scale.Maximum, "chart.scale.maximum");
+        Number(_majorUnit, scale.MajorUnit, "chart.scale.majorUnit");
+        Check(_logarithmic, "chart.scale.logarithmic", scale.Logarithmic, Refresh);
+        Check(_reversed, "chart.scale.reversed", scale.Reversed, Refresh);
+
+        _trendline.ItemsSource = TrendlineChoices.Select(kind => Texts[kind is { } chosen ? $"chart.trendline.{Lower(chosen.ToString())}" : "chart.trendline.none"]).ToArray();
+        _trendline.SelectedIndex = Math.Max(0, Array.IndexOf(TrendlineChoices, settings.Trendline?.Kind));
+        _trendline.SelectionChanged += (_, _) => Refresh();
+        _errorBars.ItemsSource = ErrorBarChoices.Select(kind => Texts[kind is { } chosen ? $"chart.errorBars.{Lower(chosen.ToString())}" : "chart.errorBars.none"]).ToArray();
+        _errorBars.SelectedIndex = Math.Max(0, Array.IndexOf(ErrorBarChoices, settings.ErrorBars?.Kind));
+        _errorBars.SelectionChanged += (_, _) => Refresh();
+        Number(_errorAmount, settings.ErrorBars?.Value, "chart.errorBars.amount");
+        Avalonia.Automation.AutomationProperties.SetName(_trendline, Texts["chart.trendline"]);
+        Avalonia.Automation.AutomationProperties.SetName(_errorBars, Texts["chart.errorBars"]);
+    }
+
+    private void Number(TextBox box, double? value, string name)
+    {
+        box.Text = value is { } number ? number.ToString(_request.Culture) : string.Empty;
+        box.PlaceholderText = Texts["chart.scale.automatic"];
+        box.TextChanged += (_, _) => Refresh();
+        Avalonia.Automation.AutomationProperties.SetName(box, Texts[name]);
+    }
+
+    private double? Parsed(TextBox box) =>
+        double.TryParse((box.Text ?? string.Empty).Trim(), System.Globalization.NumberStyles.Float, _request.Culture, out var value) && double.IsFinite(value) ? value : null;
+
+    private ChartAxisScale ChosenScale()
+    {
+        var original = _request.Settings.ValueAxisScale;
+        var scale = original with
+        {
+            Minimum = Parsed(_minimum),
+            Maximum = Parsed(_maximum),
+            MajorUnit = Parsed(_majorUnit) is > 0 and var unit ? unit : null,
+            Logarithmic = _logarithmic.IsChecked == true,
+            Reversed = _reversed.IsChecked == true,
+        };
+        return scale.IsAutomatic ? ChartAxisScale.Automatic : scale;
+    }
+
+    private ChartTrendline? ChosenTrendline()
+    {
+        var kind = _trendline.SelectedIndex > 0 && _trendline.SelectedIndex < TrendlineChoices.Length ? TrendlineChoices[_trendline.SelectedIndex] : null;
+        if (kind is not { } chosen) return null;
+        return _request.Settings.Trendline is { } original && original.Kind == chosen ? original : new ChartTrendline(chosen);
+    }
+
+    private ChartErrorBars? ChosenErrorBars()
+    {
+        var kind = _errorBars.SelectedIndex > 0 && _errorBars.SelectedIndex < ErrorBarChoices.Length ? ErrorBarChoices[_errorBars.SelectedIndex] : null;
+        if (kind is not { } chosen) return null;
+        var amount = Parsed(_errorAmount) ?? (chosen == ErrorBarKind.Percentage ? 5 : 1);
+        return _request.Settings.ErrorBars is { } original && original.Kind == chosen
+            ? original with { Value = amount }
+            : new ChartErrorBars(chosen, amount);
     }
 
     private void Check(CheckBox box, string key, bool value, Action changed)
@@ -365,6 +462,10 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         ShowGridLines = _grid.IsChecked == true,
         SourceRange = _request.RangeValidator is null ? _request.Settings.SourceRange : (_range.Text ?? string.Empty).Trim(),
         SeriesSources = _seriesRanges is null ? _request.Settings.SeriesSources : _seriesRanges.Sources,
+        ValueAxisScale = ChosenScale(),
+        Trendline = ChosenTrendline(),
+        ErrorBars = ChosenErrorBars(),
+        SeriesCount = _data.Series.Count,
     };
 
     private DialogChrome Chrome => _chrome ??= new DialogChrome(_services.Icons, _metrics);

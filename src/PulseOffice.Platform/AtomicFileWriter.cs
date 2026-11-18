@@ -123,11 +123,18 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         return stem.Length <= MaximumTemporaryStem ? stem : char.IsHighSurrogate(stem[MaximumTemporaryStem - 1]) ? stem[..(MaximumTemporaryStem - 1)] : stem[..MaximumTemporaryStem];
     }
 
+    private static string FinalTarget(string full)
+    {
+        var info = new FileInfo(full);
+        if (info.LinkTarget is null) return full;
+        return info.ResolveLinkTarget(returnFinalTarget: true) is { } target ? Path.GetFullPath(target.FullName) : full;
+    }
+
     private static async Task<T> CommitAsync<T>(string path, Func<string, CancellationToken, Task<T>> produce, Predicate<T> keep, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        var full = Path.GetFullPath(path);
+        var full = FinalTarget(Path.GetFullPath(path));
         var temporary = Path.Combine(Path.GetDirectoryName(full) ?? ".",
             $".{TemporaryStem(full)}.{Guid.NewGuid():N}{Path.GetExtension(full)}");
         try

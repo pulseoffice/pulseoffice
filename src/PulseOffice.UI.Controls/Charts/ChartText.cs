@@ -18,6 +18,19 @@ public sealed class ChartText(CultureInfo culture)
     public string Number(double value, string pattern) =>
         double.IsFinite(value) ? value.ToString(pattern, culture) : string.Empty;
 
+    public string Formatted(double value, string? code)
+    {
+        if (code is not { Length: > 0 } || code.Equals("General", StringComparison.OrdinalIgnoreCase) || code.Contains('[')) return Number(value);
+        try
+        {
+            return Number(value, code);
+        }
+        catch (FormatException)
+        {
+            return Number(value);
+        }
+    }
+
     public void Centred(DrawingContext context, FormattedText text, Point centre) =>
         context.DrawText(text, new Point(centre.X - text.Width / 2, centre.Y - text.Height / 2));
 }

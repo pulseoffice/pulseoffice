@@ -15,8 +15,22 @@ public sealed class BarPlot : ChartPlotBase
         ChartType.Bar or ChartType.StackedBar or ChartType.PercentStackedBar
         or ChartType.PopulationPyramid;
 
-    public override PlotScale? ValueAxis(ChartFrame frame) =>
-        StackScale(Prepared(frame), frame.Plot, HorizontalAxis(frame.Definition.Type), Stacked(frame.Definition.Type));
+    public override PlotScale? ValueAxis(ChartFrame frame) => Primary(frame, Prepared(frame), HorizontalAxis(frame.Definition.Type));
+
+    public override PlotScale? SecondaryValueAxis(ChartFrame frame) => SecondaryScale(frame, Prepared(frame), Splits(frame), HorizontalAxis(frame.Definition.Type));
+
+    public override PlotScale? SeriesScale(ChartFrame frame, int series) =>
+        ScaleOf(frame, series, Primary(frame, Prepared(frame), HorizontalAxis(frame.Definition.Type)), SecondaryValueAxis(frame));
+
+    private readonly ChartSeriesStroke _strokes = new();
+
+    private bool Splits(ChartFrame frame) =>
+        frame.Definition.HasSecondaryAxis && !Stacked(frame.Definition.Type) && frame.Definition.Type != ChartType.PopulationPyramid;
+
+    private PlotScale Primary(ChartFrame frame, ChartData data, bool horizontal) =>
+        Stacked(frame.Definition.Type)
+            ? Scaled(StackScale(data, frame.Plot, horizontal, true), frame.Definition.ValueAxis)
+            : PrimaryScale(frame, data, Splits(frame), horizontal);
 
     public override void Draw(ChartFrame frame)
     {
@@ -30,9 +44,9 @@ public sealed class BarPlot : ChartPlotBase
 
     private void DrawCombination(ChartFrame frame, ChartData data)
     {
-        var scale = StackScale(data, frame.Plot, horizontal: false, stacked: false);
+        var scale = Primary(frame, data, false);
+        var secondary = SecondaryScale(frame, data, Splits(frame));
         var categories = Categories(data, frame.Plot);
-        var zero = scale.Position(Math.Max(0, scale.Minimum));
         var columns = Enumerable.Range(0, data.Series.Count).Where(series => !frame.Definition.IsLineSeries(series, data.Series.Count)).ToList();
         var lines = Enumerable.Range(0, data.Series.Count).Where(series => frame.Definition.IsLineSeries(series, data.Series.Count));
 
@@ -42,14 +56,15 @@ public sealed class BarPlot : ChartPlotBase
                 var series = columns[slot];
                 if (!IsPlotted(data.Series[series], index) || Value(data.Series[series], index) == 0) continue;
                 var (start, width) = categories.Slot(index, slot, columns.Count);
-                frame.Context.FillRectangle(Brush(data, series), Rectangle(false, start, width, zero, scale.Position(Value(data.Series[series], index))));
+                var own = ScaleOf(frame, series, scale, secondary);
+                frame.Context.FillRectangle(Brush(data, series), Rectangle(false, start, width, own.Position(Math.Max(0, own.Minimum)), own.Position(Value(data.Series[series], index))));
             }
 
         foreach (var series in lines)
         {
             var points = Enumerable.Range(0, categories.Count)
                 .Where(index => IsPlotted(data.Series[series], index))
-                .Select(index => new Point(categories.Centre(index), scale.Position(Value(data.Series[series], index))))
+                .Select(index => new Point(categories.Centre(index), ScaleOf(frame, series, scale, secondary).Position(Value(data.Series[series], index))))
                 .ToList();
             if (points.Count == 0) continue;
 
@@ -61,9 +76,9 @@ public sealed class BarPlot : ChartPlotBase
                 sink.EndFigure(false);
             }
 
-            var pen = new Pen(Brush(data, series), 2.5) { LineJoin = PenLineJoin.Round, LineCap = PenLineCap.Round };
-            frame.Context.DrawGeometry(null, pen, geometry);
-            foreach (var point in points) frame.Context.DrawEllipse(Brush(data, series), null, point, 3, 3);
+            var format = frame.Definition.SeriesFormat(series);
+            frame.Context.DrawGeometry(null, _strokes.Pen(Brush(data, series), format, 2.5), geometry);
+            foreach (var point in points) _strokes.Marker(frame.Context, Brush(data, series), format, point, 3);
         }
     }
 
@@ -78,26 +93,27 @@ public sealed class BarPlot : ChartPlotBase
 
     private void DrawGrouped(ChartFrame frame, ChartData data, bool horizontal)
     {
-        var scale = StackScale(data, frame.Plot, horizontal, stacked: false);
+        var scale = Primary(frame, data, horizontal);
+        var secondary = SecondaryScale(frame, data, Splits(frame), horizontal);
         var categories = Categories(data, frame.Plot, horizontal);
-        var zero = scale.Position(Math.Max(0, scale.Minimum));
 
         for (var index = 0; index < categories.Count; index++)
             for (var series = 0; series < data.Series.Count; series++)
             {
                 if (!IsPlotted(data.Series[series], index) || Value(data.Series[series], index) == 0) continue;
                 var (start, width) = categories.Slot(index, series, data.Series.Count);
-                var position = scale.Position(Value(data.Series[series], index));
+                var own = ScaleOf(frame, series, scale, secondary);
+                var position = own.Position(Value(data.Series[series], index));
 
                 frame.Context.FillRectangle(
                     Brush(data, series),
-                    Rectangle(horizontal, start, width, zero, position));
+                    Rectangle(horizontal, start, width, own.Position(Math.Max(0, own.Minimum)), position));
             }
     }
 
     private void DrawStacked(ChartFrame frame, ChartData data, bool horizontal)
     {
-        var scale = StackScale(data, frame.Plot, horizontal, stacked: true);
+        var scale = Primary(frame, data, horizontal);
         var categories = Categories(data, frame.Plot, horizontal);
 
         for (var index = 0; index < categories.Count; index++)
@@ -129,7 +145,8 @@ public sealed class BarPlot : ChartPlotBase
         var horizontal = HorizontalAxis(frame.Definition.Type);
         var data = Prepared(frame);
         var stacked = Stacked(frame.Definition.Type);
-        var scale = StackScale(data, frame.Plot, horizontal, stacked);
+        var scale = Primary(frame, data, horizontal);
+        var secondary = SecondaryScale(frame, data, Splits(frame), horizontal);
         var categories = Categories(data, frame.Plot, horizontal);
 
         for (var index = 0; index < categories.Count; index++)
@@ -149,10 +166,11 @@ public sealed class BarPlot : ChartPlotBase
                 var (start, width) = stacked
                     ? (categories.Start(index) + categories.Width * 0.15, categories.Width * 0.7)
                     : categories.Slot(index, series, data.Series.Count);
-                var along = scale.Position(end);
+                var along = ScaleOf(frame, series, scale, secondary).Position(end);
                 yield return new ChartDataLabel(
                     horizontal ? new Point(along, start + width / 2) : new Point(start + width / 2, along),
-                    Value(frame.Data.Series[series], index));
+                    Value(frame.Data.Series[series], index))
+                { Series = series, Index = index, Across = index + 1 };
             }
         }
     }

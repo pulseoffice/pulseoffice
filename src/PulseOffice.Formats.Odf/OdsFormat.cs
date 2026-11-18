@@ -145,6 +145,15 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
         if (exotic > 0)
             losses.Add(Diagnostic.Info("ODF021", $"{exotic} charts of types that ODF does not define, such as waterfall and statistical charts, keep their type in a PulseOffice extension: other applications show them as the nearest standard chart, usually columns.").With(exotic));
 
+        var extendedCharts = workbook.Sheets
+            .SelectMany(sheet => sheet.Objects)
+            .OfType<PlacedObject>()
+            .Select(placed => placed.Content)
+            .OfType<Charts.ChartDefinition>()
+            .Count(_chartExtensions.Needs);
+        if (extendedCharts > 0)
+            losses.Add(Diagnostic.Info("ODF287", $"{extendedCharts} charts use dashed series lines, a logarithm base other than 10, error bars without end caps or a standard deviation multiplier: ODF has no attribute for these, so they are kept in a PulseOffice extension and other applications show solid lines, base 10, capped bars and one standard deviation. XLSX keeps them.").With(extendedCharts));
+
         var duotoneImages = workbook.Sheets
             .SelectMany(sheet => sheet.Objects)
             .OfType<PlacedObject>()
@@ -221,6 +230,8 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
         hash is not null && (hash.StartsWith(PasswordKey.OoxmlPrefix, StringComparison.Ordinal) || hash.StartsWith(PasswordKey.OoxmlLegacyPrefix, StringComparison.Ordinal));
 
     private readonly OdfChartVocabulary _charts = new();
+
+    private readonly OdfChartExtensions _chartExtensions = new();
     private readonly OdfHeaderFooterText _headerFooterText = new(new PulseOffice.Foundation.Pages.HeaderFooterCodes());
 
     public OperationResult<bool> Write(Workbook workbook, Stream stream)

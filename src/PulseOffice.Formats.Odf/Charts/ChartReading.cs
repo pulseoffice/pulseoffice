@@ -11,6 +11,10 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
 {
     protected IOdfParagraphText Paragraphs => paragraphs;
 
+    private readonly OdfChartAxisScales _scales = new();
+
+    private readonly OdfChartSeriesFormats _formats = new();
+
     public ChartDefinition? Read(XElement chart, string id)
     {
         if (chart.Element(Chart + "plot-area") is not { } plot) return null;
@@ -20,6 +24,12 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
         var type = vocabulary.Declared((string?)chart.Attribute(PulseChart + "type"), chartClass,
             vocabulary.Refine(vocabulary.TypeOf(chartClass, Flags(chart, plot)), Traits(chart, plot)));
         var lines = plot.Elements(Chart + "series").Count(series => (string?)series.Attribute(Chart + "class") == "chart:line");
+        var numbers = new OdfNumberStyleReader(chart.Document);
+        var horizontalStyle = Named(chart, (string?)Axis(plot, "x")?.Attribute(Chart + "style-name"));
+        var verticalStyle = Named(chart, (string?)Axis(plot, "y")?.Attribute(Chart + "style-name"));
+        var secondaryStyle = Named(chart, (string?)SecondaryAxis(plot)?.Attribute(Chart + "style-name"));
+        var formats = plot.Elements(Chart + "series").Select(series => _formats.Read(series, SeriesStyle(chart, series), name => Named(chart, name))).ToList();
+        var labelled = plot.Elements(Chart + "series").Select(series => SeriesStyle(chart, series)).FirstOrDefault(style => _formats.LabelsShown(style?.Element(Style + "chart-properties")));
         var combined = type is ChartType.Column or ChartType.ColumnLine && chartClass == "chart:bar" && lines > 0 && lines < plot.Elements(Chart + "series").Count();
         return Source(chart, plot, new ChartDefinition
         {
@@ -37,6 +47,11 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
             SeriesNames = SeriesNames(plot),
             SeriesColors = vocabulary.IsCircular(type) ? null : SeriesColors(chart, plot),
             ThreeDimensional = (string?)PlotProperties(chart, plot)?.Attribute(Chart + "three-dimensional") == "true",
+            DataLabels = _formats.ReadLabels(labelled?.Element(Style + "chart-properties"), labelled, numbers),
+            CategoryAxis = _scales.Read(horizontalStyle, verticalStyle, numbers),
+            ValueAxis = _scales.Read(verticalStyle, horizontalStyle, numbers),
+            SecondaryValueAxis = _scales.Read(secondaryStyle, null, numbers),
+            SeriesFormats = formats.Any(format => !format.IsPlain) ? [.. formats.Select(format => format.IsPlain ? null : format)] : null,
         });
     }
 
@@ -67,7 +82,12 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
     protected abstract ChartDefinition Source(XElement chart, XElement plot, ChartDefinition common);
 
     private XElement? Axis(XElement plot, string dimension) =>
-        plot.Elements(Chart + "axis").FirstOrDefault(axis => (string?)axis.Attribute(Chart + "dimension") == dimension);
+        plot.Elements(Chart + "axis").FirstOrDefault(axis => (string?)axis.Attribute(Chart + "dimension") == dimension && !IsSecondary(axis));
+
+    private XElement? SecondaryAxis(XElement plot) =>
+        plot.Elements(Chart + "axis").FirstOrDefault(axis => (string?)axis.Attribute(Chart + "dimension") == "y" && IsSecondary(axis));
+
+    private bool IsSecondary(XElement axis) => ((string?)axis.Attribute(Chart + "name"))?.StartsWith("secondary", StringComparison.Ordinal) == true;
 
     private string? AxisTitle(XElement plot, string dimension) =>
         Axis(plot, dimension)?.Element(Chart + "title") is { } title && paragraphs.Read(title) is { Length: > 0 } text ? text : null;
@@ -76,9 +96,7 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
     {
         var name = (string?)series.Attribute(Chart + "style-name");
         var properties = Named(chart, name)?.Elements().FirstOrDefault(element => element.Name.LocalName == "chart-properties");
-        return properties is not null
-            && (((string?)properties.Attribute(Chart + "data-label-number") ?? "none") != "none"
-                || (string?)properties.Attribute(Chart + "data-label-text") == "true");
+        return _formats.LabelsShown(properties);
     }
 
     private XElement? PlotProperties(XElement chart, XElement plot)

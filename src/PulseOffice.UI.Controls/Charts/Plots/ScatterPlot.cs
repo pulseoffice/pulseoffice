@@ -13,6 +13,8 @@ public sealed class ScatterPlot : ChartPlotBase
 
     public override PlotScale? ValueAxis(ChartFrame frame) => Layout(frame)?.Vertical;
 
+    public override PlotScale? SeriesScale(ChartFrame frame, int series) => Layout(frame)?.Vertical;
+
     public override bool HasCategoryAxis(ChartType type) => false;
 
     public override PlotScale? CategoryValueAxis(ChartFrame frame) => Layout(frame)?.Horizontal;
@@ -25,10 +27,14 @@ public sealed class ScatterPlot : ChartPlotBase
     {
         if (Layout(frame) is not { } layout) yield break;
         var horizontalValues = frame.Data.Series[0].Values;
-        foreach (var series in layout.Plotted)
+        for (var plotted = 0; plotted < layout.Plotted.Count; plotted++)
+        {
+            var series = layout.Plotted[plotted];
             for (var point = 0; point < series.Values.Count && point < horizontalValues.Count; point++)
                 if (double.IsFinite(horizontalValues[point]) && double.IsFinite(series.Values[point]))
-                    yield return new ChartDataLabel(new Point(layout.Horizontal.Position(horizontalValues[point]), layout.Vertical.Position(series.Values[point])), series.Values[point]);
+                    yield return new ChartDataLabel(new Point(layout.Horizontal.Position(horizontalValues[point]), layout.Vertical.Position(series.Values[point])), series.Values[point])
+                    { Series = plotted + 1, Index = point, Across = horizontalValues[point] };
+        }
     }
 
     public override void Draw(ChartFrame frame)
@@ -93,8 +99,8 @@ public sealed class ScatterPlot : ChartPlotBase
         if (values.Count == 0) return null;
 
         return new ScatterLayout(
-            PlotScale.Nice(horizontalValues.Min(), horizontalValues.Max(), frame.Plot.X, frame.Plot.Right),
-            PlotScale.Nice(values.Min(), values.Max(), frame.Plot.Bottom, frame.Plot.Y),
+            Scaled(PlotScale.Nice(horizontalValues.Min(), horizontalValues.Max(), frame.Plot.X, frame.Plot.Right), frame.Definition.CategoryAxis),
+            Scaled(PlotScale.Nice(values.Min(), values.Max(), frame.Plot.Bottom, frame.Plot.Y), frame.Definition.ValueAxis),
             rest,
             plotted);
     }

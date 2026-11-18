@@ -36,11 +36,13 @@ public sealed class AuditSpellingTests
         var patterns = HyphenationPatterns.Parse(LanguageTag.Parse("it"), ["UTF-8", "a1b", "b1c", ".ab4"]);
         var word = string.Concat(Enumerable.Repeat("abc", 20_000));
 
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        new PulseOffice.Testing.GrowthCheck().Linear(repeats =>
+        {
+            var sized = string.Concat(Enumerable.Repeat("abc", repeats));
+            return () => patterns.Positions(sized);
+        }, 20_000);
         var positions = patterns.Positions(word);
-        watch.Stop();
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"{watch.Elapsed}");
         Assert.Contains(4, positions);
     }
 

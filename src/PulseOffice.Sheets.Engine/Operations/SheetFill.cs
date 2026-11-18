@@ -76,7 +76,7 @@ public sealed class SheetFill : ISheetFill
         var filled = axis.Filled(source, steps);
         var result = new List<CellRange>();
 
-        foreach (var region in sheet.Merges.All.Where(region => source.Contains(region.Start) && source.Contains(region.End)))
+        foreach (var region in sheet.Merges.Overlapping(source).Where(region => source.Contains(region.Start) && source.Contains(region.End)))
             for (var copy = 1; ; copy++)
             {
                 var offset = (axis.Backwards ? -1 : 1) * copy * period;

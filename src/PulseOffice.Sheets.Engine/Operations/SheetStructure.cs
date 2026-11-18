@@ -435,12 +435,13 @@ internal sealed class RulesPart : StructurePart
     public override void Apply(StructureEdit edit)
     {
         var rules = edit.Sheet.ConditionalRules;
+        var kept = new List<Formatting.ConditionalRule>(rules.Count);
+        foreach (var rule in rules)
+            if (Moved(edit, rule) is { } moved)
+                kept.Add(moved);
 
-        for (var index = rules.Count - 1; index >= 0; index--)
-        {
-            if (Moved(edit, rules[index]) is { } moved) rules[index] = moved;
-            else rules.RemoveAt(index);
-        }
+        rules.Clear();
+        rules.AddRange(kept);
     }
 
     private Formatting.ConditionalRule? Moved(StructureEdit edit, Formatting.ConditionalRule rule)

@@ -23,6 +23,14 @@ public sealed record ChartSettings
     public string? SourceRange { get; init; }
 
     public IReadOnlyList<ChartSeriesSource>? SeriesSources { get; init; }
+
+    public ChartAxisScale ValueAxisScale { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartTrendline? Trendline { get; init; }
+
+    public ChartErrorBars? ErrorBars { get; init; }
+
+    public int SeriesCount { get; init; }
 }
 
 public interface IChartSettingsMapper
@@ -51,6 +59,9 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
             ShowGridLines = chart.ShowGridLines,
             SourceRange = string.IsNullOrEmpty(chart.SourceRange) ? null : chart.SourceRange,
             SeriesSources = chart.SeriesSources,
+            ValueAxisScale = chart.ValueAxis,
+            Trendline = chart.SeriesFormat(0).Trendline,
+            ErrorBars = chart.SeriesFormat(0).ErrorBars,
         };
     }
 
@@ -59,7 +70,8 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(settings);
 
-        return chart with
+        var formatted = Analysed(chart, settings);
+        return formatted with
         {
             Type = settings.Type,
             ChartTitle = Clean(settings.Title),
@@ -72,7 +84,19 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
             ShowGridLines = settings.ShowGridLines,
             SourceRange = Clean(settings.SourceRange) ?? chart.SourceRange,
             SeriesSources = settings.SeriesSources is { Count: > 0 } sources ? sources : null,
+            ValueAxis = settings.ValueAxisScale.IsAutomatic ? ChartAxisScale.Automatic : settings.ValueAxisScale,
         };
+    }
+
+    private ChartDefinition Analysed(ChartDefinition chart, ChartSettings settings)
+    {
+        var first = chart.SeriesFormat(0);
+        if (settings.Trendline == first.Trendline && settings.ErrorBars == first.ErrorBars) return chart;
+        var count = Math.Max(settings.SeriesCount, chart.SeriesFormats?.Count ?? 0);
+        var result = chart;
+        for (var series = 0; series < Math.Max(count, 1); series++)
+            result = result.WithSeriesFormat(series, result.SeriesFormat(series) with { Trendline = settings.Trendline, ErrorBars = settings.ErrorBars });
+        return result;
     }
 
     private string? Clean(string? text) =>

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using PulseOffice.Document.Commands;
 using PulseOffice.Sheets.Addressing;
@@ -56,11 +55,18 @@ public sealed class LedgerGridRound19Tests
         parts.Sheet.SetValue(new CellAddress(0, 0), CellValue.Number(1));
         parts.Sheet.SetValue(new CellAddress(4, 1), CellValue.Text("x"));
 
-        var clock = Stopwatch.StartNew();
-        parts.Operations.ApplyFill(new SheetGridView.FillRequest(Columns(0, 0), Columns(0, 2)));
-        clock.Stop();
+        new PulseOffice.Testing.GrowthCheck().Flat(lastRow =>
+        {
+            var sized = new Parts();
+            sized.Sheet.SetValue(new CellAddress(0, 0), CellValue.Number(1));
+            sized.Sheet.SetValue(new CellAddress(4, 1), CellValue.Text("x"));
+            return () => sized.Operations.ApplyFill(new SheetGridView.FillRequest(
+                new CellRange(new CellAddress(0, 0), new CellAddress(lastRow, 0)),
+                new CellRange(new CellAddress(0, 0), new CellAddress(lastRow, 2))));
+        }, 10_000, CellAddress.MaxRows - 1);
 
-        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(500), clock.Elapsed.ToString());
+        parts.Operations.ApplyFill(new SheetGridView.FillRequest(Columns(0, 0), Columns(0, 2)));
+
         Assert.Equal(1, parts.Sheet.GetValue(new CellAddress(0, 1)).AsNumber());
         Assert.Equal(1, parts.Sheet.GetValue(new CellAddress(0, 2)).AsNumber());
         Assert.True(parts.Sheet.GetValue(new CellAddress(4, 1)).IsEmpty);
@@ -75,11 +81,17 @@ public sealed class LedgerGridRound19Tests
         var row = new CellRange(new CellAddress(0, 0), new CellAddress(0, CellAddress.MaxColumns - 1));
         var rows = new CellRange(new CellAddress(0, 0), new CellAddress(3, CellAddress.MaxColumns - 1));
 
-        var clock = Stopwatch.StartNew();
-        parts.Operations.ApplyFill(new SheetGridView.FillRequest(row, rows));
-        clock.Stop();
+        new PulseOffice.Testing.GrowthCheck().Flat(lastColumn =>
+        {
+            var sized = new Parts();
+            sized.Sheet.SetValue(new CellAddress(0, 3), CellValue.Number(7));
+            return () => sized.Operations.ApplyFill(new SheetGridView.FillRequest(
+                new CellRange(new CellAddress(0, 0), new CellAddress(0, lastColumn)),
+                new CellRange(new CellAddress(0, 0), new CellAddress(3, lastColumn))));
+        }, 1_600, CellAddress.MaxColumns - 1);
 
-        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(500), clock.Elapsed.ToString());
+        parts.Operations.ApplyFill(new SheetGridView.FillRequest(row, rows));
+
         Assert.Equal(7, parts.Sheet.GetValue(new CellAddress(3, 3)).AsNumber());
     }
 

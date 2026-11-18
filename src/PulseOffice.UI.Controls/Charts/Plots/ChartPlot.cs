@@ -13,7 +13,14 @@ public sealed record ChartFrame(
 
 public sealed record ChartLegendItem(string Name, Color Colour);
 
-public sealed record ChartDataLabel(Point Anchor, double Value);
+public sealed record ChartDataLabel(Point Anchor, double Value)
+{
+    public int Series { get; init; } = -1;
+
+    public int Index { get; init; } = -1;
+
+    public double Across { get; init; } = double.NaN;
+}
 
 public interface IChartPlot
 {
@@ -31,6 +38,10 @@ public interface IChartPlot
 
     PlotScale? ValueAxis(ChartFrame frame);
 
+    PlotScale? SecondaryValueAxis(ChartFrame frame);
+
+    PlotScale? SeriesScale(ChartFrame frame, int series);
+
     bool HorizontalAxis(ChartType type);
 
     bool KeepsGaps { get; }
@@ -45,6 +56,28 @@ public abstract class ChartPlotBase : IChartPlot
     public virtual bool DrawsAxes => true;
 
     public virtual PlotScale? ValueAxis(ChartFrame frame) => null;
+
+    public virtual PlotScale? SecondaryValueAxis(ChartFrame frame) => null;
+
+    public virtual PlotScale? SeriesScale(ChartFrame frame, int series) => null;
+
+    private readonly ChartAxisScaling _axisScaling = new();
+
+    protected PlotScale Scaled(PlotScale automatic, ChartAxisScale axis) => _axisScaling.Apply(automatic, axis);
+
+    protected ChartData Side(ChartFrame frame, ChartData data, bool secondary, bool split) =>
+        split && frame.Definition.HasSecondaryAxis
+            ? data with { Series = [.. data.Series.Select((series, index) => frame.Definition.SeriesFormat(index).SecondaryAxis == secondary ? series : series with { Values = [] })] }
+            : data;
+
+    protected PlotScale PrimaryScale(ChartFrame frame, ChartData data, bool split, bool horizontal = false) =>
+        Scaled(ValueScale(Side(frame, data, false, split), frame.Plot, horizontal), frame.Definition.ValueAxis);
+
+    protected PlotScale? SecondaryScale(ChartFrame frame, ChartData data, bool split, bool horizontal = false) =>
+        split && frame.Definition.HasSecondaryAxis ? Scaled(ValueScale(Side(frame, data, true, split), frame.Plot, horizontal), frame.Definition.SecondaryValueAxis) : null;
+
+    protected PlotScale ScaleOf(ChartFrame frame, int series, PlotScale primary, PlotScale? secondary) =>
+        secondary is not null && frame.Definition.SeriesFormat(series).SecondaryAxis ? secondary : primary;
 
     public virtual bool HorizontalAxis(ChartType type) => false;
 

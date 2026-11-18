@@ -168,6 +168,10 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
         var charts = workbook.Sheets.SelectMany(sheet => sheet.Objects).Select(placed => placed.Content).OfType<Charts.ChartDefinition>().ToList();
         if (charts.Any(_charts.LosesType))
             losses.Add(Diagnostic.Warning("XLSX087", "Chart types that DrawingML does not have, such as stepped lines, waterfall, statistical and other special charts, are written as column charts in XLSX. ODS keeps them. PulseOffice reads the type back from an extension."));
+        if (charts.Any(_charts.DropsSeriesAnalysis))
+            losses.Add(Diagnostic.Warning("XLSX241", "Trendlines, error bars and secondary axes on pie, doughnut and radar chart series have no place in DrawingML: they are not written to XLSX. ODS keeps them."));
+        if (charts.Any(_charts.DropsCategoryUnits))
+            losses.Add(Diagnostic.Info("XLSX242", "DrawingML category axes have no major or minor unit: the units set on a category axis are not written to XLSX. ODS keeps them."));
         if (charts.Any(_charts.FlattensThreeDimensional))
             losses.Add(Diagnostic.Info("XLSX088", "DrawingML has no three-dimensional line or column-and-line charts: these 3D charts are written flat in XLSX. ODS keeps the 3D view."));
 

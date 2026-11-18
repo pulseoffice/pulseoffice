@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using PulseOffice.Sheets;
 using PulseOffice.Sheets.Addressing;
@@ -94,14 +93,16 @@ public sealed class Round126SubtotalsTests(EngineFixture fixture) : IClassFixtur
         sheet.SetValue(new CellAddress(0, 0), CellValue.Number(1));
         sheet.SetValue(new CellAddress(2, 1), CellValue.Number(2));
         var whole = new CellRange(CellAddress.First, new CellAddress(CellAddress.MaxRows - 1, 199));
-        var clock = Stopwatch.StartNew();
-
         var plan = new SheetConsolidation().Plan(workbook,
             new ConsolidationRequest([new ConsolidationSource(0, whole), new ConsolidationSource(0, whole)], new CellAddress(0, 300)));
 
-        clock.Stop();
         Assert.Equal(2, plan.Values[new CellAddress(0, 300)].AsNumber());
         Assert.Equal(4, plan.Values[new CellAddress(2, 301)].AsNumber());
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"took {clock.Elapsed}");
+        new PulseOffice.Testing.GrowthCheck().Flat(lastRow =>
+        {
+            var range = new CellRange(CellAddress.First, new CellAddress(lastRow, 199));
+            return () => new SheetConsolidation().Plan(workbook,
+                new ConsolidationRequest([new ConsolidationSource(0, range), new ConsolidationSource(0, range)], new CellAddress(0, 300)));
+        }, 10_000, CellAddress.MaxRows - 1);
     }
 }

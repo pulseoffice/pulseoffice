@@ -41,15 +41,20 @@ public class SheetLayoutScaleTests
         var layout = new SheetLayout();
         for (var row = 0; row < 200_000; row += 2) layout.SetRowHeight(row, Twip.FromPoints(30));
 
-        var clock = Stopwatch.StartNew();
         long total = 0;
-        for (var row = 0; row < 200_000; row += 7) total += layout.RowOffset(row).Value;
-        clock.Stop();
+        new PulseOffice.Testing.GrowthCheck().Linear(rows =>
+        {
+            var sized = new SheetLayout();
+            for (var row = 0; row < rows; row += 2) sized.SetRowHeight(row, Twip.FromPoints(30));
+            return () =>
+            {
+                for (var row = 0; row < rows; row += 7) total += sized.RowOffset(row).Value;
+            };
+        }, 200_000);
 
         Assert.Equal(Twip.FromPoints(45).Value, layout.RowOffset(2).Value);
         Assert.Equal(Twip.FromPoints(45).Value * 50_000L, layout.RowOffset(100_000).Value);
         Assert.True(total > 0);
-        Assert.True(clock.ElapsedMilliseconds < 1000, $"took {clock.ElapsedMilliseconds} ms");
     }
 
     [Fact]

@@ -4,15 +4,25 @@ public sealed record PlotScale(double Minimum, double Maximum, double From, doub
 {
     public double Range => Maximum - Minimum;
 
+    public bool Logarithmic { get; init; }
+
+    public double LogBase { get; init; } = 10;
+
+    public double? MajorStep { get; init; }
+
     public double Span => To - From;
 
     public double Position(double value) =>
-        Maximum / 2 - Minimum / 2 is var half && half > 0
+        Logarithmic && Minimum > 0 && Maximum > Minimum
+            ? From + Span * ((Math.Log(Math.Max(value, Minimum)) - Math.Log(Minimum)) / (Math.Log(Maximum) - Math.Log(Minimum)))
+            : Maximum / 2 - Minimum / 2 is var half && half > 0
             ? From + Span * ((value / 2 - Minimum / 2) / half)
             : From;
 
     public double Value(double position) =>
-        Span == 0 ? Minimum : Minimum + Range * ((position - From) / Span);
+        Span == 0 ? Minimum
+        : Logarithmic && Minimum > 0 && Maximum > Minimum ? Math.Exp(Math.Log(Minimum) + (Math.Log(Maximum) - Math.Log(Minimum)) * ((position - From) / Span))
+        : Minimum + Range * ((position - From) / Span);
 
     public static PlotScale Nice(double minimum, double maximum, double from, double to)
     {
@@ -55,6 +65,8 @@ public sealed record PlotScale(double Minimum, double Maximum, double From, doub
         if (!(Maximum > Minimum) || !double.IsFinite(Range)) return [Minimum];
 
         most = Math.Max(1, most);
+        if (Logarithmic && Minimum > 0) return Powers(most);
+        if (MajorStep is { } fixedStep && fixedStep > 0 && double.IsFinite(fixedStep) && Range / fixedStep <= most * 20) return Stepped(fixedStep);
         var step = Step(Range);
         while (Range / step > most) step *= 2;
         if (!double.IsFinite(step) || step <= 0) return Ticks();
@@ -64,6 +76,26 @@ public sealed record PlotScale(double Minimum, double Maximum, double From, doub
         for (var tick = first; tick <= Maximum + step * 1e-9 && ticks.Count <= most + 1; tick += step)
             ticks.Add(Math.Abs(tick) < step * 1e-9 ? 0 : tick);
         return ticks.Count < 2 ? Ticks() : ticks;
+    }
+
+    private List<double> Powers(int most)
+    {
+        var logBase = LogBase > 1 && double.IsFinite(LogBase) ? LogBase : 10;
+        var first = Math.Ceiling(Math.Log(Minimum, logBase) - 1e-9);
+        var last = Math.Floor(Math.Log(Maximum, logBase) + 1e-9);
+        var stride = Math.Max(1, Math.Ceiling((last - first + 1) / Math.Max(most, 1)));
+        var ticks = new List<double>();
+        for (var exponent = first; exponent <= last; exponent += stride) ticks.Add(Math.Pow(logBase, exponent));
+        return ticks.Count == 0 ? [Minimum, Maximum] : ticks;
+    }
+
+    private List<double> Stepped(double step)
+    {
+        var ticks = new List<double>();
+        var first = Math.Ceiling(Minimum / step - 1e-9) * step;
+        for (var tick = first; tick <= Maximum + step * 1e-9; tick += step)
+            ticks.Add(Math.Abs(tick) < step * 1e-9 ? 0 : tick);
+        return ticks;
     }
 
     private static double Step(double range)

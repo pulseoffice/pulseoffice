@@ -75,6 +75,29 @@ public sealed record ChartDefinition : EmbeddedObject
 
     public bool ShowDataLabels { get; init; }
 
+    public ChartDataLabelOptions DataLabels { get; init; } = ChartDataLabelOptions.ValuesOnly;
+
+    public ChartAxisScale CategoryAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartAxisScale ValueAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public ChartAxisScale SecondaryValueAxis { get; init; } = ChartAxisScale.Automatic;
+
+    public IReadOnlyList<ChartSeriesFormat?>? SeriesFormats { get; init; }
+
+    public ChartSeriesFormat SeriesFormat(int series) =>
+        SeriesFormats is { } formats && series >= 0 && series < formats.Count && formats[series] is { } format ? format : ChartSeriesFormat.Plain;
+
+    public bool HasSecondaryAxis => SeriesFormats?.Any(format => format?.SecondaryAxis == true) == true;
+
+    public ChartDefinition WithSeriesFormat(int series, ChartSeriesFormat format)
+    {
+        var formats = new List<ChartSeriesFormat?>(SeriesFormats ?? []);
+        while (formats.Count <= series) formats.Add(null);
+        formats[series] = format.IsPlain ? null : format;
+        return this with { SeriesFormats = formats.All(item => item is null) ? null : formats };
+    }
+
     public bool ThreeDimensional { get; init; }
 
     public int LineSeriesCount { get; init; } = 1;

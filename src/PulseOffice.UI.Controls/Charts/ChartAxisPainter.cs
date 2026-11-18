@@ -9,13 +9,25 @@ public sealed class ChartAxisPainter(ChartText text)
     private const double LabelSize = 9;
     private readonly IBrush _labels = Brushes.Gray;
 
-    public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid)
+    public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid) =>
+        Values(context, scale, plot, horizontal, grid, null);
+
+    public void Secondary(DrawingContext context, PlotScale scale, Rect plot, string? format)
+    {
+        foreach (var value in scale.Divisions())
+        {
+            var label = text.Layout(text.Formatted(value, format), _labels, LabelSize);
+            context.DrawText(label, new Point(plot.Right + 4, scale.Position(value) - label.Height / 2));
+        }
+    }
+
+    public void Values(DrawingContext context, PlotScale scale, Rect plot, bool horizontal, bool grid, string? format)
     {
         var pen = new Pen(new SolidColorBrush(Colors.Gray, 0.3));
 
         foreach (var value in scale.Divisions())
         {
-            var label = text.Layout(text.Number(value), _labels, LabelSize);
+            var label = text.Layout(text.Formatted(value, format), _labels, LabelSize);
             var position = scale.Position(value);
             if (horizontal)
             {
