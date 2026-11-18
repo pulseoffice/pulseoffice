@@ -21,6 +21,7 @@ public sealed class BorderSchema : Control
     private readonly ResourceBrushes _brushes = new();
     private readonly IBrush _paperGuide = new ImmutableSolidColorBrush(Color.FromRgb(0x9C, 0xA3, 0xAF));
     private readonly IBrush _paperSample = new ImmutableSolidColorBrush(Color.FromRgb(0xE5, 0xE7, 0xEB));
+    private readonly IBrush _paper = Brushes.White;
     private BorderPosition? _hover;
     private int _focus;
 
@@ -116,9 +117,9 @@ public sealed class BorderSchema : Control
     public override void Render(DrawingContext context)
     {
         var border = Brush(Palette.Keys.Border, Brushes.LightGray);
-        context.DrawRectangle(Brushes.White, new Pen(border, 1), new Rect(Bounds.Size), 6, 6);
-        var guide = _paperGuide;
-        var sample = _paperSample;
+        context.DrawRectangle(Brush(Palette.Keys.Page, _paper), new Pen(border, 1), new Rect(Bounds.Size), 6, 6);
+        var guide = Brush(Palette.Keys.PageGuide, _paperGuide);
+        var sample = Brush(Palette.Keys.PageSample, _paperSample);
         var accent = Brush("PulseAccent", Brushes.DodgerBlue);
         var marked = IsFocused ? FocusedPosition : _hover;
         _painter.Paint(context, Area, _model.Scope, _model.Frame, new BorderPaintColors(guide, sample, accent), marked);

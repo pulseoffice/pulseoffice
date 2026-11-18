@@ -119,7 +119,10 @@ public sealed class Evaluator(IFunctionRegistry functions, ISpecialFormRegistry 
 
         var range = ctx.GetSpillRange(node.SheetName, node.Anchor);
 
-        return range is null ? EvalValue.Error(CellError.Reference) : new RangeValue(node.SheetName, range.Value);
+        if (range is not null) return new RangeValue(node.SheetName, range.Value);
+        return ctx.GetCellValue(node.SheetName, node.Anchor) is { IsError: true, Error: CellError.Spill }
+            ? EvalValue.Error(CellError.Spill)
+            : EvalValue.Error(CellError.Reference);
     }
 
     private EvalValue EvaluateName(NameNode node, EvaluationScope scope, IEvaluationContext ctx, int depth)

@@ -21,7 +21,6 @@ public sealed class DesignRulesTests
         ["PulseOffice.Documents.UI:FolioCanvas"] = "da dividere: gesti degli oggetti da condividere con Ledger e Deck (revisione 2026-10, resta)",
         ["PulseOffice.Sheets.Engine:CalculationEngine"] = "da dividere: grafo delle dipendenze e ricalcolo (revisione 2026-10, resta)",
         ["PulseOffice.Formats.Interchange:RtfReadSession"] = "da dividere per gruppi di parole di controllo (revisione 2026-10, resta)",
-        ["PulseOffice.Documents.UI:FolioEditor"] = "facciata dell'editor di Folio; i comandi che lo aggirano vanno riportati qui prima di dividerlo (revisione 2026-10, resta)",
     };
 
     private readonly IReadOnlyDictionary<string, string> statefulStaticClasses = new Dictionary<string, string>(StringComparer.Ordinal)

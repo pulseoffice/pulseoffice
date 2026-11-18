@@ -36,6 +36,11 @@ public static class Palette
         public const string Danger = "PulseDanger";
         public const string Warning = "PulseWarning";
         public const string Success = "PulseSuccess";
+
+        public const string Page = "PulsePage";
+        public const string PageInk = "PulsePageInk";
+        public const string PageGuide = "PulsePageGuide";
+        public const string PageSample = "PulsePageSample";
     }
 
     public static void Apply(Application application, bool dark)
@@ -91,6 +96,11 @@ public static class Palette
         (Keys.Danger, "#DC2626"),
         (Keys.Warning, "#D97706"),
         (Keys.Success, "#16A34A"),
+
+        (Keys.Page, "#FFFFFF"),
+        (Keys.PageInk, "#111827"),
+        (Keys.PageGuide, "#9CA3AF"),
+        (Keys.PageSample, "#E5E7EB"),
     ];
 
     private static readonly (string Key, string Color)[] Dark =
@@ -117,5 +127,10 @@ public static class Palette
         (Keys.Danger, "#F87171"),
         (Keys.Warning, "#FBBF24"),
         (Keys.Success, "#4ADE80"),
+
+        (Keys.Page, "#D5DAE1"),
+        (Keys.PageInk, "#111827"),
+        (Keys.PageGuide, "#6B7280"),
+        (Keys.PageSample, "#BCC3CD"),
     ];
 }

@@ -10,7 +10,7 @@ namespace PulseOffice.Documents.UI.Commands;
 
 public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEditing sections, IFolioForms forms, ITextCatalog texts,
     PulseOffice.Documents.Protection.IProtectionKeys keys, PulseOffice.UI.Controls.Services.IStatusBarService status,
-    IColumnLayoutEditors columns, ITabbedForms tabbed) : FolioCommandSet(context)
+    IColumnLayoutEditors columns, ITabbedForms tabbed, IFolioColumnLayouts layouts) : FolioCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -30,7 +30,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
         return
         [
             new TextField(prefix + "name", texts["folio.section.name"], settings.Name),
-            new ColumnLayoutField(prefix + "columnLayout", columnsTitle, new ColumnLayout(settings.Columns.Count, settings.Columns.Gap.ToCentimeters(), settings.Columns.Separator), "cm", columns)
+            new ColumnLayoutField(prefix + "columnLayout", columnsTitle, layouts.Layout(settings.Columns, 17), "cm", columns)
             {
                 Section = columnsTitle,
             },
@@ -50,9 +50,7 @@ public sealed class FolioSectionCommands(IActiveFolioContext context, ISectionEd
     {
         var layout = values.TryGetValue(prefix + "columnLayout", out var chosen) && chosen is ColumnLayout picked ? picked : new ColumnLayout(1, 1.25, false);
         var balanced = values.Flag(prefix + "balanced");
-        var sectionColumns = layout.Count <= 1 && !layout.Separator
-            ? SectionColumns.Single with { Balanced = balanced }
-            : new SectionColumns(Math.Clamp(layout.Count, 1, 10), Twip.FromCentimeters(layout.Gap)) { Separator = layout.Separator, Balanced = balanced }.KeepingSpansOf(before ?? SectionColumns.Single);
+        var sectionColumns = layouts.Columns(layout, balanced, before ?? SectionColumns.Single);
         return new SectionSettings(values.Text(prefix + "name").Trim() is { Length: > 0 } name ? name : fallback, sectionColumns, values.Flag(prefix + "protected"), values.Flag(prefix + "hidden"))
         {
             ProtectionKey = values.Text(prefix + "password") is { Length: > 0 } password ? keys.Digest(password) : previous,

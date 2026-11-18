@@ -309,23 +309,36 @@ public sealed class DialogHost : ContentControl, IDialogService, PulseOffice.UI.
     {
         if (!ReferenceEquals(_dialogPresenter?.Content, entry.Shell)) return;
 
-        if (entry.Content is not Visual root) return;
+        if (entry.Content is not Visual root || entry.Frame is not { } frame) return;
 
-        var candidates = root.GetVisualDescendants()
-            .OfType<InputElement>()
-            .Where(element => element.Focusable && element.IsEffectivelyEnabled && element.IsEffectivelyVisible)
-            .ToList();
+        if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Visual focused
+            && !ReferenceEquals(focused, frame) && frame.IsVisualAncestorOf(focused)) return;
 
-        var target = candidates.FirstOrDefault(element => element is TextBox { IsReadOnly: false })
-            ?? candidates.FirstOrDefault(element => element is SelectingItemsControl or ToggleButton or NumericUpDown or Slider);
+        var target = InitialTarget(root, frame);
 
         if (target is not null) target.Focus(NavigationMethod.Tab);
-        else if (entry.Frame is { } frame)
+        else
         {
             frame.Focusable = true;
             frame.Focus(NavigationMethod.Unspecified);
         }
     }
+
+    private static InputElement? InitialTarget(Visual content, Visual frame)
+    {
+        var inside = Reachable(content).ToList();
+
+        return inside.FirstOrDefault(element => element is TextBox { IsReadOnly: false })
+            ?? inside.FirstOrDefault(element => element is SelectingItemsControl or ToggleButton or NumericUpDown or Slider)
+            ?? Reachable(frame).OfType<Button>().FirstOrDefault(button => button.IsDefault)
+            ?? inside.FirstOrDefault(element => element is Button);
+    }
+
+    private static IEnumerable<InputElement> Reachable(Visual root) =>
+        root.GetVisualDescendants()
+            .OfType<InputElement>()
+            .Where(element => element.Focusable && element.IsEffectivelyEnabled && element.IsEffectivelyVisible
+                && KeyboardNavigation.GetIsTabStop(element));
 
     private void Build(DialogEntry entry, DesignTokens.Metrics metrics)
     {
@@ -611,6 +624,8 @@ public sealed class DialogHost : ContentControl, IDialogService, PulseOffice.UI.
             _backdrop.Opacity = 1;
         }
         if (_dialogPresenter is not null) _dialogPresenter.IsVisible = true;
+        var entry = collapsed.Entry;
+        Dispatcher.UIThread.Post(() => FocusInside(entry), DispatcherPriority.Loaded);
     }
 
     private sealed class Collapsed(DialogHost host, DialogEntry entry, Control bar, Border accent, Action interrupted) : IDisposable

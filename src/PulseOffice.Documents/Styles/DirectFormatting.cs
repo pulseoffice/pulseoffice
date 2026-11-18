@@ -187,6 +187,7 @@ public sealed class DirectFormatting : IDirectFormatting
         ListHeader = paragraph.ListHeader,
         PageStyleName = paragraph.PageStyleName,
         PageNumberRestart = paragraph.PageNumberRestart,
+        LineNumberRestart = paragraph.LineNumberRestart,
         NextPageStyleName = paragraph.NextPageStyleName,
     }.WithRuns([.. paragraph.Runs.Select(Clear)]);
 

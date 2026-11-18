@@ -50,7 +50,12 @@ internal sealed class OdtStyleLookup(OdtCharacterCodec characters, OdtParagraphC
         var character = characters.Read(text, context.FontFaces).Properties;
         var parent = (string?)style.Attribute(Style + "parent-style-name") is { } p ? context.StyleNames.Resolve(p) : null;
         var master = (string?)style.Attribute(Style + "master-page-name") is { Length: > 0 } m ? context.PageNames.Resolve(m) : null;
-        return new AutomaticParagraph(parent, paragraph, character, master, (string?)style.Attribute(Pt + "implied-page") == "true");
+        var lineNumber = (string?)style.Element(Style + "paragraph-properties")?.Attribute(Text + "line-number") is { } restart
+                         && int.TryParse(restart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value >= 1
+            ? Math.Min(value, 32_767)
+            : (int?)null;
+        return new AutomaticParagraph(parent, paragraph, character, master, (string?)style.Attribute(Pt + "implied-page") == "true",
+            lineNumber, (string?)style.Attribute(Pt + "implied-line-number") == "true");
     }
 
     public AutomaticText TextStyle(string? name, OdtReadContext context)
@@ -165,6 +170,12 @@ internal sealed class OdtParagraphReader(
         var properties = automatic.Paragraph with { PageStyleName = automatic.Implied ? null : automatic.Master };
         var paragraph = direct.Set(new TextParagraph(text) { StyleName = automatic.Parent }, properties).WithRuns(runs);
         if (runs.Count == 0) paragraph = paragraph with { Runs = [] };
+        if (automatic.LineNumber is { } lineNumber)
+        {
+            if (!automatic.LineNumberImplied) paragraph = paragraph with { LineNumberRestart = lineNumber };
+            else if (paragraph.PageStyleName is null && context.Document.LineNumbering is { Start: 1 } numbering)
+                context.Document.LineNumbering = numbering with { Start = lineNumber };
+        }
         if ((string?)element.Attribute(Pt + "next-master-page") is { Length: > 0 } deferred && paragraph.PageStyleName is null)
             paragraph = paragraph with { NextPageStyleName = context.PageNames.Resolve(deferred) };
 

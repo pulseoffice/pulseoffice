@@ -22,17 +22,11 @@ the round that fixes it is joined and the join run is green.
   opened such a chart here. (199)
 
 ## Folio
-- ODT carries the line numbering start value and the per-section restart only in our extension attributes on
-  `text:linenumbering-configuration`; other readers number continuously from 1. Line numbers restart where the page style
-  changes, so continuous Word sections with the same layout do not restart. (198)
-- The gutter is not in the page dialog (kept when the margins are edited); ODT stores it as our extension and folds it
-  into the margin for other readers. (198)
-- Columns of different widths have no editor: the page and section dialogs keep the widths only while the column count
-  is unchanged. (198)
-- A Word document mixing mirrored page styles with asymmetric non-mirrored ones still loses the mirroring (DOCX037);
-  reading `w:mirrorMargins` marks every page style mirrored, symmetric ones included. (198)
-- A change of the tracked-move colour or marks in the settings is drawn when a paragraph is laid out again; open
-  documents are not relaid out at once. (199)
+- DOCX writes a Folio line number restart only as a continuous Word section at the top level of the body with the
+  document's start value; restarts inside sections or tables, or with another value, are declared lost (DOCX248). (204)
+- The section dialog seeds and scales uneven column widths against a 17 cm text width: it does not know the text width
+  of the page the section sits on. (204)
+- `FolioEditor` is over 800 lines (927) and should be split. (204)
 - RTF has no Hiragana list numbering: Hiragana lists are written with Katakana numbers (RTF007). (199)
 
 ## Shell and formats
@@ -40,14 +34,31 @@ the round that fixes it is joined and the join run is green.
 
 ## Ledger
 
-- Round 200 (formula engine), not yet reviewed: XLOOKUP with an array lookup value (per-element results), spill ranges
-  moving with row and column edits, A1# references across XLSX `cm`/metadata and ODS round trips, iteration settings
-  with circular references, structured table references.
+- Round 205 (data tools), open: remove duplicates has no dialog (always no header, all columns; `KeyColumns` is never
+  set) and reports a protected sheet with the format-protection text; text to columns overwrites cells to the right
+  without asking; a left-to-right sort remembered on an AutoFilter is dropped (`AutoFilterState.Remember` checks the
+  column count only, the ODS reader keeps only downward sorts); XLSX `customList` items containing a comma split on
+  read; XLSX dynamic month/quarter filters (no stored bounds) are still dropped on read; the sort gate checks merges
+  as if the first row were a header (the engine then refuses silently when it is not).
+- Structured table references (`Table1[Column]`, `[@Column]`, `[#Totals]`) are resolved to absolute A1 ranges when
+  an XLSX is read and are not kept in the model: the formulas round-trip as A1 references, and renaming a table or a
+  column does not touch them. ODS has no structured references. (202)
+- XLOOKUP with an array lookup value and a multi-column return range keeps only the first column per element; check
+  what the other applications give (nested array). (202)
+- A1# on an anchor holding a single-value formula gives #REF!; check whether the other applications return the value.
+  (202)
+- The circular-reference status notice refreshes on selection and view changes, not on every recalculation (the
+  engine raises no event); entering a formula with Enter moves the selection, so the usual path is covered. (202)
 
 ## Accessibility
-- The border dialog's schema and the chart previews paint a fixed white canvas with black text in dark and
-  high-contrast themes (they mimic the page, but are not themed). (201)
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
-  the ribbon, dialogs or panels. (201)
-- Keyboard-only walk of every dialog (Tab order, focus on open and return to the editor) not yet done for this
-  round's area beyond the icon-only buttons. (201)
+  the ribbon, dialogs or panels, nor over the new polite live region of the status bar. (201, 203)
+- The ribbon has no key tips (Alt + letter badges on tabs and commands); it is reached with F6 and walked with the arrow
+  keys and Tab. (203)
+- The show's black, white and end screens and the slide number typed on the keypad are not announced to assistive
+  technology. (203)
+- Chart text is still drawn in fixed black by the chart renderer; on the dimmed dark-theme page token it reads, but a
+  high-contrast theme would need the renderer to take the page ink. (203)
+- Keyboard walk of the chart editor tabs, table look options, PDF export, page setup, find and replace, styles and
+  media options was done by reading the source against the shared DialogHost behaviour, not live with a virtual
+  display. (203)

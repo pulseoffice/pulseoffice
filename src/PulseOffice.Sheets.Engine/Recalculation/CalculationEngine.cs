@@ -309,6 +309,7 @@ public sealed class CalculationEngine
                 pass.Evaluating.Remove(cell);
             }
 
+            var multiValued = !context.ImplicitIntersection && IsMultiValued(result);
             var produced = Materialize(cell, result, context, pass.Spilled);
             if (pass.SelfReads.Remove(cell))
             {
@@ -317,7 +318,7 @@ public sealed class CalculationEngine
             }
             _values[cell] = produced;
             WriteBack(cell, produced);
-            RecordArrayUse(cell, context.UsedArrays);
+            RecordArrayUse(cell, context.UsedArrays || multiValued);
         }
         finally
         {
@@ -355,6 +356,13 @@ public sealed class CalculationEngine
     private static double Change(CellValue before, CellValue after) =>
         before.IsNumeric && after.IsNumeric ? Math.Abs(after.AsNumber() - before.AsNumber())
         : before.Equals(after) ? 0 : double.PositiveInfinity;
+
+    private static bool IsMultiValued(EvalValue result) => result switch
+    {
+        ArrayValue array => array.RowCount > 1 || array.ColumnCount > 1,
+        RangeValue range => !range.Range.IsSingleCell,
+        _ => false,
+    };
 
     private void RecordArrayUse(SheetCell cell, bool usedArrays)
     {
@@ -671,9 +679,14 @@ public sealed class CalculationEngine
         var affected = _graph.TransitiveDependents([.. touched, .. _volatile]).ToHashSet();
         affected.UnionWith(_volatile);
 
-        foreach (var (anchor, area) in _blockedSpills)
-            if (touched.Any(c => c.SheetIndex == anchor.SheetIndex && area.Contains(c.Address)))
-                affected.Add(anchor);
+        var unblocked = _blockedSpills
+            .Where(blocked => touched.Any(c => c.SheetIndex == blocked.Key.SheetIndex && blocked.Value.Contains(c.Address)))
+            .Select(blocked => blocked.Key).ToList();
+        if (unblocked.Count > 0)
+        {
+            affected.UnionWith(unblocked);
+            affected.UnionWith(_graph.TransitiveDependents(unblocked));
+        }
 
         Recalculate(affected);
     }

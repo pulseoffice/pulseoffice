@@ -80,7 +80,7 @@ public sealed class FolioCanvas : Control
         _scroll = scroll;
         Focusable = false;
         Cursor = new Cursor(StandardCursorType.Ibeam);
-        _editor.BrushChanged += (_, _) => Cursor = new Cursor(_editor.Brush is null ? StandardCursorType.Ibeam : StandardCursorType.Cross);
+        _editor.Brush.Changed += (_, _) => Cursor = new Cursor(_editor.Brush.Sample is null ? StandardCursorType.Ibeam : StandardCursorType.Cross);
         _blink = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Render, (_, _) =>
         {
             _caretShown = !_caretShown;
@@ -376,7 +376,7 @@ public sealed class FolioCanvas : Control
             e.Handled = true;
             return;
         }
-        if (e.ClickCount >= 2 && ObjectAt(point.Position) is { } framed && _editor.EnterFrame(framed.Box.ObjectId, PositionAt(point.Position)))
+        if (e.ClickCount >= 2 && ObjectAt(point.Position) is { } framed && _editor.Objects.EnterFrame(framed.Box.ObjectId, PositionAt(point.Position)))
         {
             e.Handled = true;
             return;
@@ -643,7 +643,7 @@ public sealed class FolioCanvas : Control
 
     private void UpdateCursor(Point point)
     {
-        var wanted = _editor.Brush is not null || Drawing ? StandardCursorType.Cross
+        var wanted = _editor.Brush.Sample is not null || Drawing ? StandardCursorType.Cross
             : !_editor.ReadOnly() && BoundaryAt(point) is not null ? StandardCursorType.SizeWestEast
             : StandardCursorType.Ibeam;
         if (_cursor == wanted) return;
@@ -704,7 +704,7 @@ public sealed class FolioCanvas : Control
             _column = null;
             e.Pointer.Capture(null);
             var current = column.Column < column.Table.Columns.Count ? column.Table.Columns[column.Column].ToPoints() : 0;
-            if (Math.Abs(column.Preview - column.Edge) > 0.5) _editor.ResizeColumn(column.Table, column.Column, current + column.Preview - column.Edge);
+            if (Math.Abs(column.Preview - column.Edge) > 0.5) _editor.Cells.ResizeColumn(column.Table, column.Column, current + column.Preview - column.Edge);
             InvalidateVisual();
             e.Handled = true;
             return;
@@ -732,7 +732,7 @@ public sealed class FolioCanvas : Control
         _dragging = false;
         _block = null;
         e.Pointer.Capture(null);
-        if (_editor.Brush is not null) _editor.PaintBrush();
+        if (_editor.Brush.Sample is not null) _editor.Brush.Paint();
         e.Handled = true;
     }
 
@@ -785,7 +785,7 @@ public sealed class FolioCanvas : Control
     {
         if (_editor.ReadOnly() || _editor.SelectedObjectIds.Count > 1 || _editor.SelectedObjectId is not { } id
             || _editor.Document.Objects.Find(id) is not { Content: PulseOffice.Documents.Objects.EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject shape } } item
-            || _editor.ObjectLocked(item))
+            || _editor.Objects.Locked(item))
             return null;
         if (_services.Objects.Find(_editor.DisplayLayout, id, out var index) is not { } box || index >= _arrangement.Pages.Count) return null;
         return (shape, new PulseOffice.UI.Controls.Shapes.AdjustFrame(new Rect(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height), item.RotationDegrees, item.FlipHorizontal, item.FlipVertical), _arrangement.Pages[index]);
@@ -834,10 +834,10 @@ public sealed class FolioCanvas : Control
                     (release.X - target.X) / Scale, (release.Y - target.Y) / Scale));
                 break;
             case PulseOffice.Drawing.Shapes.ObjectHandle.Rotate:
-                _editor.RotateSelectedObject(gesture.Rotation);
+                _editor.Objects.Rotate(gesture.Rotation);
                 break;
             default:
-                _editor.ResizeSelectedObject(new PulseOffice.Foundation.Units.DocumentSize(
+                _editor.Objects.Resize(new PulseOffice.Foundation.Units.DocumentSize(
                     PulseOffice.Foundation.Units.Twip.FromPoints(Math.Max(1, gesture.Preview.Width)), PulseOffice.Foundation.Units.Twip.FromPoints(Math.Max(1, gesture.Preview.Height))));
                 break;
         }

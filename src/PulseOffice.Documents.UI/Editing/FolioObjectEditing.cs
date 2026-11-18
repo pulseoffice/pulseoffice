@@ -59,7 +59,7 @@ public sealed class FolioObjectEditing(
 
     public bool Change(FolioEditor editor, Action<AnchoredObject> change)
     {
-        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.Objects.Locked(item)) return false;
         var probe = item.Clone();
         change(probe);
         if (probe.SameState(item)) return false;
@@ -69,7 +69,7 @@ public sealed class FolioObjectEditing(
 
     public bool Replace(FolioEditor editor, Func<EmbeddedObject, EmbeddedObject> change)
     {
-        if (editor.ReadOnly() || Selected(editor) is not { Content: EmbeddedContent embedded } item || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || Selected(editor) is not { Content: EmbeddedContent embedded } item || editor.Objects.Locked(item)) return false;
         var next = change(embedded.Value);
         if (Equals(next, embedded.Value)) return false;
         Swap(editor, item, item.CopyAs(item.Id, item.Anchor, embedded.With(next)), "replace-object");
@@ -96,7 +96,7 @@ public sealed class FolioObjectEditing(
 
     public bool Order(FolioEditor editor, ObjectOrder order)
     {
-        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.Objects.Locked(item)) return false;
         arrangement.Order(editor.Document, editor.History, item.Id, order);
         return Settle(editor, item.Id);
     }
@@ -173,7 +173,7 @@ public sealed class FolioObjectEditing(
         if (editor.ReadOnly()) return false;
         if (Selected(editor) is { } item)
         {
-            if (editor.ObjectLocked(item)) return false;
+            if (editor.Objects.Locked(item)) return false;
             captions.CaptionObject(editor.Document, editor.History, item.Id, request);
             editor.Normalize();
             editor.SelectObject(null);
@@ -192,14 +192,14 @@ public sealed class FolioObjectEditing(
 
     public bool Link(FolioEditor editor, string targetId)
     {
-        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.Document.Objects.Find(targetId) is not { } target || editor.ObjectLocked(item) || editor.ObjectLocked(target) || !chains.CanLink(editor.Document, item, target)) return false;
+        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.Document.Objects.Find(targetId) is not { } target || editor.Objects.Locked(item) || editor.Objects.Locked(target) || !chains.CanLink(editor.Document, item, target)) return false;
         linking.Link(editor.Document, editor.History, item.Id, targetId);
         return Settle(editor, item.Id);
     }
 
     public bool Unlink(FolioEditor editor)
     {
-        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.ObjectLocked(item) || !chains.Chained(editor.Document, item)) return false;
+        if (editor.ReadOnly() || Selected(editor) is not { } item || editor.Objects.Locked(item) || !chains.Chained(editor.Document, item)) return false;
         linking.Unlink(editor.Document, editor.History, item.Id);
         return Settle(editor, item.Id);
     }

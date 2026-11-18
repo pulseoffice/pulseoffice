@@ -21,8 +21,8 @@ public sealed class MediaView : UserControl, IDisposable
     private readonly ITextCatalog _texts;
     private readonly Lock _gate = new();
     private readonly Image _picture = new() { Stretch = Stretch.Uniform };
-    private readonly Button _toggle = new() { MinWidth = 36, Padding = new Thickness(6, 2), Focusable = false };
-    private readonly Slider _seek = new() { Minimum = 0, Maximum = 1, VerticalAlignment = VerticalAlignment.Center, Focusable = false };
+    private readonly Button _toggle = new() { MinWidth = 36, Padding = new Thickness(6, 2) };
+    private readonly Slider _seek = new() { Minimum = 0, Maximum = 1, VerticalAlignment = VerticalAlignment.Center, SmallChange = 0.05, LargeChange = 0.1 };
     private readonly Border _bar;
     private WriteableBitmap? _bitmap;
     private MediaFrame? _pending;
@@ -48,6 +48,12 @@ public sealed class MediaView : UserControl, IDisposable
             _moving = false;
             _session.SeekTo(_seek.Value);
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        _seek.KeyUp += (_, e) =>
+        {
+            if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+                _session.SeekTo(_seek.Value);
+        };
+        Avalonia.Automation.AutomationProperties.SetName(_seek, _texts["media.view.position"]);
 
         var controls = new DockPanel { LastChildFill = true, Margin = new Thickness(6, 4) };
         DockPanel.SetDock(_toggle, Dock.Left);
@@ -68,7 +74,9 @@ public sealed class MediaView : UserControl, IDisposable
         _picture.IsVisible = showsPicture;
 
         PointerEntered += (_, _) => _bar.Opacity = 1;
-        PointerExited += (_, _) => _bar.Opacity = showsPicture ? 0 : 1;
+        PointerExited += (_, _) => _bar.Opacity = showsPicture && !IsKeyboardFocusWithin ? 0 : 1;
+        GotFocus += (_, _) => _bar.Opacity = 1;
+        LostFocus += (_, _) => _bar.Opacity = showsPicture && !IsPointerOver && !IsKeyboardFocusWithin ? 0 : 1;
 
         _session.Playback.FrameReady += OnFrame;
         _session.Progress += OnProgress;
@@ -155,6 +163,8 @@ public sealed class MediaView : UserControl, IDisposable
     {
         var playing = _session.IsPlaying;
         _toggle.Content = playing ? PauseGlyph : PlayGlyph;
-        ToolTip.SetTip(_toggle, _texts[playing ? "media.view.pause" : "media.player.play"]);
+        var name = _texts[playing ? "media.view.pause" : "media.player.play"];
+        ToolTip.SetTip(_toggle, name);
+        Avalonia.Automation.AutomationProperties.SetName(_toggle, name);
     }
 }

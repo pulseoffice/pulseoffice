@@ -43,8 +43,8 @@ public sealed class FolioObjectTests
         Assert.False(Mover(scene).Move(scene.Editor, "o1", new ObjectDrop(0, 120, 300, 130, 310)));
         Assert.False(Mover(scene).Nudge(scene.Editor, "o1", 10, 10));
         Assert.False(Mover(scene).Reanchor(scene.Editor, "o1", ObjectAnchorKind.Paragraph));
-        Assert.False(scene.Editor.RotateSelectedObject(90));
-        Assert.False(scene.Editor.DeleteSelectedObject());
+        Assert.False(scene.Editor.Objects.Rotate(90));
+        Assert.False(scene.Editor.Objects.Delete());
         Assert.NotNull(scene.Document.Objects.Find("o1"));
 
         Assert.Equal(before, Item(scene).Placement);
@@ -112,7 +112,7 @@ public sealed class FolioObjectTests
     {
         var scene = Scene(id => new ParagraphAnchor(id));
 
-        Assert.True(scene.Editor.RotateSelectedObject(390));
+        Assert.True(scene.Editor.Objects.Rotate(390));
 
         Assert.Equal(30, Item(scene).RotationDegrees, 3);
         var box = scene.Services.GetRequiredService<IFolioObjectHits>().Find(scene.Editor.Layout, "o1", out _)!;

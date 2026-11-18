@@ -198,6 +198,7 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
         base.OnAttachedToVisualTree(e);
         _services.Context.Attach(_target);
         _services.Rulers.Layout.Changed += OnLayoutChanged;
+        _editor.MoveDisplay.Link();
         ApplyScrollBars();
         Announce();
         Avalonia.Threading.Dispatcher.UIThread.Post(FocusOnArrival, Avalonia.Threading.DispatcherPriority.Loaded);
@@ -212,6 +213,7 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
     {
         _services.Context.Detach(_target);
         _services.Rulers.Layout.Changed -= OnLayoutChanged;
+        _editor.MoveDisplay.Unlink();
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -233,7 +235,7 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
     {
         e.Handled = true;
         if (string.IsNullOrEmpty(e.Text) || e.Text.All(char.IsControl)) return;
-        if (_editor.SelectedObjectId is { } selected && !_editor.EnterFrame(selected, null)) return;
+        if (_editor.SelectedObjectId is { } selected && !_editor.Objects.EnterFrame(selected, null)) return;
         _editor.Type(e.Text);
     }
 
@@ -268,7 +270,7 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
         {
             if (e.Key is Key.Delete or Key.Back)
             {
-                _editor.DeleteSelectedObject();
+                _editor.Objects.Delete();
                 e.Handled = true;
                 return;
             }

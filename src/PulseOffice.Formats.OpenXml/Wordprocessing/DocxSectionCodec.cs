@@ -136,6 +136,11 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
         return style;
     }
 
+    public int? LineNumberRestart(W.SectionProperties section) =>
+        section.GetFirstChild<W.LineNumberType>() is { CountBy: not null, Restart.Value: var restart } lineNumbers && restart == W.LineNumberRestartValues.NewSection
+            ? values.Bounded((lineNumbers.Start?.Value ?? 0) + 1L, 1, LargestStart)
+            : null;
+
     public SectionColumns Columns(W.SectionProperties section)
     {
         var columns = section.GetFirstChild<W.Columns>();

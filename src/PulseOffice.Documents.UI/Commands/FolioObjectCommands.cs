@@ -51,10 +51,10 @@ public sealed class FolioObjectCommands(
             DefaultGesture = "Ctrl+Alt+Shift+O",
             EnabledWhen = _ => Editor is { } editor && (editor.Document.Objects.All.Count > 1 || editor.Document.Objects.All.Count == 1 && editor.SelectedObjectId is null),
         }, editor => cycle.Step(editor, 1)),
-        Action(Contextual("folio.object.delete", _ => true) with { DefaultGesture = null }, editor => editor.DeleteSelectedObject()),
+        Action(Contextual("folio.object.delete", _ => true) with { DefaultGesture = null }, editor => editor.Objects.Delete()),
         Action(Contextual("folio.object.originalSize", item => item.Content is EmbeddedContent embedded && embedded.Value.NaturalSize != item.Size), editor =>
         {
-            if (objects.Selected(editor) is { Content: EmbeddedContent embedded }) editor.ResizeSelectedObject(embedded.Value.NaturalSize);
+            if (objects.Selected(editor) is { Content: EmbeddedContent embedded }) editor.Objects.Resize(embedded.Value.NaturalSize);
         }),
         .. _anchors.Select(anchor => Action(Contextual($"folio.object.anchor.{anchor.Key}", item => anchor.Kind != ObjectAnchorKind.AsCharacter || item.Content is EmbeddedContent) with
         {

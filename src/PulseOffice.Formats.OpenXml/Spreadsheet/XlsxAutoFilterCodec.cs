@@ -28,6 +28,8 @@ internal sealed class XlsxAutoFilterCodec
 
     private readonly XlsxSortStateCodec _sorts = new();
 
+    private readonly XlsxDynamicFilterReader _dynamic = new();
+
     public AutoFilter? Build(Workbook workbook, Sheet sheet, XlsxConditionalMapper formats)
     {
         if (sheet.AutoFilter.Range is not { } range) return null;
@@ -112,6 +114,8 @@ internal sealed class XlsxAutoFilterCodec
                 };
             else if (column.GetFirstChild<Top10>() is { } top)
                 filter = filter with { Top = new TopItemsCriterion(top.Top?.Value == false, top.Percent?.Value == true, top.Val?.Value is { } count && double.IsFinite(count) ? Math.Clamp(count, 0, 1048576) : 10) };
+            else if (column.GetFirstChild<DynamicFilter>() is { } dynamic)
+                filter = _dynamic.Apply(filter, dynamic);
             else if (column.GetFirstChild<CustomFilters>() is { } customs)
             {
                 var conditions = new List<string>();

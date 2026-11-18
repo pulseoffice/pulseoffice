@@ -42,10 +42,10 @@ public sealed class CountingLineNumbers : PulseOffice.Documents.Layout.Queries.I
 
     public int Passes { get; private set; }
 
-    public IReadOnlyDictionary<PulseOffice.Documents.Layout.Tree.LineBox, int> Number(PulseOffice.Documents.Layout.Tree.DocumentLayout layout, PulseOffice.Documents.Styles.LineNumbering numbering)
+    public IReadOnlyDictionary<PulseOffice.Documents.Layout.Tree.LineBox, int> Number(PulseOffice.Documents.Layout.Tree.DocumentLayout layout, PulseOffice.Documents.Styles.LineNumbering numbering, IReadOnlyDictionary<string, int> restarts)
     {
         Passes++;
-        return _inner.Number(layout, numbering);
+        return _inner.Number(layout, numbering, restarts);
     }
 }
 
@@ -104,11 +104,11 @@ public sealed class FolioUiRound4Tests
         var scene = new FolioScene();
         scene.Type("Testo libero");
         var before = scene.Document.Body.Blocks.OfType<ParagraphBlock>().First().Content;
-        scene.Editor.Arm(BoldSample());
+        scene.Editor.Brush.Arm(BoldSample());
         scene.Editor.SelectAll();
         scene.Document.Protection = new DocumentProtection(DocumentRestriction.ReadOnly, null);
 
-        Assert.False(scene.Editor.PaintBrush());
+        Assert.False(scene.Editor.Brush.Paint());
 
         Assert.Equal(before, scene.Document.Body.Blocks.OfType<ParagraphBlock>().First().Content);
     }, CancellationToken.None);
@@ -118,10 +118,10 @@ public sealed class FolioUiRound4Tests
     {
         var scene = Sandwich();
         var before = Closed(scene).Content;
-        scene.Editor.Arm(BoldSample());
+        scene.Editor.Brush.Arm(BoldSample());
         scene.Editor.Select(new DocumentPosition("primo", 0), new DocumentPosition("ultimo", 6));
 
-        Assert.False(scene.Editor.PaintBrush());
+        Assert.False(scene.Editor.Brush.Paint());
 
         Assert.Equal(before, Closed(scene).Content);
     }, CancellationToken.None);
@@ -150,7 +150,7 @@ public sealed class FolioUiRound4Tests
         scene.Type("Testo");
         scene.Document.LineNumbering = new PulseOffice.Documents.Styles.LineNumbering();
         var numbers = new CountingLineNumbers();
-        var marks = new PulseOffice.Documents.UI.Rendering.FolioLineNumberMarks(numbers);
+        var marks = new PulseOffice.Documents.UI.Rendering.FolioLineNumberMarks(numbers, new PulseOffice.Documents.Blocks.BlockTree());
         var layout = scene.Editor.Layout;
 
         for (var frame = 0; frame < 4; frame++) marks.Apply(PulseOffice.Documents.UI.Rendering.PageMarks.None, scene.Document, layout);

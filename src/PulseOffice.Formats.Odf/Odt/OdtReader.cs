@@ -322,9 +322,17 @@ internal sealed class OdtDocumentReader(
                 {
                     firstParagraph = false;
                     if (!context.Ours) InitialPage(body[start], element, context);
+                    LineNumberStart(body[start], context);
                 }
             }
         }
+    }
+
+    private void LineNumberStart(Block first, OdtReadContext context)
+    {
+        if (first is not ParagraphBlock { Content.LineNumberRestart: { } start } paragraph || context.Document.LineNumbering is not { Start: 1 } numbering) return;
+        context.Document.LineNumbering = numbering with { Start = start };
+        paragraph.Content = paragraph.Content with { LineNumberRestart = null };
     }
 
     private void InitialPage(Block first, XElement element, OdtReadContext context)

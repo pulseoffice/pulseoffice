@@ -1,10 +1,15 @@
 using PulseOffice.Localization;
+using PulseOffice.Sheets.Engine.Recalculation;
 using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Sheets.UI.LedgerViewParts;
 
-internal sealed class LedgerStatusSegments(IStatusBarService status, ITextCatalog texts, SheetSelection selection, ISelectionSummary summary)
+internal sealed class LedgerStatusSegments(
+    IStatusBarService status, ITextCatalog texts, SheetSelection selection, ISelectionSummary summary, CalculationEngine engine)
 {
+    private readonly CircularReferenceReport _circularReport = new();
+    private readonly StatusSegment _circular = status.Register("ledger.circular", StatusSegmentKind.Contextual);
+
     private readonly StatusSegment _summary = status.Register("ledger.summary", StatusSegmentKind.Contextual);
     private readonly StatusSegment _zoom = status.Register("ledger.zoom", StatusSegmentKind.Contextual);
 
@@ -19,6 +24,7 @@ internal sealed class LedgerStatusSegments(IStatusBarService status, ITextCatalo
     {
         _summary.IsVisible = false;
         _zoom.IsVisible = false;
+        _circular.IsVisible = false;
     }
 
     public void ShowZoom(double zoom)
@@ -29,6 +35,7 @@ internal sealed class LedgerStatusSegments(IStatusBarService status, ITextCatalo
 
     public void UpdateSummary(Worksheet sheet)
     {
+        UpdateCircular();
         if (selection.IsSingleCell)
         {
             _summary.Text = string.Empty;
@@ -40,5 +47,12 @@ internal sealed class LedgerStatusSegments(IStatusBarService status, ITextCatalo
         _summary.Text = totals.Numbers == 0
             ? texts.Format("status.summary.count", totals.Filled)
             : texts.Format("status.summary.full", totals.Sum, totals.Average, totals.Filled);
+    }
+
+    private void UpdateCircular()
+    {
+        var first = _circularReport.FirstCell(engine);
+        _circular.Text = first is null ? string.Empty : texts.Format("status.circular", first);
+        _circular.IsVisible = first is not null;
     }
 }

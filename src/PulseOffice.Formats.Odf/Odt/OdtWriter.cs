@@ -191,6 +191,7 @@ internal sealed class OdtDocumentWriter(
         if (document.IsMaster || mimeType == OdtMimeTypes.TextMaster) text.Add(new XAttribute(Text + "global", "true"));
         text.Add(new XAttribute(Pt + "initial-page-style", document.InitialPageStyle));
         if (document.InitialPageStyle != DefaultStyleNames.Standard) session.ImpliedInitialPage = document.InitialPageStyle;
+        if (document.LineNumbering is { Start: > 1 } numbering) session.ImpliedLineNumberStart = numbering.Start;
 
         var declarations = new List<XElement>();
         if (document.Variables.Count > 0)
@@ -225,6 +226,7 @@ internal sealed class OdtDocumentWriter(
             content.Add(marks.Unmarked(item, session.ContentStyles, session, blocks));
         blocks.Write(content, document.Body.Blocks, session.ContentStyles, session);
         session.ImpliedInitialPage = null;
+        session.ImpliedLineNumberStart = null;
 
         if ((drawings.Forms(document.FormSettings, session)
             ?? new OdfFormControlMapper().SettingsOnly(document.FormSettings, "Form")) is { } forms)

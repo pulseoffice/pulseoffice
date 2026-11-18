@@ -11,6 +11,8 @@ public sealed record GoalSeekRequest(SheetCell Formula, SheetCell Variable, doub
     public int MaximumIterations { get; init; } = 100;
 
     public double InitialStep { get; init; } = 1;
+
+    public bool Reaches(double difference) => Math.Abs(difference) <= Tolerance * Math.Max(1, Math.Abs(Target));
 }
 
 public sealed record GoalSeekOutcome(bool Found, double Value, double Reached, int Iterations)
@@ -61,7 +63,7 @@ public sealed class GoalSeek : IGoalSeek
         if (first is not { } f0)
             return new GoalSeekOutcome(false, start, double.NaN, 0);
 
-        if (Math.Abs(f0) <= request.Tolerance)
+        if (request.Reaches(f0))
             return new GoalSeekOutcome(true, x0, f0 + request.Target, 0);
 
         for (var iteration = 1; iteration <= request.MaximumIterations; iteration++)
@@ -69,7 +71,7 @@ public sealed class GoalSeek : IGoalSeek
             if (Evaluate(engine, request, x1) is not { } f1)
                 return new GoalSeekOutcome(false, x1, double.NaN, iteration);
 
-            if (Math.Abs(f1) <= request.Tolerance)
+            if (request.Reaches(f1))
                 return new GoalSeekOutcome(true, x1, f1 + request.Target, iteration);
 
             var slope = f1 - f0;
@@ -95,7 +97,7 @@ public sealed class GoalSeek : IGoalSeek
         var reached = Evaluate(engine, request, x1);
 
         return new GoalSeekOutcome(
-            reached is { } last && Math.Abs(last) <= request.Tolerance,
+            reached is { } last && request.Reaches(last),
             x1,
             reached is { } value ? value + request.Target : double.NaN,
             request.MaximumIterations);

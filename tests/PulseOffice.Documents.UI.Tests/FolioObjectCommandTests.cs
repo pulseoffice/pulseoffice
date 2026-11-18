@@ -132,7 +132,7 @@ public sealed class FolioObjectCommandTests
         objects.InsertTextFrame(scene.Editor, new DocumentSize(Twip.FromCentimeters(5), Twip.FromCentimeters(2)));
         var frame = scene.Editor.SelectedObjectId!;
 
-        Assert.True(scene.Editor.EnterFrame(frame, null));
+        Assert.True(scene.Editor.Objects.EnterFrame(frame, null));
         scene.Editor.Type("dentro");
 
         var box = (TextBoxContent)scene.Document.Objects.Find(frame)!.Content;
@@ -141,7 +141,7 @@ public sealed class FolioObjectCommandTests
         Assert.Null(scene.Editor.SelectedObjectId);
         Shape(scene);
         var shape = scene.Editor.SelectedObjectId!;
-        Assert.True(scene.Editor.EnterFrame(shape, null));
+        Assert.True(scene.Editor.Objects.EnterFrame(shape, null));
         scene.Editor.Type("forma");
 
         var story = scene.Document.Objects.Find(shape)!.Content.Story!;

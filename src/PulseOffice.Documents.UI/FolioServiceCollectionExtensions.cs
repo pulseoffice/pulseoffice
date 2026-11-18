@@ -171,6 +171,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<IFolioParagraphDialog, FolioParagraphDialog>();
         services.AddSingleton<FolioDialogCommands>();
         services.AddSingleton<IFolioListForms, FolioListForms>();
+        services.AddSingleton<IFolioColumnLayouts, FolioColumnLayouts>();
         services.AddSingleton<FolioPageServices>();
         services.AddSingleton<IFolioPageTabs, FolioPageTabs>();
         services.AddSingleton<IFolioPageDialog, FolioPageDialog>();

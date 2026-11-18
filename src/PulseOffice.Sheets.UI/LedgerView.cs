@@ -233,7 +233,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
             ShowContextMenu("sheet", new Rect(_sheetTabs.Bounds.Width / 2, 0, 1, _sheetTabs.Bounds.Height));
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
-        _segments = new LedgerStatusSegments(_status, _texts, _selection, new SelectionSummary());
+        _segments = new LedgerStatusSegments(_status, _texts, _selection, new SelectionSummary(), _engine);
 
         _overlay.Children.Add(_editing.CellEditor);
         _overlay.Children.Add(_shapeText.Editor);

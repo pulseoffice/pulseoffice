@@ -267,6 +267,8 @@ public sealed record TextParagraph(string Text)
 
     public int? PageNumberRestart { get; init; }
 
+    public int? LineNumberRestart { get; init; }
+
     public string? NextPageStyleName { get; init; }
 
     public IReadOnlyList<TabStop>? TabStops { get; init; }

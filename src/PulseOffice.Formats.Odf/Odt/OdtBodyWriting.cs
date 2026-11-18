@@ -101,7 +101,19 @@ internal sealed class OdtParagraphWriter(
         session.ImpliedInitialPage = null;
         var master = properties.PageStyleName ?? implied;
 
+        var impliedStart = session.ImpliedLineNumberStart;
+        session.ImpliedLineNumberStart = null;
+        var impliedLineNumber = content.LineNumberRestart is null
+            ? impliedStart ?? (session.Document.LineNumbering is { RestartEachSection: true } numbering && properties.PageStyleName is not null ? (int?)numbering.Start : null)
+            : null;
+        var lineNumber = content.LineNumberRestart ?? impliedLineNumber;
+
         var paragraphElement = codec.Paragraph(properties);
+        if (lineNumber is { } restart)
+        {
+            paragraphElement ??= new XElement(Style + "paragraph-properties");
+            paragraphElement.Add(new XAttribute(Text + "line-number", restart));
+        }
         var textProperties = codec.Hyphenation(properties).Concat(inline.MarkAttributes(block, session)).ToList();
         var parent = content.StyleName is null ? null : names.Encode(content.StyleName);
         string? styleName = parent;
@@ -111,6 +123,7 @@ internal sealed class OdtParagraphWriter(
             [
                 master is null ? null : new XAttribute(Style + "master-page-name", names.Encode(master)),
                 implied is not null && properties.PageStyleName is null ? new XAttribute(Pt + "implied-page", "true") : null,
+                impliedLineNumber is not null ? new XAttribute(Pt + "implied-line-number", "true") : null,
                 paragraphElement,
                 textProperties.Count > 0 ? new XElement(Style + "text-properties", textProperties) : null,
             ], "P");

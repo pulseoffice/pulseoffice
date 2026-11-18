@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:spectrum="using:PulseOffice.UI.Controls.Spectrum"
         x:Class="PulseOffice.UI.Controls.Theming.PulseTheme">
 
 
@@ -13,7 +14,7 @@
     </Setter>
   </Style>
 
-  <Style Selector="MenuItem, CheckBox, RadioButton, ToggleSwitch, ComboBox, Slider">
+  <Style Selector="MenuItem, CheckBox, RadioButton, ToggleSwitch, ComboBox, Slider, :is(spectrum|SpectrumSurface)">
     <Setter Property="FocusAdorner">
       <FocusAdornerTemplate>
         <Border BorderThickness="2" BorderBrush="{DynamicResource PulseAccent}" CornerRadius="4" />

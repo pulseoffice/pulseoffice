@@ -150,6 +150,11 @@ public sealed class StatusBarView : ContentControl
                     : Palette.Keys.TextSecondary);
 
             ToolTip.SetTip(block, segment.Tooltip ?? segment.Text);
+            if (segment.Kind == StatusSegmentKind.Transient)
+            {
+                Avalonia.Automation.AutomationProperties.SetName(block, segment.Text);
+                Avalonia.Automation.AutomationProperties.SetLiveSetting(block, Avalonia.Automation.AutomationLiveSetting.Polite);
+            }
             Control shown = block;
             if (segment.CommandId is { Length: > 0 } commandId)
             {

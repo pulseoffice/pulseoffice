@@ -47,7 +47,7 @@ public sealed class Round198FolioPageQueueTests
         f.Add("uno");
         f.Add("due", p => p with { PageStyleName = "Other" });
 
-        var numbers = new PulseOffice.Documents.Layout.Queries.LineNumbers().Number(f.Layout(), new LineNumbering(1) { RestartEachSection = true, Start = 5 });
+        var numbers = new PulseOffice.Documents.Layout.Queries.LineNumbers().Number(f.Layout(), new LineNumbering(1) { RestartEachSection = true, Start = 5 }, new Dictionary<string, int>());
 
         Assert.Equal([5, 5], numbers.Values.Order());
     }

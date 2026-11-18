@@ -96,7 +96,7 @@ public sealed class FolioPanelProtectionTests
         var before = block.Columns[0];
         Protect(scene);
 
-        Assert.False(scene.Editor.ResizeColumn(block, 0, before.ToPoints() + 40));
+        Assert.False(scene.Editor.Cells.ResizeColumn(block, 0, before.ToPoints() + 40));
 
         Assert.Equal(before, scene.Document.Body.Blocks.OfType<TableBlock>().First().Columns[0]);
     }, CancellationToken.None);

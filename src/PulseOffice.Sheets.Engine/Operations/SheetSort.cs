@@ -47,6 +47,8 @@ public interface ISheetSort
         SortOrientation orientation = SortOrientation.TopToBottom);
 
     bool Splits(Worksheet sheet, CellRange range, bool hasHeader);
+
+    bool BreaksMerges(Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom);
 }
 
 public sealed class SheetSorter : ISheetSort
@@ -71,7 +73,7 @@ public sealed class SheetSorter : ISheetSort
         ArgumentNullException.ThrowIfNull(sheet);
         ArgumentNullException.ThrowIfNull(keys);
         var axis = new SortAxis(orientation == SortOrientation.LeftToRight);
-        if (keys.Count == 0 || axis.Lines(range) < 2 || Splits(sheet, range, hasHeader, axis)) return;
+        if (keys.Count == 0 || axis.Lines(range) < 2 || Splits(sheet, range, hasHeader, axis) || BreaksMerges(sheet, range, hasHeader, axis)) return;
         if (Occupied(sheet, range) is not { } occupied) return;
         range = occupied;
 
@@ -135,6 +137,10 @@ public sealed class SheetSorter : ISheetSort
         public CellAddress WithLine(CellAddress address, int line) =>
             acrossColumns ? new CellAddress(address.Row, line) : new CellAddress(line, address.Column);
 
+        public CellRange From(CellRange range, int line) => acrossColumns
+            ? new CellRange(new CellAddress(range.Start.Row, line), range.End)
+            : new CellRange(new CellAddress(line, range.Start.Column), range.End);
+
         public (int Rows, int Columns) Delta(int lines) => acrossColumns ? (0, lines) : (lines, 0);
     }
 
@@ -161,6 +167,18 @@ public sealed class SheetSorter : ISheetSort
                 if (cell.IsPartOfArrayFormula || cell.IsSpilled || cell.SpillRange is not null) return true;
             }
         return false;
+    }
+
+    public bool BreaksMerges(Worksheet sheet, CellRange range, bool hasHeader, SortOrientation orientation = SortOrientation.TopToBottom) =>
+        BreaksMerges(sheet, range, hasHeader, new SortAxis(orientation == SortOrientation.LeftToRight));
+
+    private bool BreaksMerges(Worksheet sheet, CellRange range, bool hasHeader, SortAxis axis)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        if (sheet.Merges.Count == 0 || Occupied(sheet, range) is not { } occupied) return false;
+        var lines = new CellRange(range.Start, axis.WithLine(range.End, axis.LastLine(occupied)));
+        var first = axis.FirstLine(lines) + (hasHeader ? 1 : 0);
+        return first <= axis.LastLine(lines) && sheet.Merges.Overlapping(axis.From(lines, first)).Any();
     }
 
     private CellRange? Occupied(Worksheet sheet, CellRange range)
@@ -258,7 +276,7 @@ public sealed class SheetSorter : ISheetSort
                 if (first >= 0 && second >= 0) return first.CompareTo(second);
             }
 
-            if (a.IsNumeric && b.IsNumeric) return a.AsNumber().CompareTo(b.AsNumber());
+            if (a.Kind == b.Kind && a.Kind is ValueKind.Number or ValueKind.Boolean) return a.AsNumber().CompareTo(b.AsNumber());
 
             if (a.Kind == ValueKind.Text && b.Kind == ValueKind.Text)
                 return compare.Compare(a.AsText(), b.AsText(), key.CaseSensitive ? CompareOptions.None : CompareOptions.IgnoreCase);
@@ -279,10 +297,11 @@ public sealed class SheetSorter : ISheetSort
 
         private int Rank(CellValue value) => value.Kind switch
         {
-            ValueKind.Number or ValueKind.Boolean => 0,
+            ValueKind.Number => 0,
             ValueKind.Text => 1,
-            ValueKind.Empty => 3,
-            _ => 2,
+            ValueKind.Boolean => 2,
+            ValueKind.Empty => 4,
+            _ => 3,
         };
     }
 }

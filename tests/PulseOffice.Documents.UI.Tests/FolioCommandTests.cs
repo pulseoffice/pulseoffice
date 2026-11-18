@@ -49,7 +49,7 @@ public sealed class FolioCommandTests
             .. new FolioObjectCommands(active, services.GetRequiredService<IFolioObjectEditing>(), services.GetRequiredService<IFolioObjectMover>(), null!, services.GetRequiredService<PulseOffice.Documents.Editing.ICaptions>(), services.GetRequiredService<PulseOffice.Documents.Objects.IFrameChains>(), services.GetRequiredService<IFolioObjectCycle>()).GetCommands(),
             .. new FolioListCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.IListEditing>(), null!, null!, null!).GetCommands(),
             .. new FolioStyleCommands(active, null!, null!, null!, null!, null!, null!, null!, null!).GetCommands(),
-            .. new FolioSectionCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.ISectionEditing>(), null!, null!, null!, null!, null!, null!).GetCommands(),
+            .. new FolioSectionCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.ISectionEditing>(), null!, null!, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioViewCommands(active, services.GetRequiredService<FolioViewCommandServices>()).GetCommands(),
             .. new FolioToolCommands(active, services.GetRequiredService<FolioToolServices>()).GetCommands(),
             .. new FolioClipboardCommands(active, services.GetRequiredService<PulseOffice.Exchange.IObjectExchange>(), services.GetRequiredService<PulseOffice.Documents.Editing.Tables.ITablePasting>(), null!).GetCommands(),
@@ -208,7 +208,7 @@ public sealed class FolioCommandTests
         Assert.Equal(FolioContextMenus.ObjectRoot, new FolioContextMenus(null!, scene.Services.GetRequiredService<ITableEditing>(), new PulseOffice.UI.Controls.Services.ContextMenuKey()).RootFor(scene.Editor));
 
         var bigger = size with { Width = PulseOffice.Foundation.Units.Twip.FromCentimeters(8) };
-        Assert.True(scene.Editor.ResizeSelectedObject(bigger));
+        Assert.True(scene.Editor.Objects.Resize(bigger));
         Assert.True(Enabled(scene, "folio.object.originalSize"));
         Run(scene, "folio.object.originalSize");
         Assert.Equal(size, scene.Document.Objects.Find("o1")!.Size);
@@ -381,12 +381,12 @@ public sealed class FolioTableCommandTests
         var table = Table(scene, 1, 2);
         scene.Editor.Select(new DocumentPosition(Paragraph(table, 0, 0).Id, 0), new DocumentPosition(Paragraph(table, 0, 0).Id, 0));
 
-        Assert.True(scene.Editor.MoveToCell(false));
+        Assert.True(scene.Editor.Cells.MoveToCell(false));
         Assert.Equal(Paragraph(table, 0, 1).Id, scene.Editor.Caret.ParagraphId);
-        Assert.True(scene.Editor.MoveToCell(false));
+        Assert.True(scene.Editor.Cells.MoveToCell(false));
         Assert.Equal(2, table.Rows.Count);
         Assert.Equal(Paragraph(table, 1, 0).Id, scene.Editor.Caret.ParagraphId);
-        Assert.True(scene.Editor.MoveToCell(true));
+        Assert.True(scene.Editor.Cells.MoveToCell(true));
         Assert.Equal(Paragraph(table, 0, 1).Id, scene.Editor.Caret.ParagraphId);
     }, CancellationToken.None);
 

@@ -128,22 +128,28 @@ public interface IFolioLineNumberMarks
     PageMarks Apply(PageMarks marks, TextDocument document, DocumentLayout layout);
 }
 
-public sealed class FolioLineNumberMarks(PulseOffice.Documents.Layout.Queries.ILineNumbers numbers) : IFolioLineNumberMarks
+public sealed class FolioLineNumberMarks(PulseOffice.Documents.Layout.Queries.ILineNumbers numbers, PulseOffice.Documents.Blocks.IBlockTree tree) : IFolioLineNumberMarks
 {
-    private (DocumentLayout Layout, PulseOffice.Documents.Styles.LineNumbering Numbering, IReadOnlyDictionary<LineBox, int> Table)? _last;
+    private (DocumentLayout Layout, PulseOffice.Documents.Styles.LineNumbering Numbering, IReadOnlyDictionary<string, int> Restarts, IReadOnlyDictionary<LineBox, int> Table)? _last;
 
     public PageMarks Apply(PageMarks marks, TextDocument document, DocumentLayout layout)
     {
         if (document.LineNumbering is not { } numbering) return marks;
-        var table = Table(layout, numbering);
+        var table = Table(layout, numbering, Restarts(document));
         return marks with { Numbering = numbering, LineNumber = line => table.TryGetValue(line, out var number) ? number : null };
     }
 
-    private IReadOnlyDictionary<LineBox, int> Table(DocumentLayout layout, PulseOffice.Documents.Styles.LineNumbering numbering)
+    private Dictionary<string, int> Restarts(TextDocument document) =>
+        tree.Paragraphs(document.Body)
+            .Where(paragraph => paragraph.Content.LineNumberRestart is not null)
+            .ToDictionary(paragraph => paragraph.Id, paragraph => paragraph.Content.LineNumberRestart!.Value, StringComparer.Ordinal);
+
+    private IReadOnlyDictionary<LineBox, int> Table(DocumentLayout layout, PulseOffice.Documents.Styles.LineNumbering numbering, IReadOnlyDictionary<string, int> restarts)
     {
-        if (_last is { } last && ReferenceEquals(last.Layout, layout) && last.Numbering == numbering) return last.Table;
-        var table = numbers.Number(layout, numbering);
-        _last = (layout, numbering, table);
+        if (_last is { } last && ReferenceEquals(last.Layout, layout) && last.Numbering == numbering && last.Restarts.Count == restarts.Count
+            && last.Restarts.All(pair => restarts.TryGetValue(pair.Key, out var value) && value == pair.Value)) return last.Table;
+        var table = numbers.Number(layout, numbering, restarts);
+        _last = (layout, numbering, restarts, table);
         return table;
     }
 }

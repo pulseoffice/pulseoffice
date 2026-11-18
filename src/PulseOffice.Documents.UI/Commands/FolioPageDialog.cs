@@ -52,7 +52,8 @@ public sealed record FolioPageServices(
     IPageSketchLayout Sketches,
     ITextFormatPreviews Previews,
     IIconCatalog Icons,
-    ITextCatalog Texts);
+    ITextCatalog Texts,
+    IFolioColumnLayouts ColumnLayouts);
 
 public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
 {
@@ -106,6 +107,8 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
                         Mirrored = style.Usage == PageUsage.Mirrored,
                     },
                     Centimetres, true, services.Margins) { Section = margins },
+                new NumberField("gutter", texts["folio.page.gutter"], style.Gutter.ToCentimeters(), 0, 10, 0.05) { Unit = Centimetres, Section = margins },
+                new ChoiceField("gutterPosition", texts["folio.page.gutter.position"], [texts["folio.page.gutter.left"], texts["folio.page.gutter.top"]], style.GutterAtTop ? 1 : 0) { Section = margins },
                 new ChoiceField("usage", texts["folio.page.usage"], [.. _usages.Select(usage => texts[$"folio.page.usage.{usage.ToString().ToLowerInvariant()}"])], Math.Max(0, Array.IndexOf(_usages, style.Usage))) { Section = layout },
                 new ChoiceField("numbers", texts["folio.page.numbers"], [.. _numbers.Select(item => texts[$"folio.list.format.{item.ToString().ToLowerInvariant()}"])], Math.Max(0, Array.IndexOf(_numbers, style.NumberFormat))) { Section = layout },
                 new ChoiceField("next", texts["folio.page.next"], [texts["folio.styles.same"], .. others], style.NextStyleName is { } next ? others.ToList().IndexOf(next) + 1 : 0) { Section = layout },
@@ -124,7 +127,7 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
             Previewed(Region("footer", style.Footer, texts["folio.page.tab.footer"], []), style),
             Previewed(new FormTab(texts["folio.page.tab.columns"], texts["folio.page.columns.explanation"],
             [
-                new ColumnLayoutField("columnLayout", texts["folio.page.tab.columns"], new ColumnLayout(style.Columns.Count, style.Columns.Gap.ToCentimeters(), style.Columns.Separator), Centimetres, services.Columns),
+                new ColumnLayoutField("columnLayout", texts["folio.page.tab.columns"], services.ColumnLayouts.Layout(style.Columns, TextWidth(style)), Centimetres, services.Columns),
             ]), style),
             Previewed(new FormTab(texts["folio.page.tab.watermark"], texts["folio.page.watermark.explanation"],
             [
@@ -146,6 +149,9 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
         var (left, right) = Fit(margins.Left, margins.Right, style.Width.ToCentimeters());
         var (top, bottom) = Fit(margins.Top, margins.Bottom, style.Height.ToCentimeters());
         style.Margins = new Margins(Twip.FromCentimeters(left), Twip.FromCentimeters(top), Twip.FromCentimeters(right), Twip.FromCentimeters(bottom));
+        var (gutter, atTop) = Gutter(style, values);
+        style.GutterAtTop = atTop;
+        style.Gutter = Twip.FromCentimeters(Math.Min(gutter, Math.Max(0, (atTop ? style.Height.ToCentimeters() - top - bottom : style.Width.ToCentimeters() - left - right) - MinimumBody)));
         style.Usage = margins.Mirrored ? PageUsage.Mirrored : _usages[values.Choice("usage", _usages.Length)];
         style.NumberFormat = _numbers[values.Choice("numbers", _numbers.Length)];
         var next = values.Choice("next", others.Count + 1);
@@ -157,9 +163,7 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
         style.FirstPageDifferent = values.Flag("firstDifferent");
         style.EvenPagesDifferent = values.Flag("evenDifferent");
         var columns = Columns(style, values);
-        style.Columns = columns.Count <= 1 && !columns.Separator
-            ? SectionColumns.Single
-            : new SectionColumns(Math.Clamp(columns.Count, 1, 10), Twip.FromCentimeters(columns.Gap)) { Separator = columns.Separator }.KeepingSpansOf(style.Columns);
+        style.Columns = services.ColumnLayouts.Columns(columns, style.Columns.Balanced, style.Columns);
         style.Watermark = values.Text("mark").Trim() is { Length: > 0 } text
             ? new PageWatermark(text)
             {
@@ -178,10 +182,11 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
         var (width, height) = Size(style, values);
         var margins = Margins(style, values);
         var columns = Columns(style, values);
+        var (gutter, atTop) = Gutter(style, values);
         return new PageSketch(width, height)
         {
             Orientation = values.Choice("orientation", 2) == 1 ? PageSketchOrientation.Landscape : PageSketchOrientation.Portrait,
-            Margins = new PageSketchMargins(margins.Left, margins.Top, margins.Right, margins.Bottom),
+            Margins = new PageSketchMargins(margins.Left + (atTop ? 0 : gutter), margins.Top + (atTop ? gutter : 0), margins.Right, margins.Bottom),
             Header = Band("header", style.Header, values),
             Footer = Band("footer", style.Footer, values),
             Columns = Math.Clamp(columns.Count, 1, 10),
@@ -215,10 +220,20 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
             ? chosen
             : new PageMargins(style.Margins.Top.ToCentimeters(), style.Margins.Bottom.ToCentimeters(), style.Margins.Left.ToCentimeters(), style.Margins.Right.ToCentimeters());
 
+    private (double Width, bool AtTop) Gutter(PageStyle style, IReadOnlyDictionary<string, object> values) =>
+        (Math.Max(0, values.Number("gutter", style.Gutter.ToCentimeters())),
+         values.ContainsKey("gutterPosition") ? values.Choice("gutterPosition", 2) == 1 : style.GutterAtTop);
+
     private ColumnLayout Columns(PageStyle style, IReadOnlyDictionary<string, object> values) =>
         values.TryGetValue("columnLayout", out var value) && value is ColumnLayout chosen
             ? chosen
-            : new ColumnLayout(style.Columns.Count, style.Columns.Gap.ToCentimeters(), style.Columns.Separator);
+            : services.ColumnLayouts.Layout(style.Columns, TextWidth(style));
+
+    private double TextWidth(PageStyle style)
+    {
+        var margins = style.BoundMargins;
+        return Math.Max(1, style.Width.ToCentimeters() - margins.Left.ToCentimeters() - margins.Right.ToCentimeters());
+    }
 
     private PageSketchBand? Band(string key, HeaderFooterContent region, IReadOnlyDictionary<string, object> values)
     {

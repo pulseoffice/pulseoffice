@@ -45,8 +45,18 @@ public sealed class FolioChangeSettings : ISettingsProvider
     ];
 }
 
-public sealed class SettingsMoveDisplayOptions(ISettingsService settings) : IMoveDisplayOptions
+public sealed class SettingsMoveDisplayOptions : IMoveDisplayOptions
 {
+    private readonly ISettingsService _settings;
+
+    public SettingsMoveDisplayOptions(ISettingsService settings)
+    {
+        _settings = settings;
+        _settings.Changed += OnSettingChanged;
+    }
+
+    public event EventHandler? Changed;
+
     private readonly IReadOnlyDictionary<string, uint?> _colors = new Dictionary<string, uint?>(StringComparer.Ordinal)
     {
         ["green"] = 0xFF008A00,
@@ -66,5 +76,10 @@ public sealed class SettingsMoveDisplayOptions(ISettingsService settings) : IMov
             _ => MovedToMark.DoubleUnderline,
         });
 
-    private string Text(string key) => settings.Get<string>(key) ?? string.Empty;
+    private string Text(string key) => _settings.Get<string>(key) ?? string.Empty;
+
+    private void OnSettingChanged(object? sender, SettingChangedEventArgs e)
+    {
+        if (e.Key is FolioChangeSettings.MoveColor or FolioChangeSettings.MovedFrom or FolioChangeSettings.MovedTo) Changed?.Invoke(this, EventArgs.Empty);
+    }
 }

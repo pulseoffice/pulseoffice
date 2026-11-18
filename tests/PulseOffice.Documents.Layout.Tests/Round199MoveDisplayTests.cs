@@ -14,6 +14,12 @@ public sealed class Round199MoveDisplayTests
     private sealed class ChosenMoves(MoveDisplay display) : IMoveDisplayOptions
     {
         public MoveDisplay Current { get; } = display;
+
+        public event EventHandler? Changed
+        {
+            add { }
+            remove { }
+        }
     }
 
     private IChangeMarkup Markup(MoveDisplay display) => new ServiceCollection().AddDocumentsModel().AddDocumentsLayout()

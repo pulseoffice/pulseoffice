@@ -27,7 +27,7 @@ public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjec
 {
     public bool Reanchor(FolioEditor editor, string objectId, ObjectAnchorKind kind)
     {
-        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { } item || Kind(item.Anchor) == kind || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { } item || Kind(item.Anchor) == kind || editor.Objects.Locked(item)) return false;
         var layout = editor.Layout;
         var queries = editor.Services.Queries;
         var box = hits.Find(layout, objectId, out var page);
@@ -74,7 +74,7 @@ public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjec
 
     public bool Move(FolioEditor editor, string objectId, ObjectDrop drop)
     {
-        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { } item || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { } item || editor.Objects.Locked(item)) return false;
         var layout = editor.Layout;
         if (drop.Page < 0 || drop.Page >= layout.Pages.Count) return false;
         var queries = editor.Services.Queries;
@@ -111,7 +111,7 @@ public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjec
 
     public bool Nudge(FolioEditor editor, string objectId, double dx, double dy)
     {
-        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { Anchor: not AsCharacterAnchor } item || editor.ObjectLocked(item)) return false;
+        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { Anchor: not AsCharacterAnchor } item || editor.Objects.Locked(item)) return false;
         Change(editor, objectId, target => target.Placement = target.Placement with
         {
             X = Points(target.Placement.X.ToPoints() + dx),

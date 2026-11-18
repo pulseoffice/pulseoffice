@@ -52,6 +52,8 @@ internal sealed class OdtWriteSession(TextDocument document)
 
     public string? ImpliedInitialPage { get; set; }
 
+    public int? ImpliedLineNumberStart { get; set; }
+
     public OdtDrawingSession Drawing { get; } = new(new PulseOffice.Text.Rich.TextCultures(System.Globalization.CultureInfo.InvariantCulture).For(document.Language));
 
     public OdtStyleSink ContentStyles { get; } = new(string.Empty);

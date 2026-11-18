@@ -22,6 +22,12 @@ public sealed class SheetSortGate(ISheetEditGuard guard, IStatusBarService statu
             return true;
         }
 
+        if (sorter.BreaksMerges(sheet, range, hasHeader: true))
+        {
+            status.Report(texts["status.sort.merged"], NotificationSeverity.Error);
+            return true;
+        }
+
         if (!sheet.Protection.IsEnabled) return false;
 
         if (!sheet.Protection.AllowSort)

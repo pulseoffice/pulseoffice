@@ -124,5 +124,5 @@ public sealed class DocxParagraphMarkSplits(IParagraphText text)
     private string Synthetic(ParagraphBlock paragraph, int segment) =>
         paragraph.Id + "\u0001" + segment.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    private TextParagraph Bare(TextParagraph content) => content with { PageStyleName = null, PageNumberRestart = null, NextPageStyleName = null };
+    private TextParagraph Bare(TextParagraph content) => content with { PageStyleName = null, PageNumberRestart = null, LineNumberRestart = null, NextPageStyleName = null };
 }

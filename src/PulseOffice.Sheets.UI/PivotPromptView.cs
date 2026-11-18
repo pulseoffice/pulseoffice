@@ -246,11 +246,24 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
 
     private void Rebuild()
     {
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
+        var keptField = focused is CheckBox && _fieldList.Children.Contains(focused) ? focused.Tag : null;
+        var keptChip = focused is Button && _zones.Values.Any(zone => zone.Items.Children.Contains(focused)) ? focused.Tag : null;
+        Populate();
+        if (keptField is int field && _fieldList.Children.FirstOrDefault(child => Equals(child.Tag, field)) is { } box)
+            box.Focus(NavigationMethod.Tab);
+        else if (keptChip is int column
+            && _zones.Values.SelectMany(zone => zone.Items.Children).FirstOrDefault(child => Equals(child.Tag, column)) is { } chip)
+            chip.Focus(NavigationMethod.Tab);
+    }
+
+    private void Populate()
+    {
         _fieldList.Children.Clear();
         for (var column = 0; column < Model.Columns.Count; column++)
         {
             var index = column;
-            var box = new CheckBox { Content = Model.Columns[column], IsChecked = Model.AreaOf(column) != PivotArea.Unused };
+            var box = new CheckBox { Content = Model.Columns[column], IsChecked = Model.AreaOf(column) != PivotArea.Unused, Tag = index };
             box.IsCheckedChanged += (_, _) => Model.Toggle(index, box.IsChecked == true, _previewer.IsNumeric);
             Draggable(box, index);
             _fieldList.Children.Add(box);
@@ -330,6 +343,7 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
             HorizontalContentAlignment = HorizontalAlignment.Left,
             ContextMenu = menu,
             Padding = new Thickness(6, 2),
+            Tag = column,
         };
         chip.Classes.Add("dialogQuiet");
         AutomationProperties.SetName(chip, label);

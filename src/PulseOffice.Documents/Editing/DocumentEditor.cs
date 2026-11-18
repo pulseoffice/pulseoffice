@@ -143,7 +143,7 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
         var (left, right) = text.Split(paragraph.State, offset);
         paragraph.State = left;
         var nextStyle = atEnd ? document.Styles.Paragraph.Find(paragraph.StyleName)?.NextStyleName : null;
-        var cleared = right.Content with { PageStyleName = null, PageNumberRestart = null, PageBreakBefore = null, ColumnBreakBefore = null };
+        var cleared = right.Content with { PageStyleName = null, PageNumberRestart = null, LineNumberRestart = null, PageBreakBefore = null, ColumnBreakBefore = null };
         var content = nextStyle is null ? cleared : cleared with { StyleName = nextStyle, OutlineLevel = null };
         var created = new ParagraphBlock(document.NextId(ParagraphPrefix), content) { Marks = right.Marks };
         container.Insert(index, created);

@@ -56,7 +56,6 @@ internal sealed class OdtStylesWriter(
                 new XAttribute(Text + "increment", lines.Increment),
                 new XAttribute(Text + "restart-on-page", lines.RestartEachPage ? "true" : "false"),
                 new XAttribute(Text + "count-empty-lines", lines.CountBlankLines ? "true" : "false"),
-                lines.Start > 1 ? new XAttribute(Pt + "start", lines.Start) : null,
                 lines.RestartEachSection ? new XAttribute(Pt + "restart-on-section", "true") : null));
         return styles;
     }

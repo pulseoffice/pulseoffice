@@ -63,10 +63,10 @@ public sealed class FolioStyleCommands(
         .. _characterStyles.Select(CharacterStyle),
         Editing("folio.format.paintbrush") with
         {
-            CheckedWhen = _ => Editor?.Brush is not null,
+            CheckedWhen = _ => Editor?.Brush.Sample is not null,
             Execute = (_, _) => Run(editor =>
             {
-                editor.Arm(editor.Brush is not null ? null : editor.Services.Brush.Capture(editor.Document, editor.HasSelection ? editor.Selection.Start : editor.Caret));
+                editor.Brush.Arm(editor.Brush.Sample is not null ? null : editor.Services.Brush.Capture(editor.Document, editor.HasSelection ? editor.Selection.Start : editor.Caret));
                 return Task.CompletedTask;
             }),
         },

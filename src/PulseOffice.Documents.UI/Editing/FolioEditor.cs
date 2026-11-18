@@ -40,10 +40,22 @@ public sealed class FolioEditor : IDisposable
         _anchor = _tracker.Track(first);
         _caret = _tracker.Track(first);
         document.Changed += OnDocumentChanged;
+        MoveDisplay = new FolioMoveDisplayLink(this, services.Moves);
+        Cells = new FolioCellCursor(this);
+        Objects = new FolioSelectedObject(this);
+        Brush = new FolioFormatBrush(this);
         services.Assist.Learn(document);
     }
 
     public TextDocument Document { get; }
+
+    public FolioMoveDisplayLink MoveDisplay { get; }
+
+    public FolioCellCursor Cells { get; }
+
+    public FolioSelectedObject Objects { get; }
+
+    public FolioFormatBrush Brush { get; }
 
     public UndoStack History { get; }
 
@@ -134,6 +146,7 @@ public sealed class FolioEditor : IDisposable
     public void Dispose()
     {
         Document.Changed -= OnDocumentChanged;
+        MoveDisplay.Unlink();
         _tracker.Dispose();
     }
 
@@ -199,48 +212,6 @@ public sealed class FolioEditor : IDisposable
             : new DocumentPosition(FirstBodyParagraph().Id, 0);
     }
 
-    public bool EnterFrame(string objectId, DocumentPosition? at)
-    {
-        if (Document.Objects.Find(objectId) is not { Content.Story: { } box }) return false;
-        var frames = Document.Objects.All.Select(item => item.Content.Story).OfType<PulseOffice.Documents.Blocks.BlockContainer>().ToList();
-        if (at is { } hit && frames.Any(story => ReferenceEquals(story, _services.Stories.Find(Document, hit.ParagraphId).Story)))
-        {
-            PlaceCaret(hit, false);
-            return true;
-        }
-        if (box.Blocks.OfType<PulseOffice.Documents.Blocks.ParagraphBlock>().FirstOrDefault() is not { } first) return false;
-        var last = _services.Order.StoryOf(Document, first.Id);
-        PlaceCaret(new DocumentPosition(last[^1].Id, last[^1].Length), false);
-        return true;
-    }
-
-    public bool DeleteSelectedObject()
-    {
-        if (ReadOnly() || SelectedObjectId is not { } id || Document.Objects.Find(id) is { } item && ObjectLocked(item)) return false;
-        SelectedObjectId = null;
-        _services.Editor.RemoveObject(Document, History, id);
-        Normalize();
-        Changed?.Invoke(this, EventArgs.Empty);
-        return true;
-    }
-
-    public bool ResizeSelectedObject(PulseOffice.Foundation.Units.DocumentSize size) =>
-        ChangeSelectedObject(item => item.Size != size, item => item.Size = size);
-
-    public bool RotateSelectedObject(double degrees)
-    {
-        var normalized = ((degrees % 360) + 360) % 360;
-        return ChangeSelectedObject(item => Math.Abs(item.RotationDegrees - normalized) > 0.01, item => item.RotationDegrees = normalized);
-    }
-
-    public bool ObjectLocked(PulseOffice.Documents.Objects.AnchoredObject item)
-    {
-        ArgumentNullException.ThrowIfNull(item);
-        if (DocumentLocked()) return true;
-        return item.Anchor.Accept(new PulseOffice.Documents.Objects.AnchorParagraph()) is { } paragraph
-            && (Generated(paragraph) || _services.Guard.Check(Document, paragraph) != PulseOffice.Documents.Protection.EditVerdict.Allowed);
-    }
-
     public void Refresh() => Changed?.Invoke(this, EventArgs.Empty);
 
     public void Reflow()
@@ -249,14 +220,6 @@ public sealed class FolioEditor : IDisposable
         _layout = null;
         _live = null;
         Changed?.Invoke(this, EventArgs.Empty);
-    }
-
-    private bool ChangeSelectedObject(Func<PulseOffice.Documents.Objects.AnchoredObject, bool> differs, Action<PulseOffice.Documents.Objects.AnchoredObject> change)
-    {
-        if (ReadOnly() || SelectedObjectId is not { } id || Document.Objects.Find(id) is not { } item || ObjectLocked(item) || !differs(item)) return false;
-        _services.Editor.ChangeObject(Document, History, id, change);
-        Changed?.Invoke(this, EventArgs.Empty);
-        return true;
     }
 
     public IReadOnlyList<DocumentRange> BlockRanges { get; private set; } = [];
@@ -574,7 +537,7 @@ public sealed class FolioEditor : IDisposable
         if (SelectedObjectId is { } id)
         {
             var copied = _services.Objects.Of(Document, id);
-            DeleteSelectedObject();
+            Objects.Delete();
             return copied;
         }
         if (BlockRanges.Count > 0)
@@ -644,26 +607,6 @@ public sealed class FolioEditor : IDisposable
         return true;
     }
 
-    public FormatSample? Brush { get; private set; }
-
-    public event EventHandler? BrushChanged;
-
-    public void Arm(FormatSample? sample)
-    {
-        Brush = sample;
-        BrushChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    public bool PaintBrush()
-    {
-        if (Brush is not { } sample) return false;
-        var collapsed = !HasSelection;
-        var range = collapsed ? CharacterRange() : Selection;
-        Arm(null);
-        if (RefusesEdit(range)) return false;
-        return Change(() => _services.Brush.Paint(Document, History, range, sample, collapsed));
-    }
-
     public bool Change(Action change)
     {
         if (ReadOnly()) return false;
@@ -726,64 +669,6 @@ public sealed class FolioEditor : IDisposable
     public TableSelection? CellRange() => HasSelection && TableAt() is { Range.IsSingleCell: false } selection ? selection : null;
 
     public CultureInfo Culture() => _services.Cultures.For(EffectiveRun().Language, Document.Language);
-
-    public void SelectCells(TableBlock table, TableCellRange range)
-    {
-        var first = table.Cell(range.Top, range.Left).Content.Blocks.OfType<ParagraphBlock>().FirstOrDefault();
-        var corner = table.Rows[range.Bottom].Cells[range.Right];
-        if (corner.Covered)
-            corner = Enumerable.Range(0, range.Right + 1).Reverse().Select(column => table.Rows[range.Bottom].Cells[column]).FirstOrDefault(cell => !cell.Covered) ?? corner;
-        var last = corner.Content.Blocks.OfType<ParagraphBlock>().LastOrDefault();
-        if (first is null || last is null) return;
-        Select(new DocumentPosition(first.Id, 0), new DocumentPosition(last.Id, last.Length));
-    }
-
-    public bool MoveToCell(bool backwards)
-    {
-        if (_services.Tables.Editing.Locate(Document, Caret.ParagraphId) is not { } at) return false;
-        _services.Tables.Recognition.Leave(this, at);
-        var table = at.Table;
-        var row = at.Row;
-        var column = at.Column;
-        do
-        {
-            column += backwards ? -1 : 1;
-            if (column >= table.Rows[row].Cells.Count)
-            {
-                column = 0;
-                row++;
-            }
-            else if (column < 0)
-            {
-                row--;
-                if (row < 0) return true;
-                column = table.Rows[row].Cells.Count - 1;
-            }
-            if (row >= table.Rows.Count)
-            {
-                if (RefusesEdit()) return true;
-                _services.Tables.Editing.InsertRow(Document, History, at with { Row = table.Rows.Count - 1 }, true);
-                Normalize();
-            }
-        }
-        while (table.Rows[row].Cells[column].Covered);
-        var paragraphs = table.Rows[row].Cells[column].Content.Blocks.OfType<ParagraphBlock>().ToList();
-        if (paragraphs.Count == 0) return true;
-        Select(new DocumentPosition(paragraphs[0].Id, 0), new DocumentPosition(paragraphs[^1].Id, paragraphs[^1].Length));
-        return true;
-    }
-
-    public bool ResizeColumn(TableBlock table, int column, double points)
-    {
-        if (TableParagraphs(table).Any(RefusesEdit)) return false;
-        _services.Tables.Geometry.ResizeColumn(Document, History, table, column, points);
-        Normalize();
-        Changed?.Invoke(this, EventArgs.Empty);
-        return true;
-    }
-
-    private IEnumerable<string> TableParagraphs(TableBlock table) =>
-        ReadOnly() ? [Caret.ParagraphId] : table.Rows.SelectMany(row => row.Cells).Select(cell => cell.Content.Blocks.OfType<ParagraphBlock>().FirstOrDefault()?.Id).OfType<string>();
 
     private void Recalculate()
     {

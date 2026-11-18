@@ -88,8 +88,8 @@ public sealed class FolioKeyMap : IFolioKeyMap
         Add(Key.Delete, KeyModifiers.None, new EditKeyAction(editor => editor.DeleteForward()));
         Add(Key.Enter, KeyModifiers.None, new EditKeyAction(editor => editor.SplitParagraph()));
         Add(Key.Enter, KeyModifiers.Shift, new EditKeyAction(editor => editor.LineBreak()));
-        Add(Key.Tab, KeyModifiers.None, new ListLevelKeyAction(lists, 1, editor => editor.MoveToCell(false) || editor.Type("\t")));
-        Add(Key.Tab, KeyModifiers.Shift, new ListLevelKeyAction(lists, -1, editor => editor.MoveToCell(true)));
+        Add(Key.Tab, KeyModifiers.None, new ListLevelKeyAction(lists, 1, editor => editor.Cells.MoveToCell(false) || editor.Type("\t")));
+        Add(Key.Tab, KeyModifiers.Shift, new ListLevelKeyAction(lists, -1, editor => editor.Cells.MoveToCell(true)));
         Add(Key.Tab, KeyModifiers.Control, new EditKeyAction(editor => editor.Type("\t")));
 
         foreach (var primary in new[] { KeyModifiers.Control, KeyModifiers.Meta })

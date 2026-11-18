@@ -18,6 +18,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     private readonly DocxSectionStarts _starts = new();
 
+    private readonly DocxMirroredMargins _mirrored = new();
+
     private readonly DocxBlockCarriers _carriers = new();
 
     private readonly IUnusedHeaderVariants _unusedHeaders = unusedHeaders ?? new UnusedHeaderVariants(new BlockTree());
@@ -128,6 +130,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
         new(document => UsedPageStyles(document).Where(style => _starts.Mark(style, document) is null).Any(style => style.Usage != PageUsage.All && !(style.Usage == PageUsage.Mirrored && MirroredMargins(document))
                         || style.NextStyleName is { } next && next != style.Name && !(style.Name == DefaultStyleNames.FirstPage && next == DefaultStyleNames.Standard)),
             Diagnostic.Info("DOCX037", "Word sections have no left-only, right-only or mirrored page styles and no following page style: page usage and the next page style are lost in DOCX. ODT keeps them.")),
+        new(document => ParagraphBlocks(document).Any(paragraph => paragraph.Content.LineNumberRestart is not null
+                        && !(document.Body.Blocks.Contains(paragraph) && SectionLineRestart(document, paragraph.Content))),
+            Diagnostic.Info("DOCX248", "Word restarts line numbers only at sections, with the document's start value: other line number restarts are lost in DOCX. ODT keeps them.")),
         new(document => UsedPageStyles(document).Any(style => style.NumberFormat == NumberFormat.Hiragana),
             Diagnostic.Info("DOCX247", "Word page numbers have no Hiragana format: Hiragana page numbers are written as full-width Katakana in DOCX. ODT keeps them.")),
         new(document => GutterAtTop(document) && UsedPageStyles(document).Any(style => !style.GutterAtTop && style.Gutter.Value > 0),
@@ -229,6 +234,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     private IEnumerable<InlineMark> Marks(TextDocument document) => ParagraphBlocks(document).SelectMany(paragraph => paragraph.Marks);
 
+    public bool SectionLineRestart(TextDocument document, TextParagraph paragraph) =>
+        document.LineNumbering is { RestartEachSection: true } lines && paragraph.LineNumberRestart == lines.Start;
+
     private IEnumerable<TextParagraph> Paragraphs(TextDocument document) => ParagraphBlocks(document).Select(paragraph => paragraph.Content);
 
     private IEnumerable<TextRun> Runs(TextDocument document) => Paragraphs(document).SelectMany(paragraph => paragraph.Runs);
@@ -238,11 +246,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
 
     public bool MirroredMargins(TextDocument document) =>
         UsedPageStyles(document).ToList() is { Count: > 0 } used && used.Any(style => style.Usage == PageUsage.Mirrored)
-        && used.All(style => style.Usage == PageUsage.Mirrored || style.Usage == PageUsage.All && Symmetric(style));
+        && used.All(style => style.Usage == PageUsage.Mirrored || style.Usage == PageUsage.All && _mirrored.Symmetric(style));
 
-    private bool Symmetric(PageStyle style) =>
-        style.Margins.Left == style.Margins.Right && style.Gutter.Value == 0
-        && (style.Borders is not { } borders || borders.Inset(BorderSide.Left).Equals(borders.Inset(BorderSide.Right)));
 
     private IEnumerable<PageStyle> UsedPageStyles(TextDocument document) =>
         PageStyleNames(document).Distinct(StringComparer.Ordinal).Select(name => document.Styles.Page.Find(name)).OfType<PageStyle>();
@@ -355,6 +360,13 @@ public sealed class DocxWriter : ITextDocumentWriter
             OwnHeaders = true;
         }
 
+        public void Continue()
+        {
+            Restart = null;
+            StartsContinuous = true;
+            OwnHeaders = false;
+        }
+
         public void Break(string style, int? restart)
         {
             Style = style;
@@ -399,6 +411,11 @@ public sealed class DocxWriter : ITextDocumentWriter
                 case ParagraphBlock paragraph when index > 0 && Deferring(paragraph) is { } lead:
                     Close(body, Section(document, state, main, context));
                     state.Defer(lead);
+                    body.Append(_blocks.Block(paragraph, context));
+                    break;
+                case ParagraphBlock paragraph when index > 0 && _pageUsage.SectionLineRestart(document, paragraph.Content):
+                    Close(body, Section(document, state, main, context));
+                    state.Continue();
                     body.Append(_blocks.Block(paragraph, context));
                     break;
                 case TableBlock table when index > 0 && (table.PageStyleName is not null || table.PageBreakBefore):

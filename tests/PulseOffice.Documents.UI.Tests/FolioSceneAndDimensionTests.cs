@@ -74,7 +74,7 @@ public sealed class FolioSceneAndDimensionTests
         Assert.Equal(originalSize, moved.Size);
 
         scene.Editor.SelectObject(id);
-        Assert.True(scene.Editor.DeleteSelectedObject());
+        Assert.True(scene.Editor.Objects.Delete());
         Assert.Null(scene.Document.Objects.Find(id));
 
         scene.History.Undo();

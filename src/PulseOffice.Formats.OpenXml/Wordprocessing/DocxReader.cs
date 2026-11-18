@@ -275,6 +275,7 @@ public sealed class DocxReader : ITextDocumentReader
             {
                 var columns = _sections.Columns(span.Properties);
                 if (columns != current.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns));
+                if (_sections.LineNumberRestart(resolved) is { } lineStart) RestartLines(document, span.FirstBlock, end, lineStart);
                 continue;
             }
 
@@ -321,6 +322,13 @@ public sealed class DocxReader : ITextDocumentReader
         }
     }
 
+    private void RestartLines(TextDocument document, int first, int end, int start)
+    {
+        var position = Enumerable.Range(first, Math.Max(0, end - first)).FirstOrDefault(index => document.Body[index] is ParagraphBlock, -1);
+        if (position >= 0 && document.Body[position] is ParagraphBlock paragraph)
+            paragraph.Content = paragraph.Content with { LineNumberRestart = start };
+    }
+
     private void Defer(TextDocument document, int first, int end, string name, int? restart, DocxReadContext context)
     {
         var position = Enumerable.Range(first, Math.Max(0, end - first)).FirstOrDefault(index => document.Body[index] is ParagraphBlock, -1);
@@ -342,6 +350,15 @@ public sealed class DocxReader : ITextDocumentReader
 
     private const double WordDefaultTabInterval = 36;
 
+    private readonly DocxMirroredMargins _mirrored = new();
+
+    private void Mirror(TextDocument document)
+    {
+        var plain = document.Styles.Page.All.Where(style => style.Usage == PageUsage.All).ToList();
+        var asymmetric = plain.Where(style => !_mirrored.Symmetric(style)).ToList();
+        foreach (var style in asymmetric.Count > 0 ? asymmetric : plain) style.Usage = PageUsage.Mirrored;
+    }
+
     private void Settings(W.Settings? settings, TextDocument document)
     {
         document.Styles.TabsRelativeToIndent = false;
@@ -350,9 +367,7 @@ public sealed class DocxReader : ITextDocumentReader
         new DocxProtectionCodec().Read(settings.GetFirstChild<W.DocumentProtection>(), document);
         if (settings.GetFirstChild<W.TrackRevisions>() is { } track && (track.Val?.Value ?? true)) document.Changes.IsRecording = true;
         if (settings.GetFirstChild<W.RevisionView>() is { DisplayRevision.Value: false }) document.Changes.ShowChanges = false;
-        if (settings.GetFirstChild<W.MirrorMargins>() is { } mirror && (mirror.Val?.Value ?? true))
-            foreach (var style in document.Styles.Page.All.Where(style => style.Usage == PageUsage.All))
-                style.Usage = PageUsage.Mirrored;
+        if (settings.GetFirstChild<W.MirrorMargins>() is { } mirror && (mirror.Val?.Value ?? true)) Mirror(document);
         if (settings.GetFirstChild<W.FormsDesign>() is { } design && (design.Val?.Value ?? true))
             document.FormSettings = document.FormSettings with { OpenInDesignMode = true };
         if (settings.GetFirstChild<W.EvenAndOddHeaders>() is { } even && (even.Val?.Value ?? true))

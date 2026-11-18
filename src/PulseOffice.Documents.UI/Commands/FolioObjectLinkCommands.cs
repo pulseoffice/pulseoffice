@@ -35,7 +35,7 @@ public sealed class FolioObjectLinkCommands(IActiveFolioContext context, IFolioO
     ];
 
     private FolioObjectLinkTarget? Editable(FolioEditor editor) =>
-        objectLinks.Target(editor) is { } target && editor.Document.Objects.Find(target.ObjectId) is { } item && !editor.ObjectLocked(item) ? target : null;
+        objectLinks.Target(editor) is { } target && editor.Document.Objects.Find(target.ObjectId) is { } item && !editor.Objects.Locked(item) ? target : null;
 
     private async Task EditAsync(CancellationToken ct)
     {

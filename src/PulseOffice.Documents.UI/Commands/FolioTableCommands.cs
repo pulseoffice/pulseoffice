@@ -129,7 +129,7 @@ public sealed class FolioTableCommands(
             EnabledWhen = _ => Editor?.TableAt() is not null,
             Execute = (_, _) =>
             {
-                if (Editor is { } editor && editor.TableAt() is { } at) editor.SelectCells(at.Table, range(at));
+                if (Editor is { } editor && editor.TableAt() is { } at) editor.Cells.SelectCells(at.Table, range(at));
                 return Task.CompletedTask;
             },
         };
@@ -234,7 +234,7 @@ public sealed class FolioTableCommands(
         var column = at.Range.Left;
         var current = column < at.Table.Columns.Count ? at.Table.Columns[column].ToPoints() : 72;
         if (await dialogs.ColumnWidthAsync(current, ct).ConfigureAwait(true) is { } width)
-            editor.ResizeColumn(at.Table, column, width);
+            editor.Cells.ResizeColumn(at.Table, column, width);
     }
 
     private async Task StyleAsync(FolioEditor editor, TableSelection at, CancellationToken ct)
