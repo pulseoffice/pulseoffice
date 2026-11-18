@@ -71,6 +71,7 @@ public sealed class XlsxReader
             {
                 if (part.Worksheet is not { } content) return;
                 _metadata.ReadValidations(content, sheet);
+                new XlsxTableReferenceRules(context.Workbook).Restore(content.GetFirstChild<WorksheetExtensionList>(), sheet);
                 foreach (var merge in content.Descendants<MergeCell>())
                     if (merge.Reference?.Value is { Length: > 0 } reference && CellRange.TryParseA1(reference, out var region))
                         _overlappingMerges.Add(sheet.Merges, region, context.Diagnostics);

@@ -40,6 +40,9 @@ public sealed class OdfTableFormulas(ITableReferenceFlattening flattening)
         return prefixed ? flattened : flattened[1..];
     }
 
+    public XAttribute? KeptOne(string? formula, string? flattened) =>
+        string.Equals(formula, flattened, StringComparison.Ordinal) || formula is null ? null : new XAttribute(_structured, formula);
+
     public IEnumerable<XAttribute> Kept(string? first, string? flattenedFirst, string? second = null, string? flattenedSecond = null)
     {
         if (!string.Equals(first, flattenedFirst, StringComparison.Ordinal)) yield return new XAttribute(_structured, first!);

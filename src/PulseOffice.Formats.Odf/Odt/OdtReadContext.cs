@@ -6,7 +6,7 @@ using PulseOffice.Documents.Styles;
 
 namespace PulseOffice.Formats.Odf.Odt;
 
-internal sealed record AutomaticParagraph(string? Parent, ParagraphProperties Paragraph, CharacterProperties Character, string? Master, bool Implied, int? LineNumber = null, bool LineNumberImplied = false);
+internal sealed record AutomaticParagraph(string? Parent, ParagraphProperties Paragraph, CharacterProperties Character, string? Master, bool Implied, int? LineNumber = null, bool LineNumberImplied = false, bool ListSuppressed = false);
 
 internal sealed record AutomaticText(string? Parent, CharacterProperties Character);
 

@@ -7,7 +7,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Documents.Revisions;
 
-public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITrackedEditing tracked, IRevisionAuthor author, IStoryCatalog stories) : IDocumentEditor
+public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITrackedEditing tracked, IRevisionAuthor author, IStoryCatalog stories, ILinkedStyleSelection linked) : IDocumentEditor
 {
     public DocumentEdit InsertText(TextDocument document, UndoStack history, DocumentPosition at, string text) =>
         document.Changes.IsRecording ? tracked.InsertText(document, history, at, text, author.Sign()) : inner.InsertText(document, history, at, text);
@@ -29,7 +29,9 @@ public sealed class TrackingDocumentEditor(IDirectDocumentEditor inner, ITracked
     }
 
     public DocumentEdit ApplyParagraphStyle(TextDocument document, UndoStack history, DocumentRange range, string styleName) =>
-        Paragraphs(document, history, range, () => inner.ApplyParagraphStyle(document, history, range, styleName));
+        linked.CharacterStyle(document, range, styleName) is { } character
+            ? ApplyCharacterStyle(document, history, range, character)
+            : Paragraphs(document, history, range, () => inner.ApplyParagraphStyle(document, history, range, styleName));
 
     public DocumentEdit ApplyCharacterStyle(TextDocument document, UndoStack history, DocumentRange range, string? styleName) =>
         Characters(document, history, range, () => inner.ApplyCharacterStyle(document, history, range, styleName));

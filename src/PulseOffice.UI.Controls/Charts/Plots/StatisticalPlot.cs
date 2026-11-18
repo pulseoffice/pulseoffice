@@ -143,7 +143,7 @@ public sealed class StatisticalPlot : ChartPlotBase
                 frame.Plot.Bottom - frame.Plot.Height * (overall <= 0 ? 0 : total / overall)))
             .ToList();
 
-        DrawPolyline(frame, points, Colors.Crimson);
+        DrawPolyline(frame, points, frame.Marks.Mark(Colors.Crimson));
     }
 
     private void DrawBoxes(ChartFrame frame)
@@ -329,8 +329,8 @@ public sealed class StatisticalPlot : ChartPlotBase
 
         var scale = PlotScale.Nice(lowest, highest, frame.Plot.Bottom, frame.Plot.Y);
         var categories = Across(frame, totals.Count);
-        var rising = new SolidColorBrush(Color.FromRgb(0x16, 0xA3, 0x4A));
-        var falling = new SolidColorBrush(Color.FromRgb(0xDC, 0x26, 0x26));
+        var rising = new SolidColorBrush(frame.Marks.Mark(Color.FromRgb(0x16, 0xA3, 0x4A)));
+        var falling = new SolidColorBrush(frame.Marks.Mark(Color.FromRgb(0xDC, 0x26, 0x26)));
 
         for (var index = 0; index < totals.Count; index++)
         {

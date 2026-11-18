@@ -28,12 +28,14 @@ public sealed class StyleReferences(IStoryCatalog stories, IBlockTree tree) : IS
                     if (style.ParentName == name) style.ParentName = target;
                     if (style.NextStyleName == name) style.NextStyleName = target;
                 });
+                RewriteStyles(recorder, sheet.Character, style => style.LinkedStyleName == name, style => style.LinkedStyleName = target);
                 RewriteParagraphs(document, recorder, content => content.StyleName == name, content => content with { StyleName = target });
                 Indexes(document, recorder, name, target);
                 Notes(document, recorder, settings => settings.ParagraphStyleName == name ? settings with { ParagraphStyleName = target } : settings);
                 break;
             case StyleFamily.Character:
                 RewriteStyles(recorder, sheet.Character, style => style.ParentName == name, style => style.ParentName = target);
+                RewriteStyles(recorder, sheet.Paragraph, style => style.LinkedStyleName == name, style => style.LinkedStyleName = target);
                 RewriteParagraphs(document, recorder, content => content.Runs.Any(run => run.StyleName == name),
                     content => content.WithRuns([.. content.Runs.Select(run => run.StyleName == name ? run with { StyleName = target } : run)]));
                 RewriteParagraphs(document, recorder, content => content.DropCap?.CharacterStyleName == name,

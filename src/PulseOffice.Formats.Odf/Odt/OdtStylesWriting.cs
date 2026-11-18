@@ -38,7 +38,8 @@ internal sealed class OdtStylesWriter(
 
         foreach (var style in sheet.Paragraph.All) styles.Add(ParagraphStyle(style, session));
         foreach (var style in sheet.Character.All)
-            styles.Add(Named(style, "text", null, TextProperties(style.Character, ParagraphProperties.None, session)));
+            styles.Add(Named(style, "text", null, TextProperties(style.Character, ParagraphProperties.None, session),
+                style.LinkedStyleName is { } linked ? new XAttribute(Pt + "linked-style-name", names.Encode(linked)) : null));
         foreach (var style in sheet.Frame.All)
             styles.Add(Named(style, "graphic", null, frames.Graphic(style.Frame)));
         foreach (var style in sheet.Table.All) styles.Add(TableStyle(style));
@@ -178,6 +179,7 @@ internal sealed class OdtStylesWriter(
         if (style.OutlineLevel is { } outline) element.Add(new XAttribute(Style + "default-outline-level", outline));
         if (style.ListStyleName is { } list) element.Add(new XAttribute(Style + "list-style-name", names.Encode(list)));
         if (style.ListLevel is { } listLevel) element.Add(new XAttribute(Style + "list-level", listLevel));
+        if (style.LinkedStyleName is { } linked) element.Add(new XAttribute(Pt + "linked-style-name", names.Encode(linked)));
         if (style.Paragraph.PageStyleName is { } master) element.Add(new XAttribute(Style + "master-page-name", names.Encode(master)));
         element.Add(new XAttribute(Style + "class", vocabulary.Categories.Token(style.Category)));
         return element;

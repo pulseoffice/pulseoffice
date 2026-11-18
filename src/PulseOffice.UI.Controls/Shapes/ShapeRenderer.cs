@@ -35,6 +35,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly IShapeEffectBounds _effects;
     private readonly IDimensionLineGeometry _dimensions;
     private readonly IShapeListText _listText;
+    private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -155,7 +156,8 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawListText(DrawingContext context, ShapeObject shape, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var ink = _brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White);
-        var rotation = shapeStyle.Text.RotationDegrees + shapeRotation;
+        var rotation = shapeStyle.Text.RotationDegrees + shapeRotation + shapeStyle.Text.Layout.FlowDegrees;
+        bounds = _flow.Box(bounds, shapeStyle.Text.Layout);
         if (Math.Abs(rotation % 360) < 0.001)
         {
             _listText.Draw(context, shape, bounds, ink, backdrop.Language);
@@ -348,7 +350,10 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawText(DrawingContext context, string content, IReadOnlyList<ShapeTextRun>? runs, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var style = shapeStyle.Text;
-        var rotation = style.RotationDegrees + shapeRotation;
+        var stacked = style.Layout.Flow == PulseOffice.Text.Rich.TextFlow.Stacked;
+        bounds = _flow.Box(bounds, style.Layout);
+        if (stacked) content = _flow.Stacked(content);
+        var rotation = style.RotationDegrees + shapeRotation + style.Layout.FlowDegrees;
         var inset = style.Inset.ToPoints();
 
         var typeface = new Typeface(
@@ -376,7 +381,7 @@ public sealed class ShapeRenderer : IShapeRenderer
 
         if (style.Underline)
             text.SetTextDecorations(TextDecorations.Underline);
-        if (runs is { Count: > 0 }) Format(text, runs, style);
+        if (runs is { Count: > 0 } && !stacked) Format(text, runs, style);
 
         var y = style.Vertical switch
         {

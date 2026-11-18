@@ -69,7 +69,7 @@ internal sealed class OdtBlockWriter(
     private string? ListStyleOf(ParagraphBlock paragraph, OdtWriteSession session)
     {
         var content = paragraph.Content;
-        if (!content.IsListItem && !content.ListHeader && content.ListStyleName is null) return null;
+        if (content.ListSuppressed || (!content.IsListItem && !content.ListHeader && content.ListStyleName is null)) return null;
         return content.ListStyleName ?? resolver.ResolveParagraphStyle(session.Document.Styles, content.StyleName).ListStyleName ?? DefaultStyleNames.List1;
     }
 
@@ -117,10 +117,11 @@ internal sealed class OdtParagraphWriter(
         var textProperties = codec.Hyphenation(properties).Concat(inline.MarkAttributes(block, session)).ToList();
         var parent = content.StyleName is null ? null : names.Encode(content.StyleName);
         string? styleName = parent;
-        if (paragraphElement is not null || textProperties.Count > 0 || master is not null)
+        if (paragraphElement is not null || textProperties.Count > 0 || master is not null || content.ListSuppressed)
         {
             styleName = sink.Register("paragraph", parent,
             [
+                content.ListSuppressed ? new XAttribute(Style + "list-style-name", string.Empty) : null,
                 master is null ? null : new XAttribute(Style + "master-page-name", names.Encode(master)),
                 implied is not null && properties.PageStyleName is null ? new XAttribute(Pt + "implied-page", "true") : null,
                 impliedLineNumber is not null ? new XAttribute(Pt + "implied-line-number", "true") : null,

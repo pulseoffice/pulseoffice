@@ -59,13 +59,14 @@ public sealed class ChartDataExtractor(IChartSeriesNames names, IChartCellText c
     private readonly SeriesLayout _columns = new ColumnSeriesLayout();
     private readonly SeriesLayout _rows = new RowSeriesLayout();
     private readonly SeriesSourceReader _sources = new(new ChartSourceReferences(), names, cells, workArea);
+    private readonly ChartTableSources _tables = new();
 
     public ChartData Extract(Workbook workbook, ChartDefinition definition, bool visibleOnly = false)
     {
         ArgumentNullException.ThrowIfNull(workbook);
         ArgumentNullException.ThrowIfNull(definition);
 
-        if (definition.HasSeriesSources) return _sources.Read(workbook, definition, visibleOnly);
+        if (definition.HasSeriesSources) return _sources.Read(workbook, _tables.Flatten(definition, workbook), visibleOnly);
         if (definition.InlineData is { } inline && string.IsNullOrEmpty(definition.SourceSheet)) return inline;
         if (workbook.FindSheet(definition.SourceSheet) is not { } sheet) return ChartData.Empty;
         if (!CellRange.TryParseA1(definition.SourceRange, out var whole)) return ChartData.Empty;

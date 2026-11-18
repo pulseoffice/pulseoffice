@@ -36,7 +36,7 @@ public sealed class Round213ShapeTextLayoutTests
         Assert.DoesNotContain(new PptxReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
         buffer.Position = 0;
         using (var document = PresentationDocument.Open(buffer, true))
-            document.PresentationPart!.SlideParts.First().Slide!.Descendants<D.BodyProperties>().First().Vertical = D.TextVerticalValues.Vertical;
+            document.PresentationPart!.SlideParts.First().Slide!.Descendants<D.BodyProperties>().First().Vertical = new D.TextVerticalValues("eaVert");
         buffer.Position = 0;
         Assert.Contains(new PptxReader(_themes, _masters).Read(buffer).Diagnostics, diagnostic => diagnostic.Code == "PPTX226");
     }
@@ -56,7 +56,7 @@ public sealed class Round213ShapeTextLayoutTests
             Add("content.xml", "<?xml version=\"1.0\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" " +
                 "xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" " +
                 "xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" office:version=\"1.3\"><office:automatic-styles>" +
-                "<style:style style:name=\"gr1\" style:family=\"graphic\"><style:graphic-properties style:writing-mode=\"tb-rl\"/></style:style></office:automatic-styles>" +
+                "<style:style style:name=\"gr1\" style:family=\"graphic\"><style:graphic-properties style:writing-mode=\"tb-lr\"/></style:style></office:automatic-styles>" +
                 "<office:body><office:presentation><draw:page draw:name=\"p\"><draw:rect draw:style-name=\"gr1\" svg:width=\"4cm\" svg:height=\"2cm\" svg:x=\"1cm\" svg:y=\"1cm\"/>" +
                 "</draw:page></office:presentation></office:body></office:document-content>");
         }

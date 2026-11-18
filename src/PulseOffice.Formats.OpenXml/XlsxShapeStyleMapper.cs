@@ -128,6 +128,8 @@ public sealed class XlsxShapeStyleMapper
         return shape;
     }
 
+    private readonly DrawingML.DrawingTextLayouts _layouts = new();
+
     public A.BodyProperties Body(ShapeTextStyle text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -144,6 +146,7 @@ public sealed class XlsxShapeStyleMapper
             Wrap = new A.TextWrappingValues(text.Wrap ? "square" : "none"),
             Rotation = _colours.Angle(text.RotationDegrees),
         };
+        _layouts.Write(body, text.Layout, 0);
 
         return body;
     }

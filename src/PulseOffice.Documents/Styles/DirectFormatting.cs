@@ -180,6 +180,7 @@ public sealed class DirectFormatting : IDirectFormatting
     {
         StyleName = paragraph.StyleName,
         ListStyleName = paragraph.ListStyleName,
+        ListSuppressed = paragraph.ListSuppressed,
         OutlineLevel = paragraph.OutlineLevel,
         BulletLevel = paragraph.BulletLevel,
         Bullet = paragraph.Bullet,

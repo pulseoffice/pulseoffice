@@ -30,6 +30,8 @@ public sealed class XlsxChartMapper
     private readonly ChartErrorValueRefresh _errorValues = new();
     private readonly LiteralSeriesSource _literals = new();
     private readonly XlsxPivotChartLink _pivotLink = new();
+    private readonly ChartTableSources _tables = new();
+    private readonly XlsxChartTableSources _tableSources = new();
 
     public XlsxChartMapper()
     {
@@ -46,7 +48,8 @@ public sealed class XlsxChartMapper
 
         foreach (var placed in sheet.Objects.Where(o => o.Content is ChartDefinition))
         {
-            var definition = _errorValues.Refresh(workbook, (ChartDefinition)placed.Content);
+            var structured = _errorValues.Refresh(workbook, (ChartDefinition)placed.Content);
+            var definition = _tables.Flatten(structured, workbook);
             var chartPart = drawingsPart.AddNewPart<ChartPart>();
             chartPart.ChartSpace = IsStatic(definition)
                 ? _builder.Build(definition, definition.InlineData!, _literals)
@@ -54,6 +57,7 @@ public sealed class XlsxChartMapper
                     definition, _data.Extract(workbook, definition),
                     definition.HasSeriesSources ? new ReferencedSeriesSource(definition, _references) : new SheetSeriesSource(definition));
             _pivotLink.Write(chartPart.ChartSpace, definition.PivotSource, definition.SourceSheet);
+            _tableSources.Write(chartPart.ChartSpace, structured);
             chartPart.ChartSpace.Save();
 
             yield return _anchors.Build(sheet.Layout, placed, drawingsPart.GetIdOfPart(chartPart));
@@ -95,6 +99,7 @@ public sealed class XlsxChartMapper
                 SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sourceSheet, StringComparison.CurrentCultureIgnoreCase))]),
             }), Sources(content.Series, pivot)));
             definition = definition with { PivotSource = _pivotLink.Read(space) };
+            if (_tableSources.Read(space) is { } kept) definition = definition with { SeriesSources = kept };
             if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
                 definition = _inlineErrors.Refresh(definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null });
 

@@ -7,6 +7,7 @@ namespace PulseOffice.Settings;
 public sealed class JsonSettingsStore : ISettingsStore, IDisposable
 {
     private readonly ConcurrentDictionary<string, JsonElement> _values = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _changed = new(StringComparer.Ordinal);
     private readonly string _path;
     private readonly ILogger<JsonSettingsStore> _logger;
     private readonly Lock _gate = new();
@@ -45,12 +46,14 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
     public void Set(string key, object? value)
     {
         _values[key] = ToJson(value);
+        lock (_gate) _changed.Add(key);
         Schedule();
     }
 
     public void Remove(string key)
     {
         _values.TryRemove(key, out _);
+        lock (_gate) _changed.Add(key);
         Schedule();
     }
 
@@ -62,10 +65,8 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
 
-                var temporary = _path + ".tmp";
-                var json = JsonSerializer.Serialize(
-                    _values.ToDictionary(pair => pair.Key, pair => pair.Value),
-                    new JsonSerializerOptions { WriteIndented = true });
+                var temporary = $"{_path}.{Guid.NewGuid():N}.tmp";
+                var json = JsonSerializer.Serialize(Merged(), new JsonSerializerOptions { WriteIndented = true });
 
                 using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
@@ -74,6 +75,7 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
                 }
 
                 File.Move(temporary, _path, overwrite: true);
+                _changed.Clear();
             }
             catch (IOException ex)
             {
@@ -84,6 +86,33 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
                 _logger.LogWarning(ex, "Permission denied saving settings to {Path}", _path);
             }
         }
+    }
+
+    private Dictionary<string, JsonElement> Merged()
+    {
+        if (OnDisk() is not { } merged) return _values.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        foreach (var key in _changed)
+        {
+            if (_values.TryGetValue(key, out var value)) merged[key] = value;
+            else merged.Remove(key);
+        }
+
+        return merged;
+    }
+
+    private Dictionary<string, JsonElement>? OnDisk()
+    {
+        try
+        {
+            if (File.Exists(_path) && JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText(_path)) is { } stored)
+                return new Dictionary<string, JsonElement>(stored, StringComparer.Ordinal);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Settings at {Path} became unreadable: overwriting them with this instance's values", _path);
+        }
+
+        return null;
     }
 
     private void FlushScheduled()

@@ -80,14 +80,11 @@ internal sealed class PptxMixedTableRuns : IPptxReadLoss
 internal sealed class PptxShapeTextLayout : IPptxReadLoss
 {
     public Diagnostic Loss { get; } = Diagnostic.Warning("PPTX226",
-        "Some shapes have vertical or stacked text, text rotated inside the shape or text in columns: Deck lays shape text out horizontally in one column, so these settings are not imported.");
+        "Some shapes have East Asian or Mongolian vertical text or right-to-left stacked text: Deck shows it as plain vertical or stacked text.");
 
     public bool Present(PresentationPart presentation) =>
-        presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.BodyProperties>().Any(Laid) == true);
+        presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.BodyProperties>().Any(Approximated) == true);
 
-    private bool Laid(DocumentFormat.OpenXml.Drawing.BodyProperties body) =>
-        body.Vertical?.InnerText is { Length: > 0 } vertical && vertical != "horz"
-        || body.ColumnCount?.Value > 1
-        || body.Rotation?.Value is { } rotation && rotation != 0
-        || body.UpRight?.Value == true;
+    private bool Approximated(DocumentFormat.OpenXml.Drawing.BodyProperties body) =>
+        body.Vertical?.InnerText is "eaVert" or "mongolianVert" or "wordArtVertRtl";
 }

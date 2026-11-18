@@ -319,6 +319,8 @@ public sealed record ShapeTextStyle
 
     public double RotationDegrees { get; init; }
 
+    public PulseOffice.Text.Rich.TextLayout Layout { get; init; } = PulseOffice.Text.Rich.TextLayout.Default;
+
     public string? Language { get; init; }
 
     public static readonly ShapeTextStyle Default = new();

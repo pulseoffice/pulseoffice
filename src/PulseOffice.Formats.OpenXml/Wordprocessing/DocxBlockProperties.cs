@@ -150,6 +150,7 @@ public sealed class DocxBlockProperties(DocxCustomXmlParts parts, DocxListHeader
         paragraph.Content = paragraph.Content with
         {
             ListHeader = true,
+            ListSuppressed = false,
             ListStyleName = entry.Attribute("list")?.Value is { Length: > 0 } list ? list : null,
             BulletLevel = int.TryParse(entry.Attribute("level")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var level) ? Math.Clamp(level, 0, 9) : 0,
             MarginLeft = double.TryParse(entry.Attribute("margin")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var margin) && double.IsFinite(margin) ? margin : null,

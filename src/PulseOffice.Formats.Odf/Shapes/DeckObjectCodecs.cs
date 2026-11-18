@@ -161,6 +161,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
         _lists.GetValue(definitions, all => _runs.Lists(all.Where(pair => pair.Key.StartsWith(OdfShapeTextLists.KeyPrefix, StringComparison.Ordinal)).Select(pair => pair.Value)));
     private readonly OdfShapeTextRuns _runs = new(paragraphs);
     private readonly OdfDimensionLines _dimensions = new();
+    private readonly OdfShapeTextRotation _textRotation = new();
 
     public XElement Build(ObjectElement element, ShapeObject shape, string styleName, IOdfTextStyleSink textStyles)
     {
@@ -175,6 +176,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
         if (shape.FlipHorizontal) geometry.Add(new XAttribute(Draw + "mirror-horizontal", "true"));
         if (shape.FlipVertical) geometry.Add(new XAttribute(Draw + "mirror-vertical", "true"));
         _arcs.Write(geometry, shape);
+        _textRotation.Write(geometry, shape);
         new OdfExtrusion().Write(geometry, shape.Style.Extrusion);
         _computed.Write(geometry, shape, element.Bounds.Width, element.Bounds.Height);
         node.Add(geometry);
@@ -246,7 +248,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
         {
             Id = id,
             Bounds = bounds,
-            Content = _computed.Apply(_arcs.Read(_runs.Read(node, new ShapeObject
+            Content = _computed.Apply(_textRotation.Read(_arcs.Read(_runs.Read(node, new ShapeObject
             {
                 Id = id,
                 Shape = presets.KindOf((string?)geometry?.Attribute(Draw + "type")),
@@ -258,7 +260,7 @@ internal sealed class DeckShapeCodec(IShapePresets presets, OdfShapeStyleReader 
                     ? (string?)automatic.Attribute(Style + "parent-style-name")
                     : null,
             }, (name, family) => definitions.TryGetValue(name, out var text) && (string?)text.Attribute(Style + "family") == family ? text : null,
-                ListsOf(definitions)), geometry), geometry, bounds.Width, bounds.Height),
+                ListsOf(definitions)), geometry), geometry), geometry, bounds.Width, bounds.Height),
         };
     }
 }

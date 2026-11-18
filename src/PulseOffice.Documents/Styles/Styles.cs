@@ -73,8 +73,11 @@ public sealed class ParagraphStyle(string name) : DocumentStyle(name)
 
     public ParagraphStyleCategory Category { get; set { field = value; Touch(); } }
 
+    public string? LinkedStyleName { get; set { field = value; Touch(); } }
+
     public override DocumentStyle CloneAs(string name) => CopyCommon(new ParagraphStyle(name)
     {
+        LinkedStyleName = LinkedStyleName,
         Paragraph = Paragraph,
         Character = Character,
         NextStyleName = NextStyleName,
@@ -91,7 +94,9 @@ public sealed class CharacterStyle(string name) : DocumentStyle(name)
 
     public CharacterProperties Character { get; set { field = value; Touch(); } } = CharacterProperties.None;
 
-    public override DocumentStyle CloneAs(string name) => CopyCommon(new CharacterStyle(name) { Character = Character });
+    public string? LinkedStyleName { get; set { field = value; Touch(); } }
+
+    public override DocumentStyle CloneAs(string name) => CopyCommon(new CharacterStyle(name) { Character = Character, LinkedStyleName = LinkedStyleName });
 }
 
 public enum NumberFormat

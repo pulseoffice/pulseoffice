@@ -20,8 +20,12 @@ internal sealed class OdfTextAnchors
 
 internal sealed class OdfTextFrameWriter(OdfUnits units, OdfTextAnchors anchors) : OdfXml
 {
-    public IEnumerable<XAttribute> Attributes(TextFrame frame, Twip height)
+    private readonly OdfTextLayouts _layouts = new();
+
+    public IEnumerable<XObject> Attributes(TextFrame frame, Twip height)
     {
+        foreach (var layout in _layouts.Write(frame.Layout)) yield return layout;
+        foreach (var rotation in _layouts.FrameRotation(frame.RotationDegrees)) yield return rotation;
         yield return new XAttribute(Draw + "textarea-vertical-align", anchors.Token(frame.Anchor));
         yield return new XAttribute(Fo + "padding-left", Length(frame.Insets.Left));
         yield return new XAttribute(Fo + "padding-top", Length(frame.Insets.Top));
@@ -33,10 +37,7 @@ internal sealed class OdfTextFrameWriter(OdfUnits units, OdfTextAnchors anchors)
         if (frame.Autofit == TextAutofit.ResizeShape && height.Value > 0)
             yield return new XAttribute(Fo + "min-height", units.Cm(height));
         if (frame.Autofit == TextAutofit.ShrinkText)
-        {
             yield return new XAttribute(Draw + "fit-to-size", "shrink-to-fit");
-            yield return new XAttribute(Style + "shrink-to-fit", "true");
-        }
     }
 
     private readonly ParagraphMargins _margins = new();
@@ -52,6 +53,7 @@ internal sealed class OdfTextFrameWriter(OdfUnits units, OdfTextAnchors anchors)
 
 internal sealed class OdfTextFrameReader(OdfValues values, OdfTextAnchors anchors) : OdfXml
 {
+    private readonly OdfTextLayouts _layouts = new();
 
     public TextFrameLayer Read(XElement? style)
     {
@@ -80,6 +82,8 @@ internal sealed class OdfTextFrameReader(OdfValues values, OdfTextAnchors anchor
                 "wrap" => true,
                 _ => (string?)properties.Attribute(Draw + "auto-grow-width") == "true" && grow == "true" ? false : null,
             },
+            Rotation = _layouts.FrameRotation(properties),
+            Layout = _layouts.Read(properties),
         };
     }
 

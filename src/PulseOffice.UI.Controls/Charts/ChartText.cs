@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
+using PulseOffice.UI.Theming;
 
 namespace PulseOffice.UI.Controls.Charts;
 
@@ -22,6 +23,13 @@ public sealed record ChartInk(IBrush Text, IBrush Paper)
 
     private static IBrush Faded(IBrush brush, double opacity, IBrush fallback) =>
         brush is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, opacity * solid.Opacity) : fallback;
+
+    public const double MarkContrast = 3.0;
+
+    public Color Mark(Color colour) =>
+        ReferenceEquals(this, Print) || Paper is not ISolidColorBrush paper
+            ? colour
+            : new WcagColorContrast().Readable(colour, [paper.Color], MarkContrast);
 
     public IBrush Backdrop => Paper is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.7 * solid.Opacity) : new SolidColorBrush(Colors.White, 0.7);
 }

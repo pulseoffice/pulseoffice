@@ -15,15 +15,15 @@ public sealed class XlsxMetadataMapper
     private readonly ValidationVocabulary _vocabulary = new();
     private readonly XlsxValidationExtension _validationExtension = new(new X14Namespaces());
 
-    public DataValidations? BuildValidations(Sheet sheet)
+    public DataValidations? BuildValidations(IReadOnlyList<Rule> validations)
     {
-        ArgumentNullException.ThrowIfNull(sheet);
+        ArgumentNullException.ThrowIfNull(validations);
 
-        if (sheet.Validations.Count == 0) return null;
+        if (validations.Count == 0) return null;
 
         var container = new DataValidations();
 
-        foreach (var validation in sheet.Validations)
+        foreach (var validation in validations)
         {
             var element = new DocumentFormat.OpenXml.Spreadsheet.DataValidation
             {
@@ -62,7 +62,7 @@ public sealed class XlsxMetadataMapper
             container.AppendChild(element);
         }
 
-        container.Count = (uint)sheet.Validations.Count;
+        container.Count = (uint)validations.Count;
         return container;
     }
 

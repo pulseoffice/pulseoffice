@@ -23,6 +23,8 @@ public interface IStyleEditing
     DocumentEdit Rename(TextDocument document, UndoStack history, StyleFamily family, string name, string newName);
 
     DocumentEdit Load(TextDocument document, UndoStack history, StyleSheet source, bool overwrite);
+
+    PageStyle PageCopy(TextDocument document, PageStyle source, string name);
 }
 
 public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper remapper) : IStyleEditing
@@ -109,10 +111,12 @@ public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper 
         {
             case StyleFamily.Paragraph when sheet.Paragraph.Find(name) is { } paragraph && name != DefaultStyleNames.Standard:
                 references.RewriteStyles(recorder, sheet.Paragraph, style => style.NextStyleName == name, style => style.NextStyleName = null);
+                references.RewriteStyles(recorder, sheet.Character, style => style.LinkedStyleName == name, style => style.LinkedStyleName = null);
                 references.Redirect(document, recorder, family, name, paragraph.ParentName ?? DefaultStyleNames.Standard);
                 Remove(recorder, sheet.Paragraph, name);
                 break;
             case StyleFamily.Character when sheet.Character.Find(name) is { } character:
+                references.RewriteStyles(recorder, sheet.Paragraph, style => style.LinkedStyleName == name, style => style.LinkedStyleName = null);
                 references.Redirect(document, recorder, family, name, character.ParentName);
                 Remove(recorder, sheet.Character, name);
                 break;
@@ -190,6 +194,19 @@ public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper 
         Load(recorder, document.Styles.Frame, source.Frame, overwrite);
         Load(recorder, document.Styles.Table, source.Table, overwrite);
         return recorder.Commit(history);
+    }
+
+    public PageStyle PageCopy(TextDocument document, PageStyle source, string name)
+    {
+        var sheet = new StyleSheet();
+        sheet.Page.Replace((PageStyle)source.CloneAs(name));
+        var copy = remapper.Remap(document, new DocumentFragment(new BlockContainer(), sheet, [], [], [])).Styles.Page.Find(name)!;
+        var created = (PageStyle)copy.CloneAs(name);
+        created.ParentName = null;
+        created.DisplayName = null;
+        created.Hidden = false;
+        created.NextStyleName = null;
+        return created;
     }
 
     private void Load<TStyle>(EditRecorder recorder, StyleCollection<TStyle> target, StyleCollection<TStyle> source, bool overwrite) where TStyle : DocumentStyle

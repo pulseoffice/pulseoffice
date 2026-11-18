@@ -209,6 +209,8 @@ internal sealed class BevelPropertyWriter : GraphicPropertyWriter
 
 internal sealed class TextAreaPropertyWriter : GraphicPropertyWriter
 {
+    private readonly TextCodecs.OdfTextLayouts _layouts = new();
+
     public override void Write(GraphicWriteContext context, ShapeStyle style)
     {
         var text = style.Text;
@@ -222,6 +224,7 @@ internal sealed class TextAreaPropertyWriter : GraphicPropertyWriter
 
         if (Math.Abs(text.RotationDegrees) > 0.001)
             context.Set(Namespaces.Style + "text-rotation-angle", context.Measure.Number(text.RotationDegrees));
+        context.Graphic.Add(_layouts.Write(text.Layout));
     }
 }
 

@@ -83,8 +83,8 @@ public sealed class XlsxWriter
             new ElementSection((sheet, _) => _sorts.Build(sheet.RangeSort)),
             new ElementSection((sheet, context) => _consolidation.Build(context.Workbook, sheet)),
             new MergesSection(),
-            new ElementsSection((sheet, context) => context.Conditionals.Build(sheet.ConditionalRules)),
-            new ElementSection((sheet, _) => _metadata.BuildValidations(sheet)),
+            new ElementsSection((sheet, context) => context.Conditionals.Build(context.TableRules.Rules(sheet))),
+            new ElementSection((sheet, context) => _metadata.BuildValidations(context.TableRules.Validations(sheet))),
             new HyperlinksSection(),
             new ElementsSection((sheet, context) => _pages.Build(sheet, context.Workbook)),
             new PartSection((part, sheet, context) => _drawings.Write(part, sheet, context.Workbook)),
@@ -97,13 +97,14 @@ public sealed class XlsxWriter
                 _controls.Write(part, sheet, controls);
             }),
             new PartSection(_tables.Write),
-            new ElementSection((sheet, context) => Extensions(sheet, context.Conditionals.Extensions, _sparklines)),
+            new ElementSection((sheet, context) => Extensions(
+                context.Conditionals.Extension(context.TableRules.Rules(sheet)), _sparklines.Extension(sheet), context.TableRules.Extension(sheet))),
         ];
     }
 
-    private WorksheetExtensionList? Extensions(PulseOffice.Sheets.Worksheet sheet, params IWorksheetExtensionSource[] sources)
+    private WorksheetExtensionList? Extensions(params WorksheetExtension?[] found)
     {
-        var extensions = sources.Select(source => source.Extension(sheet)).OfType<WorksheetExtension>().ToList();
+        var extensions = found.OfType<WorksheetExtension>().ToList();
         return extensions.Count == 0 ? null : new WorksheetExtensionList(extensions);
     }
 

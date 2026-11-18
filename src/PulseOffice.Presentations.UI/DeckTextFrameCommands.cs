@@ -20,6 +20,8 @@ public sealed class DeckTextFrameCommands(
 
     private static readonly TextAutofit[] Fits = [TextAutofit.None, TextAutofit.ShrinkText, TextAutofit.ResizeShape];
 
+    private static readonly TextFlow[] Flows = [TextFlow.Horizontal, TextFlow.Vertical, TextFlow.Vertical270, TextFlow.Stacked];
+
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Anchor("deck.paragraph.anchorTop", TextAnchor.Top),
@@ -66,6 +68,11 @@ public sealed class DeckTextFrameCommands(
             new ChoiceField("autofit", texts["deck.textFrame.autofit"],
                 [.. Fits.Select(fit => texts[$"deck.textFrame.autofit.{fit}"])], Math.Max(Array.IndexOf(Fits, frame.Autofit), 0)),
             new CheckField("wrap", texts["deck.textFrame.wrap"], frame.WordWrap),
+            new ChoiceField("flow", texts["deck.textFrame.flow"],
+                [.. Flows.Select(flow => texts[$"deck.textFrame.flow.{flow}"])], Math.Max(Array.IndexOf(Flows, frame.Layout.Flow), 0)),
+            new NumberField("rotation", texts["deck.textFrame.rotation"], Math.Round(frame.RotationDegrees, 1), -359, 359, 1),
+            new NumberField("columns", texts["deck.textFrame.columns"], Math.Max(1, frame.Layout.Columns), 1, 16, 1),
+            Centimetres("spacing", "deck.textFrame.columnSpacing", frame.Layout.ColumnSpacing, 0),
             Centimetres("left", "deck.textFrame.insetLeft", frame.Insets.Left, 0),
             Centimetres("top", "deck.textFrame.insetTop", frame.Insets.Top, 0),
             Centimetres("right", "deck.textFrame.insetRight", frame.Insets.Right, 0),
@@ -85,6 +92,13 @@ public sealed class DeckTextFrameCommands(
             Autofit = Fits[Index(values, "autofit", Fits.Length)],
             WordWrap = values["wrap"] is true,
             Insets = new TextInsets(Points(values, "left"), Points(values, "top"), Points(values, "right"), Points(values, "bottom")),
+            RotationDegrees = Number(values, "rotation"),
+            Layout = frame.Layout with
+            {
+                Flow = Flows[Index(values, "flow", Flows.Length)],
+                Columns = Math.Clamp((int)Math.Round(Number(values, "columns")), 1, 16),
+                ColumnSpacing = Points(values, "spacing"),
+            },
         };
         var before = Points(values, "before");
         var first = Points(values, "first");
@@ -102,7 +116,10 @@ public sealed class DeckTextFrameCommands(
         new(key, texts[label], Math.Round(points / PointsPerCentimetre, 2), minimum, 20, 0.05);
 
     private double Points(IReadOnlyDictionary<string, object> values, string key) =>
-        Convert.ToDouble(values[key], System.Globalization.CultureInfo.InvariantCulture) * PointsPerCentimetre;
+        Number(values, key) * PointsPerCentimetre;
+
+    private double Number(IReadOnlyDictionary<string, object> values, string key) =>
+        Convert.ToDouble(values[key], System.Globalization.CultureInfo.InvariantCulture);
 
     private int Index(IReadOnlyDictionary<string, object> values, string key, int count) =>
         values[key] is int i && i >= 0 && i < count ? i : 0;

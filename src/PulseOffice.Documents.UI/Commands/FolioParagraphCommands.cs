@@ -85,11 +85,11 @@ public sealed class FolioParagraphCommands(IActiveFolioContext context) : FolioC
     private CommandDefinition List((string Id, string ListStyle) entry) =>
         Action(Editing(entry.Id) with
         {
-            CheckedWhen = _ => Editor?.CurrentParagraph().ListStyleName == entry.ListStyle,
+            CheckedWhen = _ => Editor?.EffectiveParagraph().ListStyleName == entry.ListStyle,
         }, editor =>
         {
             var current = editor.CurrentParagraph();
-            var next = current.ListStyleName == entry.ListStyle ? null : entry.ListStyle;
+            var next = editor.EffectiveParagraph().ListStyleName == entry.ListStyle ? null : entry.ListStyle;
             editor.Apply((documents, range) => documents.SetList(editor.Document, editor.History, range, next, current.BulletLevel), editor.ParagraphRange());
         });
 

@@ -220,9 +220,23 @@ internal sealed class ConnectorObjectWriter(OdfDeckShapeMapper shapes, OdfAltTex
     {
         var style = session.NextStyle("gr");
         session.AddStyle(session.ShapeStyles.Build(style, connector.Style));
-        var slide = session.Deck.Slides.FirstOrDefault(candidate => candidate.Elements.Any(placed => placed.Id == element.Id));
-        return shapes.BuildConnector(element, connector, style, id => id != element.Id && slide?.Elements.Any(placed => placed.Id == id) == true);
+        var slide = session.Deck.Slides.FirstOrDefault(candidate => candidate.Elements.Any(placed => placed.Id == element.Id) || Pieces(candidate).Any(piece => piece.Id == element.Id));
+        var targets = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var placed in slide is null ? [] : Pieces(slide))
+        {
+            targets.TryAdd(placed.Id, placed.Id);
+            if (placed is ObjectElement { Content.Id: { Length: > 0 } content }) targets.TryAdd(content, placed.Id);
+        }
+        return shapes.BuildConnector(element, connector, style,
+            id => targets.TryGetValue(id, out var written) && written != element.Id ? written : null);
     }
+
+    private readonly PulseOffice.Presentations.SlideGroupDecomposition _decomposition = new();
+
+    private IEnumerable<SlideElement> Pieces(Slide slide) =>
+        slide.Elements.SelectMany(placed => placed is ObjectElement objectElement
+            ? _decomposition.Decompose(objectElement).Leaves.Cast<SlideElement>()
+            : [placed]);
 }
 
 internal sealed class ImageObjectWriter(OdfDeckShapeMapper shapes, OdfUnits units, OdfAltTextMapper altText)

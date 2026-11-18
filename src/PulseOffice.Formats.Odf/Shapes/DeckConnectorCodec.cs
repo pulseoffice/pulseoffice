@@ -31,7 +31,7 @@ internal sealed class DeckConnectorCodec(IShapePathWriter paths, OdfShapeStyleRe
 {
     private readonly SegmentEnds _ends = new();
 
-    public XElement Build(ObjectElement element, ConnectorObject connector, string styleName, Func<string, bool> written)
+    public XElement Build(ObjectElement element, ConnectorObject connector, string styleName, Func<string, string?> written)
     {
         var bounds = element.Bounds;
         var points = _ends.Of(connector.Path).ToList();
@@ -112,9 +112,9 @@ internal sealed class DeckConnectorCodec(IShapePathWriter paths, OdfShapeStyleRe
             ? new ConnectorEndpoint(shape, glue.Site((string?)node.Attribute(Draw + $"{side}-glue-point")))
             : ConnectorEndpoint.Free;
 
-    private void Glue(XElement node, string side, ConnectorEndpoint endpoint, Func<string, bool> written)
+    private void Glue(XElement node, string side, ConnectorEndpoint endpoint, Func<string, string?> written)
     {
-        if (endpoint.ObjectId is not { Length: > 0 } shape || !written(shape)) return;
+        if (endpoint.ObjectId is not { Length: > 0 } target || written(target) is not { } shape) return;
         node.Add(new XAttribute(Draw + $"{side}-shape", shape));
         if (glue.Index(endpoint.Site) is { } index) node.Add(new XAttribute(Draw + $"{side}-glue-point", index));
     }

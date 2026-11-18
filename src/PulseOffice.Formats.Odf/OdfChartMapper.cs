@@ -25,6 +25,8 @@ public sealed class OdfChartMapper
     private readonly OdfDrawUnits _draw = new();
     private readonly ISheetPlacement _placement;
     private readonly SeriesSourceAddresses _sources = new();
+    private readonly PulseOffice.Sheets.Engine.Operations.ChartTableSources _tables = new();
+    private readonly OdfChartTableSources _tableSources = new();
     private readonly PulseOffice.Sheets.Engine.Operations.ChartErrorValueRefresh _errorValues = new();
     private readonly PulseOffice.Sheets.Engine.Operations.ChartDataExtractor _data = new(
         new PulseOffice.Sheets.Engine.Operations.CanonicalSeriesNames(), new PulseOffice.Sheets.Engine.Operations.DocumentLanguageChartCellText());
@@ -49,12 +51,15 @@ public sealed class OdfChartMapper
         foreach (var placed in sheet.Objects)
         {
             if (placed.Content is not ChartDefinition stored) continue;
-            var definition = _errorValues.Refresh(workbook, stored);
+            var structured = _errorValues.Refresh(workbook, stored);
+            var definition = _tables.Flatten(structured, workbook);
 
             var path = $"Object {_objects.Count + 1}";
-            _objects.Add((path, IsStatic(definition)
+            var content = IsStatic(definition)
                 ? _staticBuilder.Build(definition, definition.InlineData!, placed.Size)
-                : _builder.Build(definition, _data.Extract(workbook, definition), placed.Size)));
+                : _builder.Build(definition, _data.Extract(workbook, definition), placed.Size);
+            _tableSources.Write(content, structured);
+            _objects.Add((path, content));
 
             if (!frames.TryGetValue(placed.Anchor, out var list)) frames[placed.Anchor] = list = [];
             list.Add(Frame(placed, definition, path, sheet));
@@ -103,6 +108,7 @@ public sealed class OdfChartMapper
 
         var name = (string?)anchored.Frame.Attribute(Draw + "name") ?? path;
         if ((Referenced(chart) ? _reader.Read(chart, name) : _staticReader.Read(chart, name)) is not { } definition) return null;
+        if (_tableSources.Read(chart) is { } kept) definition = definition with { SeriesSources = kept };
 
         return new PlacedObject
         {

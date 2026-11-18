@@ -112,7 +112,7 @@ public sealed class ChartAnalysisPainter
             if (format.Trendline is null && format.ErrorBars is null && format.XErrorBars is null) continue;
             var points = Ordered(anchors, series);
             if (points.Count == 0 || painter.SeriesScale(frame, series) is not { } scale) continue;
-            var colour = Plots.ChartColours.Resolve(frame.Data.Series[series].ColorHex, series);
+            var colour = frame.Marks.Mark(Plots.ChartColours.Resolve(frame.Data.Series[series].ColorHex, series));
             if (format.Trendline is { } trendline) Trend(context, trendline, points, scale, colour, frame.Formatting, horizontal);
             if (format.ErrorBars is { } bars) Whiskers(context, bars, ValueErrors(bars, frame.Data.Series[series], points, scale, horizontal), colour);
             if (format.XErrorBars is { } across) Whiskers(context, across, CategoryErrors(across, frame.Data.Series[series], points, horizontal), colour);

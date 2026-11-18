@@ -64,7 +64,7 @@ public interface IDirectDocumentEditor : IDocumentEditor
 }
 
 public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, IDirectFormatting direct, IContentTrails trails, IRangeDeletion deletion, IBlockTree tree,
-    IObjectAnchoring anchoring, ISequenceFields sequences, ITableEditing tables, Clipboard.IFragmentPaster paster, IPageTextWidth pages)
+    IObjectAnchoring anchoring, ISequenceFields sequences, ITableEditing tables, Clipboard.IFragmentPaster paster, IPageTextWidth pages, IStyleResolver resolver, ILinkedStyleSelection linked)
     : IDirectDocumentEditor
 {
     public DocumentEdit Paste(TextDocument document, UndoStack history, DocumentPosition at, Clipboard.DocumentFragment fragment) =>
@@ -176,6 +176,7 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
     public DocumentEdit ApplyParagraphStyle(TextDocument document, UndoStack history, DocumentRange range, string styleName)
     {
         if (!document.Styles.Paragraph.Contains(styleName)) throw new KeyNotFoundException($"Paragraph style '{styleName}' not found.");
+        if (linked.CharacterStyle(document, range, styleName) is { } character) return ApplyCharacterStyle(document, history, range, character);
         return EachParagraph(document, history, range, "paragraph-style",
             (state, _, _) => state with { Content = state.Content with { StyleName = styleName, OutlineLevel = null } });
     }
@@ -206,6 +207,7 @@ public sealed class DocumentEditor(IStoryCatalog stories, IParagraphText text, I
                 Content = state.Content with
                 {
                     ListStyleName = listStyleName,
+                    ListSuppressed = listStyleName is null && resolver.ResolveParagraphStyle(document.Styles, state.Content.StyleName).ListStyleName is not null,
                     BulletLevel = clamped,
                     Bullet = format == NumberFormat.Bullet,
                     Numbered = format is not null and not NumberFormat.Bullet,

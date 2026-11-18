@@ -41,6 +41,10 @@ public sealed record TextFrame
     public double LineReduction { get; init; }
 
     public bool WordWrap { get; init; } = true;
+
+    public double RotationDegrees { get; init; }
+
+    public TextLayout Layout { get; init; } = TextLayout.Default;
 }
 
 public interface ITextFrameResize

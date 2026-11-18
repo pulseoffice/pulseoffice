@@ -114,7 +114,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         return true;
     }
 
-    private bool ListRelevant(TextParagraph paragraph) => paragraph.ListStyleName is not null || paragraph.IsListItem || paragraph.ListRestart is not null || paragraph.ListId is not null || paragraph.OutlineLevel is not null;
+    private bool ListRelevant(TextParagraph paragraph) => paragraph.ListStyleName is not null || paragraph.ListSuppressed || paragraph.IsListItem || paragraph.ListRestart is not null || paragraph.ListId is not null || paragraph.OutlineLevel is not null;
 
     private IReadOnlyDictionary<string, ListPlacement?> Place(TextDocument document, List<ParagraphBlock> blocks)
     {

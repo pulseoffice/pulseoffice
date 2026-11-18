@@ -20,6 +20,8 @@ public sealed record FilterChoice(IReadOnlySet<string>? AllowedValues, string? C
     public CriteriaJoin Join { get; init; }
 
     public bool? SortDescending { get; init; }
+
+    public RelativeDatePeriod? Period { get; init; }
 }
 
 public sealed class FilterMenuView : UserControl, IDialogContent, IDialogFooterOwner, IDialogSizeHint
@@ -93,6 +95,14 @@ public sealed class FilterMenuView : UserControl, IDialogContent, IDialogFooterO
         foreach (var colour in facts.Colours.Concat(current?.Color is { } chosen && !facts.Colours.Contains(chosen) ? [chosen] : []))
             colours.Children.Add(ColourButton(colour, current?.Color == colour));
 
+        Period = new ComboBox
+        {
+            ItemsSource = new[] { kit["filter.period.none"] }.Concat(Enum.GetValues<RelativeDatePeriod>().Select(entry => kit["filter.period." + Camel(entry.ToString())])).ToList(),
+            SelectedIndex = current?.Period is { } chosenPeriod ? (int)chosenPeriod + 1 : 0,
+            MinWidth = 150,
+        };
+        AutomationProperties.SetName(Period, kit["filter.byPeriod"]);
+
         _summary = kit.Note();
 
         var layout = new StackPanel
@@ -115,6 +125,7 @@ public sealed class FilterMenuView : UserControl, IDialogContent, IDialogFooterO
                 }),
             },
         };
+        if (dates) layout.Children.Add(Section("filter.byPeriod", Period));
         if (colours.Children.Count > 0) layout.Children.Add(Section("filter.byColour", colours));
         layout.Children.Add(_summary);
         Content = layout;
@@ -149,6 +160,8 @@ public sealed class FilterMenuView : UserControl, IDialogContent, IDialogFooterO
 
     public ComboBox Join { get; }
 
+    public ComboBox Period { get; }
+
     public ComboBox SecondCondition { get; }
 
     public TextBox SecondConditionValue { get; }
@@ -175,6 +188,7 @@ public sealed class FilterMenuView : UserControl, IDialogContent, IDialogFooterO
             {
                 SecondCriteria = first is null ? null : second,
                 Join = Join.SelectedIndex == 1 ? CriteriaJoin.Or : CriteriaJoin.And,
+                Period = Model.IsDateColumn && Period.SelectedIndex > 0 ? (RelativeDatePeriod)(Period.SelectedIndex - 1) : null,
             };
         }
     }

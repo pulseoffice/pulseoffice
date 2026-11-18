@@ -48,6 +48,7 @@ internal sealed class PptxSlideWriter(
         var shapes = new Dictionary<string, uint>(StringComparer.Ordinal);
         uint shapeId = 2;
         var glued = new List<(P.ConnectionShape Shape, ObjectElement Placed, PulseOffice.Drawing.Shapes.ConnectorObject Connector)>();
+        var targets = new PptxGlueTargets();
 
         var diagrams = slide.IntactDiagrams().ToList();
         var edited = slide.TextEditedDiagrams().ToList();
@@ -60,6 +61,7 @@ internal sealed class PptxSlideWriter(
             foreach (var member in diagram.Members)
             {
                 shapes.TryAdd(member.Id, frame.NonVisualGraphicFrameProperties!.NonVisualDrawingProperties!.Id!.Value);
+                targets.Add(member, frame.NonVisualGraphicFrameProperties!.NonVisualDrawingProperties!.Id!.Value);
                 nodes.Remember(member.Id, frame);
             }
         }
@@ -82,6 +84,7 @@ internal sealed class PptxSlideWriter(
                 {
                     var id = shapeId++;
                     shapes[textElement.Id] = id;
+                    targets.Add(textElement, id);
                     var shape = _visibility.Write(_rotation.Write(text.Build(id, textElement, session.Deck.Theme, new PptxSlideRunLinks(part, session)), textElement), textElement);
                     if (slide.Interaction(textElement.Id) is { } interaction)
                         interactions.Apply(shape.NonVisualShapeProperties!.NonVisualDrawingProperties!, interaction, part, session);
@@ -92,6 +95,7 @@ internal sealed class PptxSlideWriter(
                 case MediaElement mediaElement:
                 {
                     shapes[mediaElement.Id] = shapeId;
+                    targets.Add(mediaElement, shapeId);
                     var built = _visibility.Write(_rotation.Write(media.Build(shapeId++, mediaElement, session.Document, part), mediaElement), mediaElement);
                     if (slide.Interaction(mediaElement.Id) is { } action
                         && built.Descendants<P.NonVisualDrawingProperties>().FirstOrDefault() is { } drawing)
@@ -107,6 +111,7 @@ internal sealed class PptxSlideWriter(
                     {
                         var id = shapeId++;
                         if (objects.FirstOrDefault(writer => writer.CanWrite(piece.Content))?.Write(piece, id, part) is not { } written) continue;
+                        targets.Add(piece, id);
                         if (piece.Content is PulseOffice.Drawing.Shapes.ShapeObject linked) _shapeRuns.Write(written, linked, new PptxSlideRunLinks(part, session));
                         if (piece.Content is PulseOffice.Drawing.Shapes.ConnectorObject connector && written is P.ConnectionShape connection) glued.Add((connection, piece, connector));
                         if (shapes.TryAdd(objectElement.Id, id) && slide.Interaction(objectElement.Id) is { } action
@@ -120,7 +125,7 @@ internal sealed class PptxSlideWriter(
             }
         }
 
-        foreach (var (connection, placed, connector) in glued) _glue.Write(connection, placed, connector, slide, shapes);
+        foreach (var (connection, placed, connector) in glued) _glue.Write(connection, placed, connector, targets);
         foreach (var chrome in _headerFooter.Shapes(session.Deck.HeaderFooter, slide, session.Deck.IndexOf(slide) + 1, session.Deck.Size, shapeId, session.Deck.TextLanguage))
             tree.Append(chrome);
         nodes.Declare(slide.Groups);

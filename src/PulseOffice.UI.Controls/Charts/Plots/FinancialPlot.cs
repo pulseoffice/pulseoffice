@@ -55,7 +55,8 @@ public sealed class FinancialPlot : ChartPlotBase
             var first = withOpen && index < open.Count ? open[index] : close[index];
             var rising = close[index] >= first;
 
-            var colour = new SolidColorBrush(rising ? Rising : Falling);
+            var hue = frame.Marks.Mark(rising ? Rising : Falling);
+            var colour = new SolidColorBrush(hue);
             var pen = new Pen(colour, 1.4);
 
             frame.Context.DrawLine(pen,
@@ -70,7 +71,7 @@ public sealed class FinancialPlot : ChartPlotBase
                 var body = new Rect(centre - width / 2, top, width, height);
 
                 frame.Context.DrawRectangle(rising ? null : colour, pen, body);
-                if (rising) frame.Context.DrawRectangle(new SolidColorBrush(Rising, 0.25), pen, body);
+                if (rising) frame.Context.DrawRectangle(new SolidColorBrush(hue, 0.25), pen, body);
 
                 continue;
             }

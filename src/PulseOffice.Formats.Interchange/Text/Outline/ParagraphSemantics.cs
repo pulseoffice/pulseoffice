@@ -44,6 +44,7 @@ public sealed class ParagraphSemantics(IStyleResolver resolver, IStyleChain chai
 
     public ListPlacement List(StyleSheet sheet, TextParagraph paragraph)
     {
+        if (paragraph.ListSuppressed) return ListPlacement.None;
         var name = paragraph.ListStyleName ?? resolver.ResolveParagraphStyle(sheet, paragraph.StyleName).ListStyleName;
         if (name is null && !paragraph.IsListItem) return ListPlacement.None;
         var level = Math.Clamp(paragraph.BulletLevel, 0, ListStyle.LevelCount - 1);

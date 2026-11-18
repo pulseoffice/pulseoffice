@@ -25,8 +25,14 @@ internal sealed class XlsxConditionalExtension(
     public WorksheetExtension? Extension(Worksheet sheet)
     {
         ArgumentNullException.ThrowIfNull(sheet);
+        return Extension(sheet.ConditionalRules);
+    }
 
-        var rules = sheet.ConditionalRules.Where(rule => sets.IsExtended(rule) || rule.Visual == ConditionalVisual.DataBar).ToList();
+    public WorksheetExtension? Extension(IReadOnlyList<ConditionalRule> all)
+    {
+        ArgumentNullException.ThrowIfNull(all);
+
+        var rules = all.Where(rule => sets.IsExtended(rule) || rule.Visual == ConditionalVisual.DataBar).ToList();
         if (rules.Count == 0) return null;
 
         var container = new XElement(X14 + "conditionalFormattings",

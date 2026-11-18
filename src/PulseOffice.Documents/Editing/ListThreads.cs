@@ -25,7 +25,7 @@ public sealed class ListThreads(IStoryCatalog stories, IBlockTree tree, IStyleRe
         foreach (var paragraph in paragraphs)
         {
             if (paragraph.Content.ListId is not { } raw) continue;
-            var style = paragraph.Content.ListStyleName ?? resolver.ResolveParagraphStyle(sheet, paragraph.Content.StyleName).ListStyleName;
+            var style = paragraph.Content.ListSuppressed ? null : paragraph.Content.ListStyleName ?? resolver.ResolveParagraphStyle(sheet, paragraph.Content.StyleName).ListStyleName;
             if (style is null)
             {
                 paragraph.Content = paragraph.Content with { ListId = null };

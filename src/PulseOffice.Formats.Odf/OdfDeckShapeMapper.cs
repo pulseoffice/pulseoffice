@@ -35,7 +35,7 @@ public sealed class OdfDeckShapeMapper
 
     public XElement BuildPath(ObjectElement element, ShapeOutline outline, string styleName) => _paths.Build(element, outline, styleName);
 
-    public XElement BuildConnector(ObjectElement element, ConnectorObject connector, string styleName, Func<string, bool> written) => _connectors.Build(element, connector, styleName, written);
+    public XElement BuildConnector(ObjectElement element, ConnectorObject connector, string styleName, Func<string, string?> written) => _connectors.Build(element, connector, styleName, written);
 
     public bool IsConnector(XElement node) => _connectors.Reads(node);
 

@@ -270,6 +270,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         return paragraph with
         {
             ListStyleName = listName,
+            ListSuppressed = listName is null && extras.ListId == 0,
             BulletLevel = listName is null ? 0 : extras.ListLevel,
             ListId = listName is null ? null : context.Lists.ThreadOf(extras.ListId),
             Bullet = level?.Format == NumberFormat.Bullet,

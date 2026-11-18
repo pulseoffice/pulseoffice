@@ -26,13 +26,12 @@ public sealed class CalculationEngine
     private readonly Dictionary<SheetCell, CellValue> _values = [];
     private readonly HashSet<SheetCell> _circular = [];
 
-    private readonly Dictionary<SheetCell, CellRange> _spillRanges = [];
 
-    private readonly Dictionary<SheetCell, SheetCell> _spillOwners = [];
 
-    private readonly Dictionary<SheetCell, CellRange> _blockedSpills = [];
 
     private readonly Dictionary<SheetCell, string> _requestedStyles = [];
+
+    private readonly SpillArea _spills;
 
     private readonly WholeColumnAggregates _aggregates;
 
@@ -84,6 +83,7 @@ public sealed class CalculationEngine
         _workbook = workbook;
         _functions = functions;
         _evaluator = evaluator;
+        _spills = new SpillArea(workbook, _values, _coercion);
         _aggregates = new WholeColumnAggregates(evaluator, ResolveSheet);
         _dependencies = new FormulaDependencies(this, evaluator.Names, _tables);
         _columns = new TableColumnFollower(_tables);
@@ -155,7 +155,7 @@ public sealed class CalculationEngine
         _writing++;
         try
         {
-            owner = Claim(cell);
+            owner = _spills.Claim(cell);
             Synchronize(cell, sheet[address]);
         }
         finally
@@ -164,13 +164,6 @@ public sealed class CalculationEngine
         }
 
         RecalculateFrom(owner is { } anchor ? [cell, anchor] : [cell]);
-    }
-
-    private SheetCell? Claim(SheetCell cell)
-    {
-        if (!_spillOwners.Remove(cell, out var owner)) return null;
-        _values.Remove(cell);
-        return owner;
     }
 
     private void Synchronize(SheetCell cell, Cell content)
@@ -313,19 +306,17 @@ public sealed class CalculationEngine
         }
     }
 
-    public IReadOnlyDictionary<SheetCell, CellRange> SpillRanges => _spillRanges;
+    public IReadOnlyDictionary<SheetCell, CellRange> SpillRanges => _spills.Ranges;
 
-    public bool IsSpilledInto(SheetCell cell) => _spillOwners.ContainsKey(cell);
+    public bool IsSpilledInto(SheetCell cell) => _spills.IsSpilledInto(cell);
     public IFunctionRegistry Functions => _functions;
     public IReadOnlySet<SheetCell> CircularCells => _circular;
 
     private const int MaxOnDemandDepth = 256;
 
-    internal int SpillBottom(int sheetIndex) =>
-        _spillRanges.Where(pair => pair.Key.SheetIndex == sheetIndex).Select(pair => pair.Value.End.Row).DefaultIfEmpty(-1).Max();
+    internal int SpillBottom(int sheetIndex) => _spills.Bottom(sheetIndex);
 
-    internal int SpillRight(int sheetIndex) =>
-        _spillRanges.Where(pair => pair.Key.SheetIndex == sheetIndex).Select(pair => pair.Value.End.Column).DefaultIfEmpty(-1).Max();
+    internal int SpillRight(int sheetIndex) => _spills.Right(sheetIndex);
 
     private RecalculationPass? _pass;
 
@@ -359,7 +350,7 @@ public sealed class CalculationEngine
             }
 
             var multiValued = !context.ImplicitIntersection && IsMultiValued(result);
-            var produced = Materialize(cell, result, context, pass.Spilled);
+            var produced = _spills.Materialize(cell, result, context, pass.Spilled);
             if (pass.SelfReads.Remove(cell))
             {
                 _circular.Add(cell);
@@ -480,7 +471,7 @@ public sealed class CalculationEngine
 
         Track(cell, sheet[cell.Address], sheet[cell.Address].Value, formula);
 
-        var owner = Claim(cell);
+        var owner = _spills.Claim(cell);
         sheet.SetFormula(cell.Address, formula);
 
         try
@@ -557,10 +548,10 @@ public sealed class CalculationEngine
 
         Track(cell, sheet[cell.Address], value, null);
 
-        var owner = Claim(cell);
+        var owner = _spills.Claim(cell);
         sheet.SetValue(cell.Address, value);
 
-        ReleaseSpill(cell);
+        _spills.Release(cell);
         _formulas.Remove(cell);
         _aggregates.Forget(cell);
         _values.Remove(cell);
@@ -608,13 +599,10 @@ public sealed class CalculationEngine
     {
         HasPendingCalculation = false;
 
-        var previousSpills = _spillOwners.Keys.ToList();
         _values.Clear();
         _circular.Clear();
         _graph.Clear();
-        _spillRanges.Clear();
-        _spillOwners.Clear();
-        _blockedSpills.Clear();
+        _spills.Reset();
 
         _formulas.Clear();
         _aggregates.Clear();
@@ -622,8 +610,6 @@ public sealed class CalculationEngine
         _visibilitySensitive.Clear();
         _tableReaders.Clear();
         _columns.Reset(_workbook);
-        CollectLoadedSpills();
-        _loadedSpills.UnionWith(previousSpills);
         for (var s = 0; s < _workbook.Sheets.Count; s++)
         {
             foreach (var (address, cell) in _workbook.Sheets[s].NonEmptyCells())
@@ -644,39 +630,7 @@ public sealed class CalculationEngine
         }
 
         Recalculate(_formulas.Keys.ToHashSet());
-        ClearStaleSpills();
-    }
-
-    private readonly HashSet<SheetCell> _loadedSpills = [];
-
-    private void CollectLoadedSpills()
-    {
-        _loadedSpills.Clear();
-        for (var index = 0; index < _workbook.Sheets.Count; index++)
-        {
-            var sheet = _workbook.Sheets[index];
-            foreach (var (address, cell) in sheet.NonEmptyCells().Where(pair => pair.Value.IsSpilled).ToList())
-            {
-                _loadedSpills.Add(new SheetCell(index, address));
-                sheet[address] = cell with { IsSpilled = false };
-            }
-        }
-    }
-
-    private void ClearStaleSpills()
-    {
-        foreach (var cell in _loadedSpills.Where(cell => !_spillOwners.ContainsKey(cell)))
-            if (SheetAt(cell.SheetIndex) is { } sheet && !sheet[cell.Address].HasFormula)
-                sheet[cell.Address] = sheet[cell.Address] with { Value = CellValue.Empty };
-        _loadedSpills.Clear();
-
-        for (var index = 0; index < _workbook.Sheets.Count; index++)
-        {
-            var sheet = _workbook.Sheets[index];
-            foreach (var (address, cell) in sheet.NonEmptyCells().Where(pair => pair.Value.SpillRange is not null).ToList())
-                if (!_spillRanges.ContainsKey(new SheetCell(index, address)))
-                    sheet[address] = cell with { SpillRange = null };
-        }
+        _spills.ClearStale();
     }
 
     public void RecalculateFrom(IEnumerable<SheetCell> changed)
@@ -736,9 +690,7 @@ public sealed class CalculationEngine
         var affected = _graph.TransitiveDependents([.. touched, .. _volatile]).ToHashSet();
         affected.UnionWith(_volatile);
 
-        var unblocked = _blockedSpills
-            .Where(blocked => touched.Any(c => c.SheetIndex == blocked.Key.SheetIndex && blocked.Value.Contains(c.Address)))
-            .Select(blocked => blocked.Key).ToList();
+        var unblocked = _spills.UnblockedBy(touched);
         if (unblocked.Count > 0)
         {
             affected.UnionWith(unblocked);
@@ -788,199 +740,14 @@ public sealed class CalculationEngine
         }
     }
 
-    private CellValue Materialize(
-    SheetCell cell, EvalValue result, IEvaluationContext context, HashSet<SheetCell> spilled)
-    {
-        var sheet = SheetAt(cell.SheetIndex);
-        var declared = sheet?[cell.Address].ArrayFormulaRange;
-
-        if (declared is { } area)
-            return FillDeclaredArea(cell, area, result, context, spilled);
-
-        if (!context.ImplicitIntersection && result is RangeValue { Range.IsSingleCell: false } range)
-            result = new ArrayValue([.. Enumerable.Range(0, range.Range.RowCount).Select(row =>
-                (IReadOnlyList<CellValue>)[.. Enumerable.Range(0, range.Range.ColumnCount).Select(column =>
-                    context.GetCellValue(range.SheetName, range.Range.Start.Offset(row, column)))])]);
-
-        if (context.ImplicitIntersection || result is not ArrayValue array || (array.RowCount <= 1 && array.ColumnCount <= 1))
-        {
-            ReleaseSpill(cell, spilled);
-            var scalar = _coercion.ToScalar(result, context);
-            return scalar.IsEmpty ? CellValue.Number(0) : scalar;
-        }
-
-        return Spill(cell, array, spilled);
-    }
-
-    private CellValue FillDeclaredArea(
-    SheetCell cell, CellRange area, EvalValue result, IEvaluationContext context, HashSet<SheetCell> spilled)
-    {
-        var sheet = SheetAt(cell.SheetIndex);
-        if (sheet is null || cell.Address != area.Start)
-            return _coercion.ToScalar(result, context);
-
-        var array = result as ArrayValue;
-
-        for (var row = 0; row < area.RowCount; row++)
-            for (var column = 0; column < area.ColumnCount; column++)
-            {
-                var target = new SheetCell(cell.SheetIndex,
-                    new CellAddress(area.Start.Row + row, area.Start.Column + column));
-
-                var value = array is null
-                    ? _coercion.ToScalar(result, context)
-                    : ElementAt(array, row, column);
-
-                if (target != cell)
-                {
-                    sheet[target.Address] = sheet[target.Address] with { Value = value };
-                    _values[target] = value;
-                    spilled.Add(target);
-                }
-                else
-                {
-                    _values[target] = value;
-                }
-            }
-
-        return _values[cell];
-    }
-
-    private CellValue Spill(SheetCell anchor, ArrayValue array, HashSet<SheetCell> spilled)
-    {
-        var sheet = SheetAt(anchor.SheetIndex);
-        if (sheet is null) return CellValue.FromError(CellError.Reference);
-
-        var end = new CellAddress(
-            anchor.Address.Row + array.RowCount - 1,
-            anchor.Address.Column + array.ColumnCount - 1);
-
-        if (!end.IsValid) return CellValue.FromError(CellError.Reference);
-
-        var target = new CellRange(anchor.Address, end);
-        _blockedSpills.Remove(anchor);
-
-        ReleaseSpill(anchor, spilled);
-
-        foreach (var address in target.Cells())
-        {
-            if (address == anchor.Address) continue;
-            var occupant = new SheetCell(anchor.SheetIndex, address);
-
-            var existing = sheet[address];
-            var ownedByOthers = _spillOwners.TryGetValue(occupant, out var owner) && owner != anchor;
-
-            if (existing.HasFormula || (!existing.Value.IsEmpty && !_loadedSpills.Contains(occupant)) || ownedByOthers)
-            {
-                _blockedSpills[anchor] = target;
-                return CellValue.FromError(CellError.Spill);
-            }
-        }
-
-        for (var row = 0; row < array.RowCount; row++)
-            for (var column = 0; column < array.ColumnCount; column++)
-            {
-                var address = new CellAddress(anchor.Address.Row + row, anchor.Address.Column + column);
-                var value = ElementAt(array, row, column);
-                var occupant = new SheetCell(anchor.SheetIndex, address);
-
-                if (address == anchor.Address) continue;
-
-                sheet[address] = sheet[address] with { Value = value };
-                _values[occupant] = value;
-                _spillOwners[occupant] = anchor;
-                spilled.Add(occupant);
-            }
-
-        _spillRanges[anchor] = target;
-        sheet[anchor.Address] = sheet[anchor.Address] with { SpillRange = target };
-        return ElementAt(array, 0, 0);
-    }
-
-    private void ReleaseSpill(SheetCell anchor, HashSet<SheetCell>? spilled = null)
-    {
-        if (!_spillRanges.TryGetValue(anchor, out var previous)) return;
-
-        var sheet = SheetAt(anchor.SheetIndex);
-        foreach (var address in previous.Cells())
-        {
-            if (address == anchor.Address) continue;
-            var occupant = new SheetCell(anchor.SheetIndex, address);
-
-            if (!_spillOwners.TryGetValue(occupant, out var owner) || owner != anchor) continue;
-
-            _spillOwners.Remove(occupant);
-            _values.Remove(occupant);
-            if (sheet is not null) sheet[address] = sheet[address] with { Value = CellValue.Empty };
-            spilled?.Add(occupant);
-        }
-
-        _spillRanges.Remove(anchor);
-        if (sheet is not null && sheet[anchor.Address].SpillRange is not null)
-            sheet[anchor.Address] = sheet[anchor.Address] with { SpillRange = null };
-    }
-
-    private static CellValue ElementAt(ArrayValue array, int row, int column)
-    {
-        if (row >= array.Rows.Count) return CellValue.FromError(CellError.NotAvailable);
-        var line = array.Rows[row];
-
-        var value = line.Count == 1 && column > 0 ? line[0]
-            : column < line.Count ? line[column] : CellValue.FromError(CellError.NotAvailable);
-        return value.IsEmpty ? CellValue.Number(0) : value;
-    }
-
     private void WriteBack(SheetCell cell, CellValue value)
     {
         var sheet = SheetAt(cell.SheetIndex);
         if (sheet is null) return;
         var inferred = _formulas.TryGetValue(cell, out var ast)
-            ? _formats.Infer(ast, new FormatLookup(this, cell))
+            ? _formats.Infer(ast, new FormatLookup(this, cell, _evaluator, _coercion, _hints))
             : 0;
         sheet[cell.Address] = sheet[cell.Address] with { Value = value, InferredFormatId = inferred };
-    }
-
-    private sealed class FormatLookup(CalculationEngine engine, SheetCell origin) : IFormatLookup
-    {
-        private readonly int _defaultSheet = origin.SheetIndex;
-
-        public NumberFormatCatalog Formats => engine._workbook.NumberFormats;
-
-        public FormatHint LastIn(string? sheetName, CellRange range)
-        {
-            var index = engine.ResolveSheet(sheetName, _defaultSheet);
-            if (engine.SheetAt(index) is not { } sheet) return FormatHint.None;
-            for (var row = Math.Min(range.End.Row, sheet.LastUsedRow); row >= range.Start.Row; row--)
-                for (var column = Math.Min(range.End.Column, sheet.LastUsedColumn); column >= range.Start.Column; column--)
-                {
-                    var address = new CellAddress(row, column);
-                    if (sheet.TryGetCell(address, out var cell) && !cell.Value.IsEmpty) return At(sheetName, address);
-                }
-            return FormatHint.None;
-        }
-
-        public CellValue? Evaluate(FormulaNode node)
-        {
-            var context = new WorkbookEvaluationContext(engine, origin);
-            return engine._coercion.ToScalar(engine._evaluator.EvaluateRaw(node, context), context);
-        }
-
-        public FormatHint At(string? sheetName, CellAddress address)
-        {
-            var index = engine.ResolveSheet(sheetName, _defaultSheet);
-            if (engine.SheetAt(index) is not { } sheet) return FormatHint.None;
-            var formats = engine._workbook.NumberFormats;
-            var own = engine._workbook.Styles.Get(sheet.StyleIdAt(address)).NumberFormatId;
-            if (own != 0) return engine._hints.Of(own, formats);
-            return sheet.TryGetCell(address, out var target) && target.HasFormula ? engine._hints.Of(target.InferredFormatId, formats) : FormatHint.None;
-        }
-
-        public FormulaNode? Expand(NameNode name)
-        {
-            if (engine._workbook.ResolveName(name.Name, engine.SheetAt(_defaultSheet)?.Name)?.Expression is not { } expression) return null;
-            try { return engine._evaluator.Names.Expand(expression, origin.Address); }
-            catch (FormulaSyntaxException) { return null; }
-        }
     }
 
     private void RegisterDependencies(SheetCell cell, FormulaNode ast)

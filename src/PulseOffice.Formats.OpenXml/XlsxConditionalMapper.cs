@@ -87,5 +87,5 @@ public sealed class XlsxConditionalMapper
         return rules;
     }
 
-    internal IWorksheetExtensionSource Extensions => _extension;
+    internal DocumentFormat.OpenXml.Spreadsheet.WorksheetExtension? Extension(IReadOnlyList<ConditionalRule> rules) => _extension.Extension(rules);
 }

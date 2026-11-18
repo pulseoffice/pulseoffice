@@ -89,7 +89,8 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                 paragraphs.Elements(tabs.Defaults(sheet.DefaultParagraph, sheet), new DocxParagraphExtras(null, null, 0, null))))));
         foreach (var style in sheet.Paragraph.All)
         {
-            var element = Header(style, W.StyleValues.Paragraph, StyleFamily.Paragraph, map, map.IdOf(StyleFamily.Paragraph, style.NextStyleName));
+            var element = Header(style, W.StyleValues.Paragraph, StyleFamily.Paragraph, map, map.IdOf(StyleFamily.Paragraph, style.NextStyleName),
+                map.IdOf(StyleFamily.Character, style.LinkedStyleName));
             var outlined = style.ListStyleName is null && style.OutlineLevel is { } outline && sheet.Outline.Level(outline - 1).Format != NumberFormat.None;
             element.Append(new W.StyleParagraphProperties(paragraphs.Elements(tabs.Style(style, sheet),
                 outlined
@@ -101,14 +102,14 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
 
         foreach (var style in sheet.Character.All)
         {
-            var element = Header(style, W.StyleValues.Character, StyleFamily.Character, map, null);
+            var element = Header(style, W.StyleValues.Character, StyleFamily.Character, map, null, map.IdOf(StyleFamily.Paragraph, style.LinkedStyleName));
             element.Append(new W.StyleRunProperties(characters.Elements(style.Character)));
             styles.Append(element);
         }
 
         foreach (var style in sheet.Table.All)
         {
-            var element = Header(style, W.StyleValues.Table, StyleFamily.Table, map, null);
+            var element = Header(style, W.StyleValues.Table, StyleFamily.Table, map, null, null);
             tables.Write(element, style.Table);
             styles.Append(element);
         }
@@ -162,6 +163,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                         ListLevel = extras.ListId is not null && extras.ListLevel > 0 && !Outline(sheet, extras, lists) ? extras.ListLevel + 1 : null,
                         DisplayName = element.Aliases?.Val?.Value,
                         Hidden = Hidden(element),
+                        LinkedStyleName = Linked(element, map, StyleFamily.Character),
                     };
                     sheet.Paragraph.Replace(paragraph);
                     break;
@@ -172,6 +174,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                         Character = characters.Read(element.StyleRunProperties),
                         DisplayName = element.Aliases?.Val?.Value,
                         Hidden = Hidden(element),
+                        LinkedStyleName = Linked(element, map, StyleFamily.Paragraph),
                     });
                     break;
                 case StyleFamily.Table:
@@ -181,7 +184,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
         }
     }
 
-    private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next)
+    private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next, string? linked)
     {
         var id = map.Bind(family, style.Name);
         var element = new W.Style { Type = type, StyleId = id, CustomStyle = !map.IsDefaultParagraph(id) };
@@ -190,9 +193,13 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
         if (style.DisplayName is not null) element.Append(new W.Aliases { Val = style.DisplayName });
         if (style.ParentName is not null && map.IdOf(family, style.ParentName) is { } parent) element.Append(new W.BasedOn { Val = parent });
         if (next is not null) element.Append(new W.NextParagraphStyle { Val = next });
+        if (linked is not null) element.Append(new W.LinkedStyle { Val = linked });
         if (style.Hidden) element.Append(new W.SemiHidden());
         return element;
     }
+
+    private string? Linked(W.Style style, DocxStyleMap map, StyleFamily family) =>
+        map.NameOf(style.LinkedStyle?.Val?.Value) is { } name && map.IdOf(family, name) == style.LinkedStyle!.Val!.Value ? name : null;
 
     private bool Hidden(W.Style style) => style.SemiHidden is { } hidden && hidden.Val?.Value != W.OnOffOnlyValues.Off;
 

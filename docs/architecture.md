@@ -420,7 +420,7 @@ patterns and boundaries.
 - No unit constant (`EmuPer…`, `TwipsPer…`) redeclared outside `Foundation`.
 
 ### What remains
-- Types still over the cap, with a reason in the table: `Paginator`, `SlideView`, `FolioCanvas`, `CalculationEngine`,
+- Types still over the cap, with a reason in the table: `Paginator`, `SlideView`, `FolioCanvas`,
   `RtfReadSession`, `FolioEditor` (plus two data tables). `OdtBodyReading`, `OdtBodyWriting` and `DocxDrawingCodec` exceed the cap
   as files but are already split into several types.
 - A shared object gesture machine in `PulseOffice.UI.Controls` for Ledger, Deck and Folio (extracted in

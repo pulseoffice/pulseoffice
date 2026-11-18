@@ -29,6 +29,7 @@ internal sealed class DrawingTextAnchors
 
 internal sealed class BodyFrameReader(DrawingTextAnchors anchors)
 {
+    private readonly DrawingTextLayouts _layouts = new();
 
     public TextFrameLayer Read(D.BodyProperties? body)
     {
@@ -51,6 +52,8 @@ internal sealed class BodyFrameReader(DrawingTextAnchors anchors)
             FontScale = normal is null ? null : Fraction(Attribute(normal, "fontScale")),
             LineReduction = normal is null ? null : Fraction(Attribute(normal, "lnSpcReduction")),
             Wrap = Attribute(body, "wrap") switch { "none" => false, "square" => true, _ => null },
+            Rotation = _layouts.Rotation(body),
+            Layout = _layouts.Read(body),
         };
     }
 
@@ -79,6 +82,7 @@ internal sealed class BodyFrameReader(DrawingTextAnchors anchors)
 
 internal sealed class BodyPropertiesBuilder(DrawingTextAnchors anchors)
 {
+    private readonly DrawingTextLayouts _layouts = new();
 
     public D.BodyProperties Build(TextFrame frame)
     {
@@ -91,6 +95,7 @@ internal sealed class BodyPropertiesBuilder(DrawingTextAnchors anchors)
             Anchor = anchors.Value(frame.Anchor),
             Wrap = frame.WordWrap ? D.TextWrappingValues.Square : D.TextWrappingValues.None,
         };
+        _layouts.Write(body, frame.Layout, frame.RotationDegrees);
 
         body.Append(frame.Autofit switch
         {

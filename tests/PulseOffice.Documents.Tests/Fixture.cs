@@ -38,7 +38,7 @@ public sealed class Fixture
         var styles = new Indexes.IndexStyles();
         IndexEditing = new Indexes.IndexEditing(Stories, Tree, new Indexes.IndexComposer(entries, styles, new Fields.ReferenceTargets(Bookmarks, Outline, new Fields.DocumentReadingOrder(Tree, Stories), Stories, new Fields.FieldRunRewriter())), styles);
         Editor = new DocumentEditor(Stories, Text, new DirectFormatting(), Trails, Deletion, Tree, Anchoring, Sequences, new TableEditing(Stories, Deletion),
-            new Clipboard.FragmentPaster(Stories, Text, new Clipboard.FragmentAdoption(new Clipboard.FragmentRemapper(Stories, Tree), new Clipboard.StyleMerger()), Anchoring, Sequences), new PageTextWidth());
+            new Clipboard.FragmentPaster(Stories, Text, new Clipboard.FragmentAdoption(new Clipboard.FragmentRemapper(Stories, Tree), new Clipboard.StyleMerger()), Anchoring, Sequences), new PageTextWidth(), new StyleResolver(), new LinkedStyleSelection(Stories));
         Factory = new TextDocumentFactory(new DefaultStyleSheetFactory());
         Document = Factory.Create();
         History = new UndoStack();

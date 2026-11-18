@@ -2,6 +2,8 @@ namespace PulseOffice.Sheets.Engine.Operations;
 
 public sealed class TableReferenceOwners
 {
+    private readonly ChartTableSources _charts = new();
+
     public void Rename(Workbook workbook, IReadOnlyList<TableRename> renames)
     {
         ArgumentNullException.ThrowIfNull(workbook);
@@ -25,6 +27,12 @@ public sealed class TableReferenceOwners
                     SecondFormula = Renamed(validation.SecondFormula, renames),
                 };
                 if (renamed != validation) sheet.Validations[index] = renamed;
+            }
+            for (var index = 0; index < sheet.Objects.Count; index++)
+            {
+                if (sheet.Objects[index] is not { Content: PulseOffice.Charts.ChartDefinition chart } placed) continue;
+                var renamed = _charts.Rename(chart, renames);
+                if (!ReferenceEquals(renamed, chart)) sheet.Objects[index] = placed with { Content = renamed };
             }
         }
 

@@ -6,7 +6,11 @@ namespace PulseOffice.UI.Controls.Text.Rich;
 
 public sealed record ComposedTextFrame(TextFrameArea Area, IReadOnlyList<TypesetLine> Lines, IReadOnlyList<double> Tops)
 {
-    public Point Origin(int line, TypesetSegment segment) => new(Area.Inner.X + segment.X, Tops[line] + segment.Y);
+    public IReadOnlyList<double>? Shifts { get; init; }
+
+    public double Left(int line) => Area.Inner.X + (Shifts is { } shifts && line < shifts.Count ? shifts[line] : 0);
+
+    public Point Origin(int line, TypesetSegment segment) => new(Left(line) + segment.X, Tops[line] + segment.Y);
 
     public int ContentEnd(int line) => Lines[line].Segments.Count == 0 ? Lines[line].Offset : Lines[line].Segments.Max(segment => segment.End);
 }
@@ -23,13 +27,21 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
     private readonly RunText _runText = new();
     private readonly TextFrameGeometry _geometry = new();
     private readonly TextFramePlacement _placement = new();
+    private readonly TextFlowFrame _flow = new();
+    private readonly TextColumns _columns = new();
 
     public ComposedTextFrame Compose(RichText text, Rect bounds, ITextTheme theme, TextFields fields, double scale)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         var frame = text.Frame;
-        var area = _geometry.Area(bounds, frame, scale);
+        var layout = frame.Layout;
+        var outer = _geometry.Area(_flow.Box(bounds, layout), frame, scale);
+        var columns = Math.Max(1, layout.Columns);
+        var spacing = columns > 1 ? Math.Min(outer.Points(layout.ColumnSpacing), outer.Inner.Width / 2) : 0;
+        var area = columns > 1
+            ? outer with { Inner = outer.Inner.WithWidth(Math.Max(1, (outer.Inner.Width - spacing * (columns - 1)) / columns)) }
+            : outer;
         var block = new TextBlockTypesetter(theme, labels, _runText);
         var paragraphs = text.Paragraphs.Count > 0 ? text.Paragraphs : [new TextParagraph(string.Empty)];
 
@@ -38,7 +50,8 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
         if (frame.Autofit == TextAutofit.ShrinkText && height > area.Inner.Height)
             (lines, height) = Shrink(block, paragraphs, area, fields, frame.WordWrap);
 
-        return new ComposedTextFrame(area, lines, _placement.Tops(lines, area, frame.Anchor, height));
+        if (columns == 1) return new ComposedTextFrame(area, lines, _placement.Tops(lines, area, frame.Anchor, height));
+        return _columns.Distribute(area, lines, _placement.Tops(lines, area, TextAnchor.Top, height), columns, area.Inner.Width + spacing);
     }
 
     private (IReadOnlyList<TypesetLine> Lines, double Height) Shrink(
@@ -58,6 +71,26 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
             else high = middle;
         }
         return (best, block.Height(best));
+    }
+}
+
+public sealed class TextColumns
+{
+    public ComposedTextFrame Distribute(TextFrameArea area, IReadOnlyList<TypesetLine> lines, IReadOnlyList<double> tops, int columns, double pitch)
+    {
+        var placed = new List<double>(lines.Count);
+        var shifts = new List<double>(lines.Count);
+        var (column, start) = (0, 0.0);
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var local = tops[index] - area.Inner.Y;
+            var bottom = local + lines[index].Height * lines[index].Paragraph.LineSpacing;
+            if (column < columns - 1 && index > 0 && bottom - start > area.Inner.Height && local > start)
+                (column, start) = (column + 1, local - lines[index].Before);
+            placed.Add(area.Inner.Y + local - start);
+            shifts.Add(column * pitch);
+        }
+        return new ComposedTextFrame(area, lines, placed) { Shifts = shifts };
     }
 }
 

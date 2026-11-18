@@ -137,7 +137,7 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
 
     private bool OutlineNumbered(PulseOffice.Text.Rich.TextParagraph content, DocxWriteContext context)
     {
-        if (content.IsListItem || content.ListStyleName is not null || content.OutlineLevel is not { } level || level < 1 || level > ListStyle.LevelCount) return false;
+        if (content.IsListItem || content.ListSuppressed || content.ListStyleName is not null || content.OutlineLevel is not { } level || level < 1 || level > ListStyle.LevelCount) return false;
         var sheet = context.Document.Styles;
         if (sheet.Outline.Level(level - 1).Format == NumberFormat.None) return false;
         var style = content.StyleName is { } name ? sheet.Paragraph.Find(name) : null;
@@ -146,7 +146,7 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
 
     private int? ListId(PulseOffice.Text.Rich.TextParagraph content, DocxWriteContext context)
     {
-        if (listHeaders.IsHeader(content, context.Document.Styles)) return 0;
+        if (content.ListSuppressed || listHeaders.IsHeader(content, context.Document.Styles)) return 0;
         if (!content.IsListItem && content.ListStyleName is null) return null;
         if (content.ListStyleName is { } name && content.ListId is { } thread)
         {

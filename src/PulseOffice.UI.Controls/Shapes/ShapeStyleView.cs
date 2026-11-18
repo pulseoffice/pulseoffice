@@ -322,6 +322,31 @@ public sealed class ShapeStyleView : UserControl, IDialogContent, IDialogFooterO
                 Text = style.Text with { Inset = Twip.FromPoints(value) },
             })));
 
+        var flows = Enum.GetValues<PulseOffice.Text.Rich.TextFlow>();
+
+        panel.Children.Add(Choice("shape.text.flow",
+            [.. flows.Select(value => _texts[$"shape.text.flow.{Lower(value)}"])],
+            Array.IndexOf(flows, _shape.Style.Text.Layout.Flow),
+            index => Style(style => style with
+            {
+                Text = style.Text with { Layout = style.Text.Layout with { Flow = flows[index] } },
+            })));
+
+        panel.Children.Add(Number("shape.text.rotation", _shape.Style.Text.RotationDegrees, -359, 359,
+            value => Style(style => style with { Text = style.Text with { RotationDegrees = value } })));
+
+        panel.Children.Add(Number("shape.text.columns", _shape.Style.Text.Layout.Columns, 1, 16,
+            value => Style(style => style with
+            {
+                Text = style.Text with { Layout = style.Text.Layout with { Columns = (int)Math.Round(value) } },
+            })));
+
+        panel.Children.Add(Number("shape.text.columnSpacing", _shape.Style.Text.Layout.ColumnSpacing, 0, 144,
+            value => Style(style => style with
+            {
+                Text = style.Text with { Layout = style.Text.Layout with { ColumnSpacing = value } },
+            })));
+
         panel.Children.Add(Number("shape.rotation", _shape.RotationDegrees, 0, 359,
             value => Update(shape => shape with { RotationDegrees = value })));
 

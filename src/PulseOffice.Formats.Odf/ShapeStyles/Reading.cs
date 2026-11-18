@@ -239,6 +239,8 @@ internal sealed class BevelPropertyReader : GraphicPropertyReader
 
 internal sealed class TextPropertyReader : GraphicPropertyReader
 {
+    private readonly TextCodecs.OdfTextLayouts _layouts = new();
+
     private const double SmallestSize = 1;
 
     private const double LargestSize = 4000;
@@ -268,6 +270,7 @@ internal sealed class TextPropertyReader : GraphicPropertyReader
                 Horizontal = context.Vocabulary.ParagraphAlignment.Value((string?)paragraph?.Attribute(Namespaces.Fo + "text-align")),
                 Vertical = context.Vocabulary.VerticalAlignment.Value(context.Get(Namespaces.Draw + "textarea-vertical-align")),
                 RotationDegrees = measure.ParseAngle(context.Get(Namespaces.Style + "text-rotation-angle"), 0),
+                Layout = _layouts.Read(context.Graphic) ?? fallback.Layout,
                 Language = Language(text),
             },
         };

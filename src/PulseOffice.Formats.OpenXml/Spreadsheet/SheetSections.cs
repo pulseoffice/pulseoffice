@@ -146,6 +146,7 @@ internal sealed class XlsxWriteContext(Book workbook, XlsxStyleMapper styles, Xl
     public XlsxConditionalMapper Conditionals => conditionals;
     public SharedStrings Strings => strings;
     public XlsxCellCodec Cells { get; } = new();
+    public XlsxTableReferenceRules TableRules { get; } = new(workbook);
     public OutlineLevels Outlines { get; } = new();
     public XlsxColumnMetrics Columns { get; } = new XlsxColumnMetricsFactory().For(PulseOffice.Sheets.Styling.CellFont.Default);
     public bool UsesDynamicArrays { get; set; }

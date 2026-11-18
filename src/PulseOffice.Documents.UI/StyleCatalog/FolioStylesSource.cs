@@ -160,6 +160,7 @@ public sealed class FolioStyleActions(
                 newParagraph.NextStyleName = paragraph.NextStyleName == basis ? name : paragraph.NextStyleName;
                 newParagraph.DisplayName = null;
                 newParagraph.Hidden = false;
+                newParagraph.LinkedStyleName = null;
                 editor.Change(() => styles.Add(editor.Document, editor.History, sheet.Paragraph, newParagraph, "style-new-paragraph"));
                 break;
             case StyleFamily.Character when sheet.Character.Find(basis) is { } character:
@@ -171,8 +172,7 @@ public sealed class FolioStyleActions(
                 editor.Change(() => styles.Add(editor.Document, editor.History, sheet.List, new ListStyle(name, list.Levels), "style-new-list"));
                 break;
             case StyleFamily.Page when sheet.Page.Find(basis) is { } page:
-                var created = new PageStyle(name);
-                Copy((PageStyle)page.Clone(), created);
+                var created = styles.PageCopy(editor.Document, page, name);
                 editor.Change(() => styles.Add(editor.Document, editor.History, sheet.Page, created, "style-new-page"));
                 break;
             case StyleFamily.Frame when sheet.Frame.Find(basis) is { } frame:
@@ -204,29 +204,6 @@ public sealed class FolioStyleActions(
         StyleFamily.Table => sheet.Table.Contains(name),
         _ => sheet.Page.Contains(name),
     };
-
-    private void Copy(PageStyle source, PageStyle target)
-    {
-        target.Size = source.Size;
-        target.Orientation = source.Orientation;
-        target.Margins = source.Margins;
-        target.Columns = source.Columns;
-        target.Gutter = source.Gutter;
-        target.GutterAtTop = source.GutterAtTop;
-        target.Usage = source.Usage;
-        target.Background = source.Background;
-        target.Borders = source.Borders;
-        target.Watermark = source.Watermark;
-        target.NumberFormat = source.NumberFormat;
-        target.FirstPageDifferent = source.FirstPageDifferent;
-        target.EvenPagesDifferent = source.EvenPagesDifferent;
-        target.Header.Enabled = source.Header.Enabled;
-        target.Header.Spacing = source.Header.Spacing;
-        target.Header.MinimumHeight = source.Header.MinimumHeight;
-        target.Footer.Enabled = source.Footer.Enabled;
-        target.Footer.Spacing = source.Footer.Spacing;
-        target.Footer.MinimumHeight = source.Footer.MinimumHeight;
-    }
 }
 
 public sealed class FolioStylesSource : IStylesPanelSource

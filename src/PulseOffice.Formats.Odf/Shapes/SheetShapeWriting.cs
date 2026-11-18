@@ -81,6 +81,7 @@ internal sealed class SheetShapeElementVisitor(SheetShapeServices services, stri
     private const string TypePrefix = "ooxml-";
 
     private readonly OdfArcGeometry _arcs = new();
+    private readonly OdfShapeTextRotation _textRotation = new();
 
     public override XElement? VisitShape(ShapeObject shape)
     {
@@ -103,6 +104,7 @@ internal sealed class SheetShapeElementVisitor(SheetShapeServices services, stri
             new XAttribute(Namespaces.Draw + "mirror-vertical", shape.FlipVertical ? "true" : "false")));
         new OdfExtrusion().Write(custom.Elements().Last(), shape.Style.Extrusion);
         _arcs.Write(custom.Elements().Last(), shape);
+        _textRotation.Write(custom.Elements().Last(), shape);
         services.Computed.Write(custom.Elements().Last(), shape, slot.Width, slot.Height);
         return custom;
     }
@@ -135,6 +137,15 @@ internal sealed class SheetShapeElementVisitor(SheetShapeServices services, stri
         return element;
     }
 
+    private readonly OdfGluePoints _glue = new();
+
+    private void Glue(XElement element, string side, ConnectorEndpoint endpoint)
+    {
+        if (endpoint.ObjectId is not { Length: > 0 } target) return;
+        element.Add(new XAttribute(Namespaces.Draw + $"{side}-shape", target));
+        if (_glue.Index(endpoint.Site) is { } index) element.Add(new XAttribute(Namespaces.Draw + $"{side}-glue-point", index));
+    }
+
     public override XElement? VisitConnector(ConnectorObject connector)
     {
         var points = new SegmentEnds().Of(connector.Path.Scaled(slot.Width.Value, slot.Height.Value)).ToList();
@@ -159,8 +170,8 @@ internal sealed class SheetShapeElementVisitor(SheetShapeServices services, stri
             new XAttribute(Namespaces.Svg + "x2", units.Length(new Twip(slot.X.Value + (int)Math.Round(end.X)))),
             new XAttribute(Namespaces.Svg + "y2", units.Length(new Twip(slot.Y.Value + (int)Math.Round(end.Y)))));
 
-        if (connector.Start.ObjectId is { } from) element.Add(new XAttribute(Namespaces.Draw + "start-shape", from));
-        if (connector.End.ObjectId is { } to) element.Add(new XAttribute(Namespaces.Draw + "end-shape", to));
+        Glue(element, "start", connector.Start);
+        Glue(element, "end", connector.End);
         element.Add(new XElement(Namespaces.Text + "p", string.Empty));
         return element;
     }

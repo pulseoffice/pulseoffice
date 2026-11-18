@@ -19,7 +19,6 @@ public sealed class DesignRulesTests
         ["PulseOffice.Documents.Layout:Paginator"] = "da dividere: impaginazione, note e colonne nello stesso ciclo (revisione 2026-10, resta)",
         ["PulseOffice.Presentations.UI:SlideView"] = "da dividere: gesti degli oggetti da condividere con Ledger e Folio (revisione 2026-10, resta)",
         ["PulseOffice.Documents.UI:FolioCanvas"] = "da dividere: gesti degli oggetti da condividere con Ledger e Deck (revisione 2026-10, resta)",
-        ["PulseOffice.Sheets.Engine:CalculationEngine"] = "da dividere: grafo delle dipendenze e ricalcolo (revisione 2026-10, resta)",
         ["PulseOffice.Formats.Interchange:RtfReadSession"] = "da dividere per gruppi di parole di controllo (revisione 2026-10, resta)",
     };
 

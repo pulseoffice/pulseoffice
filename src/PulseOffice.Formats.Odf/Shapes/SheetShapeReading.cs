@@ -88,6 +88,7 @@ internal sealed class SheetCustomShapeReader(IOdfParagraphText paragraphs) : She
 {
     private readonly OdfArcGeometry _arcs = new();
     private readonly OdfComputedGeometry _computed = new();
+    private readonly OdfShapeTextRotation _textRotation = new();
     private readonly OdfShapeTextRuns _links = new(paragraphs);
 
     public override bool Reads(XElement element) => element.Name == Namespaces.Draw + "custom-shape";
@@ -101,7 +102,7 @@ internal sealed class SheetCustomShapeReader(IOdfParagraphText paragraphs) : She
         var geometry = custom.Element(Namespaces.Draw + "enhanced-geometry");
         var text = paragraphs.Read(custom);
 
-        var shape = _arcs.Read(_links.Read(custom, new ShapeObject
+        var shape = _textRotation.Read(_arcs.Read(_links.Read(custom, new ShapeObject
         {
             Id = (string?)custom.Attribute(Namespaces.Draw + "name") ?? (string?)custom.Parent?.Attribute(Namespaces.Draw + "name") ?? $"shape{ordinal}",
             Shape = context.Presets.KindOf((string?)geometry?.Attribute(Namespaces.Draw + "type")),
@@ -109,7 +110,7 @@ internal sealed class SheetCustomShapeReader(IOdfParagraphText paragraphs) : She
             FlipVertical = (string?)geometry?.Attribute(Namespaces.Draw + "mirror-vertical") == "true",
             Text = text.Length > 0 ? text : null,
             Style = new OdfExtrusion().Read(geometry, context.Style((string?)custom.Attribute(Namespaces.Draw + "style-name") ?? (string?)custom.Parent?.Attribute(Namespaces.Draw + "style-name"))),
-        }, context.TextStyle, context.Lists), geometry);
+        }, context.TextStyle, context.Lists), geometry), geometry);
 
         var box = custom.Attribute(Namespaces.Svg + "width") is not null ? custom : custom.Parent!;
         var units = context.Units;
@@ -253,6 +254,13 @@ internal sealed class SheetFreeformShapeReader : SheetShapeReader
 
 internal sealed class SheetConnectorShapeReader : SheetShapeReader
 {
+    private readonly OdfGluePoints _glue = new();
+
+    private ConnectorEndpoint Endpoint(XElement element, string side) =>
+        (string?)element.Attribute(Namespaces.Draw + $"{side}-shape") is { Length: > 0 } target
+            ? new ConnectorEndpoint(target, _glue.Site((string?)element.Attribute(Namespaces.Draw + $"{side}-glue-point")))
+            : ConnectorEndpoint.Free;
+
     public override bool Reads(XElement element) => element.Name == Namespaces.Draw + "connector";
 
     public override PlacedObject? Read(XElement element, CellAddress anchor, SheetShapeReadContext context)
@@ -280,8 +288,8 @@ internal sealed class SheetConnectorShapeReader : SheetShapeReader
                 "curve" => ConnectorKind.Curved,
                 _ => ConnectorKind.Elbow,
             },
-            Start = new ConnectorEndpoint((string?)element.Attribute(Namespaces.Draw + "start-shape")),
-            End = new ConnectorEndpoint((string?)element.Attribute(Namespaces.Draw + "end-shape")),
+            Start = Endpoint(element, "start"),
+            End = Endpoint(element, "end"),
             Style = context.Style((string?)element.Attribute(Namespaces.Draw + "style-name")),
             Path = new ShapeOutline([new ShapeFigure(
             [

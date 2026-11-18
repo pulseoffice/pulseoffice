@@ -41,7 +41,27 @@ public sealed class OdfConditionalMapper
         var flattened = rule.WithFormulas(formula => _tableFormulas.FlattenText(formula, workbook, at));
         var element = _codecs.First(codec => codec.Writes(flattened)).Write(sheet, flattened);
         element.Add(_tableFormulas.Kept(rule.Formula, flattened.Formula));
+        var entries = Entries(element);
+        for (var index = 0; index < Math.Min(entries.Count, rule.Thresholds.Count); index++)
+            entries[index].Add(_tableFormulas.KeptOne(rule.Thresholds[index].Formula, flattened.Thresholds[index].Formula));
         return element;
+    }
+
+    private List<XElement> Entries(XElement element) =>
+        [.. element.Elements().Where(child => child.Name == Namespaces.Calcext + "formatting-entry" || child.Name == Namespaces.Calcext + "color-scale-entry")];
+
+    private ConditionalRule KeptThresholds(XElement element, ConditionalRule rule)
+    {
+        var entries = Entries(element);
+        var thresholds = rule.Thresholds.ToList();
+        var changed = false;
+        for (var index = 0; index < Math.Min(entries.Count, thresholds.Count); index++)
+        {
+            if (_tableFormulas.Read(entries[index]) is not { } structured) continue;
+            thresholds[index] = thresholds[index] with { Formula = structured };
+            changed = true;
+        }
+        return changed ? rule with { Thresholds = thresholds } : rule;
     }
 
     public IReadOnlyList<ConditionalRule> ReadRules(XElement table, IReadOnlyDictionary<string, CellStyle> namedStyles)
@@ -61,6 +81,7 @@ public sealed class OdfConditionalMapper
             {
                 if (_codecs.FirstOrDefault(codec => codec.Element == element.Name) is not { } codec) continue;
                 var rule = codec.Read(element, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] };
+                rule = KeptThresholds(element, rule);
                 rules.Add(_tableFormulas.Read(element) is { } structured ? rule with { Formula = structured } : rule);
             }
         }

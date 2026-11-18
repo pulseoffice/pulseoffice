@@ -133,11 +133,19 @@ internal sealed class SheetDrawingVisitor(
         return element;
     }
 
+    private readonly OoxmlConnectionSites _sites = new();
+    private readonly OoxmlAutomaticGlue _automaticGlue = new();
+
+    private uint SiteIndex(ConnectorSite site, uint automatic) => site == ConnectorSite.Automatic ? automatic : _sites.Index(site);
+
     public override OpenXmlElement? VisitConnector(ConnectorObject connector)
     {
         var visual = new Xdr.NonVisualConnectorShapeDrawingProperties();
-        if (ids.Of(connector.Start.ObjectId) is { } from) visual.AppendChild(new A.StartConnection { Id = from, Index = 2U });
-        if (ids.Of(connector.End.ObjectId) is { } to) visual.AppendChild(new A.EndConnection { Id = to, Index = 0U });
+        var source = ids.Of(connector.Start.ObjectId);
+        var target = ids.Of(connector.End.ObjectId);
+        if (source is { } start) visual.AppendChild(new A.StartConnection { Id = start, Index = SiteIndex(connector.Start.Site, 2U) });
+        if (target is { } end) visual.AppendChild(new A.EndConnection { Id = end, Index = SiteIndex(connector.End.Site, 0U) });
+        _automaticGlue.Write(visual, connector, source is not null, target is not null);
 
         var line = new A.Outline { Width = (int)Emu.FromTwips(connector.Style.Line.Width).Value };
         line.AppendChild(new A.SolidFill(_colours.Of(connector.Style.Line.ColorHex, 1)));
@@ -253,12 +261,14 @@ internal sealed class SheetConnectorReader : SheetDrawingReader
         var line = properties?.GetFirstChild<A.Outline>();
         var drawing = visual?.GetFirstChild<Xdr.NonVisualConnectorShapeDrawingProperties>();
 
-        return new ConnectorObject
+        var start = drawing?.GetFirstChild<A.StartConnection>();
+        var end = drawing?.GetFirstChild<A.EndConnection>();
+        return _automatic.Read(new ConnectorObject
         {
             Id = visual?.GetFirstChild<Xdr.NonVisualDrawingProperties>()?.Name?.Value ?? $"connector{context.Next()}",
             Shape = context.Styles.Connector(properties?.GetFirstChild<A.PresetGeometry>()?.Preset?.InnerText),
-            Start = new ConnectorEndpoint(context.Name(drawing?.GetFirstChild<A.StartConnection>()?.Id?.Value)),
-            End = new ConnectorEndpoint(context.Name(drawing?.GetFirstChild<A.EndConnection>()?.Id?.Value)),
+            Start = Endpoint(context.Name(start?.Id?.Value), start?.Index?.Value),
+            End = Endpoint(context.Name(end?.Id?.Value), end?.Index?.Value),
             Style = ShapeStyle.Default with
             {
                 Fill = ShapeFill.None,
@@ -270,8 +280,14 @@ internal sealed class SheetConnectorReader : SheetDrawingReader
                     EndArrow = line?.GetFirstChild<A.TailEnd>() is null ? ArrowEnd.None : ArrowEnd.Arrow,
                 },
             },
-        };
+        }, drawing);
     }
+
+    private readonly OoxmlConnectionSites _sites = new();
+    private readonly OoxmlAutomaticGlue _automatic = new();
+
+    private ConnectorEndpoint Endpoint(string? target, uint? index) =>
+        target is { Length: > 0 } ? new ConnectorEndpoint(target, _sites.Site(index)) : ConnectorEndpoint.Free;
 }
 
 internal sealed class SheetFreeformReader : SheetDrawingReader

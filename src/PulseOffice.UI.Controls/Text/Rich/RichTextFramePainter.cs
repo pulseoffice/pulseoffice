@@ -29,11 +29,27 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
         ArgumentNullException.ThrowIfNull(text);
 
         var composed = composer.Compose(text, scene.Bounds, scene.Theme, scene.Fields, scene.Scale);
+        var rotation = text.Frame.RotationDegrees + text.Frame.Layout.FlowDegrees;
+        if (Math.Abs(rotation % 360) < 0.001)
+        {
+            PaintLines(scene, composed);
+            return;
+        }
+        var centre = scene.Bounds.Center;
+        using (scene.Context.PushTransform(
+            Matrix.CreateTranslation(-centre.X, -centre.Y)
+            * Matrix.CreateRotation(rotation * Math.PI / 180)
+            * Matrix.CreateTranslation(centre.X, centre.Y)))
+            PaintLines(scene, composed);
+    }
+
+    private void PaintLines(RichTextScene scene, ComposedTextFrame composed)
+    {
         for (var index = 0; index < composed.Lines.Count; index++)
         {
             var line = composed.Lines[index];
-            if (line.Label is { } label) scene.Context.DrawText(label, new Point(composed.Area.Inner.X + line.LabelX, composed.Tops[index]));
-            if (line.Picture is { } picture) PaintPicture(scene, picture, picture.Box.Translate(new Vector(composed.Area.Inner.X, composed.Tops[index])), line);
+            if (line.Label is { } label) scene.Context.DrawText(label, new Point(composed.Left(index) + line.LabelX, composed.Tops[index]));
+            if (line.Picture is { } picture) PaintPicture(scene, picture, picture.Box.Translate(new Vector(composed.Left(index), composed.Tops[index])), line);
             var words = scene.Proofing is { } proofing && line.Paragraph.EffectiveRuns().All(run => run.Field == TextFieldKind.None)
                 ? proofing(line.Paragraph.Text)
                 : null;

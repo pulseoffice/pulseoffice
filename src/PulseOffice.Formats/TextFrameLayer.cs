@@ -25,6 +25,10 @@ public sealed record TextFrameLayer
 
     public bool? Wrap { get; init; }
 
+    public double? Rotation { get; init; }
+
+    public TextLayout? Layout { get; init; }
+
     public TextFrameLayer Over(TextFrameLayer lower) => new()
     {
         Anchor = Anchor ?? lower.Anchor,
@@ -36,6 +40,8 @@ public sealed record TextFrameLayer
         FontScale = Autofit is null ? lower.FontScale : FontScale,
         LineReduction = Autofit is null ? lower.LineReduction : LineReduction,
         Wrap = Wrap ?? lower.Wrap,
+        Rotation = Rotation ?? lower.Rotation,
+        Layout = Layout ?? lower.Layout,
     };
 
     public static TextFrameLayer Of(TextFrame frame) => new()
@@ -49,6 +55,8 @@ public sealed record TextFrameLayer
         FontScale = frame.FontScale,
         LineReduction = frame.LineReduction,
         Wrap = frame.WordWrap,
+        Rotation = frame.RotationDegrees,
+        Layout = frame.Layout,
     };
 
     public TextFrame ToFrame(TextFrame fallback) => new()
@@ -61,5 +69,7 @@ public sealed record TextFrameLayer
         FontScale = FontScale ?? 1.0,
         LineReduction = LineReduction ?? 0,
         WordWrap = Wrap ?? fallback.WordWrap,
+        RotationDegrees = Rotation ?? fallback.RotationDegrees,
+        Layout = Layout ?? fallback.Layout,
     };
 }

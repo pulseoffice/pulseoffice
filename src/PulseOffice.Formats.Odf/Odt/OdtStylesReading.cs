@@ -81,7 +81,7 @@ internal sealed class OdtStylesReader(
                     break;
                 case "text" when !sheet.Character.Contains(name):
                     var reading = characters.Read(style.Element(Style + "text-properties"), context.FontFaces);
-                    var character = Common(new CharacterStyle(name) { Character = reading.Properties }, style, context);
+                    var character = Common(new CharacterStyle(name) { Character = reading.Properties, LinkedStyleName = Linked(style, context) }, style, context);
                     if (reading.RelativeSize is { } factor) relative["c:" + name] = factor;
                     sheet.Character.Add(character);
                     break;
@@ -252,6 +252,9 @@ internal sealed class OdtStylesReader(
     private string? Name(XElement style, OdtReadContext context) =>
         (string?)style.Attribute(Style + "name") is { } encoded ? context.StyleNames.Resolve(encoded) : null;
 
+    private string? Linked(XElement style, OdtReadContext context) =>
+        (string?)style.Attribute(Pt + "linked-style-name") is { Length: > 0 } linked ? context.StyleNames.Resolve(linked) : null;
+
     private T Common<T>(T style, XElement element, OdtReadContext context) where T : DocumentStyle
     {
         style.ParentName = (string?)element.Attribute(Style + "parent-style-name") is { } parent ? context.StyleNames.Resolve(parent)
@@ -279,6 +282,7 @@ internal sealed class OdtStylesReader(
             ListStyleName = (string?)element.Attribute(Style + "list-style-name") is { Length: > 0 } list ? context.StyleNames.Resolve(list) : null,
             ListLevel = measure.Integer((string?)element.Attribute(Style + "list-level")),
             Category = vocabulary.Categories.Value((string?)element.Attribute(Style + "class")),
+            LinkedStyleName = Linked(element, context),
         }, element, context);
     }
 

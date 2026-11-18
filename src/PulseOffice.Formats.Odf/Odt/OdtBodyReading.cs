@@ -55,7 +55,7 @@ internal sealed class OdtStyleLookup(OdtCharacterCodec characters, OdtParagraphC
             ? Math.Min(value, 32_767)
             : (int?)null;
         return new AutomaticParagraph(parent, paragraph, character, master, (string?)style.Attribute(Pt + "implied-page") == "true",
-            lineNumber, (string?)style.Attribute(Pt + "implied-line-number") == "true");
+            lineNumber, (string?)style.Attribute(Pt + "implied-line-number") == "true", (string?)style.Attribute(Style + "list-style-name") is { Length: 0 });
     }
 
     public AutomaticText TextStyle(string? name, OdtReadContext context)
@@ -185,6 +185,9 @@ internal sealed class OdtParagraphReader(
             var level = int.TryParse((string?)element.Attribute(Text + "outline-level"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 1;
             if (context.Ours || level != resolved.OutlineLevel) paragraph = paragraph with { OutlineLevel = level };
         }
+
+        if (list is null && automatic.ListSuppressed && resolved.ListStyleName is not null)
+            paragraph = paragraph with { ListSuppressed = true };
 
         if (list is not null)
         {

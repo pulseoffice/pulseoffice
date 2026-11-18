@@ -189,6 +189,7 @@ internal sealed class DeckConnectorCodec(XlsxShapeStyleMapper styles) : DeckElem
 internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, ConnectorPresetPaths paths, OoxmlConnectionSites sites) : DeckDrawingCodec
 {
     private readonly OoxmlGeometry _geometry = new();
+    private readonly OoxmlAutomaticGlue _automatic = new();
 
     public ObjectElement? Read(P.ConnectionShape connection, string id)
     {
@@ -205,7 +206,7 @@ internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, Con
             Id = id,
             Bounds = Bounds(transform),
             RotationDegrees = transform?.Rotation is { } rotation ? rotation / 60000.0 : 0,
-            Content = new ConnectorObject
+            Content = _automatic.Read(new ConnectorObject
             {
                 Id = id,
                 Shape = kind,
@@ -214,7 +215,7 @@ internal sealed class DeckConnectionShapeReader(XlsxShapeStyleMapper styles, Con
                 Style = style with { Fill = ShapeFill.None },
                 Path = custom ?? paths.Of(kind, geometry?.Preset?.InnerText, Adjustment(geometry),
                     transform?.HorizontalFlip?.Value ?? false, transform?.VerticalFlip?.Value ?? false),
-            },
+            }, visual),
         };
     }
 

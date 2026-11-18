@@ -50,8 +50,9 @@ public sealed class DocumentStyleConverter : SnapshotConverter<DocumentStyle>
                 ListStyleName = node.Get<string>("listStyle"),
                 ListLevel = node.Get<int?>("listLevel"),
                 Category = node.Get("category", ParagraphStyleCategory.Text),
+                LinkedStyleName = node.Get<string>("linked"),
             },
-            StyleFamily.Character => new CharacterStyle(name) { Character = node.Get("character", CharacterProperties.None) },
+            StyleFamily.Character => new CharacterStyle(name) { Character = node.Get("character", CharacterProperties.None), LinkedStyleName = node.Get<string>("linked") },
             StyleFamily.List => new ListStyle(name, node.Get<List<ListLevel>>("levels", [])),
             StyleFamily.Page => Page(name, node),
             StyleFamily.Frame => new FrameStyle(name) { Frame = node.Get("frame", FrameProperties.None) },
@@ -71,10 +72,11 @@ public sealed class DocumentStyleConverter : SnapshotConverter<DocumentStyle>
         {
             case ParagraphStyle paragraph:
                 node.Put("paragraph", paragraph.Paragraph).Put("character", paragraph.Character).Put("next", paragraph.NextStyleName)
-                    .Put("outlineLevel", paragraph.OutlineLevel).Put("listStyle", paragraph.ListStyleName).Put("listLevel", paragraph.ListLevel).Put("category", paragraph.Category);
+                    .Put("outlineLevel", paragraph.OutlineLevel).Put("listStyle", paragraph.ListStyleName).Put("listLevel", paragraph.ListLevel).Put("category", paragraph.Category)
+                    .Put("linked", paragraph.LinkedStyleName);
                 break;
             case CharacterStyle character:
-                node.Put("character", character.Character);
+                node.Put("character", character.Character).Put("linked", character.LinkedStyleName);
                 break;
             case ListStyle list:
                 node.Put("levels", list.Levels);

@@ -268,6 +268,8 @@ internal sealed class ExtrusionPartReader : DrawingPartReader
 
 internal sealed class TextPartReader : DrawingPartReader
 {
+    private readonly DrawingML.DrawingTextLayouts _layouts = new();
+
     public override ShapeStyle Read(DrawingReadContext context, ShapeStyle style)
     {
         if (context.Body is not { } body) return style;
@@ -292,6 +294,7 @@ internal sealed class TextPartReader : DrawingPartReader
                 Wrap = properties?.Wrap?.InnerText != "none",
                 Inset = new Emu(properties?.LeftInset?.Value ?? 0).ToTwips(),
                 RotationDegrees = (properties?.Rotation?.Value ?? 0) / 60000.0,
+                Layout = _layouts.Read(properties) ?? fallback.Layout,
                 Vertical = context.Vocabulary.Anchors.Value(properties?.Anchor?.InnerText),
                 Horizontal = context.Vocabulary.Alignments.Value(paragraph?.GetFirstChild<A.ParagraphProperties>()?.Alignment?.InnerText),
             },

@@ -122,8 +122,9 @@ public sealed class FolioListCommands(IActiveFolioContext context, IListEditing 
             EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && lists.CanContinue(editor.Document, editor.ParagraphRange()),
             Execute = (_, _) => Run(editor => lists.Continue(editor.Document, editor.History, editor.ParagraphRange())),
         },
-        InList("folio.list.none") with
+        Editing("folio.list.none") with
         {
+            EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && editor.EffectiveParagraph().ListStyleName is not null,
             Execute = (_, _) => Run(editor => editor.Services.Editor.SetList(editor.Document, editor.History, editor.ParagraphRange(), null, 0)),
         },
         Jump("folio.list.nextInLevel", 1),
@@ -170,12 +171,12 @@ public sealed class FolioListCommands(IActiveFolioContext context, IListEditing 
     private CommandDefinition ApplyStyle((string Id, string Style) entry) =>
         Editing(entry.Id) with
         {
-            CheckedWhen = _ => Editor?.CurrentParagraph().ListStyleName == entry.Style,
+            CheckedWhen = _ => Editor?.EffectiveParagraph().ListStyleName == entry.Style,
             Execute = (_, _) => Run(editor =>
             {
                 if (!editor.Document.Styles.List.Contains(entry.Style)) return;
                 var current = editor.CurrentParagraph();
-                editor.Services.Editor.SetList(editor.Document, editor.History, editor.ParagraphRange(), current.ListStyleName == entry.Style ? null : entry.Style, current.BulletLevel);
+                editor.Services.Editor.SetList(editor.Document, editor.History, editor.ParagraphRange(), editor.EffectiveParagraph().ListStyleName == entry.Style ? null : entry.Style, current.BulletLevel);
             }),
         };
 

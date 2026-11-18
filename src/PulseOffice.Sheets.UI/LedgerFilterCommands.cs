@@ -123,6 +123,7 @@ public sealed class LedgerFilterCommands(
             Join = choice.Join,
             IncludeBlanks = choice.IncludeBlanks,
             Color = choice.Color,
+            Period = choice.Period,
         });
 
         Record(sheet, before);

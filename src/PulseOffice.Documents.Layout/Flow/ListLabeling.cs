@@ -105,7 +105,7 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
                 result[i] = paragraph.ListHeader ? Header(style, paragraph) : Styled(style, paragraph, counters, Language(paragraph, language));
                 continue;
             }
-            if (!paragraph.IsListItem && paragraph.OutlineLevel is { } outline && outline is > 0 and <= ListStyle.LevelCount
+            if (!paragraph.IsListItem && !paragraph.ListSuppressed && paragraph.OutlineLevel is { } outline && outline is > 0 and <= ListStyle.LevelCount
                 && sheet.Outline.Level(outline - 1).Format != NumberFormat.None)
             {
                 result[i] = Styled(sheet.Outline, paragraph with { BulletLevel = outline - 1 }, counters, Language(paragraph, language));

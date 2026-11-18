@@ -241,6 +241,8 @@ public sealed record TextParagraph(string Text)
 
     public string? ListStyleName { get; init; }
 
+    public bool ListSuppressed { get; init; }
+
     public int? OutlineLevel { get; init; }
 
     public int? ListRestart { get; init; }

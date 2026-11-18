@@ -9,14 +9,18 @@ the round that fixes it is joined and the join run is green.
 - Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
   reference suite have not opened such a file here. (194)
 - The built-in media player has not run live on any system (Windows and macOS cannot be tested here). (193)
-- Vertical and stacked text, text rotated inside a shape and text columns are not in the shape text model: they are
-  declared on import (PPTX226, ODP217), not carried. (213)
-- Connector glue: automatic ends are written to PPTX as the site they face and re-read as fixed sites on rectangular
-  targets; connectors inside groups are written and read without glue; PowerPoint and the reference suite have not
-  opened the new `p:cxnSp` custom-geometry and `draw:connector` output here. (213)
-- Ledger connectors lose their chosen sites: XLSX always writes indices 2 and 0 and reads none, ODS writes no glue
-  points. (213)
-- ODP shrink-on-overflow also writes `style:shrink-to-fit` on graphic properties, which ODF defines only for cells. (213)
+- Shape text layout drawing is partial: shapes draw flow and rotation but not columns or upright text; text boxes
+  draw flow, rotation and columns but not stacked or upright text; editing a rotated or vertical text box keeps the
+  caret and hit testing in the unrotated frame, and hit testing ignores columns. East Asian, Mongolian and
+  left-to-right vertical modes are shown as plain vertical text (PPTX226, ODP217). (214)
+- ODF has no native 270-degree flow, upright text or text box rotation: they use our `urn:pulseoffice:shape-text`
+  extension; shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
+  standard `draw:text-rotate-angle`. The sign of `draw:text-rotate-angle` follows the ODF counter-clockwise convention
+  and has not been checked against another application. (214)
+- Connector glue output (`p:cxnSp`, `draw:connector`, the automatic-end extension) has not been opened in PowerPoint,
+  Excel or the reference suite here. (213, 214)
+- Ledger connector routing ignores the chosen sites now carried by XLSX and ODS: `SheetConnectors` routes between
+  facing sides. (214)
 
 ## Charts
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
@@ -34,12 +38,10 @@ the round that fixes it is joined and the join run is green.
   value), inside tables, frames, notes and comments, on a paragraph that defers a page style change, and any restart
   when numbering restarts on every page (DOCX248). Not yet opened in Word. (204, 209, reviewed again in 212: the remaining cases have no Word
   section form)
-- A paragraph cannot switch off the list its paragraph style carries: DOCX `w:numId w:val="0"` and ODF
-  `style:list-style-name=""` are read as "inherit", so such paragraphs come out numbered (medium). The model needs an
-  explicit "no list" value through the resolver, layout and both codecs. (212)
-- DOCX linked paragraph and character styles (`w:link`) are not modelled: the pair is read as two unrelated styles and
-  written without the link. (212)
-- A new page style made from an existing one copies its settings but not its header and footer text. (212)
+- Linked styles: Word creates the "… Char" partner when a linked paragraph style is first applied to a partial
+  selection; we only use a link that already exists, and the styles panel has no way to create or edit a link. (215)
+- Pasting or loading styles from another document does not check that a linked partner travels with the style; a
+  dangling link is ignored when applied but kept in the model. (215)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 
@@ -48,12 +50,12 @@ the round that fixes it is joined and the join run is green.
 
 ## Ledger
 
-- Round 210 (Ledger queue), open: chart series sources holding table references are not kept structured nor renamed;
-  XLSX writes table references in conditional formats and validations as they are, which Excel does not accept there
-  (they need flattening plus an extension that keeps the structured form); colour-scale and data-bar threshold
-  formulas are not kept structured in ODS; relative-period filters have no entry in the AutoFilter menu (they come only
-  from files), and other ODF readers see the bounds of the day the file was saved; `CalculationEngine.cs` is still
-  over 800 lines (1028).
+- Round 216 (Ledger table references), open: the chart editor shows and edits table-reference series sources as text
+  but offers no table/column picker; a table reference whose table is deleted leaves the chart series at `#REF!` with no
+  diagnostic; XLSX restores structured conditional-format and validation formulas by matching range and flat formula,
+  so a file edited in Excel after saving keeps the flat form (by design) and two identical rules on one range may
+  exchange their structured forms; the relative-period list of the AutoFilter menu has not been seen in the running
+  app nor walked with the keyboard.
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
@@ -63,6 +65,7 @@ the round that fixes it is joined and the join run is green.
   ribbon's own popovers (menus, galleries, split-button lists, collapsed and overflow groups) but not combo box
   drop-downs, the font family list, the submenus of the title-bar menus, or a popover opened outside the ribbon; badges
   outside the ribbon sit in the adorner layer, which was not checked live inside separate popup windows. (208, 211)
-- Chart marks drawn in series-derived colours (trend lines, error bars, the Pareto line, rising and falling waterfall
-  bars) keep their fixed hues; their contrast on dark paper was not measured. (211)
-- The keyboard walks of rounds 208 and 211 (shape style dialog included) were written without running them. (208, 211)
+- Settings and languages: switching the interface language while a Ledger cell is being edited leaves the edit text in
+  the old formula separators, which the new convention then parses; not reproduced live. There is no high-contrast
+  theme, only light, dark and system. A settings store does not reload values another running instance wrote until
+  restart (writes no longer overwrite them). (217)
