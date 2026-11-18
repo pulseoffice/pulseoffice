@@ -96,4 +96,16 @@ public sealed record MediaElement : SlideElement
     public bool Muted { get; init; }
 
     public bool HasPlaybackSettings => Loop || Muted || Volume < 0.9995;
+
+    public TimeSpan TrimStart { get; init; }
+
+    public TimeSpan TrimEnd { get; init; }
+
+    public TimeSpan FadeIn { get; init; }
+
+    public TimeSpan FadeOut { get; init; }
+
+    public bool IsTrimmed => TrimStart > TimeSpan.Zero || TrimEnd > TimeSpan.Zero;
+
+    public bool IsFaded => FadeIn > TimeSpan.Zero || FadeOut > TimeSpan.Zero;
 }

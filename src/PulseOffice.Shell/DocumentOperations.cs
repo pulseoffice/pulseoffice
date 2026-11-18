@@ -40,6 +40,8 @@ public interface IDocumentOperations
 
     bool WriteTo(OpenDocument document, string path);
 
+    bool WriteTo(OpenDocument document, string path, Stream destination);
+
     string? RenderHtml(OpenDocument document);
 
     PulseOffice.Document.Versions.DocumentVersionCollection? Versions(OpenDocument document);

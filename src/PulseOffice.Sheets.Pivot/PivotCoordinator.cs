@@ -50,10 +50,15 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
 
         var existing = workbook.Pivots.FirstOrDefault(pivot => pivot.Id == definition.Id);
 
-        if (existing is null
-            && renderer.Measure(table, definition).Cells().Any(address => !destination[address].Value.IsEmpty || destination[address].HasFormula))
+        var previousSheet = existing is null ? null : workbook.FindSheet(existing.DestinationSheet);
+        var previous = previousSheet is null ? null : existing!.OutputRange;
+
+        bool OwnedByThisPivot(CellAddress address) =>
+            previous is { } owned && ReferenceEquals(previousSheet, destination) && owned.Contains(address);
+
+        if (extent.Cells().Any(address => !OwnedByThisPivot(address) && (!destination[address].Value.IsEmpty || destination[address].HasFormula)))
             return OperationResult<CellRange>.Fail(Diagnostic.Error("PVT005", "The destination already contains data.", definition.DestinationSheet));
-        if (existing?.OutputRange is { } previous) Clear(destination, previous);
+        if (previous is { } range) Clear(previousSheet!, range);
 
         var written = renderer.Render(table, definition, destination, workbook.Styles, labels);
 

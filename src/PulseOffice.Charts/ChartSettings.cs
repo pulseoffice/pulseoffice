@@ -91,11 +91,18 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
     private ChartDefinition Analysed(ChartDefinition chart, ChartSettings settings)
     {
         var first = chart.SeriesFormat(0);
-        if (settings.Trendline == first.Trendline && settings.ErrorBars == first.ErrorBars) return chart;
+        var trendChanged = settings.Trendline != first.Trendline;
+        var errorsChanged = settings.ErrorBars != first.ErrorBars && settings.ErrorBars?.Kind != ErrorBarKind.Custom;
+        if (!trendChanged && !errorsChanged) return chart;
         var count = Math.Max(settings.SeriesCount, chart.SeriesFormats?.Count ?? 0);
         var result = chart;
         for (var series = 0; series < Math.Max(count, 1); series++)
-            result = result.WithSeriesFormat(series, result.SeriesFormat(series) with { Trendline = settings.Trendline, ErrorBars = settings.ErrorBars });
+        {
+            var format = result.SeriesFormat(series);
+            if (trendChanged) format = format with { Trendline = settings.Trendline };
+            if (errorsChanged) format = format with { ErrorBars = settings.ErrorBars };
+            result = result.WithSeriesFormat(series, format);
+        }
         return result;
     }
 

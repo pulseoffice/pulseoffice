@@ -18,7 +18,8 @@ public sealed class ShellSendCommands(
     IStatusBarService status,
     ITextCatalog texts,
     IDiagnosticTexts diagnostics,
-    PulseOffice.Platform.ITemporaryFiles temporary)
+    PulseOffice.Platform.ITemporaryFiles temporary,
+    IDocumentCopyWriter copies)
 {
     private enum Attachment { AsSaved, OpenDocument, Office, Pdf }
 
@@ -136,10 +137,21 @@ public sealed class ShellSendCommands(
 
             using var pdf = File.Create(file);
             var written = exporter.Write(printable, pdf, new PdfExportOptions(Title: module.SuggestedName(document)));
-            return written.Succeeded ? file : null;
+            if (!written.Succeeded) return null;
+            WarnIfUnprotected(document, file, DocumentCopyOutcome.WrittenWithoutPassword);
+            return file;
         }
 
-        return module.WriteTo(document, file) ? file : null;
+        var outcome = copies.Write(document, file);
+        if (outcome == DocumentCopyOutcome.Failed) return null;
+        WarnIfUnprotected(document, file, outcome);
+        return file;
+    }
+
+    private void WarnIfUnprotected(OpenDocument document, string file, DocumentCopyOutcome outcome)
+    {
+        if (document.Protection is null || outcome != DocumentCopyOutcome.WrittenWithoutPassword) return;
+        status.Report(texts.Format("status.save.passwordOdfOnly", Path.GetFileName(file)), NotificationSeverity.Warning);
     }
 
     private static string? SavedExtension(OpenDocument document) =>

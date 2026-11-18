@@ -6,6 +6,8 @@ namespace PulseOffice.UI.Controls.Charts.Plots;
 
 public sealed class RadarPlot : ChartPlotBase
 {
+    private readonly ChartSeriesStroke _strokes = new();
+
     public override bool Handles(ChartType type) => type is
         ChartType.Radar or ChartType.FilledRadar or ChartType.Polar
         or ChartType.ParallelCoordinates;
@@ -62,10 +64,14 @@ public sealed class RadarPlot : ChartPlotBase
                 sink.EndFigure(true);
             }
 
+            var format = frame.Definition.SeriesFormat(order);
             frame.Context.DrawGeometry(
                 frame.Definition.Type is ChartType.FilledRadar ? Brush(frame.Data, order, 0.3) : null,
-                new Pen(Brush(frame.Data, order), 2),
+                _strokes.Pen(Brush(frame.Data, order), format, 2),
                 geometry);
+            if (frame.Definition.Type is ChartType.FilledRadar || format.Marker is MarkerSymbol.Automatic or MarkerSymbol.None) continue;
+            for (var index = 0; index < count; index++)
+                _strokes.Marker(frame.Context, Brush(frame.Data, order), format, Corner(centre, scale.Position(Value(series, index)), index, count), 2.5);
         }
     }
 

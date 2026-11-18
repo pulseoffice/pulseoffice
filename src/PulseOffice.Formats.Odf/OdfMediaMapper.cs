@@ -1,3 +1,4 @@
+using System.Xml;
 using System.Xml.Linq;
 using PulseOffice.Foundation.Units;
 using PulseOffice.Presentations;
@@ -38,8 +39,9 @@ public sealed class OdfMediaMapper(ILinkedFiles links, OdfMediaPlayback playback
                 new XAttribute(Xlink + "actuate", "onLoad"),
                 new XAttribute(Draw + "mime-type", MediaTypes.StarMediaType),
                 playback.Write(media)));
-        if (media.FileName is { Length: > 0 } name)
-            frame.Add(new XAttribute(XNamespace.Xmlns + "pulsemedia", _pulse.NamespaceName), new XAttribute(_pulse + "file-name", name));
+        var extensions = Extensions(media).ToList();
+        if (extensions.Count > 0)
+            frame.Add(new XAttribute(XNamespace.Xmlns + "pulsemedia", _pulse.NamespaceName), extensions);
         if (posterHref is not null)
             frame.Add(new XElement(Draw + "image",
                 new XAttribute(Xlink + "href", posterHref),
@@ -79,8 +81,47 @@ public sealed class OdfMediaMapper(ILinkedFiles links, OdfMediaPlayback playback
             LinkedPath = linked,
             Loop = settings.Loop,
             Muted = settings.Muted,
-            Volume = settings.Volume,
+            Volume = ExactVolume(frame) ?? settings.Volume,
+            TrimStart = Duration(frame, "trim-start"),
+            TrimEnd = Duration(frame, "trim-end"),
+            FadeIn = Duration(frame, "fade-in"),
+            FadeOut = Duration(frame, "fade-out"),
         };
+    }
+
+    private IEnumerable<XAttribute> Extensions(MediaElement media)
+    {
+        if (media.FileName is { Length: > 0 } name) yield return new XAttribute(_pulse + "file-name", name);
+        if (playback.LosesVolume(media.Volume))
+            yield return new XAttribute(_pulse + "volume", Math.Clamp(media.Volume, 0, 1).ToString("0.######", System.Globalization.CultureInfo.InvariantCulture));
+        if (media.TrimStart > TimeSpan.Zero) yield return new XAttribute(_pulse + "trim-start", XmlConvert.ToString(media.TrimStart));
+        if (media.TrimEnd > TimeSpan.Zero) yield return new XAttribute(_pulse + "trim-end", XmlConvert.ToString(media.TrimEnd));
+        if (media.FadeIn > TimeSpan.Zero) yield return new XAttribute(_pulse + "fade-in", XmlConvert.ToString(media.FadeIn));
+        if (media.FadeOut > TimeSpan.Zero) yield return new XAttribute(_pulse + "fade-out", XmlConvert.ToString(media.FadeOut));
+    }
+
+    private double? ExactVolume(XElement frame) =>
+        double.TryParse((string?)frame.Attribute(_pulse + "volume"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var volume)
+            && double.IsFinite(volume)
+            ? Math.Clamp(volume, 0, 1)
+            : null;
+
+    private TimeSpan Duration(XElement frame, string name)
+    {
+        if ((string?)frame.Attribute(_pulse + name) is not { Length: > 0 } text) return TimeSpan.Zero;
+        try
+        {
+            var value = XmlConvert.ToTimeSpan(text);
+            return value > TimeSpan.Zero ? value : TimeSpan.Zero;
+        }
+        catch (FormatException)
+        {
+            return TimeSpan.Zero;
+        }
+        catch (OverflowException)
+        {
+            return TimeSpan.Zero;
+        }
     }
 
     private string Cm(Twip value) =>
@@ -120,6 +161,9 @@ public sealed class OdfMediaPlayback
 
     private bool Flag(Dictionary<string, string?> values, string name) =>
         values.TryGetValue(name, out var value) && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
+    public bool LosesVolume(double volume) =>
+        Math.Abs(Fraction(Decibels(volume)) - Math.Clamp(volume, 0, 1)) > 1e-6;
 
     private int Decibels(double volume) =>
         volume <= 0 ? (int)SilentDecibels : (int)Math.Round(Math.Clamp(20 * Math.Log10(Math.Min(1, volume)), SilentDecibels, 0));

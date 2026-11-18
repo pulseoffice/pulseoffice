@@ -56,15 +56,31 @@ public sealed record ChartTrendline(TrendlineKind Kind)
     public int EffectivePeriod => Math.Max(2, Period);
 }
 
-public enum ErrorBarKind { FixedValue, Percentage, StandardDeviation, StandardError }
+public enum ErrorBarKind { FixedValue, Percentage, StandardDeviation, StandardError, Custom }
 
 public enum ErrorBarDirection { Both, Plus, Minus }
+
+public sealed record ChartErrorValues(string? Reference, IReadOnlyList<double> Values)
+{
+    public static readonly ChartErrorValues Empty = new(null, []);
+
+    public double At(int index) => index >= 0 && index < Values.Count && double.IsFinite(Values[index]) ? Math.Abs(Values[index]) : 0;
+
+    public bool Equals(ChartErrorValues? other) =>
+        other is not null && string.Equals(Reference, other.Reference, StringComparison.Ordinal) && Values.SequenceEqual(other.Values);
+
+    public override int GetHashCode() => HashCode.Combine(Reference, Values.Count);
+}
 
 public sealed record ChartErrorBars(ErrorBarKind Kind, double Value)
 {
     public ErrorBarDirection Direction { get; init; }
 
     public bool EndCaps { get; init; } = true;
+
+    public ChartErrorValues? Plus { get; init; }
+
+    public ChartErrorValues? Minus { get; init; }
 }
 
 public enum MarkerSymbol { Automatic, None, Circle, Square, Diamond, Triangle, Cross, Star, Plus, Dash, Dot }
@@ -88,6 +104,8 @@ public sealed record ChartSeriesFormat
     public ChartTrendline? Trendline { get; init; }
 
     public ChartErrorBars? ErrorBars { get; init; }
+
+    public ChartErrorBars? XErrorBars { get; init; }
 
     public bool IsPlain => this == Plain;
 }

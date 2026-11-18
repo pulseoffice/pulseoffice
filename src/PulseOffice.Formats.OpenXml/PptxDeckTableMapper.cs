@@ -33,6 +33,10 @@ public sealed class PptxDeckTableMapper
         {
             FirstRow = table.Style.HeaderRow,
             BandRow = table.Style.BandedRows,
+            BandColumn = table.Style.BandedColumns ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
+            FirstColumn = table.Style.FirstColumn ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
+            LastColumn = table.Style.LastColumn ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
+            LastRow = table.Style.LastRow ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
         });
 
         var grid = new D.TableGrid();
@@ -227,7 +231,17 @@ public sealed class PptxDeckTableMapper
             Id = id,
             Query = new DataQuerySource { ConnectionId = string.Empty, Sql = string.Empty },
             Snapshot = new DataSnapshot { Columns = columns, Rows = dataRows },
-            Style = new DataTableStyle { HeaderRow = firstRow, BandedRows = bandRow, OwnLook = ownLook, Grid = !ownLook },
+            Style = new DataTableStyle
+            {
+                HeaderRow = firstRow,
+                BandedRows = bandRow,
+                BandedColumns = tbl.TableProperties?.BandColumn?.Value ?? false,
+                FirstColumn = tbl.TableProperties?.FirstColumn?.Value ?? false,
+                LastColumn = tbl.TableProperties?.LastColumn?.Value ?? false,
+                LastRow = tbl.TableProperties?.LastRow?.Value ?? false,
+                OwnLook = ownLook,
+                Grid = !ownLook,
+            },
             Merges = merges,
             CellFormats = cellFormats,
             Layout = ReadLayout(tbl, rows),

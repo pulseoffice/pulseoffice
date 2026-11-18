@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml;
 internal sealed class ReferencedSeriesSource(ChartDefinition definition, IChartSourceReferences references) : ISeriesSource
 {
     private readonly LiteralSeriesSource _literals = new();
-    private readonly PulseOffice.Sheets.Engine.Parsing.SheetNameQuoting _quoting = new();
+    private readonly OoxmlRangeFormulas _formulas = new(references);
     private readonly IReadOnlyList<ChartSeriesSource> _sources = definition.SeriesSources ?? [];
 
     public OpenXmlElement Name(int index, string name) =>
@@ -44,10 +44,5 @@ internal sealed class ReferencedSeriesSource(ChartDefinition definition, IChartS
 
     private ChartSeriesSource? Source(int index) => index >= 0 && index < _sources.Count ? _sources[index] : null;
 
-    private string? Formula(string? text) =>
-        references.Read(text) is { } reference
-            ? reference.Range.IsSingleCell
-                ? $"{_quoting.Quoted(reference.Sheet)}!{reference.Range.Start.ToA1(true, true)}"
-                : $"{_quoting.Quoted(reference.Sheet)}!{reference.Range.Start.ToA1(true, true)}:{reference.Range.End.ToA1(true, true)}"
-            : null;
+    private string? Formula(string? text) => _formulas.Formula(text);
 }

@@ -106,16 +106,17 @@ public sealed class ChartAnalysisPainter
         for (var series = 0; series < frame.Data.Series.Count; series++)
         {
             var format = frame.Definition.SeriesFormat(series);
-            if (format.Trendline is null && format.ErrorBars is null) continue;
+            if (format.Trendline is null && format.ErrorBars is null && format.XErrorBars is null) continue;
             var points = anchors.Where(anchor => anchor.Series == series && double.IsFinite(anchor.Across)).OrderBy(anchor => anchor.Across).ToList();
             if (points.Count == 0 || painter.SeriesScale(frame, series) is not { } scale) continue;
             var colour = Plots.ChartColours.Resolve(frame.Data.Series[series].ColorHex, series);
-            if (format.Trendline is { } trendline) Trend(context, trendline, points, scale, colour);
+            if (format.Trendline is { } trendline) Trend(context, trendline, points, scale, colour, frame.Formatting);
             if (format.ErrorBars is { } bars) Errors(context, bars, frame.Data.Series[series], points, scale, colour);
+            if (format.XErrorBars is { } across) AcrossErrors(context, across, frame.Data.Series[series], points, colour);
         }
     }
 
-    private void Trend(DrawingContext context, ChartTrendline trendline, List<Plots.ChartDataLabel> points, PlotScale scale, Color colour)
+    private void Trend(DrawingContext context, ChartTrendline trendline, List<Plots.ChartDataLabel> points, PlotScale scale, Color colour, System.Globalization.CultureInfo culture)
     {
         var first = points[0];
         var last = points[^1];
@@ -135,12 +136,47 @@ public sealed class ChartAnalysisPainter
             sink.EndFigure(false);
         }
         context.DrawGeometry(null, new Pen(new SolidColorBrush(colour, 0.85), 1.5) { DashStyle = new DashStyle([5, 3], 0) }, geometry);
+        if (!trendline.DisplayEquation && !trendline.DisplayRSquared) return;
+        if (_trends.Summary(trendline, [.. points.Select(point => (point.Across, point.Value))]) is not { } summary) return;
+        var lines = new List<string>();
+        if (trendline.DisplayEquation) lines.Add(summary.Equation);
+        if (trendline.DisplayRSquared) lines.Add("R² = " + summary.RSquared.ToString("0.####", culture));
+        var text = new FormattedText(string.Join(Environment.NewLine, lines), culture, FlowDirection.LeftToRight, Typeface.Default, 9,
+            new SolidColorBrush(Color.FromRgb((byte)(colour.R / 2), (byte)(colour.G / 2), (byte)(colour.B / 2))));
+        var end = curve[^1];
+        var anchor = new Point(first.Anchor.X + (end.X - first.Across) * pixelsPerUnit, scale.Position(end.Y));
+        context.DrawText(text, new Point(anchor.X - text.Width - 4, anchor.Y - text.Height - 4));
     }
+
+    private void AcrossErrors(DrawingContext context, ChartErrorBars bars, ChartSeries series, List<Plots.ChartDataLabel> points, Color colour)
+    {
+        var first = points[0];
+        var last = points[^1];
+        if (!(last.Across > first.Across)) return;
+        var pixelsPerUnit = (last.Anchor.X - first.Anchor.X) / (last.Across - first.Across);
+        var across = Enumerable.Repeat(double.NaN, series.Values.Count).ToArray();
+        foreach (var point in points.Where(point => point.Index >= 0 && point.Index < across.Length)) across[point.Index] = point.Across;
+        var spans = _errors.Spans(bars, across);
+        var pen = ErrorPen(colour);
+        foreach (var point in points)
+        {
+            if (point.Index < 0 || point.Index >= spans.Count || spans[point.Index] is not { } span) continue;
+            var y = point.Anchor.Y;
+            var low = first.Anchor.X + (span.Low - first.Across) * pixelsPerUnit;
+            var high = first.Anchor.X + (span.High - first.Across) * pixelsPerUnit;
+            context.DrawLine(pen, new Point(low, y), new Point(high, y));
+            if (!bars.EndCaps) continue;
+            context.DrawLine(pen, new Point(low, y - 3), new Point(low, y + 3));
+            context.DrawLine(pen, new Point(high, y - 3), new Point(high, y + 3));
+        }
+    }
+
+    private Pen ErrorPen(Color colour) => new(new SolidColorBrush(Color.FromRgb((byte)(colour.R / 2), (byte)(colour.G / 2), (byte)(colour.B / 2))), 1);
 
     private void Errors(DrawingContext context, ChartErrorBars bars, ChartSeries series, List<Plots.ChartDataLabel> points, PlotScale scale, Color colour)
     {
         var spans = _errors.Spans(bars, series.Values);
-        var pen = new Pen(new SolidColorBrush(Color.FromRgb((byte)(colour.R / 2), (byte)(colour.G / 2), (byte)(colour.B / 2))), 1);
+        var pen = ErrorPen(colour);
         foreach (var point in points)
         {
             if (point.Index < 0 || point.Index >= spans.Count || spans[point.Index] is not { } span) continue;

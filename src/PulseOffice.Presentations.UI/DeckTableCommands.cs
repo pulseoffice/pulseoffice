@@ -17,7 +17,8 @@ public sealed class DeckTableCommands(
     IDeckTableLooks looks,
     PulseOffice.UI.Controls.Borders.IBorderDialog borderDialog,
     IDeckTableBorders borders,
-    PulseOffice.UI.Controls.Sorting.ISortLevelsDialog sortLevels) : DeckCommandSet(context)
+    PulseOffice.UI.Controls.Sorting.ISortLevelsDialog sortLevels,
+    IDeckTableStyleOptions styleOptions) : DeckCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -31,6 +32,7 @@ public sealed class DeckTableCommands(
         Table("deck.table.sortDescending", table => Sort(table, true), table => table.Merges.Count == 0 && table.Snapshot.Rows.Count > 1),
         SortCommand(),
         StyleCommand(),
+        StyleOptionsCommand(),
         BordersCommand(),
         EditCommand(),
         DeleteCommand(),
@@ -124,6 +126,41 @@ public sealed class DeckTableCommands(
                 t.Actions.EditTable(slide, element.Id, table => looks.Apply(table, choice.Look, choice.HeaderRow, choice.BandedRows));
             },
         };
+
+    private CommandDefinition StyleOptionsCommand() =>
+        Prototype("deck.table.styleOptions") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.Target?.Selected() is ObjectElement { Content: DataTableObject },
+            Execute = async (_, ct) =>
+            {
+                if (Context.Target is not { } t || t.Selected() is not ObjectElement { Content: DataTableObject current }) return;
+                var now = styleOptions.Of(current);
+                var values = await dialogs.ShowAsync<Dictionary<string, object>>(
+                    new PulseOffice.UI.Controls.FormPromptView(
+                        texts["deck.table.styleOptions.explanation"],
+                        [
+                            new PulseOffice.UI.Controls.CheckField("firstColumn", texts["deck.table.styleOptions.firstColumn"], now.FirstColumn),
+                            new PulseOffice.UI.Controls.CheckField("lastColumn", texts["deck.table.styleOptions.lastColumn"], now.LastColumn),
+                            new PulseOffice.UI.Controls.CheckField("lastRow", texts["deck.table.styleOptions.lastRow"], now.LastRow),
+                            new PulseOffice.UI.Controls.CheckField("bandedColumns", texts["deck.table.styleOptions.bandedColumns"], now.BandedColumns),
+                        ],
+                        texts),
+                    new PulseOffice.UI.Controls.Services.DialogOptions { TitleKey = "command.deck.table.styleOptions.title", PreferredWidth = 380 },
+                    ct).ConfigureAwait(true);
+                if (values is null) return;
+                var chosen = new DeckTableEmphasis(
+                    Checked(values, "firstColumn"), Checked(values, "lastColumn"), Checked(values, "lastRow"), Checked(values, "bandedColumns"));
+                if (chosen == now) return;
+                if (t.CurrentSlide() is not { } slide || t.Selected() is not ObjectElement { Content: DataTableObject } element) return;
+                t.Actions.EditTable(slide, element.Id, table => styleOptions.Apply(table, chosen));
+            },
+        };
+
+    private static bool Checked(Dictionary<string, object> values, string key) =>
+        values.TryGetValue(key, out var value) && value is true;
 
     private CommandDefinition BordersCommand() =>
         Prototype("deck.table.borders") with

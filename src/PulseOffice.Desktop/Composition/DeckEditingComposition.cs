@@ -171,6 +171,7 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Document.Embedding.ITableSizing, PulseOffice.Document.Embedding.DistributedColumnSizing>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckTableCommands>();
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckTableLooks, PulseOffice.Presentations.UI.DeckTableLooks>();
+        services.AddSingleton<PulseOffice.Presentations.UI.IDeckTableStyleOptions, PulseOffice.Presentations.UI.DeckTableStyleOptions>();
         services.AddSingleton<PulseOffice.Presentations.IDeckTextRedaction, PulseOffice.Presentations.DeckTextRedaction>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckToolCommands>();
         services.AddSingleton<PulseOffice.Shell.IWorkspaceOpener>(s =>

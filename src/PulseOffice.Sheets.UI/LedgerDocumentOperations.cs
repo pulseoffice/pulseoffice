@@ -85,11 +85,13 @@ public sealed class LedgerDocumentOperations(
 
     public string OfficeExtension => "xlsx";
 
-    public bool WriteTo(OpenDocument document, string path)
+    public bool WriteTo(OpenDocument document, string path) =>
+        atomic.Replace(path, stream => WriteTo(document, path, stream), written => written);
+
+    public bool WriteTo(OpenDocument document, string path, Stream destination)
     {
         if (WorkbookOf(document) is not { } workbook || formats.WriterFor(path) is not { } writer) return false;
-
-        return atomic.Replace(path, stream => writer.Write(workbook, stream).Succeeded, written => written);
+        return writer.Write(workbook, destination).Succeeded;
     }
 
     public string? RenderHtml(OpenDocument document) =>

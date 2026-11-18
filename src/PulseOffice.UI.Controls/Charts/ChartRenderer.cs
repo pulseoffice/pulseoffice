@@ -135,7 +135,7 @@ public sealed class ChartRenderer
     private readonly ChartAnalysisPainter _analysis = new();
 
     private bool HasAnalysis(ChartDefinition definition, ChartData data) =>
-        Enumerable.Range(0, data.Series.Count).Any(series => definition.SeriesFormat(series) is { Trendline: not null } or { ErrorBars: not null });
+        Enumerable.Range(0, data.Series.Count).Any(series => definition.SeriesFormat(series) is { Trendline: not null } or { ErrorBars: not null } or { XErrorBars: not null });
 
     private string LabelText(ChartText text, ChartDefinition definition, ChartData data, Plots.ChartDataLabel label)
     {

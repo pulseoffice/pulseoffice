@@ -162,7 +162,7 @@ public partial class App : Application
             {
                 _closing = true;
                 FlushSettings();
-                _services.GetRequiredService<IDocumentRecovery>().DiscardAll();
+                _services.GetRequiredService<IDocumentRecovery>().DiscardSession();
                 DisposeServices();
             };
         }

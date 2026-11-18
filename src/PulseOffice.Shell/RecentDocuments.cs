@@ -63,10 +63,10 @@ public sealed class RecentDocuments : IRecentDocuments
         lock (_gate)
         {
             _items.RemoveAll(item => string.Equals(item.Path, path, _pathComparison));
-            _items.Insert(0, new RecentDocument(path, name, DateTimeOffset.Now));
+            if (Capacity == 0) _items.Clear();
+            else _items.Insert(0, new RecentDocument(path, name, DateTimeOffset.Now));
 
-            var kept = Capacity;
-            if (_items.Count > kept) _items.RemoveRange(kept, _items.Count - kept);
+            if (_items.Count > MaximumKept) _items.RemoveRange(MaximumKept, _items.Count - MaximumKept);
         }
 
         Save();

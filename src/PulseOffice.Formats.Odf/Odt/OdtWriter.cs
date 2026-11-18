@@ -454,9 +454,15 @@ internal sealed class OdtFidelityRules
             document => document.Objects.All.Select(item => item.Content).OfType<PulseOffice.Documents.Objects.EmbeddedContent>()
                 .Select(content => content.Value).OfType<PulseOffice.Charts.ChartDefinition>().Any(chart => _charts.KeptOnlyByExtension(chart.Type)),
             Diagnostic.Info("ODT182", "Chart types that ODF does not define, such as waterfall, statistical and other special charts, keep their type in a PulseOffice extension: other applications show them as the nearest standard chart, usually columns.")),
+        new FidelityRule<TextDocument>(
+            document => document.Objects.All.Select(item => item.Content).OfType<PulseOffice.Documents.Objects.EmbeddedContent>()
+                .Select(content => content.Value).OfType<PulseOffice.Charts.ChartDefinition>().Any(_chartExtensions.Needs),
+            Diagnostic.Info("ODT287", OdfChartExtensions.Loss)),
     ]);
 
     private readonly OdfChartVocabulary _charts = new();
+
+    private readonly OdfChartExtensions _chartExtensions = new();
 
     private bool SpanningControls(TextDocument document) => _controls.All(document).Any(span => !span.InOneParagraph);
 

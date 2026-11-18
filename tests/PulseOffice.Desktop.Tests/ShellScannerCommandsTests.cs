@@ -89,6 +89,8 @@ public sealed class ShellScannerCommandsTests : IDisposable
 
         public bool WriteTo(OpenDocument document, string path) => false;
 
+        public bool WriteTo(OpenDocument document, string path, Stream destination) => false;
+
         public string? RenderHtml(OpenDocument document) => null;
 
         public PulseOffice.Document.Versions.DocumentVersionCollection? Versions(OpenDocument document) => null;

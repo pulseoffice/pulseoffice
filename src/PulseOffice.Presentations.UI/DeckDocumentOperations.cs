@@ -81,11 +81,13 @@ public sealed class DeckDocumentOperations(
 
     public string OfficeExtension => "pptx";
 
-    public bool WriteTo(OpenDocument document, string path)
+    public bool WriteTo(OpenDocument document, string path) =>
+        atomic.Replace(path, stream => WriteTo(document, path, stream), written => written);
+
+    public bool WriteTo(OpenDocument document, string path, Stream destination)
     {
         if (document.Model is not Presentation deck || formats.WriterFor(path) is not { } writer) return false;
-
-        return atomic.Replace(path, stream => writer.Write(deck, stream).Succeeded, written => written);
+        return writer.Write(deck, destination).Succeeded;
     }
 
     public string? RenderHtml(OpenDocument document) =>

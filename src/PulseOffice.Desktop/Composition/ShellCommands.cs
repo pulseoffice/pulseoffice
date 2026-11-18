@@ -151,7 +151,7 @@ public sealed class ShellCommands(
                 if (workspace.Active is not { Path: { Length: > 0 } path } document) return;
                 if (!await unsaved().ConfirmCloseAsync([document], ct)) return;
                 workspace.Close(document);
-                await openRouter.OpenAsync(path, ct);
+                await openRouter.EditAsync(path, ct);
             },
         },
 

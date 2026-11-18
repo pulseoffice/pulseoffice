@@ -67,6 +67,13 @@ public sealed class TemplateSaveTests(HeadlessDesktopSession headless) : IDispos
             return true;
         }
 
+        public bool WriteTo(OpenDocument document, string path, Stream destination)
+        {
+            Written.Add(path);
+            destination.Write("new"u8);
+            return true;
+        }
+
         public string? RenderHtml(OpenDocument document) => null;
 
         public PulseOffice.Document.Versions.DocumentVersionCollection? Versions(OpenDocument document) => null;
@@ -93,10 +100,12 @@ public sealed class TemplateSaveTests(HeadlessDesktopSession headless) : IDispos
         workspace.Open(new OpenDocument(ModuleKind.Sheets, "Budget", new Panel(), new UndoStack()));
         var writer = new Writer();
         var dialogs = new Answers(replies);
+        var catalog = new DocumentOperationsCatalog([writer]);
         var commands = new ShellTemplateCommands(
-            workspace, new DocumentOperationsCatalog([writer]), Fake<IDocumentOpenRouter>(), Fake<PulseOffice.Platform.IFileDialogService>(), dialogs,
+            workspace, catalog, Fake<IDocumentOpenRouter>(), Fake<PulseOffice.Platform.IFileDialogService>(), dialogs,
             Fake<IStatusBarService>(), new TextCatalog(UiLanguage.English), new Library(_folder),
-            Fake<PulseOffice.UI.Controls.Galleries.IGalleryNavigator>(), Fake<PulseOffice.UI.Controls.Printing.IPageCanvasFactory>());
+            Fake<PulseOffice.UI.Controls.Galleries.IGalleryNavigator>(), Fake<PulseOffice.UI.Controls.Printing.IPageCanvasFactory>(),
+            new DocumentCopyWriter(catalog, Fake<IDocumentPasswordGate>(), new PulseOffice.Platform.AtomicFileWriter()));
         return (writer, dialogs, commands.GetCommands().Single(command => command.Id.Value == "shell.file.saveAsTemplate"));
     }
 

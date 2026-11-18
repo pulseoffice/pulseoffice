@@ -239,6 +239,12 @@ internal sealed class PptxFidelityRules
             deck => Objects(deck).Select(element => element.Content).OfType<PulseOffice.Charts.ChartDefinition>().Any(_charts.FlattensThreeDimensional),
             Diagnostic.Info("PPTX043", "DrawingML has no three-dimensional line or column-and-line charts: these 3D charts are written flat in PPTX. ODP keeps the 3D view.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
+            deck => Objects(deck).Select(element => element.Content).OfType<PulseOffice.Charts.ChartDefinition>().Any(_charts.DropsSeriesAnalysis),
+            Diagnostic.Warning("PPTX241", "Trendlines, error bars and secondary axes on pie, doughnut and radar chart series have no place in DrawingML: they are not written to PPTX. ODP keeps them.")),
+        new FidelityRule<PulseOffice.Presentations.Presentation>(
+            deck => Objects(deck).Select(element => element.Content).OfType<PulseOffice.Charts.ChartDefinition>().Any(_charts.DropsCategoryUnits),
+            Diagnostic.Info("PPTX242", "DrawingML category axes have no major or minor unit: the units set on a category axis are not written to PPTX. ODP keeps them.")),
+        new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.FormSettings != new PulseOffice.Document.Forms.FormDocumentSettings(),
             Diagnostic.Warning("PPTX027", "Open in design mode, automatic focus and the data source of forms have no PPTX equivalent; they are dropped in PPTX and kept in ODP.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(

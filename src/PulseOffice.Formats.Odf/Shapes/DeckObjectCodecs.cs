@@ -509,9 +509,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
         var columns = Math.Max(1, snapshot.Columns.Count);
 
         var prefix = "tva_" + new string([.. element.Id.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')]);
-        var body = new XElement(Table + "table",
-            new XAttribute(Table + "use-first-row-styles", table.Style.HeaderRow ? "true" : "false"),
-            new XAttribute(Table + "use-banding-rows-styles", table.Style.BandedRows ? "true" : "false"));
+        var body = new XElement(Table + "table", TemplateFlags(table.Style));
 
         var fractions = table.Layout.ColumnFractions.Count == snapshot.Columns.Count && snapshot.Columns.Count > 0
             ? table.Layout.ColumnFractions
@@ -540,9 +538,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
         automaticStyles.Add(new XElement(Style + "style",
             new XAttribute(Style + "name", frameStyle),
             new XAttribute(Style + "family", "graphic"),
-            new XElement(Style + "graphic-properties",
-                new XAttribute(Table + "use-first-row-styles", table.Style.HeaderRow ? "true" : "false"),
-                new XAttribute(Table + "use-banding-rows-styles", table.Style.BandedRows ? "true" : "false"))));
+            new XElement(Style + "graphic-properties", TemplateFlags(table.Style))));
         var frame = Placed(Draw + "frame", element, body);
         frame.SetAttributeValue(Draw + "style-name", frameStyle);
         return frame;
@@ -620,7 +616,11 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
                 Style = new DataTableStyle
                 {
                     HeaderRow = header,
-                    BandedRows = (string?)(settings?.Attribute(Table + "use-banding-rows-styles") ?? tableElement.Attribute(Table + "use-banding-rows-styles")) == "true",
+                    BandedRows = TemplateFlag(settings, tableElement, "use-banding-rows-styles"),
+                    BandedColumns = TemplateFlag(settings, tableElement, "use-banding-columns-styles"),
+                    FirstColumn = TemplateFlag(settings, tableElement, "use-first-column-styles"),
+                    LastColumn = TemplateFlag(settings, tableElement, "use-last-column-styles"),
+                    LastRow = TemplateFlag(settings, tableElement, "use-last-row-styles"),
                     OwnLook = looks.Count > 0,
                     Grid = looks.Count == 0,
                 },
@@ -645,6 +645,21 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
     private (int Rows, int Columns) Spans(XElement cell) =>
         (Count(cell, Table + "number-rows-spanned"),
          Count(cell, Table + "number-columns-spanned"));
+
+    private IEnumerable<XAttribute> TemplateFlags(DataTableStyle style)
+    {
+        yield return Flag("use-first-row-styles", style.HeaderRow);
+        yield return Flag("use-banding-rows-styles", style.BandedRows);
+        if (style.BandedColumns) yield return Flag("use-banding-columns-styles", true);
+        if (style.FirstColumn) yield return Flag("use-first-column-styles", true);
+        if (style.LastColumn) yield return Flag("use-last-column-styles", true);
+        if (style.LastRow) yield return Flag("use-last-row-styles", true);
+    }
+
+    private XAttribute Flag(string name, bool value) => new(Table + name, value ? "true" : "false");
+
+    private bool TemplateFlag(XElement? settings, XElement table, string name) =>
+        (string?)(settings?.Attribute(Table + name) ?? table.Attribute(Table + name)) == "true";
 
     private bool HasHeader(XElement? settings, XElement table) =>
         (string?)(settings?.Attribute(Table + "use-first-row-styles") ?? table.Attribute(Table + "use-first-row-styles")) == "true"

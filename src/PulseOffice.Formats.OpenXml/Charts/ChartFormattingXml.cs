@@ -148,7 +148,10 @@ internal sealed class OoxmlSeriesFormats
         (ErrorBarKind.Percentage, C.ErrorValues.Percentage),
         (ErrorBarKind.StandardDeviation, C.ErrorValues.StandardDeviation),
         (ErrorBarKind.StandardError, C.ErrorValues.StandardError),
+        (ErrorBarKind.Custom, C.ErrorValues.Custom),
     ];
+
+    private readonly OoxmlRangeFormulas _formulas = new();
 
     private readonly (MarkerSymbol Symbol, C.MarkerStyleValues Value)[] _markers =
     [
@@ -183,7 +186,9 @@ internal sealed class OoxmlSeriesFormats
         if (format.Marker != MarkerSymbol.Automatic && CarriesMarkers(series)) Marker(series, format);
         if (!CarriesTrendlines(series)) return;
         if (format.Trendline is { } trendline) BeforeData(series, Trendline(trendline));
-        if (format.ErrorBars is { } bars) BeforeData(series, ErrorBars(bars, series is C.ScatterChartSeries or C.BubbleChartSeries));
+        var directed = series is C.ScatterChartSeries or C.BubbleChartSeries;
+        if (format.ErrorBars is { } bars) BeforeData(series, ErrorBars(bars, directed ? C.ErrorBarDirectionValues.Y : null));
+        if (format.XErrorBars is { } across && directed) BeforeData(series, ErrorBars(across, C.ErrorBarDirectionValues.X));
     }
 
     private void Line(OpenXmlCompositeElement series, ChartSeriesFormat format)
@@ -245,10 +250,10 @@ internal sealed class OoxmlSeriesFormats
         return element;
     }
 
-    private C.ErrorBars ErrorBars(ChartErrorBars bars, bool directed)
+    private C.ErrorBars ErrorBars(ChartErrorBars bars, C.ErrorBarDirectionValues? direction)
     {
         var element = new C.ErrorBars();
-        if (directed) element.AppendChild(new C.ErrorDirection { Val = C.ErrorBarDirectionValues.Y });
+        if (direction is { } dimension) element.AppendChild(new C.ErrorDirection { Val = dimension });
         element.AppendChild(new C.ErrorBarType
         {
             Val = bars.Direction switch
@@ -260,8 +265,44 @@ internal sealed class OoxmlSeriesFormats
         });
         element.AppendChild(new C.ErrorBarValueType { Val = _errorKinds.First(pair => pair.Kind == bars.Kind).Value });
         element.AppendChild(new C.NoEndCap { Val = !bars.EndCaps });
+        if (bars.Kind == ErrorBarKind.Custom)
+        {
+            element.AppendChild(new C.Plus(CustomValues(bars.Plus)));
+            element.AppendChild(new C.Minus(CustomValues(bars.Minus)));
+            return element;
+        }
         if (bars.Kind != ErrorBarKind.StandardError) element.AppendChild(new C.ErrorBarValue { Val = double.IsFinite(bars.Value) ? bars.Value : 1 });
         return element;
+    }
+
+    private OpenXmlElement CustomValues(ChartErrorValues? values)
+    {
+        var points = values?.Values ?? [];
+        var cache = Enumerable.Range(0, points.Count).Where(index => double.IsFinite(points[index]))
+            .Select(index => new C.NumericPoint(new C.NumericValue(points[index].ToString("R", System.Globalization.CultureInfo.InvariantCulture))) { Index = (uint)index });
+        if (_formulas.Formula(values?.Reference) is { } formula)
+        {
+            var numbers = new C.NumberingCache(new C.FormatCode("General"), new C.PointCount { Val = (uint)points.Count });
+            foreach (var point in cache) numbers.AppendChild(point);
+            return new C.NumberReference(new C.Formula(formula), numbers);
+        }
+        var literal = new C.NumberLiteral(new C.FormatCode("General"), new C.PointCount { Val = (uint)points.Count });
+        foreach (var point in cache) literal.AppendChild(point);
+        return literal;
+    }
+
+    private ChartErrorValues CustomValues(OpenXmlCompositeElement? side)
+    {
+        if (side is null) return ChartErrorValues.Empty;
+        var reference = side.GetFirstChild<C.NumberReference>();
+        var points = (OpenXmlCompositeElement?)reference?.NumberingCache ?? side.GetFirstChild<C.NumberLiteral>();
+        var count = (int)Math.Min((points?.GetFirstChild<C.PointCount>()?.Val?.Value ?? 0u), 100000u);
+        var values = Enumerable.Repeat(double.NaN, count).ToArray();
+        foreach (var point in points?.Elements<C.NumericPoint>() ?? [])
+            if (point.Index?.Value is { } index && index < count
+                && double.TryParse(point.NumericValue?.Text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+                values[index] = value;
+        return new ChartErrorValues(_formulas.Model(reference?.Formula?.Text), values);
     }
 
     public ChartSeriesFormat Read(OpenXmlCompositeElement? series, bool secondary)
@@ -281,6 +322,9 @@ internal sealed class OoxmlSeriesFormats
             SecondaryAxis = secondary,
             Trendline = series.GetFirstChild<C.Trendline>() is { } trendline ? Trendline(trendline) : null,
             ErrorBars = series.Elements<C.ErrorBars>().FirstOrDefault(bars => bars.GetFirstChild<C.ErrorDirection>()?.Val?.Value != C.ErrorBarDirectionValues.X) is { } bars ? ErrorBars(bars) : null,
+            XErrorBars = series is C.ScatterChartSeries or C.BubbleChartSeries
+                && series.Elements<C.ErrorBars>().FirstOrDefault(bars => bars.GetFirstChild<C.ErrorDirection>()?.Val?.Value == C.ErrorBarDirectionValues.X) is { } across
+                    ? ErrorBars(across) : null,
         };
         return format.IsPlain ? ChartSeriesFormat.Plain : format;
     }
@@ -327,9 +371,8 @@ internal sealed class OoxmlSeriesFormats
         {
             Direction = direction == C.ErrorBarValues.Plus ? ErrorBarDirection.Plus : direction == C.ErrorBarValues.Minus ? ErrorBarDirection.Minus : ErrorBarDirection.Both,
             EndCaps = element.GetFirstChild<C.NoEndCap>()?.Val?.Value != true,
+            Plus = kind == ErrorBarKind.Custom ? CustomValues(element.GetFirstChild<C.Plus>()) : null,
+            Minus = kind == ErrorBarKind.Custom ? CustomValues(element.GetFirstChild<C.Minus>()) : null,
         };
     }
-
-    public bool UsesCustomErrorValues(OpenXmlCompositeElement series) =>
-        series.Elements<C.ErrorBars>().Any(bars => bars.GetFirstChild<C.ErrorBarValueType>()?.Val?.Value == C.ErrorValues.Custom);
 }

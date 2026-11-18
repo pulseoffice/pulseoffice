@@ -125,6 +125,7 @@ internal static class CommandingComposition
         services.AddSingleton<ShellPrintCommands>();
         services.AddSingleton<ShellDocumentCommands>();
         services.AddSingleton<ShellPasswordCommands>();
+        services.AddSingleton<IDocumentCopyWriter, DocumentCopyWriter>();
         services.AddSingleton<ShellSendCommands>();
         services.AddSingleton<ShellRemoteCommands>();
         services.AddSingleton<ShellSignatureCommands>();

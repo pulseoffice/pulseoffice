@@ -88,6 +88,10 @@ public sealed record DataTableStyle
 {
     public bool HeaderRow { get; init; } = true;
     public bool BandedRows { get; init; } = true;
+    public bool BandedColumns { get; init; }
+    public bool FirstColumn { get; init; }
+    public bool LastColumn { get; init; }
+    public bool LastRow { get; init; }
     public bool Grid { get; init; } = true;
     public double FontSize { get; init; } = 11;
     public string? AccentHex { get; init; }

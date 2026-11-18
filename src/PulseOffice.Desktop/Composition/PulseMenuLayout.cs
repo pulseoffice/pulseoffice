@@ -202,6 +202,7 @@ public static class PulseMenuLayout
         ("deck.object.textAttributes", "format/object"),
         ("deck.object.positionSize", "format/object"),
         ("deck.object.altText", "format/object"),
+        ("deck.object.mediaOptions", "format/object"),
         ("deck.object.group", "format/arrange/group"),
         ("deck.object.ungroup", "format/arrange/group"),
         ("deck.object.enterGroup", "format/arrange/group"),

@@ -21,6 +21,8 @@ public sealed class PptxMediaMapper
 
     private readonly PptxMediaTiming _timing = new();
 
+    private readonly PptxMediaEditing _editing = new();
+
 
     private static readonly byte[] TransparentPng =
     [
@@ -59,7 +61,7 @@ public sealed class PptxMediaMapper
             appNvPr.Append(new D.VideoFromFile { Link = referenceId });
         else
             appNvPr.Append(new D.AudioFromFile { Link = referenceId });
-        appNvPr.Append(MediaExtension(mediaReferenceId, media.IsLinked));
+        appNvPr.Append(MediaExtension(mediaReferenceId, media));
 
         return new P.Picture(
             new P.NonVisualPictureProperties(
@@ -110,6 +112,7 @@ public sealed class PptxMediaMapper
         var playback = pic.NonVisualPictureProperties?.NonVisualDrawingProperties?.Id?.Value is { } spid
             ? _timing.Read(part.Slide?.GetFirstChild<P.Timing>(), spid)
             : PptxMediaPlayback.Default;
+        var editing = _editing.Read(appNvPr);
         return new MediaElement
         {
             Id = id,
@@ -124,6 +127,10 @@ public sealed class PptxMediaMapper
             Loop = playback.Loop,
             Muted = playback.Muted,
             Volume = playback.Volume,
+            TrimStart = editing.TrimStart,
+            TrimEnd = editing.TrimEnd,
+            FadeIn = editing.FadeIn,
+            FadeOut = editing.FadeOut,
         };
     }
 
@@ -180,11 +187,12 @@ public sealed class PptxMediaMapper
             new Twip((int)((extents?.Cy?.Value ?? 0) / PulseOffice.Foundation.Units.Emu.PerTwip)));
     }
 
-    private DocumentFormat.OpenXml.OpenXmlElement MediaExtension(string referenceId, bool linked)
+    private DocumentFormat.OpenXml.OpenXmlElement MediaExtension(string referenceId, MediaElement source)
     {
-        var media = linked
+        var media = source.IsLinked
             ? new DocumentFormat.OpenXml.Office2010.PowerPoint.Media { Link = referenceId }
             : new DocumentFormat.OpenXml.Office2010.PowerPoint.Media { Embed = referenceId };
+        _editing.Write(media, source);
         var ext = new P.ApplicationNonVisualDrawingPropertiesExtension { Uri = "{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}" };
         ext.Append(media);
         var list = new P.ApplicationNonVisualDrawingPropertiesExtensionList();

@@ -8,7 +8,7 @@ public sealed class GrowthCheck
     private readonly TimeSpan _floor;
     private readonly double _slack;
 
-    public GrowthCheck() : this(TimeSpan.FromMilliseconds(2), 4)
+    public GrowthCheck() : this(TimeSpan.FromMilliseconds(10), 4)
     {
     }
 

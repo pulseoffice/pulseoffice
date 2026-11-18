@@ -25,7 +25,10 @@ public sealed class DeckTableLooks : IDeckTableLooks
             for (var column = 0; column < columns; column++)
             {
                 var header = row < 0;
-                var fill = header ? look.HeaderFill : bandedRows && row % 2 == 1 ? look.BandFill : look.BodyFill;
+                var fill = header ? look.HeaderFill
+                    : bandedRows && row % 2 == 1 ? look.BandFill
+                    : table.Style.BandedColumns && column % 2 == 1 ? look.BandFill ?? look.BodyFill
+                    : look.BodyFill;
                 var opening = row == first;
                 var closing = header || row == rows - 1;
                 var align = table.CellFormats.FirstOrDefault(format => format.Row == row && format.Column == column)?.VerticalAlign ?? CellVerticalAlign.Center;
@@ -35,7 +38,7 @@ public sealed class DeckTableLooks : IDeckTableLooks
                     {
                         FillHex = fill is { } colour ? Hex(colour) : null,
                         TextHex = header && look.HeaderInk is { } ink ? Hex(ink) : null,
-                        Bold = header && look.HeaderBold,
+                        Bold = header ? look.HeaderBold : Emphasized(table.Style, row, column, rows, columns),
                         Top = look.InnerLines || opening ? line : null,
                         Bottom = look.InnerLines || closing ? line : null,
                         Left = look.InnerLines ? line : null,
@@ -57,6 +60,9 @@ public sealed class DeckTableLooks : IDeckTableLooks
             },
         };
     }
+
+    private bool Emphasized(DataTableStyle style, int row, int column, int rows, int columns) =>
+        (style.FirstColumn && column == 0) || (style.LastColumn && column == columns - 1) || (style.LastRow && row == rows - 1);
 
     private string Hex(uint argb) => new ArgbColor(argb).ToHashedHex();
 }

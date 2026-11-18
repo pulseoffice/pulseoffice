@@ -7,8 +7,11 @@ using PulseOffice.Settings;
 
 namespace PulseOffice.Shell;
 
+public sealed record RecoveryOwner(int ProcessId, DateTimeOffset Started);
+
 public sealed record RecoverySnapshot(
-    string Id, ModuleKind Module, string Title, string? OriginalPath, DateTimeOffset SavedAt, bool ReadOnly = false)
+    string Id, ModuleKind Module, string Title, string? OriginalPath, DateTimeOffset SavedAt, bool ReadOnly = false,
+    RecoveryOwner? Owner = null)
 {
     public string DataFileName => Id + ".dati";
 }
@@ -42,6 +45,8 @@ public interface IDocumentRecovery
     void DiscardFor(OpenDocument document);
 
     void DiscardAll();
+
+    void DiscardSession();
 }
 
 public sealed class DocumentRecovery : IDocumentRecovery
@@ -53,6 +58,8 @@ public sealed class DocumentRecovery : IDocumentRecovery
     private readonly ConditionalWeakTable<OpenDocument, StrongBox<int>> _discards = [];
     private readonly IDocumentPasswordGate? _passwords;
     private readonly IPrivateFiles _privateFiles;
+    private readonly IRecoveryOwnership _ownership;
+    private readonly RecoveryOwner _owner;
     private readonly Lock _queueGate = new();
     private Task _queueTail = Task.CompletedTask;
 
@@ -61,8 +68,11 @@ public sealed class DocumentRecovery : IDocumentRecovery
         ILogger<DocumentRecovery> logger,
         string directory,
         IDocumentPasswordGate? passwords = null,
-        IPrivateFiles? privateFiles = null)
+        IPrivateFiles? privateFiles = null,
+        IRecoveryOwnership? ownership = null)
     {
+        _ownership = ownership ?? new ProcessRecoveryOwnership();
+        _owner = _ownership.Current;
         _passwords = passwords;
         _privateFiles = privateFiles ?? new PrivateFilesFactory().Create();
         _providers = [.. providers];
@@ -110,7 +120,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
             _identifiers[document] = id = Guid.NewGuid().ToString("N");
 
         var snapshot = new RecoverySnapshot(
-            id, document.Module, document.Title, document.Path, DateTimeOffset.Now, document.IsReadOnly);
+            id, document.Module, document.Title, document.Path, DateTimeOffset.Now, document.IsReadOnly, _owner);
 
         try
         {
@@ -252,7 +262,13 @@ public sealed class DocumentRecovery : IDocumentRecovery
     {
         foreach (var snapshot in Pending.ToList()) Discard(snapshot.Id);
 
-        foreach (var document in _identifiers.Values.ToList()) Discard(document);
+        DiscardSession();
+    }
+
+    public void DiscardSession()
+    {
+        foreach (var document in _identifiers.Keys.ToList()) _discards.GetOrCreateValue(document).Value++;
+        foreach (var id in _identifiers.Values.ToList()) Discard(id);
         _identifiers.Clear();
     }
 
@@ -279,7 +295,8 @@ public sealed class DocumentRecovery : IDocumentRecovery
                 var snapshot = JsonSerializer.Deserialize<RecoverySnapshot>(File.ReadAllText(file));
 
                 if (snapshot is not null && IsIdentifier(snapshot.Id) && snapshot.Title is not null
-                    && File.Exists(Path.Combine(_directory, snapshot.DataFileName)))
+                    && File.Exists(Path.Combine(_directory, snapshot.DataFileName))
+                    && !HeldByAnotherRunningInstance(snapshot))
                     found.Add(snapshot);
             }
             catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
@@ -290,6 +307,9 @@ public sealed class DocumentRecovery : IDocumentRecovery
 
         return [.. found.OrderByDescending(s => s.SavedAt)];
     }
+
+    private bool HeldByAnotherRunningInstance(RecoverySnapshot snapshot) =>
+        snapshot.Owner is { } owner && owner != _owner && _ownership.IsAlive(owner);
 
     private bool IsIdentifier(string? id) =>
         id is { Length: 32 } && id.All(Uri.IsHexDigit);

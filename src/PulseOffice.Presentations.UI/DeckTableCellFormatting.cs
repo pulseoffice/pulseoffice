@@ -34,9 +34,14 @@ public sealed class DeckTableLookSeed : IDeckTableLookSeed
                 {
                     Look = new TableCellLook
                     {
-                        FillHex = header ? HeaderFillHex : style.BandedRows && row % 2 == 1 ? BandHex : null,
+                        FillHex = header ? HeaderFillHex
+                            : (style.BandedRows && row % 2 == 1) || (style.BandedColumns && column % 2 == 1) ? BandHex
+                            : null,
                         TextHex = header ? accent : null,
-                        Bold = header,
+                        Bold = header
+                            || (style.FirstColumn && column == 0)
+                            || (style.LastColumn && column == table.Snapshot.Columns.Count - 1)
+                            || (style.LastRow && row == table.Snapshot.Rows.Count - 1),
                         FontSize = style.FontSize,
                         Horizontal = !header && table.Snapshot.Columns[column].Kind == DataValueKind.Number ? CellHorizontalAlign.Right : null,
                         Top = grid,

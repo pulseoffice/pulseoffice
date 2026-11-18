@@ -6,6 +6,8 @@ namespace PulseOffice.UI.Controls.Charts.Plots;
 
 public sealed class ScatterPlot : ChartPlotBase
 {
+    private readonly ChartSeriesStroke _strokes = new();
+
     public override bool Handles(ChartType type) => type is
         ChartType.Scatter or ChartType.ScatterWithLines or ChartType.Bubble;
 
@@ -49,6 +51,7 @@ public sealed class ScatterPlot : ChartPlotBase
         for (var index = 0; index < layout.Plotted.Count; index++)
         {
             var series = layout.Plotted[index];
+            var format = frame.Definition.SeriesFormat(index + 1);
             var points = new List<(Point Point, int Index)>();
 
             for (var point = 0; point < series.Values.Count && point < horizontalValues.Count; point++)
@@ -71,7 +74,7 @@ public sealed class ScatterPlot : ChartPlotBase
                     sink.EndFigure(false);
                 }
 
-                frame.Context.DrawGeometry(null, new Pen(Brush(frame.Data, index + 1), 1.6), geometry);
+                frame.Context.DrawGeometry(null, _strokes.Pen(Brush(frame.Data, index + 1), format, 1.6), geometry);
             }
 
             foreach (var (centre, source) in points)
@@ -81,7 +84,8 @@ public sealed class ScatterPlot : ChartPlotBase
                 if (largest > 0 && source < sizes.Count && double.IsFinite(sizes[source]))
                     radius = 4 + 14 * Math.Sqrt(Math.Abs(sizes[source]) / largest);
 
-                frame.Context.DrawEllipse(Brush(frame.Data, index + 1, 0.75), null, centre, radius, radius);
+                if (bubble || format.Marker == MarkerSymbol.Automatic) frame.Context.DrawEllipse(Brush(frame.Data, index + 1, 0.75), null, centre, radius, radius);
+                else _strokes.Marker(frame.Context, Brush(frame.Data, index + 1, 0.75), format, centre, radius);
             }
         }
     }

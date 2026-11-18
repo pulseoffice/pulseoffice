@@ -18,7 +18,8 @@ public sealed class ShellTemplateCommands(
     ITextCatalog texts,
     ITemplateLibrary library,
     PulseOffice.UI.Controls.Galleries.IGalleryNavigator navigator,
-    PulseOffice.UI.Controls.Printing.IPageCanvasFactory canvases)
+    PulseOffice.UI.Controls.Printing.IPageCanvasFactory canvases,
+    IDocumentCopyWriter copies)
 {
     private string Folder => library.Folder;
 
@@ -150,9 +151,17 @@ public sealed class ShellTemplateCommands(
         var path = Path.Combine(Folder, $"{name}.{(asOffice ? module.OfficeTemplateExtension : module.TemplateExtension)}");
         if (File.Exists(path) && !await ConfirmReplaceAsync(Path.GetFileName(path), ct).ConfigureAwait(true)) return;
 
-        var written = module.WriteTo(document, path);
-        status.Report(
-            written ? texts.Format("template.saved", Path.GetFileName(path)) : texts["template.failed"],
-            written ? NotificationSeverity.Success : NotificationSeverity.Error);
+        var outcome = copies.Write(document, path);
+        status.Report(outcome switch
+        {
+            DocumentCopyOutcome.Failed => texts["template.failed"],
+            DocumentCopyOutcome.WrittenWithoutPassword => texts.Format("status.save.passwordOdfOnly", Path.GetFileName(path)),
+            _ => texts.Format("template.saved", Path.GetFileName(path)),
+        }, outcome switch
+        {
+            DocumentCopyOutcome.Failed => NotificationSeverity.Error,
+            DocumentCopyOutcome.WrittenWithoutPassword => NotificationSeverity.Warning,
+            _ => NotificationSeverity.Success,
+        });
     }
 }

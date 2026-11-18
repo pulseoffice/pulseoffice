@@ -56,10 +56,13 @@ public sealed class FolioDocumentOperations(
 
     public string OfficeExtension => "docx";
 
-    public bool WriteTo(OpenDocument document, string path)
+    public bool WriteTo(OpenDocument document, string path) =>
+        atomic.Replace(path, stream => WriteTo(document, path, stream), written => written);
+
+    public bool WriteTo(OpenDocument document, string path, Stream destination)
     {
         if (document.Model is not TextDocument text || formats.WriterFor(path) is not { } writer) return false;
-        return atomic.Replace(path, stream => writer.Write(text, stream).Succeeded, written => written);
+        return writer.Write(text, destination).Succeeded;
     }
 
     public string? RenderHtml(OpenDocument document)

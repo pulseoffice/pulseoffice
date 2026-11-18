@@ -117,7 +117,10 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
         (ErrorBarKind.Percentage, "percentage"),
         (ErrorBarKind.StandardDeviation, "standard-deviation"),
         (ErrorBarKind.StandardError, "standard-error"),
+        (ErrorBarKind.Custom, "cell-range"),
     ];
+
+    private readonly SeriesSourceAddresses _addresses = new();
 
     private readonly (MarkerSymbol Symbol, string Name)[] _symbols =
     [
@@ -216,13 +219,15 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
                         new XAttribute(Chart + "display-r-square", trendline.DisplayRSquared ? "true" : "false"))
                     : null);
         }
-        if (format.ErrorBars is { } bars)
-        {
-            var name = seriesStyle + "-error";
-            styles.Add(new XElement(Style + "style", new XAttribute(Style + "name", name), new XAttribute(Style + "family", "chart"),
-                new XElement(Style + "chart-properties", Errors(bars))));
-            yield return new XElement(Chart + "error-indicator", new XAttribute(Chart + "style-name", name), new XAttribute(Chart + "dimension", "y"));
-        }
+        if (format.ErrorBars is { } bars) yield return Indicator(seriesStyle + "-error", "y", bars, styles);
+        if (format.XErrorBars is { } across) yield return Indicator(seriesStyle + "-error-x", "x", across, styles);
+    }
+
+    private XElement Indicator(string name, string dimension, ChartErrorBars bars, IList<XElement> styles)
+    {
+        styles.Add(new XElement(Style + "style", new XAttribute(Style + "name", name), new XAttribute(Style + "family", "chart"),
+            new XElement(Style + "chart-properties", Errors(bars))));
+        return new XElement(Chart + "error-indicator", new XAttribute(Chart + "style-name", name), new XAttribute(Chart + "dimension", dimension));
     }
 
     private IEnumerable<XAttribute> Regression(ChartTrendline trendline)
@@ -258,8 +263,27 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
             case ErrorBarKind.StandardDeviation when Math.Abs(value - 1) > 1e-12:
                 yield return new XAttribute(PulseChart + "error-value", Number(value));
                 break;
+            case ErrorBarKind.Custom:
+                foreach (var attribute in Side("upper", bars.Plus)) yield return attribute;
+                foreach (var attribute in Side("lower", bars.Minus)) yield return attribute;
+                break;
         }
         if (!bars.EndCaps) yield return new XAttribute(PulseChart + "error-end-caps", "false");
+    }
+
+    private IEnumerable<XAttribute> Side(string side, ChartErrorValues? values)
+    {
+        if (_addresses.Address(values?.Reference) is { } address) yield return new XAttribute(Chart + $"error-{side}-range", address);
+        if (values is { Values.Count: > 0 })
+            yield return new XAttribute(PulseChart + $"error-{side}-values", string.Join(' ', values.Values.Select(value => double.IsFinite(value) ? Number(value) : "NaN")));
+    }
+
+    private ChartErrorValues ReadSide(XElement? properties, string side)
+    {
+        var reference = _addresses.Model(Attribute(properties, $"error-{side}-range"));
+        var values = ((string?)properties?.Attribute(PulseChart + $"error-{side}-values"))?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(text => Parse(text) ?? double.NaN).ToArray() ?? [];
+        return new ChartErrorValues(reference, values);
     }
 
     public ChartDataLabelOptions ReadLabels(XElement? properties, XElement? style, OdfNumberStyleReader numbers)
@@ -315,6 +339,9 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
             ErrorBars = series.Elements(Chart + "error-indicator").FirstOrDefault(indicator => (string?)indicator.Attribute(Chart + "dimension") is null or "y") is { } error
                 ? Errors(named((string?)error.Attribute(Chart + "style-name"))?.Element(Style + "chart-properties") ?? properties)
                 : properties?.Attribute(Chart + "error-category") is { } category && category.Value != "none" ? Errors(properties) : null,
+            XErrorBars = series.Elements(Chart + "error-indicator").FirstOrDefault(indicator => (string?)indicator.Attribute(Chart + "dimension") == "x") is { } across
+                ? Errors(named((string?)across.Attribute(Chart + "style-name"))?.Element(Style + "chart-properties"))
+                : null,
         };
         return format.IsPlain ? ChartSeriesFormat.Plain : format;
     }
@@ -357,6 +384,8 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
         {
             Direction = upper && !lower ? ErrorBarDirection.Plus : lower && !upper ? ErrorBarDirection.Minus : ErrorBarDirection.Both,
             EndCaps = (string?)properties?.Attribute(PulseChart + "error-end-caps") != "false",
+            Plus = kind == ErrorBarKind.Custom ? ReadSide(properties, "upper") : null,
+            Minus = kind == ErrorBarKind.Custom ? ReadSide(properties, "lower") : null,
         };
     }
 
@@ -371,9 +400,17 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
 
 internal sealed class OdfChartExtensions
 {
+    public const string Loss = "Charts use dashed series lines, a logarithm base other than 10, error bars without end caps, a standard deviation multiplier or error values not taken from cells: ODF has no attribute for these, so they are kept in a PulseOffice extension and other applications show solid lines, base 10, capped bars, one standard deviation and no custom error bars. The OOXML formats keep them.";
+
     public bool Needs(ChartDefinition chart) =>
         new[] { chart.CategoryAxis, chart.ValueAxis, chart.SecondaryValueAxis }.Any(scale => scale.Logarithmic && Math.Abs(scale.EffectiveLogBase - 10) > 1e-12)
         || chart.SeriesFormats?.Any(format => format is not null
             && (format.Dash != LineDash.Solid || format.Marker == MarkerSymbol.Dot
-                || format.ErrorBars is { } bars && (!bars.EndCaps || bars.Kind == ErrorBarKind.StandardDeviation && Math.Abs(bars.Value - 1) > 1e-12))) == true;
+                || Extended(format.ErrorBars) || Extended(format.XErrorBars))) == true;
+
+    private bool Extended(ChartErrorBars? bars) =>
+        bars is not null
+        && (!bars.EndCaps
+            || bars.Kind == ErrorBarKind.StandardDeviation && Math.Abs(bars.Value - 1) > 1e-12
+            || bars.Kind == ErrorBarKind.Custom && (bars.Plus?.Reference is null || bars.Minus?.Reference is null));
 }

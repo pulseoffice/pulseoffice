@@ -31,7 +31,7 @@ internal sealed class SeriesSourceAddresses
     private ChartSeriesSource? Source(ChartDefinition definition, int series) =>
         definition.SeriesSources is { } sources && series >= 0 && series < sources.Count ? sources[series] : null;
 
-    private string? Address(string? text)
+    public string? Address(string? text)
     {
         if (_references.Read(text) is not { } reference) return null;
         return reference.Range.IsSingleCell ? _ranges.WriteAddress(reference.Sheet, reference.Range.Start) : _ranges.Write(reference.Sheet, reference.Range);

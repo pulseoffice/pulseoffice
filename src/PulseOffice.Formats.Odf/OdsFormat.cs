@@ -152,7 +152,7 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
             .OfType<Charts.ChartDefinition>()
             .Count(_chartExtensions.Needs);
         if (extendedCharts > 0)
-            losses.Add(Diagnostic.Info("ODF287", $"{extendedCharts} charts use dashed series lines, a logarithm base other than 10, error bars without end caps or a standard deviation multiplier: ODF has no attribute for these, so they are kept in a PulseOffice extension and other applications show solid lines, base 10, capped bars and one standard deviation. XLSX keeps them.").With(extendedCharts));
+            losses.Add(Diagnostic.Info("ODF287", $"{OdfChartExtensions.Loss} Charts affected: {extendedCharts}.").With(extendedCharts));
 
         var duotoneImages = workbook.Sheets
             .SelectMany(sheet => sheet.Objects)

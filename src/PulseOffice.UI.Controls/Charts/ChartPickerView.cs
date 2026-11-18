@@ -66,10 +66,12 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         null, TrendlineKind.Linear, TrendlineKind.Exponential, TrendlineKind.Logarithmic, TrendlineKind.Polynomial, TrendlineKind.Power, TrendlineKind.MovingAverage,
     ];
 
-    private static readonly ErrorBarKind?[] ErrorBarChoices =
+    private static readonly ErrorBarKind?[] ComputedErrorBarChoices =
     [
         null, ErrorBarKind.FixedValue, ErrorBarKind.Percentage, ErrorBarKind.StandardDeviation, ErrorBarKind.StandardError,
     ];
+
+    private ErrorBarKind?[] _errorBarChoices = ComputedErrorBarChoices;
 
     private static readonly LegendPosition[] LegendPositions =
     [
@@ -358,8 +360,9 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _trendline.ItemsSource = TrendlineChoices.Select(kind => Texts[kind is { } chosen ? $"chart.trendline.{Lower(chosen.ToString())}" : "chart.trendline.none"]).ToArray();
         _trendline.SelectedIndex = Math.Max(0, Array.IndexOf(TrendlineChoices, settings.Trendline?.Kind));
         _trendline.SelectionChanged += (_, _) => Refresh();
-        _errorBars.ItemsSource = ErrorBarChoices.Select(kind => Texts[kind is { } chosen ? $"chart.errorBars.{Lower(chosen.ToString())}" : "chart.errorBars.none"]).ToArray();
-        _errorBars.SelectedIndex = Math.Max(0, Array.IndexOf(ErrorBarChoices, settings.ErrorBars?.Kind));
+        _errorBarChoices = settings.ErrorBars?.Kind == ErrorBarKind.Custom ? [.. ComputedErrorBarChoices, ErrorBarKind.Custom] : ComputedErrorBarChoices;
+        _errorBars.ItemsSource = _errorBarChoices.Select(kind => Texts[kind is { } chosen ? $"chart.errorBars.{Lower(chosen.ToString())}" : "chart.errorBars.none"]).ToArray();
+        _errorBars.SelectedIndex = Math.Max(0, Array.IndexOf(_errorBarChoices, settings.ErrorBars?.Kind));
         _errorBars.SelectionChanged += (_, _) => Refresh();
         Number(_errorAmount, settings.ErrorBars?.Value, "chart.errorBars.amount");
         Avalonia.Automation.AutomationProperties.SetName(_trendline, Texts["chart.trendline"]);
@@ -400,8 +403,9 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
 
     private ChartErrorBars? ChosenErrorBars()
     {
-        var kind = _errorBars.SelectedIndex > 0 && _errorBars.SelectedIndex < ErrorBarChoices.Length ? ErrorBarChoices[_errorBars.SelectedIndex] : null;
+        var kind = _errorBars.SelectedIndex > 0 && _errorBars.SelectedIndex < _errorBarChoices.Length ? _errorBarChoices[_errorBars.SelectedIndex] : null;
         if (kind is not { } chosen) return null;
+        if (chosen == ErrorBarKind.Custom) return _request.Settings.ErrorBars;
         var amount = Parsed(_errorAmount) ?? (chosen == ErrorBarKind.Percentage ? 5 : 1);
         return _request.Settings.ErrorBars is { } original && original.Kind == chosen
             ? original with { Value = amount }

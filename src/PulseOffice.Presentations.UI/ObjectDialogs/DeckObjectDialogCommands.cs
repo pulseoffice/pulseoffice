@@ -35,6 +35,7 @@ public sealed class DeckObjectDialogCommands(
         yield return new ShapeStyleDialog("deck.object.textAttributes", 3, CommandSurface.Advanced, styling, editors, context, dialogs, texts);
         yield return new PositionSizeDialog(context, dialogs, texts, icons);
         yield return new AltTextDialog(altText, context, dialogs, texts);
+        yield return new MediaOptionsDialog(context, dialogs, texts);
         yield return new ChartEditDialog(charts, new InlineChartData(chartSamples, chartFamilies), context, dialogs, texts, cultures);
     }
 

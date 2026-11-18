@@ -153,6 +153,10 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Warning("DOCX135", "Chart types that DrawingML does not have, such as stepped lines, waterfall, statistical and other special charts, are written as column charts in DOCX. ODT keeps them. PulseOffice reads the type back from an extension.")),
         new(document => Charts(document).Any(_charts.FlattensThreeDimensional),
             Diagnostic.Info("DOCX136", "DrawingML has no three-dimensional line or column-and-line charts: these 3D charts are written flat in DOCX. ODT keeps the 3D view.")),
+        new(document => Charts(document).Any(_charts.DropsSeriesAnalysis),
+            Diagnostic.Warning("DOCX241", "Trendlines, error bars and secondary axes on pie, doughnut and radar chart series have no place in DrawingML: they are not written to DOCX. ODT keeps them.")),
+        new(document => Charts(document).Any(_charts.DropsCategoryUnits),
+            Diagnostic.Info("DOCX242", "DrawingML category axes have no major or minor unit: the units set on a category axis are not written to DOCX. ODT keeps them.")),
     ]);
 
     private readonly OoxmlChartFidelity _charts = new();
