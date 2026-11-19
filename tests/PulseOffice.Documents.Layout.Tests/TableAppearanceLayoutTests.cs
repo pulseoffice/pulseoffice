@@ -28,10 +28,12 @@ public sealed class TableAppearanceLayoutTests
         var cells = f.Layout().Pages[0].Tables.Single().Cells;
         var decorations = cells.SelectMany(cell => cell.Content.OfType<DecorationBox>()).ToList();
 
-        var edge = Assert.Single(decorations, box => box.Kind == DecorationKind.CellEdge);
-        Assert.Equal(BorderLineStyle.Dashed, edge.LineStyle);
-        Assert.Equal(0xFFFF0000u, edge.Color);
-        Assert.Equal(3, decorations.Count(box => box.Kind == DecorationKind.CellBorder));
+        var dashed = decorations.Where(box => box.Kind == DecorationKind.CellEdge && box.LineStyle == BorderLineStyle.Dashed).ToList();
+        Assert.NotEmpty(dashed);
+        Assert.All(dashed, edge => Assert.Equal(0xFFFF0000u, edge.Color));
+        Assert.Single(dashed.Select(edge => edge.Bounds).Distinct());
+        Assert.DoesNotContain(decorations, box => box.Kind == DecorationKind.CellEdge && box.LineStyle != BorderLineStyle.Dashed && box.Bounds == dashed[0].Bounds);
+        Assert.Equal(2, decorations.Count(box => box.Kind == DecorationKind.CellBorder));
         Assert.Contains(decorations, box => box.Kind == DecorationKind.CellBackground && box.Color == 0xFF00FF00);
     }
 

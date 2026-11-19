@@ -144,7 +144,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         _filmstrip = new DeckFilmstrip(_state, this, renderer, keyNavigation, contextMenus, stillImages, new DeckSectionHeaders(actions, texts, _state.Metrics), stripLayout);
         _shapes = new DeckShapeTextEditing(_state, this, _filmstrip,
             new PulseOffice.UI.Controls.Shapes.ShapeTextEditor(shapeTextEditing ?? new PulseOffice.Drawing.Shapes.ShapeTextEditing(), new PulseOffice.Drawing.Shapes.ShapeTextInk(), new PulseOffice.UI.Controls.Shapes.ShapeBrushes(), focus, word),
-            shapeRichText ?? new PulseOffice.Drawing.Shapes.ShapeRichText());
+            shapeRichText ?? new PulseOffice.Drawing.Shapes.ShapeRichText(), new PulseOffice.Presentations.UI.Rendering.SlideBackdrop());
         _rulers = new DeckRulers(new DeckRulerSources(_canvas, () => _state.Target, () => _deck.Grid.ShowRulers && _state.Mode == DeckViewMode.Normal, formatter ?? new RichTextFormatter(), paragraphRuler ?? new PulseOffice.UI.Controls.Rulers.ParagraphRuler()));
         _text = new DeckTextEditing(_state, this, _filmstrip, _shapes, _correction, _rulers, _ancestry,
             composer ?? new PulseOffice.UI.Controls.Text.Rich.TextFrameComposer(new ListLabels()),

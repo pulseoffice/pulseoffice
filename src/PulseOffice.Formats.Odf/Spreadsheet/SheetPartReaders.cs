@@ -115,7 +115,7 @@ internal sealed class ArrayFormulaPartReader(TableCells cells, TableRows rows) :
             {
                 foreach (var member in range.Cells())
                     sheet[member] = member == range.Start
-                        ? sheet[member] with { SpillRange = range.CellCount > 1 ? range : null, ImplicitIntersection = false }
+                        ? sheet[member] with { SpillRange = range.CellCount > 1 ? range : null, ImplicitIntersection = false, UsesArrays = true }
                         : sheet[member] with { IsSpilled = !sheet[member].HasFormula };
                 continue;
             }

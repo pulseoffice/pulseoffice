@@ -53,9 +53,8 @@ the round that fixes it is joined and the join run is green.
   on the first paragraph is now the first section's starting number (235). Not yet opened in Word. (204, 209, 212)
 - Folio notes (232, 250): a page style run starts only at a top-level paragraph with a page style (not at a table); Word
   has one footnote separator per document, so a page style's own line is declared (DOCX273). Continuation notices are
-  selectable read-only text; a drag, Shift+click or Select All takes in the notices of the pages it crosses (260), but
-  copying a selection that holds body text copies the body only, and the notice of the page where a selection ends is
-  taken in only when the pointer is on it. None of this has been opened in Word or the reference suite. (250, 254, 260)
+  selectable read-only text taken in by drags, Shift+click and Select All (260); copying body text copies the body
+  only, as in Word (265). None of this has been opened in Word or the reference suite. (250, 254, 260, 265)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
@@ -70,24 +69,33 @@ the round that fixes it is joined and the join run is green.
   aligned (not offset) objects in the bottom, inside or outside margin still align within the whole page in other
   applications. Allow-overlap goes to ODT only as our attribute. Not opened in Word or the reference suite. (254, 260)
 
-- Folio tables (259): percent and auto table widths (`tblW` pct/auto, ODT `style:rel-width`) have no model property;
-  tables are fixed-width after reading. (259)
-- Folio tables (259): DOCX table styles shading only `band1Horz`/`band1Vert` lose banding (the model shades only the
-  second band). (259)
-- Folio tables (259): border conflicts between adjacent cells are decided by drawing order and width, not by Word's
-  weight and colour rules. (259)
-- Folio TOC (259): update in an imported Word document does not reuse a heading's `_Toc` bookmark; the TOC dialog does
-  not expose the first level or the additional styles. (259)
 - Folio TOC (259): `\t` is written with commas; not checked in Word under a semicolon list separator. (259)
-- Folio tables (259): ODT table column widths in common (non-automatic) styles are not looked up. (259)
+- Folio tables (263): a percent-width table keeps its percent when columns are resized or the table width is set in
+  the table dialog; the dialog has no percent or automatic width control, and the layout scales the stored columns
+  rather than running Word's automatic-fit algorithm for `AutoWidth` tables. (263)
+- Folio tables (263): the first-band shading has no control in the table style editor (only the second band is
+  edited); a style that shades only `band1Vert` also shades rows when row banding is on. (263)
+- Folio tables (263): border conflicts follow width times style number, style rank and colour brightness; Word's
+  special cases (a `nil` border, a cell border against a table border, conflicts at merged cells along spans other than
+  the first column or row) are not modelled, and the result has not been compared with Word. (263)
+- Folio TOC (263): the TOC dialog lists every visible paragraph style as a number field on its own tab; with many
+  styles the tab is long and the style names are shown as stored (not localized). Not seen live. (263)
+
+- Folio tables (join of 262-265): with Word's border conflict rules a shared edge between two cells is drawn by both
+  cells at identical bounds; draw it once. `TableAppearanceLayoutTests.IBordiPropriDellaCellaSiDisegnanoLatoPerLato`
+  was updated to the new rules at the join and should be reviewed with that change.
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
-- Tagged PDF: Deck text boxes are tagged by composed line position (260); text drawn in a shape object (not a text
-  element) is still matched by text, and the line boxes come from a second composition of the frame, not from the one
-  painted. Not checked with a PDF/UA checker. (243, 247, 260)
+- Tagged PDF: Deck text boxes and shape text are tagged by the painted line boxes (265); shape text in columns falls
+  back to text matching, and a shape rotated inside its element is located by axis-aligned boxes. Not checked with a
+  PDF/UA checker. (243, 247, 260, 265)
+- Deck shapes have no autofit (shrink text, resize shape to fit); check whether PPTX `spAutoFit`/`normAutofit` and ODP
+  `draw:auto-grow-height`/`draw:fit-to-size` on shapes are lost silently and map them. (265)
+- Deck shape text lists: Tab/Shift+Tab level change and Enter on an empty item not walked in the running app. (265)
+- `src/PulseOffice.Presentations.UI/Rendering/SlideTextLines.cs` is unused since round 265; delete it at the join. (265)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
 - PDF form fields: a widget drawn with an embedded subset holds only the glyphs printed; a viewer that regenerates the
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
@@ -108,23 +116,21 @@ the round that fixes it is joined and the join run is green.
   which other ODF applications ignore (they keep objects locked); Folio's exact character hit skips rotated text frames; none of this was
   built, run or opened in Excel, Word, PowerPoint or the reference suite. (236)
 
-- Unmerging cells does not recalculate an anchor blocked by the merge (#SPILL! stays until the next edit in its
-  range or a full recalculation); table changes now do. (258)
-- ODS `table:null-date` other than 1899-12-30 is ignored; dates stored as `office:date-value` are unaffected, but
-  numeric serials and DATEVALUE-style results follow our epoch. (258)
-- XLSX 1904 workbooks: only date-formatted constants are shifted to the 1900 system; plain numbers used as dates by
-  formulas are not. (258)
-- Not covered in depth by round 258, queued: recalculation of spills and volatile cells after row/column insertion
-  and deletion and range moves; the XLSX writer's `cm`/`metadata.xml` for blocked (#SPILL!) anchors and cached values
-  of spilled cells; ODS round trip of spill anchors and spilled values; iterative calculation with spilling cells in
-  the cycle (iteration takes the scalar). (258)
-- Round 261 (Ledger pivots), open: no interface to edit an existing pivot (show values as, number format, grouping,
-  sorting, filters, layout, totals, repeat labels); value field number formats not modelled; XLSX grouping still
-  declared (XLSX030, needs `fieldGroup`/`rangePr`/`groupItems`); manual groups, label and value filters and slicers not
-  modelled; date group labels not localized and ungrouped dates written as serials without format; boolean items keyed
-  "VERO"/"FALSO"; base field fixed to the first row field; % of parent, rank and % running total not written to either
-  format; compact layout keeps empty per-field columns, tabular parents on their own row, no blank lines; XLSX
-  `rowItems`/`colItems` not written and not opened in Excel. (261)
+- ODS `table:null-date` other than 1899-12-30 is ignored and XLSX 1904 workbooks shift only date-formatted constants
+  (plain numbers used as dates by formulas are not): both need a workbook date epoch in `CalculationSettings`, read
+  and written by both codecs, honoured by the `IDateSystem` consumers through the evaluation context and by the format
+  renderer, replacing the 1904 load shift. (258, 262)
+- Round 261 (Ledger pivots), open: no interface to edit an existing pivot (show values as, base field, number format,
+  grouping, sorting, filters, layout, totals, repeat labels), to be built on the creation dialog (261, 264); XLSX
+  grouping still not written (XLSX030, needs `fieldGroup`/`rangePr`/`groupItems` with derived years for months across
+  years, checked in Excel; reading is done) (261, 264); manual groups, label and value filters and slicers not
+  modelled; ungrouped dates written as serials without format; compact layout keeps empty per-field columns, tabular
+  parents on their own row, no blank lines; XLSX `rowItems`/`colItems` not written and not opened in Excel. (261)
+- Round 264 (Ledger pivots), open: a text item "TRUE"/"FALSE" shares the boolean's key and renders as a boolean;
+  subtotal labels of boolean items show the invariant key; GETPIVOTDATA does not accept localized date labels; base
+  item other than "previous" not modelled; Excel percentOfParentCol reads as row parent; Excel "Months" without years
+  reads as month-and-year items; the x14 show-as extension and the `numFmtId` of data fields not yet seen in Excel.
+  (264)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over

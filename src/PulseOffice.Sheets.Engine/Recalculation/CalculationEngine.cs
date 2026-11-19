@@ -93,6 +93,16 @@ public sealed class CalculationEngine
         _workbook.SheetCleared += _ => _aggregates.Clear();
         _workbook.NamesChanged += (_, _) => { if (_writing == 0 && _formulas.Count > 0) RecalculateAll(); };
         _workbook.RowVisibilityChanged += OnRowVisibilityChanged;
+        _workbook.MergesChanged += OnMergesChanged;
+    }
+
+    private void OnMergesChanged(Worksheet sheet)
+    {
+        if (_writing > 0 || !AutomaticCalculation) return;
+        var index = _workbook.IndexOf(sheet);
+        if (index < 0) return;
+        var anchors = _spills.Anchors.Where(anchor => anchor.SheetIndex == index && _formulas.ContainsKey(anchor)).ToList();
+        if (anchors.Count > 0) RecalculateFrom(anchors);
     }
 
     private void OnRowVisibilityChanged(Worksheet sheet)
@@ -321,15 +331,6 @@ public sealed class CalculationEngine
 
     private RecalculationPass? _pass;
 
-    private sealed class RecalculationPass(IEnumerable<SheetCell> order, HashSet<SheetCell> spilled)
-    {
-        public HashSet<SheetCell> Pending { get; } = [.. order];
-        public HashSet<SheetCell> InProgress { get; } = [];
-        public HashSet<SheetCell> SelfReads { get; } = [];
-        public HashSet<SheetCell> Evaluating { get; } = [];
-        public HashSet<SheetCell> Spilled => spilled;
-    }
-
     private void Compute(SheetCell cell)
     {
         var pass = _pass!;
@@ -350,7 +351,7 @@ public sealed class CalculationEngine
                 pass.Evaluating.Remove(cell);
             }
 
-            var multiValued = !context.ImplicitIntersection && IsMultiValued(result);
+            var multiValued = _spills.IsMultiValued(result, context);
             var produced = _spills.Materialize(cell, result, context, pass.Spilled);
             if (pass.SelfReads.Remove(cell))
             {
@@ -377,6 +378,7 @@ public sealed class CalculationEngine
         }
 
         var settings = _workbook.Calculation;
+        var last = new Dictionary<SheetCell, (EvalValue Result, WorkbookEvaluationContext Context)>();
         for (var step = 0; step < settings.MaxIterations; step++)
         {
             var largestChange = 0.0;
@@ -384,26 +386,31 @@ public sealed class CalculationEngine
             {
                 var before = _values[cell];
                 var context = new WorkbookEvaluationContext(this, cell);
-                var after = _coercion.ToScalar(_evaluator.EvaluateRaw(_formulas[cell], context), context);
+                var result = _evaluator.EvaluateRaw(_formulas[cell], context);
+                last[cell] = (result, context);
+                var after = _coercion.ToScalar(result, context);
                 _values[cell] = after;
                 largestChange = Math.Max(largestChange, Change(before, after));
             }
             if (largestChange <= settings.MaxChange) break;
         }
 
-        foreach (var cell in cells) WriteBack(cell, _values[cell]);
+        foreach (var cell in cells)
+        {
+            if (last.TryGetValue(cell, out var final))
+            {
+                var multiValued = _spills.IsMultiValued(final.Result, final.Context);
+                if (multiValued) _values[cell] = _spills.Materialize(cell, final.Result, final.Context, _pass!.Spilled);
+                else _spills.Release(cell, _pass!.Spilled);
+                RecordArrayUse(cell, final.Context.UsedArrays || multiValued);
+            }
+            WriteBack(cell, _values[cell]);
+        }
     }
 
     private static double Change(CellValue before, CellValue after) =>
         before.IsNumeric && after.IsNumeric ? Math.Abs(after.AsNumber() - before.AsNumber())
         : before.Equals(after) ? 0 : double.PositiveInfinity;
-
-    private static bool IsMultiValued(EvalValue result) => result switch
-    {
-        ArrayValue array => array.RowCount > 1 || array.ColumnCount > 1,
-        RangeValue range => !range.Range.IsSingleCell,
-        _ => false,
-    };
 
     private void RecordArrayUse(SheetCell cell, bool usedArrays)
     {

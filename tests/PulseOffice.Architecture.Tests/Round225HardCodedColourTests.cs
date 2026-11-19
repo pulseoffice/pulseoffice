@@ -48,7 +48,7 @@ public sealed class Round225HardCodedColourTests
         ["PulseOffice.Presentations.UI/Rendering/ElementPainters.cs"] = 2,
         ["PulseOffice.Presentations.UI/ShowRehearsalClock.cs"] = 2,
         ["PulseOffice.Presentations.UI/SlideImageRenderer.cs"] = 1,
-        ["PulseOffice.Presentations.UI/SlideRenderer.cs"] = 1,
+        ["PulseOffice.Presentations.UI/Rendering/SlideBackdrop.cs"] = 1,
         ["PulseOffice.Presentations.UI/SlideView.cs"] = 19,
         ["PulseOffice.Presentations.UI/Themes/ThemePreviews.cs"] = 1,
         ["PulseOffice.Sheets.UI/CellFormat/CellAlignmentPage.cs"] = 4,

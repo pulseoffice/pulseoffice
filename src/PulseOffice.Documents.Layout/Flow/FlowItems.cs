@@ -157,7 +157,7 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
     {
         var structure = string.Join(';', Columns.Select(value => value.ToString("R", CultureInfo.InvariantCulture)))
             + "|" + string.Join(';', Rows.Select(row => $"{row.Height}:{row.Exact}:{row.Row.AllowBreakAcrossPages}:" + string.Join(',', row.Cells.Select(cell => $"{cell.Column}/{cell.ColumnSpan}/{cell.RowSpan}/{cell.Cell.Background}/{cell.Cell.VerticalAlign}/{cell.Cell.TextDirection}/{cell.Cell.Padding}/{cell.Appearance}"))))
-            + "|" + Table.HeaderRows + Table.RepeatHeaderRows + "|" + Table.PageStyleName + Table.PageBreakBefore + "|" + Table.Alignment + Table.Indent.Value;
+            + "|" + Table.HeaderRows + Table.RepeatHeaderRows + "|" + Table.PageStyleName + Table.PageBreakBefore + "|" + Table.Alignment + Table.Indent.Value + "|" + Table.WidthPercent;
         var parts = new List<object> { structure, Style };
         foreach (var cell in Rows.SelectMany(row => row.Cells))
         {
@@ -170,7 +170,13 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
         return new FlowKey("table:" + Table.Id, parts, string.Empty);
     }
 
-    public double Width(double available) => Columns.Count == 0 ? available : Columns.Sum();
+    public double Width(double available) => Columns.Count == 0 ? available : Columns.Sum() * Scale(available);
+
+    private double Scale(double available)
+    {
+        var natural = Columns.Sum();
+        return Table.WidthPercent is { } percent && percent > 0 && natural > 0 && available > 0 ? Math.Clamp(percent, 1, 1000) / 100 * available / natural : 1;
+    }
 
     public double Offset(double available)
     {
@@ -184,12 +190,12 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
     }
 
     public double ColumnLeft(int column, double available) =>
-        Columns.Count == 0 ? column * available / Math.Max(1, Table.ColumnCount) : Columns.Take(column).Sum();
+        Columns.Count == 0 ? column * available / Math.Max(1, Table.ColumnCount) : Columns.Take(column).Sum() * Scale(available);
 
     public double ColumnWidth(int column, int span, double available)
     {
         if (Columns.Count == 0) return span * available / Math.Max(1, Table.ColumnCount);
-        return Columns.Skip(column).Take(span).Sum();
+        return Columns.Skip(column).Take(span).Sum() * Scale(available);
     }
 
     public override T Accept<T>(IFlowItemVisitor<T> visitor) => visitor.VisitTable(this);

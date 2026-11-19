@@ -176,7 +176,7 @@ public sealed class XlsxWriter
 
         _formulas.Write(workbookPart, workbook);
         _queries.Write(workbookPart, workbook, parts);
-        _pivots.Write(workbookPart, workbook, parts);
+        _pivots.Write(workbookPart, workbook, parts, context.Styles);
         if (context.UsesDynamicArrays) new XlsxDynamicArrays().Write(workbookPart);
 
         var sharedStringPart = workbookPart.AddNewPart<SharedStringTablePart>();

@@ -40,6 +40,8 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
 {
     private const string HeadingPrefix = "__RefHeading__";
 
+    private const string WordHeadingPrefix = "_Toc";
+
     public IReadOnlyList<string> Sequences(TextDocument document) =>
         [.. order.Paragraphs(document).SelectMany(paragraph => paragraph.Content.Runs)
             .Where(run => run.Field == TextFieldKind.Sequence && run.FieldArgument is { Length: > 0 })
@@ -70,7 +72,7 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
     };
 
     public string? HeadingOf(TextDocument document, string bookmarkName) =>
-        bookmarkName.StartsWith(HeadingPrefix, StringComparison.Ordinal) && bookmarks.Find(document, bookmarkName) is { } bookmark ? bookmark.ParagraphId : null;
+        HeadingName(bookmarkName) && bookmarks.Find(document, bookmarkName) is { } bookmark ? bookmark.ParagraphId : null;
 
     private bool CaptionNamed(IReadOnlyList<TextRun> runs, string? sequence) =>
         SequenceIndex(runs, sequence) is var index && index >= 0 && runs[index].FieldDetail?.Format is { Length: > 0 };
@@ -96,8 +98,15 @@ public sealed class ReferenceTargets(IBookmarkCatalog bookmarks, IDocumentOutlin
         return name;
     }
 
-    private string? HeadingBookmark(ParagraphBlock heading) =>
-        heading.Marks.OfType<BookmarkMark>().FirstOrDefault(mark => mark.Edge == MarkEdge.Start && mark.Offset == 0 && mark.Name.StartsWith(HeadingPrefix, StringComparison.Ordinal))?.Name;
+    private bool HeadingName(string name) =>
+        name.StartsWith(HeadingPrefix, StringComparison.Ordinal) || name.StartsWith(WordHeadingPrefix, StringComparison.Ordinal);
+
+    private string? HeadingBookmark(ParagraphBlock heading)
+    {
+        var starts = heading.Marks.OfType<BookmarkMark>().Where(mark => mark.Edge == MarkEdge.Start).ToList();
+        return starts.FirstOrDefault(mark => mark.Offset == 0 && mark.Name.StartsWith(HeadingPrefix, StringComparison.Ordinal))?.Name
+            ?? starts.FirstOrDefault(mark => mark.Name.StartsWith(WordHeadingPrefix, StringComparison.Ordinal))?.Name;
+    }
 
     public string Prepare(TextDocument document, EditRecorder recorder, ReferenceTarget target)
     {

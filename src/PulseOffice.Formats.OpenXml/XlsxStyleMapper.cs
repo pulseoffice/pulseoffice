@@ -167,6 +167,8 @@ public sealed class XlsxStyleMapper
 
     private readonly ExcelBooleanFormat _booleanFormats = new();
 
+    public uint DeclareNumberFormat(int numberFormatId, string code) => NumberFormat(numberFormatId, code);
+
     private uint NumberFormat(int numberFormatId, string? code)
     {
         if (numberFormatId < PulseOffice.Sheets.Formatting.NumberFormatCatalog.FirstCustomId) return (uint)numberFormatId;

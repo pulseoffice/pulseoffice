@@ -18,6 +18,7 @@ public sealed class XlsxPivotMapper
     private readonly OccupiedCells _occupied = new();
     private readonly OoxmlTextEscape _escape = new();
     private readonly XlsxPivotExternalSources _external = new();
+    private readonly XlsxPivotGroupReader _groups = new();
     private const int DataLayoutField = -2;
 
     private readonly IReadOnlyDictionary<PivotAggregation, DataConsolidateFunctionValues> _aggregations =
@@ -48,6 +49,17 @@ public sealed class XlsxPivotMapper
             [ValueDisplayMode.Index] = ShowDataAsValues.Index,
         };
 
+    private readonly IReadOnlyDictionary<ValueDisplayMode, DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues> _extendedModes =
+        new Dictionary<ValueDisplayMode, DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues>
+        {
+            [ValueDisplayMode.PercentOfParent] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParentRow,
+            [ValueDisplayMode.PercentRunningTotal] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfRunningTotal,
+            [ValueDisplayMode.RankAscending] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.RankAscending,
+            [ValueDisplayMode.RankDescending] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.RankDescending,
+        };
+
+    private const string DataFieldExtensionUri = "{E15A36E0-9728-4e99-A89B-3F7291B0FE68}";
+
     public bool Describes(PivotField field)
     {
         ArgumentNullException.ThrowIfNull(field);
@@ -55,11 +67,11 @@ public sealed class XlsxPivotMapper
         if (field.IsCalculated) return false;
         if (field.Area == PivotArea.Value)
             return _aggregations.ContainsKey(field.Aggregation)
-                && (field.DisplayMode == ValueDisplayMode.Normal || _displayModes.ContainsKey(field.DisplayMode));
+                && (field.DisplayMode == ValueDisplayMode.Normal || _displayModes.ContainsKey(field.DisplayMode) || _extendedModes.ContainsKey(field.DisplayMode));
         return field.DateGrouping == DateGrouping.None && field.NumericGroupInterval is null;
     }
 
-    public void Write(WorkbookPart workbookPart, Workbook workbook, IReadOnlyDictionary<Worksheet, WorksheetPart> parts)
+    public void Write(WorkbookPart workbookPart, Workbook workbook, IReadOnlyDictionary<Worksheet, WorksheetPart> parts, XlsxStyleMapper? styles = null)
     {
         ArgumentNullException.ThrowIfNull(workbookPart);
         ArgumentNullException.ThrowIfNull(workbook);
@@ -107,7 +119,7 @@ public sealed class XlsxPivotMapper
 
             var tablePart = destinationPart.AddNewPart<PivotTablePart>();
             tablePart.AddPart(cachePart);
-            tablePart.PivotTableDefinition = Definition(pivot, columns, cacheId);
+            tablePart.PivotTableDefinition = Definition(pivot, columns, cacheId, new PivotFormatTarget(workbook.NumberFormats, styles));
             tablePart.PivotTableDefinition.Save();
 
             caches.AppendChild(new PivotCache { CacheId = cacheId, Id = workbookPart.GetIdOfPart(cachePart) });
@@ -220,7 +232,7 @@ public sealed class XlsxPivotMapper
         return records;
     }
 
-    private PivotTableDefinition Definition(PivotDefinition pivot, List<CacheColumn> columns, uint cacheId)
+    private PivotTableDefinition Definition(PivotDefinition pivot, List<CacheColumn> columns, uint cacheId, PivotFormatTarget formats)
     {
         var compact = pivot.Layout == PivotLayout.Compact;
         var outline = pivot.Layout != PivotLayout.Tabular;
@@ -283,7 +295,7 @@ public sealed class XlsxPivotMapper
             definition.AppendChild(new PageFields(pages.Select(index => new PageField { Field = index, Hierarchy = -1 })) { Count = (uint)pages.Count });
 
         if (values.Count > 0)
-            definition.AppendChild(new DataFields(values.Select(field => DataFieldOf(field, columns, pivot))) { Count = (uint)values.Count });
+            definition.AppendChild(new DataFields(values.Select(field => DataFieldOf(field, columns, pivot, formats))) { Count = (uint)values.Count });
 
         definition.AppendChild(new PivotTableStyle
         {
@@ -355,7 +367,7 @@ public sealed class XlsxPivotMapper
         return element;
     }
 
-    private DataField DataFieldOf(PivotField field, List<CacheColumn> columns, PivotDefinition pivot)
+    private DataField DataFieldOf(PivotField field, List<CacheColumn> columns, PivotDefinition pivot, PivotFormatTarget formats)
     {
         var index = IndexOf(field, columns);
         var data = new DataField
@@ -367,13 +379,22 @@ public sealed class XlsxPivotMapper
             BaseItem = 0u,
         };
 
-        if (field.DisplayMode != ValueDisplayMode.Normal && _displayModes.TryGetValue(field.DisplayMode, out var mode))
+        if (field.NumberFormat is { Length: > 0 } code && FileFormatId(code, formats) is { } formatId)
+            data.NumberFormatId = formatId;
+
+        var standard = _displayModes.TryGetValue(field.DisplayMode, out var mode);
+        var extended = _extendedModes.TryGetValue(field.DisplayMode, out var showAs);
+        if (field.DisplayMode != ValueDisplayMode.Normal && (standard || extended))
         {
-            data.ShowDataAs = mode;
-            var baseField = pivot.In(PivotArea.Row).Concat(pivot.In(PivotArea.Column)).FirstOrDefault();
+            if (standard) data.ShowDataAs = mode;
+            var baseField = BaseFieldOf(field, pivot);
             if (baseField is not null) data.BaseField = Math.Max(IndexOf(baseField, columns), 0);
             if (field.DisplayMode is ValueDisplayMode.DifferenceFrom or ValueDisplayMode.PercentDifferenceFrom)
                 data.BaseItem = 1048828u;
+            if (extended)
+                data.AppendChild(new DataFieldExtensionList(new DataFieldExtension(
+                    new DocumentFormat.OpenXml.Office2010.Excel.DataField { PivotShowAs = showAs })
+                { Uri = DataFieldExtensionUri }));
         }
 
         return data;
@@ -396,6 +417,58 @@ public sealed class XlsxPivotMapper
     }) + name;
 
     private const uint DataReferenceField = 4294967294u;
+
+    private ValueDisplayMode? ExtendedModeOf(DataField data)
+    {
+        var showAs = data.DataFieldExtensionList?.Elements<DataFieldExtension>()
+            .SelectMany(extension => extension.Elements<DocumentFormat.OpenXml.Office2010.Excel.DataField>())
+            .Select(extended => extended.PivotShowAs?.Value)
+            .FirstOrDefault(value => value is not null);
+        if (showAs is not { } shown) return null;
+        foreach (var (mode, value) in _extendedModes)
+            if (value == shown) return mode;
+        return shown == DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParent
+            || shown == DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParentColumn
+            ? ValueDisplayMode.PercentOfParent : null;
+    }
+
+    private string? BaseNameOf(DataField data, List<CacheField> cacheFields)
+    {
+        if ((data.ShowDataAs?.Value is null || data.ShowDataAs.Value == ShowDataAsValues.Normal) && ExtendedModeOf(data) is null) return null;
+        if (data.BaseField?.Value is not { } index || index < 0 || index >= cacheFields.Count) return null;
+        return _escape.Decode(cacheFields[index].Name?.Value ?? string.Empty);
+    }
+
+    private PivotField? BaseFieldOf(PivotField field, PivotDefinition pivot)
+    {
+        var axes = pivot.In(PivotArea.Row).Concat(pivot.In(PivotArea.Column)).ToList();
+        return axes.FirstOrDefault(axis => string.Equals(axis.SourceName, field.BaseField, StringComparison.Ordinal))
+            ?? axes.FirstOrDefault();
+    }
+
+    private uint? FileFormatId(string code, PivotFormatTarget formats)
+    {
+        foreach (var (id, builtIn) in PulseOffice.Sheets.Formatting.NumberFormatCatalog.BuiltInFormats)
+            if (string.Equals(builtIn, code, StringComparison.OrdinalIgnoreCase)) return (uint)id;
+        if (formats.Styles is null) return null;
+        var custom = formats.Catalog.Register(code);
+        return formats.Styles.DeclareNumberFormat(custom, code);
+    }
+
+    private string? FormatCodeOf(uint? fileId, IReadOnlyDictionary<uint, string> codes)
+    {
+        if (fileId is not { } id || id == 0) return null;
+        if (codes.TryGetValue(id, out var code)) return code;
+        return PulseOffice.Sheets.Formatting.NumberFormatCatalog.BuiltInFormats.TryGetValue((int)id, out var builtIn) ? builtIn : null;
+    }
+
+    private Dictionary<uint, string> FormatCodes(WorkbookPart workbookPart)
+    {
+        var codes = new Dictionary<uint, string>();
+        foreach (var format in workbookPart.WorkbookStylesPart?.Stylesheet?.NumberingFormats?.Elements<NumberingFormat>() ?? [])
+            if (format.NumberFormatId?.Value is { } id && format.FormatCode?.Value is { Length: > 0 } code) codes.TryAdd(id, code);
+        return codes;
+    }
 
     private uint? WrittenDataIndex(PivotDefinition pivot, int valueIndex)
     {
@@ -460,14 +533,7 @@ public sealed class XlsxPivotMapper
         return field.SourceColumnIndex >= 0 && field.SourceColumnIndex < columns.Count ? field.SourceColumnIndex : -1;
     }
 
-    private string KeyOf(CellValue value) => value.Kind switch
-    {
-        ValueKind.Empty => string.Empty,
-        ValueKind.Text => value.AsText(),
-        ValueKind.Boolean => value.AsBoolean() ? "VERO" : "FALSO",
-        ValueKind.Error => value.ErrorText,
-        _ => value.AsNumber().ToString("R", CultureInfo.InvariantCulture),
-    };
+    private string KeyOf(CellValue value) => PivotValues.KeyOf(value);
 
     public int Read(WorkbookPart workbookPart, Workbook workbook)
     {
@@ -476,6 +542,7 @@ public sealed class XlsxPivotMapper
 
         var sheets = workbookPart.Workbook?.Sheets?.Elements<DocumentFormat.OpenXml.Spreadsheet.Sheet>().ToList() ?? [];
         var sources = new XlsxPivotSourceResolver(workbookPart);
+        var formatCodes = FormatCodes(workbookPart);
         var external = 0;
 
         foreach (var sheet in sheets)
@@ -490,17 +557,17 @@ public sealed class XlsxPivotMapper
                 if (cachePart?.PivotCacheDefinition?.CacheSource is { } cacheSource && sources.IsExternal(cacheSource))
                 {
                     if (_external.Read(cachePart, workbookPart) is not { } read) external++;
-                    else if (ReadOne(tablePart, sheetName, (read.Sheet, read.Range), read.Source) is { } outside) workbook.Pivots.Add(outside);
+                    else if (ReadOne(tablePart, formatCodes, sheetName, (read.Sheet, read.Range), read.Source) is { } outside) workbook.Pivots.Add(outside);
                 }
                 else if (cachePart?.PivotCacheDefinition?.CacheSource?.WorksheetSource is { } local
                     && sources.Resolve(local, sheetName) is { } resolved
-                    && ReadOne(tablePart, sheetName, (resolved.Sheet, resolved.Range), null) is { } pivot) workbook.Pivots.Add(pivot);
+                    && ReadOne(tablePart, formatCodes, sheetName, (resolved.Sheet, resolved.Range), null) is { } pivot) workbook.Pivots.Add(pivot);
             }
         }
         return external;
     }
 
-    private PivotDefinition? ReadOne(PivotTablePart tablePart, string destinationSheet, (string Sheet, CellRange Range) source, PivotExternalSource? external)
+    private PivotDefinition? ReadOne(PivotTablePart tablePart, IReadOnlyDictionary<uint, string> formatCodes, string destinationSheet, (string Sheet, CellRange Range) source, PivotExternalSource? external)
     {
         var definition = tablePart.PivotTableDefinition;
         var cache = tablePart.PivotTableCacheDefinitionPart?.PivotCacheDefinition;
@@ -542,7 +609,9 @@ public sealed class XlsxPivotMapper
                 Area = PivotArea.Value,
                 AreaOrder = order++,
                 Aggregation = aggregation,
-                DisplayMode = mode is { } shown ? _displayModes.FirstOrDefault(pair => pair.Value == shown, new(ValueDisplayMode.Normal, shown)).Key : ValueDisplayMode.Normal,
+                DisplayMode = ExtendedModeOf(data) ?? (mode is { } shown ? _displayModes.FirstOrDefault(pair => pair.Value == shown, new(ValueDisplayMode.Normal, shown)).Key : ValueDisplayMode.Normal),
+                BaseField = BaseNameOf(data, cacheFields),
+                NumberFormat = FormatCodeOf(data.NumberFormatId?.Value, formatCodes),
                 DisplayName = caption is null || caption == DefaultCaption(aggregation, name) || caption == "Sum of " + name || caption == "Count of " + name ? null : caption,
             });
         }
@@ -614,18 +683,20 @@ public sealed class XlsxPivotMapper
         foreach (var index in indices)
         {
             if (index < 0 || index >= cacheFields.Count) continue;
-            var cacheField = cacheFields[index];
+            var groupField = cacheFields[index];
+            var source = _groups.SourceIndexOf(groupField, index, cacheFields.Count);
+            var cacheField = cacheFields[source];
             var pivotField = index < pivotFields.Count ? pivotFields[index] : null;
             var shared = cacheField.SharedItems?.ChildElements.ToList() ?? [];
-            var excluded = pivotField?.Items?.Elements<Item>()
+            var excluded = _groups.IsGrouped(groupField) ? new HashSet<string>() : pivotField?.Items?.Elements<Item>()
                 .Where(item => item.Hidden?.Value == true && item.Index?.Value is { } at && at < shared.Count)
                 .Select(item => SharedKey(shared[(int)item.Index!.Value]))
                 .ToHashSet() ?? [];
 
-            fields.Add(new PivotField
+            fields.Add(_groups.Grouped(new PivotField
             {
                 SourceName = _escape.Decode(cacheField.Name?.Value ?? string.Empty),
-                SourceColumnIndex = index,
+                SourceColumnIndex = source,
                 Area = area,
                 AreaOrder = order++,
                 DisplayName = pivotField?.Name?.Value,
@@ -633,8 +704,9 @@ public sealed class XlsxPivotMapper
                 ShowItemsWithNoData = pivotField?.ShowAll?.Value != false,
                 SortDescending = pivotField?.SortType?.Value == FieldSortValues.Descending,
                 ExcludedValues = excluded,
-            });
+            }, groupField));
         }
+        _groups.MergeDateLevels(fields);
     }
 
     private string SharedKey(OpenXmlElement item) => item switch
@@ -665,3 +737,5 @@ public sealed class XlsxPivotMapper
         }
     }
 }
+
+internal sealed record PivotFormatTarget(PulseOffice.Sheets.Formatting.NumberFormatCatalog Catalog, XlsxStyleMapper? Styles);

@@ -187,7 +187,7 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
         var unwritten = pivotFields.Count(field => !pivots.WrittenAggregations.Contains(field.Aggregation)
             || !pivots.WrittenDisplayModes.Contains(field.DisplayMode));
         if (unwritten > 0)
-            losses.Add(Diagnostic.Warning("ODF024", $"{unwritten} pivot data fields use an aggregation (first, last, distinct count) or a display mode (percent of parent, running total in percent, rank) that ODF cannot describe: they are saved as sum or as plain value.").With(unwritten));
+            losses.Add(Diagnostic.Warning("ODF024", $"{unwritten} pivot data fields use an aggregation (first, last, distinct count) that ODF cannot describe: they are saved as sum.").With(unwritten));
 
         var emptyText = workbook.Pivots.Count(pivot => pivot.EmptyCellText is not null || pivot.AutoRefreshOnOpen);
         if (emptyText > 0)

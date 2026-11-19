@@ -60,6 +60,8 @@ internal sealed class OdtAutomaticStyles(IReadOnlyDictionary<(string Family, str
 
 internal sealed class OdtAutomaticStyleIndex
 {
+    private static readonly HashSet<string> CommonFallbackFamilies = new(["table-column", "table-row"], StringComparer.Ordinal);
+
     public OdtAutomaticStyles Read(XElement? automatic, XElement? common = null)
     {
         var map = new Dictionary<(string, string), XElement>();
@@ -72,6 +74,10 @@ internal sealed class OdtAutomaticStyleIndex
             var name = (string?)style.Attribute(OdfPackage.Namespaces.Style + "name");
             if (family is not null && name is not null) map.TryAdd((family, name), style);
         }
+        foreach (var style in common?.Elements(OdfPackage.Namespaces.Style + "style") ?? [])
+            if ((string?)style.Attribute(OdfPackage.Namespaces.Style + "family") is { } commonFamily && CommonFallbackFamilies.Contains(commonFamily)
+                && (string?)style.Attribute(OdfPackage.Namespaces.Style + "name") is { } commonName)
+                map.TryAdd((commonFamily, commonName), style);
         var graphics = new Dictionary<string, XElement>(StringComparer.Ordinal);
         foreach (var style in common?.Elements(OdfPackage.Namespaces.Style + "style") ?? [])
             if ((string?)style.Attribute(OdfPackage.Namespaces.Style + "family") == "graphic" && (string?)style.Attribute(OdfPackage.Namespaces.Style + "name") is { } graphicName)

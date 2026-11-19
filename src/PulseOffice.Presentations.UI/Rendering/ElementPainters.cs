@@ -66,7 +66,7 @@ public sealed class TextElementPainter(ITextCatalog texts, IRichTextFramePainter
             return;
         }
 
-        frames.Paint(new RichTextScene(scene.Context, scene.Bounds, scene.Scale, scene.Theme, scene.Fields, scene.Palette.Proofing), element.Text);
+        frames.Paint(new RichTextScene(scene.Context, scene.Bounds, scene.Scale, scene.Theme, scene.Fields, scene.Palette.Proofing) { Painted = scene.Palette.Painted }, element.Text);
     }
 
     private void PaintPrompt(SlideScene scene, TextElement element, TextFrameArea area, TextFrame frame)

@@ -23,6 +23,7 @@ public static class DocumentsServiceCollectionExtensions
         services.AddSingleton<IStyleResolver, StyleResolver>();
         services.AddSingleton<IStyleLineage, StyleLineage>();
         services.AddSingleton<IStyleUsage, StyleUsage>();
+        services.AddSingleton<ICellBorderConflicts, CellBorderConflicts>();
         services.AddSingleton<ITableAppearance, TableAppearance>();
         services.AddSingleton<IDefaultStyleSheetFactory, DefaultStyleSheetFactory>();
         services.AddSingleton<ITextDocumentFactory, TextDocumentFactory>();

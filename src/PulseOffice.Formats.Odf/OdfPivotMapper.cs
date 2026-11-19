@@ -26,6 +26,10 @@ public sealed class OdfPivotMapper
         (ValueDisplayMode.PercentOfColumn, "column-percentage"), (ValueDisplayMode.RunningTotal, "running-total"),
         (ValueDisplayMode.DifferenceFrom, "member-difference"),
         (ValueDisplayMode.PercentDifferenceFrom, "member-percentage-difference"), (ValueDisplayMode.Index, "index"));
+    private readonly XNamespace _pivot = "urn:pulseoffice:pivot";
+    private readonly TokenMap<ValueDisplayMode> _extendedReferences = new(ValueDisplayMode.Normal, "none",
+        (ValueDisplayMode.PercentOfParent, "parent-percentage"), (ValueDisplayMode.PercentRunningTotal, "running-total-percentage"),
+        (ValueDisplayMode.RankAscending, "rank-ascending"), (ValueDisplayMode.RankDescending, "rank-descending"));
     private readonly TokenMap<DateGrouping> _dateParts = new(DateGrouping.None, "",
         (DateGrouping.Seconds, "seconds"), (DateGrouping.Minutes, "minutes"), (DateGrouping.Hours, "hours"),
         (DateGrouping.Days, "days"), (DateGrouping.Months, "months"), (DateGrouping.Quarters, "quarters"),
@@ -43,7 +47,8 @@ public sealed class OdfPivotMapper
     {
         ValueDisplayMode.Normal, ValueDisplayMode.PercentOfTotal, ValueDisplayMode.PercentOfRow,
         ValueDisplayMode.PercentOfColumn, ValueDisplayMode.RunningTotal, ValueDisplayMode.DifferenceFrom,
-        ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.Index,
+        ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.Index, ValueDisplayMode.PercentOfParent,
+        ValueDisplayMode.PercentRunningTotal, ValueDisplayMode.RankAscending, ValueDisplayMode.RankDescending,
     };
 
     public XElement? Build(Workbook workbook)
@@ -68,13 +73,12 @@ public sealed class OdfPivotMapper
                         new XAttribute(Namespaces.Table + "cell-range-address", _ranges.Write(pivot.SourceSheet, pivot.SourceRange)))
                     : _external.BuildSource(pivot));
 
-            var baseField = pivot.In(PivotArea.Row).Concat(pivot.In(PivotArea.Column)).FirstOrDefault();
             var placed = pivot.Fields
                 .Where(field => field.Area != PivotArea.Unused && !field.IsCalculated)
                 .OrderBy(field => field.Area)
                 .ThenBy(field => field.AreaOrder);
 
-            foreach (var field in placed) element.Add(BuildField(pivot, field, baseField));
+            foreach (var field in placed) element.Add(BuildField(pivot, field, BaseFieldOf(pivot, field)));
             if (pivot.ExternalSource is { } external) element.Add(_external.BuildCache(external));
 
             container.Add(element);
@@ -95,7 +99,19 @@ public sealed class OdfPivotMapper
 
         if (!isValue) element.Add(BuildLevel(pivot, field));
 
-        if (isValue && field.DisplayMode != ValueDisplayMode.Normal && WrittenDisplayModes.Contains(field.DisplayMode))
+        if (isValue && field.NumberFormat is { Length: > 0 } format)
+            element.Add(new XAttribute(XNamespace.Xmlns + "pulsepivot", _pivot.NamespaceName), new XAttribute(_pivot + "number-format", format));
+
+        var extended = _extendedReferences.Token(field.DisplayMode);
+        if (isValue && field.DisplayMode != ValueDisplayMode.Normal && extended != "none")
+        {
+            if (element.Attribute(XNamespace.Xmlns + "pulsepivot") is null)
+                element.Add(new XAttribute(XNamespace.Xmlns + "pulsepivot", _pivot.NamespaceName));
+            element.Add(new XAttribute(_pivot + "display", extended));
+            if (baseField is not null) element.Add(new XAttribute(_pivot + "base-field", baseField.SourceName));
+        }
+
+        if (isValue && field.DisplayMode != ValueDisplayMode.Normal && extended == "none" && WrittenDisplayModes.Contains(field.DisplayMode))
         {
             var reference = new XElement(Namespaces.Table + "data-pilot-field-reference",
                 new XAttribute(Namespaces.Table + "field-name", baseField?.SourceName ?? string.Empty),
@@ -108,6 +124,26 @@ public sealed class OdfPivotMapper
         if (!isValue && Grouping(field) is { } groups) element.Add(groups);
 
         return element;
+    }
+
+    private PivotField? BaseFieldOf(PivotDefinition pivot, PivotField field)
+    {
+        var axes = pivot.In(PivotArea.Row).Concat(pivot.In(PivotArea.Column)).ToList();
+        return axes.FirstOrDefault(axis => string.Equals(axis.SourceName, field.BaseField, StringComparison.Ordinal))
+            ?? axes.FirstOrDefault();
+    }
+
+    private ValueDisplayMode DisplayModeOf(XElement field, XElement? reference)
+    {
+        var extended = _extendedReferences.Value(field.Attribute(_pivot + "display")?.Value);
+        return extended != ValueDisplayMode.Normal ? extended : _references.Value(reference?.Attribute(Namespaces.Table + "type")?.Value);
+    }
+
+    private string? BaseNameOf(XElement field, XElement? reference)
+    {
+        if (field.Attribute(_pivot + "base-field")?.Value is { Length: > 0 } extended) return extended;
+        if (reference is null || reference.Attribute(Namespaces.Table + "type")?.Value is null or "none") return null;
+        return reference.Attribute(Namespaces.Table + "field-name")?.Value is { Length: > 0 } name ? name : null;
     }
 
     private XElement BuildLevel(PivotDefinition pivot, PivotField field)
@@ -232,7 +268,9 @@ public sealed class OdfPivotMapper
                     Area = area,
                     AreaOrder = position,
                     Aggregation = Aggregation(field.Attribute(Namespaces.Table + "function")?.Value),
-                    DisplayMode = _references.Value(reference?.Attribute(Namespaces.Table + "type")?.Value),
+                    DisplayMode = DisplayModeOf(field, reference),
+                    BaseField = area == PivotArea.Value ? BaseNameOf(field, reference) : null,
+                    NumberFormat = area == PivotArea.Value ? field.Attribute(_pivot + "number-format")?.Value : null,
                     ShowSubtotals = level is null || Subtotals(level),
                     ShowItemsWithNoData = level?.Attribute(Namespaces.Table + "show-empty")?.Value == "true",
                     SortDescending = level?.Element(Namespaces.Table + "data-pilot-sort-info")?

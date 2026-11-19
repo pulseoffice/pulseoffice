@@ -48,6 +48,7 @@ public sealed class ShapeTextEditor : Decorator
     private readonly PulseOffice.UI.Controls.Text.Editing.InlineTextEditor _inline;
     private ShapeTextPlacement? _placement;
     private Color _inkColour;
+    private string? _language;
 
     private readonly PulseOffice.UI.Controls.Text.ITextEditingFocus _focus;
 
@@ -262,7 +263,7 @@ public sealed class ShapeTextEditor : Decorator
         _box.IsHitTestVisible = false;
         var frame = _composer.Compose(
             _frames.Framed(shape, placement.RotationDegrees), placement.Bounds, _frames.Theme(shape, _inkColour),
-            new TextFields(0, DateTime.Now), placement.PixelsPerPoint / PulseOffice.UI.Controls.Text.Rich.ParagraphTypesetter.PointToTwip);
+            new TextFields(0, DateTime.Now, Language: _language), placement.PixelsPerPoint / PulseOffice.UI.Controls.Text.Rich.ParagraphTypesetter.PointToTwip);
         _inline.Update(frame, placement.Bounds);
     }
 
@@ -317,6 +318,7 @@ public sealed class ShapeTextEditor : Decorator
     {
         var ink = _brushes.Colour(_ink.Resolve(shape.Style, Behind(shape.Style.Fill, backdrop).Hex), Colors.Black);
         _inkColour = ink;
+        _language = backdrop.Language;
         var caret = new SolidColorBrush(ink);
         _box.CaretBrush = caret;
         _inline.CaretBrush = caret;

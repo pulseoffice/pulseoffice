@@ -45,15 +45,3 @@ public sealed class RangePivotSource : IPivotSource
             : PivotValues.KeyOf(value);
     }
 }
-
-public static class PivotValues
-{
-    public static string KeyOf(CellValue value) => value.Kind switch
-    {
-        ValueKind.Empty => string.Empty,
-        ValueKind.Text => value.AsText(),
-        ValueKind.Boolean => value.AsBoolean() ? "VERO" : "FALSO",
-        ValueKind.Error => value.ErrorText,
-        _ => value.AsNumber().ToString("R", System.Globalization.CultureInfo.InvariantCulture),
-    };
-}

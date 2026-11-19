@@ -193,6 +193,7 @@ public sealed class FolioIndexCommands(
         switch (current.Kind)
         {
             case IndexKind.Contents:
+                specific.Add(new NumberField("firstLevel", texts["folio.index.firstLevel"], current.FirstLevel, 1, 10) { Integer = true });
                 specific.Add(new NumberField("levels", texts["folio.index.levels"], current.Levels, 1, 10) { Integer = true });
                 specific.Add(new CheckField("outline", texts["folio.index.outline"], current.FromOutline));
                 specific.Add(new CheckField("marks", texts["folio.index.marks"], current.FromMarks));
@@ -221,6 +222,10 @@ public sealed class FolioIndexCommands(
         }
         var tabs = new List<FormTab> { new(texts["folio.index.tab.general"], texts["folio.index.general.explanation"], general) };
         if (specific.Count > 0) tabs.Add(new(Kind(current.Kind), texts["folio.index.specific.explanation"], specific));
+        List<PulseOffice.Documents.Styles.ParagraphStyle> styles = current.Kind == IndexKind.Contents ? SourceStyleCandidates(editor, current) : [];
+        if (styles.Count > 0)
+            tabs.Add(new(texts["folio.index.tab.styles"], texts["folio.index.styles.explanation"],
+                [.. styles.Select((style, i) => (FormField)new NumberField("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), style.DisplayName ?? style.Name, current.SourceStyles.LevelOf(style.Name) ?? 0, 0, 10) { Integer = true })]));
         if (await tabbed.AskAsync(titleKey, tabs, ct, 0, 520).ConfigureAwait(true) is not { } values) return null;
         return current with
         {
@@ -228,6 +233,8 @@ public sealed class FolioIndexCommands(
             PageNumbers = values.Flag("pages"),
             Hyperlinks = values.Flag("links"),
             Levels = current.Kind == IndexKind.Contents ? (int)Math.Round(values.Number("levels", current.Levels)) : current.Levels,
+            FirstLevel = current.Kind == IndexKind.Contents ? Math.Min((int)Math.Round(values.Number("firstLevel", current.FirstLevel)), (int)Math.Round(values.Number("levels", current.Levels))) : current.FirstLevel,
+            SourceStyles = current.Kind == IndexKind.Contents ? SourceStyles(styles, values, current.SourceStyles) : current.SourceStyles,
             FromOutline = current.Kind != IndexKind.Contents || values.Flag("outline"),
             FromMarks = current.Kind != IndexKind.Contents ? current.FromMarks : values.Flag("marks"),
             LetterSeparators = current.Kind == IndexKind.Alphabetical ? values.Flag("letters") : current.LetterSeparators,
@@ -242,6 +249,13 @@ public sealed class FolioIndexCommands(
                 : current.ObjectSources,
         };
     }
+
+    private List<PulseOffice.Documents.Styles.ParagraphStyle> SourceStyleCandidates(FolioEditor editor, IndexDefinition current) =>
+        [.. editor.Document.Styles.Paragraph.All.Where(style => !style.Hidden || current.SourceStyles.LevelOf(style.Name) is not null)];
+
+    private IndexSourceStyles SourceStyles(List<PulseOffice.Documents.Styles.ParagraphStyle> styles, IReadOnlyDictionary<string, object> values, IndexSourceStyles current)
+        => current.Assign(styles.Select((style, i) => new KeyValuePair<string, int>(style.Name,
+            (int)Math.Round(values.Number("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), current.LevelOf(style.Name) ?? 0)))));
 
     public const string IndexEntryPage = "indexEntry";
 

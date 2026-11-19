@@ -351,14 +351,14 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
             properties.HeaderBackground,
             properties.BandBackground);
         var cellContext = context with { Sections = false, Story = context.Story == StoryKind.Body ? StoryKind.Cell : context.Story };
-        var rows = table.Rows.Select((row, r) => new TableRowItem(row, [.. row.Cells.Select((cell, column) => Cell(table, properties, cell, r, column, cellContext))])).ToList();
+        var looks = appearance.Cells(table, properties);
+        var rows = table.Rows.Select((row, r) => new TableRowItem(row, [.. row.Cells.Select((cell, column) => Cell(looks[r][column], cell, column, cellContext))])).ToList();
         return new TableItem(table, [.. table.Columns.Select(column => column.ToPoints())], rows, style) { Story = context.Story };
     }
 
-    private TableCellItem Cell(TableBlock table, TableProperties properties, TableCell cell, int row, int column, FlowContext context)
+    private TableCellItem Cell(CellAppearance? look, TableCell cell, int column, FlowContext context)
     {
-        if (cell.Covered) return new TableCellItem(cell, column, Build(cell.Content, context));
-        var look = appearance.Cell(table, properties, row, column);
+        if (look is null) return new TableCellItem(cell, column, Build(cell.Content, context));
         var styled = look.Ink is null && !look.Bold ? context : context with { Fields = Header(context.Fields, look) };
         return new TableCellItem(cell, column, Build(cell.Content, styled)) { Appearance = look };
     }

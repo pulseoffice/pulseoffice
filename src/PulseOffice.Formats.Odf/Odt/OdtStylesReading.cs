@@ -306,6 +306,7 @@ internal sealed class OdtStylesReader(
                 HeaderBackground = measure.Color((string?)element.Attribute(Pt + "header-background")),
                 HeaderBold = (string?)element.Attribute(Pt + "header-bold") is { } bold ? bold == "true" : null,
                 BandBackground = measure.Color((string?)element.Attribute(Pt + "band-background")),
+                FirstBandBackground = measure.Color((string?)element.Attribute(Pt + "first-band-background")),
                 CellPadding = measure.Points((string?)element.Attribute(Pt + "cell-padding")),
                 VerticalCellPadding = measure.Points((string?)element.Attribute(Pt + "cell-padding-vertical")),
                 HeaderColor = measure.Color((string?)element.Attribute(Pt + "header-color")),

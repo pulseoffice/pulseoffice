@@ -166,7 +166,9 @@ public sealed class DocxBlockWriter(IDirectFormatting formatting, DocxParagraphC
         var properties = new W.TableProperties();
         if (context.Styles.IdOf(StyleFamily.Table, table.StyleName) is { } style) properties.Append(new W.TableStyle { Val = style });
         if (position is not null) properties.Append(position);
-        properties.Append(new W.TableWidth { Type = W.TableWidthUnitValues.Auto, Width = "0" });
+        properties.Append(table.WidthPercent is { } percent && percent > 0
+            ? new W.TableWidth { Type = W.TableWidthUnitValues.Pct, Width = values.Text((int)Math.Round(Math.Clamp(percent, 1, 1000) * 50)) }
+            : new W.TableWidth { Type = W.TableWidthUnitValues.Auto, Width = "0" });
         if (table.Alignment != TableAlignment.Left)
             properties.Append(new W.TableJustification { Val = table.Alignment == TableAlignment.Center ? W.TableRowAlignmentValues.Center : W.TableRowAlignmentValues.Right });
         if (table.Alignment == TableAlignment.Left && table.Indent.Value != 0)

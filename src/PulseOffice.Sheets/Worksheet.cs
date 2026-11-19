@@ -74,7 +74,7 @@ public sealed class Worksheet
     public Worksheet(string name)
     {
         Name = name;
-        Merges.Changed += _ => Revision++;
+        Merges.Changed += _ => { Revision++; MergesChanged?.Invoke(this); };
         Layout.RowVisibilityChanged += _ => RowVisibilityChanged?.Invoke(this);
         _ = new SheetObjectFollower(this, new SheetObjectAnchoring());
     }
@@ -163,6 +163,8 @@ public sealed class Worksheet
     public event Action<Worksheet>? Cleared;
 
     public event Action<Worksheet>? RowVisibilityChanged;
+
+    public event Action<Worksheet>? MergesChanged;
 
     private readonly OccupiedIndices _rowCounts = new();
     private readonly OccupiedIndices _columnCounts = new();

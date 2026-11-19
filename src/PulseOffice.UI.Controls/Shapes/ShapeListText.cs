@@ -10,7 +10,7 @@ public interface IShapeListText
 {
     bool Draws(ShapeObject shape);
 
-    void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0);
+    void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0, IPaintedTextLines? painted = null);
 
     RichText Framed(ShapeObject shape, double shapeRotation);
 
@@ -42,11 +42,11 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
         return lists.Listed(shape) || lists.Directed(shape) || Composed(shape.Style.Text.Layout);
     }
 
-    public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0)
+    public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0, IPaintedTextLines? painted = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(shape);
-        painter.Paint(new RichTextScene(context, bounds, PointScale, Theme(shape, ink), new TextFields(0, DateTime.Now, Language: language)), Framed(shape, shapeRotation));
+        painter.Paint(new RichTextScene(context, bounds, PointScale, Theme(shape, ink), new TextFields(0, DateTime.Now, Language: language)) { Painted = painted }, Framed(shape, shapeRotation));
     }
 
     public ITextTheme Theme(ShapeObject shape, Color ink)

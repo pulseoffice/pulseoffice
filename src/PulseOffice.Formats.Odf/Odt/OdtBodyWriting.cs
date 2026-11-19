@@ -629,7 +629,9 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
     {
         var width = new PulseOffice.Foundation.Units.Twip(table.Columns.Sum(column => column.Value));
         var tableStyle = sink.Register("table", table.StyleName is null ? null : names.Encode(table.StyleName),
-            [new XElement(Style + "table-properties", new XAttribute(Style + "width", measure.Length(width)), new XAttribute(Table + "align", Align(table.Alignment)),
+            [new XElement(Style + "table-properties", new XAttribute(Style + "width", measure.Length(width)),
+                table.WidthPercent is { } percent && percent > 0 ? new XAttribute(Style + "rel-width", Math.Clamp(percent, 1, 1000).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%") : null,
+                new XAttribute(Table + "align", Align(table.Alignment)),
                 table.Alignment == TableAlignment.Left && table.Indent.Value != 0 ? new XAttribute(Fo + "margin-left", measure.Length(table.Indent)) : null,
                 table.PageBreakBefore && table.PageStyleName is null ? new XAttribute(Fo + "break-before", "page") : null),
                 table.PageStyleName is { } master ? new XAttribute(Style + "master-page-name", names.Encode(master)) : null], "Tb");
@@ -637,6 +639,7 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
         var element = new XElement(Table + "table",
             new XAttribute(Table + "name", table.Name ?? table.Id),
             table.Name is null ? new XAttribute(Pt + "unnamed", "true") : null,
+            table.AutoWidth && table.WidthPercent is null ? new XAttribute(Pt + "auto-width", "true") : null,
             new XAttribute(Table + "style-name", tableStyle),
             new XAttribute(Xml + "id", table.Id),
             table.RepeatHeaderRows ? null : new XAttribute(Pt + "repeat-header", "false"),

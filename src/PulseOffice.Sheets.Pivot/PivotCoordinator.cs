@@ -66,7 +66,7 @@ public sealed class PivotCoordinator(IPivotEngine engine, IPivotRenderer rendere
 
         destination ??= workbook.AddSheet(definition.DestinationSheet);
 
-        var written = renderer.Render(table, definition, destination, workbook.Styles, labels);
+        var written = renderer.Render(table, definition, destination, workbook.Styles, labels, workbook.NumberFormats);
 
         var stored = definition with { OutputRange = written };
 

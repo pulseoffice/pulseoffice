@@ -125,6 +125,8 @@ public sealed class TableConversion(IStoryCatalog stories, IParagraphText text, 
             Direct = table.Direct,
             Alignment = table.Alignment,
             Indent = table.Indent,
+            WidthPercent = table.WidthPercent,
+            AutoWidth = table.AutoWidth,
         };
         var gap = new ParagraphBlock(document.NextId("p"), string.Empty, DefaultStyleNames.Standard);
         var index = owner.IndexOf(table);

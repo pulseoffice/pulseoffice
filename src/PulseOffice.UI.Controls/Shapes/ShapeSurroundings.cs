@@ -12,4 +12,6 @@ public readonly record struct ShapeSurroundings(string Hex)
     public ShapeSurroundings(uint argb) : this(Color.FromUInt32(argb)) { }
 
     public string? Language { get; init; }
+
+    public PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted { get; init; }
 }

@@ -35,6 +35,8 @@ public sealed record PivotField
 
     public PivotAggregation Aggregation { get; init; } = PivotAggregation.Sum;
     public ValueDisplayMode DisplayMode { get; init; } = ValueDisplayMode.Normal;
+    public string? BaseField { get; init; }
+    public string? NumberFormat { get; init; }
 
     public DateGrouping DateGrouping { get; init; } = DateGrouping.None;
     public double? NumericGroupInterval { get; init; }

@@ -39,6 +39,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
     private readonly ShapeTextColumns _columns = new();
     private readonly FormattedShapeTextLines _lines = new();
+    private readonly PlainShapeTextLines _paintedLines = new();
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -162,7 +163,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private void DrawListText(DrawingContext context, ShapeObject shape, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)
     {
         var ink = _brushes.Colour(_ink.Resolve(shapeStyle, Behind(shapeStyle.Fill, backdrop).Hex), Colors.White);
-        _listText.Draw(context, shape with { Style = shapeStyle }, bounds, ink, backdrop.Language, shapeRotation);
+        _listText.Draw(context, shape with { Style = shapeStyle }, bounds, ink, backdrop.Language, shapeRotation, backdrop.Painted);
     }
 
     private void PaintDimension(DrawingContext context, ShapeObject shape, DimensionLine dimension, Rect bounds, ShapeSurroundings backdrop)
@@ -372,7 +373,8 @@ public sealed class ShapeRenderer : IShapeRenderer
             text.SetTextDecorations(FreshUnderline());
         if (runs is { Count: > 0 }) Format(text, runs, style);
 
-        using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, style.RotationDegrees, shapeRotation))))
+        var turn = _flow.Turn(bounds, _flow.Degrees(layout, style.RotationDegrees, shapeRotation));
+        using (context.PushTransform(turn))
         {
             if (columns > 1)
             {
@@ -389,6 +391,7 @@ public sealed class ShapeRenderer : IShapeRenderer
                 _ => bounds.Y + (bounds.Height - text.Height) / 2,
             };
             context.DrawText(text, new Point(inner.X, y));
+            backdrop.Painted?.Painted(_paintedLines.Of(text, content, new Point(inner.X, y), turn));
         }
     }
 

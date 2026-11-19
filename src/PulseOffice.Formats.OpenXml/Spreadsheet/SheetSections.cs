@@ -636,7 +636,7 @@ internal sealed class SheetDataReader(OoxmlAttributeSanitizer sanitizer) : IXlsx
         foreach (var spill in state.Spills)
             foreach (var member in Occupied(spill, target))
                 target[member] = member == spill.Start
-                    ? target[member] with { SpillRange = spill.CellCount > 1 ? spill : null, ImplicitIntersection = false }
+                    ? target[member] with { SpillRange = spill.CellCount > 1 ? spill : null, ImplicitIntersection = false, UsesArrays = true }
                     : target[member] with { IsSpilled = !target[member].HasFormula };
 
         context.Outlines.Rebuild(state.RowLevels, target.RowGroups, target.Layout.IsRowHidden);

@@ -36,7 +36,8 @@ public sealed record SlideLayer(Rect Bounds, Action<DrawingContext> Paint)
 
 public readonly record struct SlidePalette(
     Color Placeholder, Color Border, Func<string, IReadOnlyList<PulseOffice.Text.Spelling.WordSpan>>? Proofing = null,
-    Action<DrawingContext>? Underlay = null, SlideOutputQuality Quality = SlideOutputQuality.Color, SlideElement? Live = null);
+    Action<DrawingContext>? Underlay = null, SlideOutputQuality Quality = SlideOutputQuality.Color, SlideElement? Live = null,
+    PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted = null);
 
 public enum SlideOutputQuality { Color, Grayscale, BlackAndWhite }
 
@@ -48,14 +49,23 @@ public sealed class SlideRenderer : ISlideRenderer
     private readonly ChromePainter _chrome = new();
     private readonly IContentPainter _content;
     private readonly IShapeBrushes _brushes;
+    private readonly PulseOffice.Presentations.UI.Rendering.ISlideBackdrop _backdrops;
 
     public SlideRenderer(IDrawingObjectRenderer objects, ITextCatalog texts) : this(objects, texts, new ShapeBrushes())
     {
     }
 
     public SlideRenderer(IDrawingObjectRenderer objects, ITextCatalog texts, IShapeBrushes brushes)
+        : this(objects, texts, brushes, new PulseOffice.Presentations.UI.Rendering.SlideBackdrop())
+    {
+    }
+
+    public SlideRenderer(
+        IDrawingObjectRenderer objects, ITextCatalog texts, IShapeBrushes brushes,
+        PulseOffice.Presentations.UI.Rendering.ISlideBackdrop backdrops)
     {
         _objects = objects;
+        _backdrops = backdrops;
         _brushes = brushes;
         _text = new TextElementPainter(texts, new ListLabels());
         _content = new StandardContentPainters(objects, texts);
@@ -81,16 +91,15 @@ public sealed class SlideRenderer : ISlideRenderer
     {
         var scale = size.Width.Value == 0 ? 1 : target.Width / size.Width.Value;
         var layoutBackground = Color.FromUInt32(master.BackgroundOf(theme, slide));
-        var background = slide.Background is { } argb ? Color.FromUInt32(argb)
-            : slide.ShowMasterBackground && slide.BackgroundImage is null ? layoutBackground : Colors.White;
+        var background = _backdrops.Background(slide, master, theme);
 
-        var backdrop = Backdrop(BackgroundFill(slide, master), background);
+        var backdrop = _backdrops.For(slide, master, theme);
         var layers = new List<SlideLayer>
         {
             new(target, context => context.FillRectangle(new SolidColorBrush(background), target)) { Fill = background },
         };
 
-        if (BackgroundFill(slide, master) is { } fill && _brushes.Fill(fill, target) is { } brush)
+        if (_backdrops.Fill(slide, master) is { } fill && _brushes.Fill(fill, target) is { } brush)
             layers.Add(new SlideLayer(target, context => context.FillRectangle(brush, target)));
         else if (slide.BackgroundImage is { } own && _objects.CanRender(own))
             layers.Add(new SlideLayer(target, context => PaintBackground(context, own, slide.BackgroundLayout, target, scale)));
@@ -117,18 +126,6 @@ public sealed class SlideRenderer : ISlideRenderer
     }
 
     private readonly PulseOffice.Drawing.Assets.ImageHeader _header = new();
-
-    private PulseOffice.UI.Controls.Shapes.ShapeSurroundings Backdrop(PulseOffice.Drawing.Shapes.ShapeFill? fill, Color background) =>
-        fill is { IsVisible: true } painted && painted.Kind is not PulseOffice.Drawing.Shapes.ShapeFillKind.Bitmap
-            && Color.TryParse(painted.Kind is PulseOffice.Drawing.Shapes.ShapeFillKind.Gradient ? painted.Gradient.StartHex : painted.ColorHex, out var colour)
-            ? new PulseOffice.UI.Controls.Shapes.ShapeSurroundings(colour)
-            : new PulseOffice.UI.Controls.Shapes.ShapeSurroundings(background);
-
-    private PulseOffice.Drawing.Shapes.ShapeFill? BackgroundFill(Slide slide, SlideMaster master) =>
-        slide.BackgroundImage is not null ? null
-        : slide.BackgroundFill is { } own ? own
-        : slide.Background is null && slide.ShowMasterBackground && master.BackgroundImage is null ? master.BackgroundFill
-        : null;
 
     private void PaintBackground(DrawingContext context, PulseOffice.Drawing.Assets.RasterImageObject image, BackgroundImageLayout layout, Rect target, double scale)
     {
@@ -196,7 +193,7 @@ public sealed class SlideRenderer : ISlideRenderer
         using var rotation = element.RotationDegrees == 0 ? default : context.PushTransform(placement.Rotated(element.RotationDegrees));
 
         element.Accept(new ElementPaintVisitor(
-            new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language } }, _text, _media, _content));
+            new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language, Painted = palette.Painted } }, _text, _media, _content));
     }
 
     private readonly record struct ElementPlacement(Rect Bounds, double Scale)

@@ -56,6 +56,10 @@ public sealed class SlideStructureTags(ISlideTextSegments segments, ITextSegment
             TextElement text when text.Text.PlainText.Trim().Length == 0 => null,
             TextElement => new PrintTag(key, PrintRole.Section, parent),
             ObjectElement { Content: PulseOffice.Document.Embedding.DataTableObject } => new PrintTag(key, PrintRole.Table, parent),
+            ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject shape } when Lettered(shape) => new PrintTag(key, PrintRole.Section, parent)
+            {
+                Alternate = new[] { shape.Description, shape.Title }.FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)),
+            },
             ObjectElement { Content: var content } => new PrintTag(key, PrintRole.Figure, parent)
             {
                 Alternate = new[] { content.Description, content.Title, content.Name }.FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)),
@@ -63,6 +67,10 @@ public sealed class SlideStructureTags(ISlideTextSegments segments, ITextSegment
             _ => null,
         };
     }
+
+    private bool Lettered(PulseOffice.Drawing.Shapes.ShapeObject shape) =>
+        shape.Dimension is null
+        && (shape.Runs is { Count: > 0 } runs ? string.Concat(runs.Select(run => run.Text)) : shape.Text ?? string.Empty).Trim().Length > 0;
 
     private bool IsTitle(SlideElement element) => element is TextElement { Text.Role: PlaceholderRole.Title };
 }

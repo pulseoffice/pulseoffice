@@ -49,6 +49,11 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Vertical });
             element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Horizontal });
         }
+        if (table.FirstBandBackground is { } first)
+        {
+            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Vertical });
+            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Horizontal });
+        }
     }
 
     public W.TableCellMarginDefault? Margins(TableProperties table)
@@ -82,7 +87,10 @@ public sealed class DocxTableStyleCodec(DocxValues values)
         var lines = Borders(properties?.GetFirstChild<W.TableBorders>());
         var padding = Padding(properties?.GetFirstChild<W.TableCellMarginDefault>());
         var header = element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == W.TableStyleOverrideValues.FirstRow);
-        var band = element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == W.TableStyleOverrideValues.Band2Horizontal);
+        uint? Band(params W.TableStyleOverrideValues[] kinds) => kinds
+            .Select(kind => element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind))
+            .Select(item => values.Color(item?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value))
+            .FirstOrDefault(color => color is not null);
         var run = header?.GetFirstChild<W.RunPropertiesBaseStyle>();
         return new TableProperties
         {
@@ -95,7 +103,8 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             HeaderBackground = values.Color(header?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
             HeaderColor = values.Color(run?.GetFirstChild<W.Color>()?.Val?.Value),
             HeaderBold = run?.GetFirstChild<W.Bold>() is { } bold ? bold.Val?.Value ?? true : null,
-            BandBackground = values.Color(band?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
+            BandBackground = Band(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
+            FirstBandBackground = Band(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
         };
     }
 

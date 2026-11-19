@@ -1,4 +1,5 @@
 using PulseOffice.Sheets.Addressing;
+using PulseOffice.Sheets.Formatting;
 using PulseOffice.Sheets.Styling;
 using PulseOffice.Sheets.Values;
 
@@ -6,15 +7,19 @@ namespace PulseOffice.Sheets.Pivot;
 
 public sealed record PivotLabels(string GrandTotal, string SubtotalFormat, string Empty = "")
 {
+    public string Quarter { get; init; } = "Q{1} {0}";
+
+    public System.Globalization.CultureInfo? Culture { get; init; }
+
     public string SubtotalOf(string item) => string.Format(
-        System.Globalization.CultureInfo.CurrentCulture, SubtotalFormat, item);
+        Culture ?? System.Globalization.CultureInfo.CurrentCulture, SubtotalFormat, item);
 }
 
 public interface IPivotRenderer
 {
     CellRange Render(
         PivotTable table, PivotDefinition definition, Worksheet destination,
-        StyleCatalog styles, PivotLabels labels);
+        StyleCatalog styles, PivotLabels labels, NumberFormatCatalog? formats = null);
 
     CellRange Measure(PivotTable table, PivotDefinition definition);
 }
@@ -23,7 +28,7 @@ public sealed class PivotRenderer : IPivotRenderer
 {
     public CellRange Render(
         PivotTable table, PivotDefinition definition, Worksheet destination,
-        StyleCatalog styles, PivotLabels labels)
+        StyleCatalog styles, PivotLabels labels, NumberFormatCatalog? formats = null)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(definition);
@@ -58,7 +63,7 @@ public sealed class PivotRenderer : IPivotRenderer
                 var isItem = column.Node.Kind != PivotNodeKind.GrandTotal && level < column.Node.Path.Count;
                 var text = column.Node.Kind == PivotNodeKind.GrandTotal
                     ? (level == 0 ? labels.GrandTotal : string.Empty)
-                    : isItem ? _items.Display(column.Node.Path[level], labels) : string.Empty;
+                    : isItem ? _items.Display(column.Node.Path[level], FieldAt(columnFields, level), labels) : string.Empty;
 
                 CellValue? typed = isItem && column.Node.Kind == PivotNodeKind.Item && level == column.Node.Path.Count - 1
                     ? _items.Value(column.Node.Path[level], FieldAt(columnFields, level), labels)
@@ -99,7 +104,7 @@ public sealed class PivotRenderer : IPivotRenderer
             var label = node.Kind switch
             {
                 PivotNodeKind.GrandTotal => CellValue.Text(labels.GrandTotal),
-                PivotNodeKind.Subtotal => CellValue.Text(labels.SubtotalOf(_items.Display(node.Label, labels))),
+                PivotNodeKind.Subtotal => CellValue.Text(labels.SubtotalOf(_items.Display(node.Label, FieldAt(rowFields, node.Depth), labels))),
                 _ => _items.Value(node.Label, FieldAt(rowFields, node.Depth), labels),
             };
 
@@ -132,12 +137,12 @@ public sealed class PivotRenderer : IPivotRenderer
                     destination.SetValue(address, value);
 
                 var isTotal = node.Kind != PivotNodeKind.Item || table.Columns[c].Node.Kind != PivotNodeKind.Item;
-                var percent = _percentModes.Contains(table.Columns[c].Field.DisplayMode);
-                if (percent)
+                var formatId = FormatIdOf(table.Columns[c].Field, formats);
+                if (formatId != 0)
                     destination.SetStyle(address, styles.Intern(CellStyle.Default with
                     {
                         Font = CellFont.Default with { Bold = isTotal },
-                        NumberFormatId = PercentFormatId,
+                        NumberFormatId = formatId,
                     }));
                 else if (isTotal)
                     destination.SetStyle(address, totalStyle);
@@ -156,6 +161,12 @@ public sealed class PivotRenderer : IPivotRenderer
         ValueDisplayMode.PercentOfTotal, ValueDisplayMode.PercentOfRow, ValueDisplayMode.PercentOfColumn,
         ValueDisplayMode.PercentOfParent, ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.PercentRunningTotal,
     };
+
+    private int FormatIdOf(PivotField field, NumberFormatCatalog? formats)
+    {
+        if (field.NumberFormat is { Length: > 0 } code && formats is not null) return formats.Register(code);
+        return _percentModes.Contains(field.DisplayMode) ? PercentFormatId : 0;
+    }
 
     private PivotField? FieldAt(IReadOnlyList<PivotField> fields, int level) =>
         level >= 0 && level < fields.Count ? fields[level] : null;
@@ -179,11 +190,17 @@ public sealed class PivotRenderer : IPivotRenderer
 
 internal sealed class PivotItemCells
 {
-    public string Display(string key, PivotLabels labels) => key.Length == 0 ? labels.Empty : key;
+    private readonly PivotDateLabels _dates = new();
+
+    public string Display(string key, PivotField? field, PivotLabels labels) =>
+        key.Length == 0 ? labels.Empty : _dates.Label(key, field, labels) ?? key;
 
     public CellValue Value(string key, PivotField? field, PivotLabels labels)
     {
         if (key.Length == 0) return CellValue.Text(labels.Empty);
+        if (_dates.Label(key, field, labels) is { } dated) return CellValue.Text(dated);
+        if (field is { DateGrouping: DateGrouping.None, NumericGroupInterval: null } && PivotValues.BooleanOf(key) is { } truth)
+            return CellValue.Boolean(truth);
         if (field is { DateGrouping: DateGrouping.None, NumericGroupInterval: null }
             && double.TryParse(key, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
             && string.Equals(number.ToString("R", System.Globalization.CultureInfo.InvariantCulture), key, StringComparison.Ordinal))
@@ -191,3 +208,24 @@ internal sealed class PivotItemCells
         return CellValue.Text(key);
     }
 }
+
+public sealed class PivotDateLabels
+{
+    public string? Label(string key, PivotField? field, PivotLabels labels)
+    {
+        if (field is null) return null;
+        var culture = labels.Culture ?? System.Globalization.CultureInfo.CurrentCulture;
+        return field.DateGrouping switch
+        {
+            DateGrouping.Quarters when key.Length == 7 && key[4] == '-' && key[5] == 'T'
+                && int.TryParse(key.AsSpan(0, 4), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var year)
+                => string.Format(culture, labels.Quarter, year, key[6]),
+            DateGrouping.Months when DateTime.TryParseExact(key, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var month)
+                => month.ToString("MMM yyyy", culture),
+            DateGrouping.Days when DateTime.TryParseExact(key, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day)
+                => day.ToString("d", culture),
+            _ => null,
+        };
+    }
+}
+

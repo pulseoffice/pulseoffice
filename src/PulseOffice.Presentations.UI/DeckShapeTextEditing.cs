@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost host, DeckFilmstrip filmstrip, PulseOffice.UI.Controls.Shapes.ShapeTextEditor shapeText, PulseOffice.Drawing.Shapes.IShapeRichText shapeRichText)
+internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost host, DeckFilmstrip filmstrip, PulseOffice.UI.Controls.Shapes.ShapeTextEditor shapeText, PulseOffice.Drawing.Shapes.IShapeRichText shapeRichText, PulseOffice.Presentations.UI.Rendering.ISlideBackdrop backdrops)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -62,9 +62,14 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
         _state.SelectedText = null;
         _state.Overlay.Margin = new Thickness(_canvas.Target.X, _canvas.Target.Y, 0, 0);
         _shapeText.SelectionBrush = _host.Accent() is ISolidColorBrush accent ? new SolidColorBrush(accent.Color, 0.3) : new SolidColorBrush(Color.FromArgb(80, 37, 99, 235));
-        _shapeText.Begin(new PulseOffice.UI.Controls.Shapes.ShapeTextEditStart(element.Id, shape, ShapePlacement(element, shape), new PulseOffice.UI.Controls.Shapes.ShapeSurroundings()) { Typed = typed });
+        _shapeText.Begin(new PulseOffice.UI.Controls.Shapes.ShapeTextEditStart(element.Id, shape, ShapePlacement(element, shape), Backdrop()) { Typed = typed });
         _host.AttachContext();
     }
+
+    private PulseOffice.UI.Controls.Shapes.ShapeSurroundings Backdrop() =>
+        _canvas.Deck is { } deck && (_shapeTextSlide ?? _state.Current) is { } slide
+            ? backdrops.For(slide, deck.MasterOf(slide), deck.ThemeOf(slide)) with { Language = _canvas.Fields.Language }
+            : new PulseOffice.UI.Controls.Shapes.ShapeSurroundings() { Language = _canvas.Fields.Language };
 
     private PulseOffice.UI.Controls.Shapes.ShapeTextPlacement ShapePlacement(SlideElement element, PulseOffice.Drawing.Shapes.ShapeObject shape)
     {
@@ -115,7 +120,7 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
             var live = _shapeText.Live!;
             var formatted = _shapeRichText.FromRich(live, transform(_shapeRichText.ToRich(live), range));
             _actions.EditShapeText(slide, element, formatted, format: true);
-            _shapeText.Reformat(formatted, new PulseOffice.UI.Controls.Shapes.ShapeSurroundings());
+            _shapeText.Reformat(formatted, Backdrop());
             return true;
         }
 

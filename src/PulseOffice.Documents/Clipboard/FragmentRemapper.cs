@@ -140,6 +140,8 @@ public sealed class FragmentRemapper(IStoryCatalog stories, IBlockTree tree) : I
                 PageBreakBefore = table.PageBreakBefore,
                 Alignment = table.Alignment,
                 Indent = table.Indent,
+                WidthPercent = table.WidthPercent,
+                AutoWidth = table.AutoWidth,
             };
 
         public Block VisitSection(SectionBlock section) =>

@@ -11,9 +11,9 @@ public interface ISlideTextSegments
     PrintTextSegments? For(PrintTag container, SlideElement element, SlideElementPlacement? placement = null);
 }
 
-public sealed class SlideTextSegments(TableGeometry geometry) : ISlideTextSegments
+public sealed class SlideTextSegments(TableGeometry geometry, PulseOffice.Drawing.Shapes.IShapeRichText shapeText) : ISlideTextSegments
 {
-    public SlideTextSegments() : this(new TableGeometry())
+    public SlideTextSegments() : this(new TableGeometry(), new PulseOffice.Drawing.Shapes.ShapeRichText())
     {
     }
 
@@ -24,6 +24,7 @@ public sealed class SlideTextSegments(TableGeometry geometry) : ISlideTextSegmen
         {
             TextElement text when container.Role == PrintRole.Section => Paragraphs(container, text.Text, placement),
             ObjectElement { Content: DataTableObject table } when container.Role == PrintRole.Table => Cells(container, table, placement),
+            ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject shape } when container.Role == PrintRole.Section => Paragraphs(container, shapeText.ToRich(shape), placement),
             _ => null,
         };
     }

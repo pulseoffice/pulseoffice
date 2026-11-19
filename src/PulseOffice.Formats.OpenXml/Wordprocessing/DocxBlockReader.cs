@@ -431,6 +431,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
             Direct = tableStyles.Padding(tableProperties?.TableCellMarginDefault),
             Alignment = Alignment(tableProperties?.TableJustification?.Val?.Value),
         };
+        PreferredWidth(table, tableProperties?.TableWidth);
         if (table.Alignment == TableAlignment.Left && tableProperties?.TableIndentation is { } indentation && indentation.Type?.Value != W.TableWidthUnitValues.Pct)
             table.Indent = new Twip(values.Bounded(indentation.Width?.Value ?? 0, -LargestLength, LargestLength));
         var styled = appearance.Style(context.Document.Styles, table);
@@ -480,6 +481,21 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var share = left > 0 ? values.Bounded(left / missing, 1, LargestLength) : Twip.FromCentimeters(2).Value;
         for (var index = 0; index < columns.Count; index++)
             if (columns[index].Value == 0) columns[index] = new Twip(share);
+    }
+
+    private void PreferredWidth(TableBlock table, W.TableWidth? width)
+    {
+        if (width is null) return;
+        if (width.Type?.Value == W.TableWidthUnitValues.Auto) table.AutoWidth = true;
+        else if (width.Type?.Value == W.TableWidthUnitValues.Pct && Percent(width.Width?.Value) is { } percent and > 0) table.WidthPercent = Math.Clamp(percent, 1, 1000);
+    }
+
+    private double? Percent(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (text.EndsWith('%'))
+            return double.TryParse(text.TrimEnd('%'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var stated) ? stated : null;
+        return values.Integer(text) is { } fiftieths ? fiftieths / 50.0 : null;
     }
 
     public const string TruncatedTable = "DOCX222";

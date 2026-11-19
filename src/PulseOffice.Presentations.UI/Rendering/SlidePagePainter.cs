@@ -23,10 +23,10 @@ public interface ISlidePagePainter
     IPrintableSlide For(Presentation deck, Slide slide);
 }
 
-public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture, ISlideLinkAreas links, ISlideStructureTags structure, ISlideTextLines textLines) : ISlidePagePainter
+public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture, ISlideLinkAreas links, ISlideStructureTags structure) : ISlidePagePainter
 {
     public SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture)
-        : this(renderer, replay, paths, capture, new SlideLinkAreas(), new SlideStructureTags(), new SlideTextLines())
+        : this(renderer, replay, paths, capture, new SlideLinkAreas(), new SlideStructureTags())
     {
     }
 
@@ -52,7 +52,8 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         var target = new Rect(area.Left.ToPoints(), area.Top.ToPoints(), area.Width.ToPoints(), area.Height.ToPoints());
         var number = deck.NumberOf(slide);
         var chrome = new HeaderFooterResolver().Resolve(deck.HeaderFooter, slide, number, DateTime.Now, deck.MasterOf(slide).Elements, deck.TextLanguage);
-        var layers = renderer.Layers(slide, deck.Size, target, deck.ThemeOf(slide), deck.MasterOf(slide), _palette,
+        var painted = new PulseOffice.UI.Controls.Text.Rich.PaintedTextLineLog();
+        var layers = renderer.Layers(slide, deck.Size, target, deck.ThemeOf(slide), deck.MasterOf(slide), _palette with { Painted = painted },
             null, chrome, new SlideFieldsFactory().For(deck, slide));
 
         var clipped = new ClippedPageCanvas(canvas, area);
@@ -62,7 +63,14 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         foreach (var layer in layers)
         {
             canvas.Tag(layer.Fill is null ? structure.For(slide, layer.Element) : null);
-            PaintLayer(layer.Fill is null ? structure.Tagged(clipped, slide, layer.Element, Placement(deck, slide, layer.Element, target, scale)) : clipped, layer, target, scale);
+            if (layer.Fill is not null)
+            {
+                PaintLayer(clipped, layer, target, scale, null);
+                continue;
+            }
+            painted.Clear();
+            var recording = Record(layer);
+            PaintLayer(structure.Tagged(clipped, slide, layer.Element, Placement(layer.Element, target, scale, [.. painted.Lines])), layer, target, scale, recording);
         }
         canvas.Tag(null);
         canvas.MarkTarget(links.Anchor(slide), area.Top.ToPoints());
@@ -70,7 +78,7 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
             canvas.MarkLink(link.Area, link.Target);
     }
 
-    private void PaintLayer(IPageCanvas canvas, SlideLayer layer, Rect target, double scale)
+    private void PaintLayer(IPageCanvas canvas, SlideLayer layer, Rect target, double scale, DrawingGroup? recorded)
     {
         if (layer.Fill is { } fill)
         {
@@ -78,7 +86,7 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
             return;
         }
 
-        if (Record(layer) is not { } recording)
+        if (recorded is not { } recording)
         {
             Rasterize(canvas, layer.Paint, layer.Bounds.Inflate(12).Intersect(target));
             return;
@@ -102,14 +110,14 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         parts.PaintVector(canvas);
     }
 
-    private SlideElementPlacement? Placement(Presentation deck, Slide slide, SlideElement? element, Rect target, double scale)
+    private SlideElementPlacement? Placement(SlideElement? element, Rect target, double scale, IReadOnlyList<PulseOffice.UI.Controls.Text.Rich.RichTextLineBox> lines)
     {
         if (element is null) return null;
         var bounds = new Rect(target.X + element.Bounds.Left.Value * scale, target.Y + element.Bounds.Top.Value * scale,
             element.Bounds.Width.Value * scale, element.Bounds.Height.Value * scale);
         return new SlideElementPlacement(bounds.X, bounds.Y, bounds.Width, bounds.Height, scale, element.RotationDegrees)
         {
-            Lines = textLines.For(deck, slide, element, bounds, scale),
+            Lines = lines,
         };
     }
 

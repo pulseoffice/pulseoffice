@@ -79,7 +79,7 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
                     : aggregator.Aggregate(columns[c].Field.Aggregation, matching);
             }
 
-        _displays.Apply(cells, rowNodes, columns);
+        _displays.Apply(cells, rowNodes, columns, rowFields);
 
         return new PivotTable(rowNodes, columns, cells);
     }
@@ -308,6 +308,7 @@ internal sealed class ValueDisplays
         new ShareOfTotal(),
         new ShareOfColumn(),
         new ShareOfRow(),
+        new ShareOfParent(),
         new RunningTotal(),
         new PercentRunningTotal(),
         new Rank(ValueDisplayMode.RankAscending, (value, number) => value < number),
@@ -317,7 +318,7 @@ internal sealed class ValueDisplays
         new PreviousDifference(ValueDisplayMode.PercentDifferenceFrom, percent: true),
     }.ToDictionary(display => display.Mode);
 
-    public void Apply(CellValue[,] cells, IReadOnlyList<PivotNode> rows, IReadOnlyList<PivotColumn> columns)
+    public void Apply(CellValue[,] cells, IReadOnlyList<PivotNode> rows, IReadOnlyList<PivotColumn> columns, IReadOnlyList<PivotField> rowFields)
     {
         var raw = (CellValue[,])cells.Clone();
 
@@ -325,11 +326,19 @@ internal sealed class ValueDisplays
         {
             if (!_displays.TryGetValue(columns[c].Field.DisplayMode, out var display)) continue;
 
-            var pass = new DisplayPass(raw, rows, columns, c);
+            var pass = new DisplayPass(raw, rows, columns, c) { BaseLevel = BaseLevelOf(columns[c].Field, rowFields) };
             for (var r = 0; r < rows.Count; r++)
                 if (raw[r, c].IsNumeric && display.Show(pass, r, raw[r, c].AsNumber()) is { } shown)
                     cells[r, c] = shown;
         }
+    }
+
+    private int BaseLevelOf(PivotField field, IReadOnlyList<PivotField> rowFields)
+    {
+        if (field.BaseField is not { Length: > 0 } name) return 0;
+        for (var level = 0; level < rowFields.Count; level++)
+            if (string.Equals(rowFields[level].SourceName, name, StringComparison.Ordinal)) return level;
+        return 0;
     }
 }
 
@@ -369,6 +378,50 @@ internal sealed class DisplayPass
 
     public double Running { get; set; }
 
+    public int BaseLevel { get; init; }
+
+    public IReadOnlyList<string>? RunningScope { get; set; }
+
+    public double ParentTotal(int row)
+    {
+        var node = Rows[row];
+        if (node.Kind == PivotNodeKind.GrandTotal || node.Path.Count == 0) return Total;
+        var parent = node.Path.Take(node.Path.Count - 1).ToList();
+        if (parent.Count == 0) return Total;
+        var sum = 0.0;
+        for (var r = 0; r < Rows.Count; r++)
+            if (IsItem(r) && Cells[r, Column].IsNumeric && StartsWith(Rows[r].Path, parent)) sum += Cells[r, Column].AsNumber();
+        return sum;
+    }
+
+    public void Restart(int row)
+    {
+        var scope = ScopeOf(row);
+        if (RunningScope is not null && PathComparer.Instance.Equals(RunningScope, scope)) return;
+        RunningScope = scope;
+        Running = 0;
+    }
+
+    public double ScopeTotal(int row)
+    {
+        var scope = ScopeOf(row);
+        if (scope.Count == 0) return Total;
+        var sum = 0.0;
+        for (var r = 0; r < Rows.Count; r++)
+            if (IsItem(r) && Cells[r, Column].IsNumeric && StartsWith(Rows[r].Path, scope)) sum += Cells[r, Column].AsNumber();
+        return sum;
+    }
+
+    public IReadOnlyList<string> ScopeOf(int row) => [.. Rows[row].Path.Take(Math.Min(BaseLevel, Rows[row].Path.Count))];
+
+    private static bool StartsWith(IReadOnlyList<string> path, IReadOnlyList<string> prefix)
+    {
+        if (path.Count < prefix.Count) return false;
+        for (var index = 0; index < prefix.Count; index++)
+            if (!string.Equals(path[index], prefix[index], StringComparison.Ordinal)) return false;
+        return true;
+    }
+
     private readonly int _leafDepth;
 
     public CellValue? PreviousOuter(int row)
@@ -376,8 +429,8 @@ internal sealed class DisplayPass
         if (Rows.Any(node => node.Path.Count > 0))
         {
             var node = Rows[row];
-            if (node.Path.Count == 0) return null;
-            var target = PreviousPath(Rows, node);
+            if (node.Path.Count <= BaseLevel) return null;
+            var target = PreviousPath(Rows, node, BaseLevel);
             if (target is null) return null;
             for (var r = 0; r < Rows.Count; r++)
                 if (Rows[r].Kind == node.Kind && PathComparer.Instance.Equals(Rows[r].Path, target)) return Cells[r, Column];
@@ -387,7 +440,7 @@ internal sealed class DisplayPass
         var current = Columns[Column];
         if (current.Node.Path.Count == 0) return null;
         var nodes = Columns.Select(column => column.Node).ToList();
-        var previous = PreviousPath(nodes, current.Node);
+        var previous = PreviousPath(nodes, current.Node, 0);
         if (previous is null) return null;
         for (var c = 0; c < Columns.Count; c++)
             if (Columns[c].FieldIndex == current.FieldIndex && Columns[c].Node.Kind == current.Node.Kind
@@ -396,13 +449,15 @@ internal sealed class DisplayPass
         return null;
     }
 
-    private static List<string>? PreviousPath(IReadOnlyList<PivotNode> nodes, PivotNode node)
+    private static List<string>? PreviousPath(IReadOnlyList<PivotNode> nodes, PivotNode node, int level)
     {
-        var outer = nodes.Where(candidate => candidate.Path.Count > 0).Select(candidate => candidate.Path[0])
+        var prefix = node.Path.Take(level).ToList();
+        var outer = nodes.Where(candidate => candidate.Path.Count > level && StartsWith(candidate.Path, prefix))
+            .Select(candidate => candidate.Path[level])
             .Distinct(StringComparer.Ordinal).ToList();
-        var position = outer.IndexOf(node.Path[0]);
+        var position = outer.IndexOf(node.Path[level]);
         if (position <= 0) return null;
-        return [outer[position - 1], .. node.Path.Skip(1)];
+        return [.. prefix, outer[position - 1], .. node.Path.Skip(level + 1)];
     }
 
     public bool IsItem(int row) => Rows[row].Kind == PivotNodeKind.Item && Rows[row].Path.Count == _leafDepth;
@@ -459,11 +514,17 @@ internal sealed class ShareOfRow() : ValueDisplay(ValueDisplayMode.PercentOfRow)
     public override CellValue? Show(DisplayPass pass, int row, double number) => Ratio(number, pass.RowTotal(row));
 }
 
+internal sealed class ShareOfParent() : ValueDisplay(ValueDisplayMode.PercentOfParent)
+{
+    public override CellValue? Show(DisplayPass pass, int row, double number) => Ratio(number, pass.ParentTotal(row));
+}
+
 internal sealed class RunningTotal() : ValueDisplay(ValueDisplayMode.RunningTotal)
 {
     public override CellValue? Show(DisplayPass pass, int row, double number)
     {
         if (!pass.IsItem(row)) return null;
+        pass.Restart(row);
         pass.Running += number;
         return CellValue.Number(pass.Running);
     }
@@ -474,8 +535,9 @@ internal sealed class PercentRunningTotal() : ValueDisplay(ValueDisplayMode.Perc
     public override CellValue? Show(DisplayPass pass, int row, double number)
     {
         if (!pass.IsItem(row)) return null;
+        pass.Restart(row);
         pass.Running += number;
-        return Ratio(pass.Running, pass.Total);
+        return Ratio(pass.Running, pass.ScopeTotal(row));
     }
 }
 

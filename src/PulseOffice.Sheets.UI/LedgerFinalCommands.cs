@@ -383,7 +383,7 @@ public sealed class LedgerFinalCommands(
         };
 
         var result = Checkpointed(checkpoints, texts["command.ledger.pivot.calculatedField.title"],
-            () => pivots.Apply(workbook, updated, new PulseOffice.Sheets.Pivot.PivotLabels(texts["pivot.grandTotal"], texts["pivot.subtotal"], texts["pivot.blank"])),
+            () => pivots.Apply(workbook, updated, new LedgerPivotLabels(texts).Create()),
             outcome => outcome.Succeeded);
 
         Context.RequestRefresh();
@@ -470,7 +470,7 @@ public sealed class LedgerFinalCommands(
         var result = Checkpointed(checkpoints, texts["history.pivot.chart"], () =>
         {
             sheet.Objects.Add(placed);
-            return pivots.Apply(workbook, pivot, new PulseOffice.Sheets.Pivot.PivotLabels(texts["pivot.grandTotal"], texts["pivot.subtotal"], texts["pivot.blank"]));
+            return pivots.Apply(workbook, pivot, new LedgerPivotLabels(texts).Create());
         }, outcome => outcome.Succeeded);
 
         Context.RequestRefresh();

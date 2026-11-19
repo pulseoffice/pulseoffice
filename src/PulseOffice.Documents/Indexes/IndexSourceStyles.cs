@@ -22,6 +22,9 @@ public sealed class IndexSourceStyles : IEquatable<IndexSourceStyles>
         return new IndexSourceStyles(levels);
     }
 
+    public IndexSourceStyles Assign(IEnumerable<KeyValuePair<string, int>> levels) =>
+        levels.Aggregate(this, (styles, entry) => styles.With(entry.Key, entry.Value > 0 ? entry.Value : null));
+
     public IndexSourceStyles Map(Func<string, string?> rename)
     {
         var levels = new SortedDictionary<string, int>(StringComparer.Ordinal);

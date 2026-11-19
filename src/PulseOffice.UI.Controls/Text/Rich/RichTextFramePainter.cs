@@ -7,16 +7,23 @@ namespace PulseOffice.UI.Controls.Text.Rich;
 
 public sealed record RichTextScene(
     DrawingContext Context, Rect Bounds, double Scale, ITextTheme Theme, TextFields Fields,
-    Func<string, IReadOnlyList<WordSpan>>? Proofing = null);
+    Func<string, IReadOnlyList<WordSpan>>? Proofing = null)
+{
+    public IPaintedTextLines? Painted { get; init; }
+}
 
 public interface IRichTextFramePainter
 {
     void Paint(RichTextScene scene, RichText text);
 }
 
-public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPictureBitmaps pictures) : IRichTextFramePainter
+public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPictureBitmaps pictures, IRichTextLineBoxes boxes) : IRichTextFramePainter
 {
     public RichTextFramePainter(ITextFrameComposer composer) : this(composer, new BulletPictureBitmaps())
+    {
+    }
+
+    public RichTextFramePainter(ITextFrameComposer composer, IBulletPictureBitmaps pictures) : this(composer, pictures, new RichTextLineBoxes())
     {
     }
 
@@ -32,6 +39,7 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
         var composed = composer.Compose(text, scene.Bounds, scene.Theme, scene.Fields, scene.Scale);
         using (scene.Context.PushTransform(composed.Placement))
             PaintLines(scene, composed);
+        scene.Painted?.Painted(boxes.Of(text, composed));
     }
 
     private void PaintLines(RichTextScene scene, ComposedTextFrame composed)

@@ -204,6 +204,7 @@ internal sealed class OdtStylesWriter(
         if (table.HeaderBackground is { } header) element.Add(new XAttribute(Pt + "header-background", measure.Hex(header)));
         if (table.HeaderBold is { } bold) element.Add(new XAttribute(Pt + "header-bold", bold ? "true" : "false"));
         if (table.BandBackground is { } band) element.Add(new XAttribute(Pt + "band-background", measure.Hex(band)));
+        if (table.FirstBandBackground is { } first) element.Add(new XAttribute(Pt + "first-band-background", measure.Hex(first)));
         if (table.CellPadding is { } padding) element.Add(new XAttribute(Pt + "cell-padding", measure.Points(padding)));
         if (table.VerticalCellPadding is { } vertical) element.Add(new XAttribute(Pt + "cell-padding-vertical", measure.Points(vertical)));
         if (table.HeaderColor is { } ink) element.Add(new XAttribute(Pt + "header-color", measure.Hex(ink)));

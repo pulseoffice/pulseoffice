@@ -78,6 +78,13 @@ internal sealed class SpillArea(Workbook workbook, Dictionary<SheetCell, CellVal
         }
     }
 
+    public bool IsMultiValued(EvalValue result, IEvaluationContext context) => !context.ImplicitIntersection && result switch
+    {
+        ArrayValue array => array.RowCount > 1 || array.ColumnCount > 1,
+        RangeValue range => !range.Range.IsSingleCell,
+        _ => false,
+    };
+
     public CellValue Materialize(SheetCell cell, EvalValue result, IEvaluationContext context, HashSet<SheetCell> spilled)
     {
         var sheet = SheetAt(cell.SheetIndex);

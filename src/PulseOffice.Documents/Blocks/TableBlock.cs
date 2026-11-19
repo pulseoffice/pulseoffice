@@ -133,6 +133,10 @@ public sealed class TableBlock(string id, IEnumerable<TableRow> rows, IEnumerabl
 
     public Twip Indent { get; set; }
 
+    public double? WidthPercent { get; set; }
+
+    public bool AutoWidth { get; set; }
+
     public int ColumnCount => Columns.Count;
 
     public TableCell Cell(int row, int column) => Rows[row].Cells[column];
@@ -151,5 +155,7 @@ public sealed class TableBlock(string id, IEnumerable<TableRow> rows, IEnumerabl
         PageBreakBefore = PageBreakBefore,
         Alignment = Alignment,
         Indent = Indent,
+        WidthPercent = WidthPercent,
+        AutoWidth = AutoWidth,
     };
 }

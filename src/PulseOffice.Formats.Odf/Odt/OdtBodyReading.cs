@@ -824,11 +824,19 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
             PageBreakBefore = (string?)tableStyle?.Element(Style + "table-properties")?.Attribute(Fo + "break-before") == "page",
             Alignment = Alignment(tableStyle?.Element(Style + "table-properties")),
             Indent = Indent(tableStyle?.Element(Style + "table-properties")),
+            WidthPercent = RelativeWidth(tableStyle?.Element(Style + "table-properties")),
+            AutoWidth = (string?)element.Attribute(Pt + "auto-width") == "true",
         };
         Unpadded(table);
         repair.Repair(context.Document, table);
         return table;
     }
+
+    private double? RelativeWidth(XElement? properties) =>
+        ((string?)properties?.Attribute(Style + "rel-width"))?.Trim() is { } text && text.EndsWith('%')
+        && double.TryParse(text.TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) && percent > 0
+            ? Math.Clamp(percent, 1, 1000)
+            : (string?)properties?.Attribute(Table + "align") == "margins" ? 100 : null;
 
     private TableAlignment Alignment(XElement? properties) => (string?)properties?.Attribute(Table + "align") switch
     {

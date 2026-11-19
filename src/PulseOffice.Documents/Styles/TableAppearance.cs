@@ -14,10 +14,23 @@ public interface ITableAppearance
     BoxBorders StyleBorders(TableBlock table, TableProperties style, int row, int column);
 
     uint? StyleBackground(TableBlock table, TableProperties style, int row, int column);
+
+    CellAppearance?[][] Cells(TableBlock table, TableProperties style);
 }
 
-public sealed class TableAppearance(IStyleResolver resolver) : ITableAppearance
+public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflicts conflicts) : ITableAppearance
 {
+    public TableAppearance(IStyleResolver resolver) : this(resolver, new CellBorderConflicts())
+    {
+    }
+
+    public CellAppearance?[][] Cells(TableBlock table, TableProperties style)
+    {
+        var looks = table.Rows.Select((row, r) => row.Cells.Select((cell, column) => cell.Covered ? null : Cell(table, style, r, column)).ToArray()).ToArray();
+        conflicts.Resolve(table, looks);
+        return looks;
+    }
+
     public TableProperties Style(StyleSheet sheet, TableBlock table) => table.Direct.Over(resolver.ResolveTableStyle(sheet, table.StyleName));
 
     public CellAppearance Cell(TableBlock table, TableProperties style, int row, int column)
@@ -54,6 +67,8 @@ public sealed class TableAppearance(IStyleResolver resolver) : ITableAppearance
         if (row < table.HeaderRows && style.HeaderBackground is { } header) return header;
         var body = row - Math.Max(0, table.HeaderRows);
         if (style.BandBackground is { } band && (table.Banding.BandsRow(body) || body >= 0 && table.Banding.BandsColumn(column))) return band;
+        if (style.FirstBandBackground is { } first && body >= 0
+            && (table.Banding.BandedRows && !table.Banding.BandsRow(body) || table.Banding.BandedColumns && !table.Banding.BandsColumn(column))) return first;
         return style.Background;
     }
 

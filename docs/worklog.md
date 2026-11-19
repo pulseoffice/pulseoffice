@@ -14049,3 +14049,25 @@ Ledger engine: MAP broadcasts and pads mismatched arrays with #N/A as Excel does
   layout and repeat labels rendered, repeat labels native in XLSX; XLSX report filter selection read; GETPIVOTDATA
   accepts "Sum of" names; numeric items as numbers, "(blank)" label, percent formats, XLSX captions per function.
   Log: docs/deep-audit/round-261-ledger-pivots.md.
+
+### Round 262: Ledger spill recalculation (2026-11-19)
+- Merge and unmerge recalculate spill anchors; iterated cycles lay out spills; blocked dynamic anchors stay dynamic
+  through XLSX and ODS round trips without recalculation. Structure edits, moves, XLSX metadata and ODS spill round
+  trips checked. Log: docs/deep-audit/round-262-ledger-spill-recalculation.md.
+
+### Round 263: Folio tables and TOC leftovers (2026-11-19)
+- Percent and automatic table widths in the model, DOCX and ODT, scaled by layout; first table-style band shading;
+  Word-like border conflict resolution between neighbouring cells; ODT column widths from common styles; TOC update
+  reuses Word `_Toc` bookmarks; TOC dialog exposes the first level and the source styles.
+  Log: docs/deep-audit/round-263-folio-tables-toc-leftovers.md.
+
+### Round 264: Ledger pivot leftovers (2026-11-19)
+- Value field number formats and a selectable base field in model, engine, XLSX and ODS; % of parent computed; % of
+  parent, % running total and rank written to both formats; boolean items keyed "TRUE"/"FALSE"; localized date group
+  labels; XLSX range and date grouping read. Log: docs/deep-audit/round-264-pivot-leftovers.md.
+
+### Round 265: notice copy, tagged PDF shape text, Deck shape text editing (2026-11-19)
+- Continuation notices: copying body text copies the body only, as in Word (notices are layout text); kept.
+- Tagged PDF takes Deck line boxes from the painted composition (`IPaintedTextLines`); shape text is a section with
+  paragraphs tagged by position. The shape text editor inks and composes against the slide backdrop and language
+  (`ISlideBackdrop`). Log: docs/deep-audit/round-265-notes-and-shape-text.md.

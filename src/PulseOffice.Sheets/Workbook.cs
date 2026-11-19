@@ -62,6 +62,8 @@ public sealed class Workbook : Security.IMacroSignatureHolder, PulseOffice.Docum
         sheet.ContentChanged += Relay;
         sheet.RowVisibilityChanged -= RelayVisibility;
         sheet.RowVisibilityChanged += RelayVisibility;
+        sheet.MergesChanged -= RelayMerges;
+        sheet.MergesChanged += RelayMerges;
         sheet.Cleared -= RelayCleared;
         sheet.Cleared += RelayCleared;
         sheet.Owner = this;
@@ -73,6 +75,10 @@ public sealed class Workbook : Security.IMacroSignatureHolder, PulseOffice.Docum
     public event Action<Worksheet>? RowVisibilityChanged;
 
     private void RelayVisibility(Worksheet sheet) => RowVisibilityChanged?.Invoke(sheet);
+
+    public event Action<Worksheet>? MergesChanged;
+
+    private void RelayMerges(Worksheet sheet) => MergesChanged?.Invoke(sheet);
 
     public event Action<Worksheet>? SheetCleared;
 
@@ -142,6 +148,7 @@ public sealed class Workbook : Security.IMacroSignatureHolder, PulseOffice.Docum
         if (consolidationBefore != Consolidation) _detachedConsolidation[sheet] = (consolidationBefore, Consolidation);
         sheet.ContentChanged -= Relay;
         sheet.RowVisibilityChanged -= RelayVisibility;
+        sheet.MergesChanged -= RelayMerges;
         sheet.Cleared -= RelayCleared;
         sheet.Owner = null;
 
