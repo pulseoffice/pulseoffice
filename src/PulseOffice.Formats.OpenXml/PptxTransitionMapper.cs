@@ -44,8 +44,8 @@ public sealed class PptxTransitionMapper
         {
             Speed = transition.DurationMs switch
             {
-                <= 300 => P.TransitionSpeedValues.Fast,
-                >= 800 => P.TransitionSpeedValues.Slow,
+                <= 625 => P.TransitionSpeedValues.Fast,
+                >= 875 => P.TransitionSpeedValues.Slow,
                 _ => P.TransitionSpeedValues.Medium,
             },
         };
@@ -188,8 +188,8 @@ public sealed class PptxTransitionMapper
             Direction = direction,
             DurationMs = transition.Speed?.Value switch
             {
-                var s when s == P.TransitionSpeedValues.Fast => 300,
-                var s when s == P.TransitionSpeedValues.Slow => 900,
+                var s when s == P.TransitionSpeedValues.Medium => 750,
+                var s when s == P.TransitionSpeedValues.Slow => 1000,
                 _ => 500,
             },
             Advance = transition.AdvanceAfterTime is null ? AdvanceMode.OnClick

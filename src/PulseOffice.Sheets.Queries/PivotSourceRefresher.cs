@@ -53,7 +53,7 @@ public sealed class PivotSourceRefresher(
 
         var entries = new List<PivotSourceFetched>();
         foreach (var (pivot, source) in external)
-            entries.Add(await FetchAsync(pivot, source, ct).ConfigureAwait(false));
+            entries.Add(await FetchAsync(pivot, source, workbook.Calculation, ct).ConfigureAwait(false));
         return new PivotSourceFetch(entries);
     }
 
@@ -78,7 +78,7 @@ public sealed class PivotSourceRefresher(
         return applied;
     }
 
-    private async Task<PivotSourceFetched> FetchAsync(PivotDefinition pivot, PivotExternalSource source, CancellationToken ct)
+    private async Task<PivotSourceFetched> FetchAsync(PivotDefinition pivot, PivotExternalSource source, CalculationSettings calculation, CancellationToken ct)
     {
         if (!source.CanQuery)
             return Failure(pivot, Diagnostic.Warning("PVT010", $"The source of pivot table '{pivot.Name}' cannot be queried from here: its cached records are kept.", pivot.Name).With(pivot.Name));
@@ -99,7 +99,7 @@ public sealed class PivotSourceRefresher(
         try
         {
             var result = await provider.ExecuteAsync(connection, new QueryDefinition { Sql = sql }, ct).ConfigureAwait(false);
-            return new PivotSourceFetched(pivot.Id, Cache(result), null);
+            return new PivotSourceFetched(pivot.Id, Cache(result, calculation), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -127,10 +127,10 @@ public sealed class PivotSourceRefresher(
             && (string.Equals(candidate.DisplayName, name, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(candidate.Id, name, StringComparison.OrdinalIgnoreCase)));
 
-    private PivotRecordCache Cache(QueryResult result) => new()
+    private PivotRecordCache Cache(QueryResult result, CalculationSettings calculation) => new()
     {
         Headers = [.. result.Columns.Select(column => column.Name)],
-        Records = [.. result.Rows.Select(row => (IReadOnlyList<CellValue>)[.. row.Select(_values.Convert)])],
+        Records = [.. result.Rows.Select(row => (IReadOnlyList<CellValue>)[.. row.Select(value => _values.Convert(value, calculation))])],
     };
 
     private IReadOnlyList<PivotField> Rebound(IReadOnlyList<PivotField> fields, IReadOnlyList<string> headers)

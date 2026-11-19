@@ -17,8 +17,6 @@ public interface IFilterColumnDates
 
 public sealed class FilterColumnDates : IFilterColumnDates
 {
-    private const double FirstSerial = -657435;
-    private const double LastSerial = 2958465;
     private const string DateOnly = "yyyy-MM-dd";
     private const string DateAndTime = "yyyy-MM-dd HH:mm:ss";
 
@@ -29,9 +27,9 @@ public sealed class FilterColumnDates : IFilterColumnDates
         ArgumentNullException.ThrowIfNull(formats);
         moment = default;
         var value = sheet[address].Value;
-        if (value.Kind != ValueKind.Number || value.AsNumber() is not (> FirstSerial and < LastSerial and var serial)) return false;
+        if (value.Kind != ValueKind.Number || !(sheet.Owner?.Calculation ?? CalculationSettings.Default).TryDateOf(value.AsNumber(), out var date)) return false;
         if (formats.Get(styles.Get(sheet.StyleIdAt(address)).NumberFormatId).Sections is not [{ ValueKind: Formatting.FormatValueKind.DateTime }, ..]) return false;
-        moment = DateTime.FromOADate(serial);
+        moment = date;
         return true;
     }
 

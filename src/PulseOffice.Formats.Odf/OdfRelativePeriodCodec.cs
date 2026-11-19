@@ -11,12 +11,12 @@ internal sealed class OdfRelativePeriodCodec
 
     private readonly RelativeDatePeriods _periods = new();
 
-    public IEnumerable<XElement> Write(int column, RelativeDatePeriod period, DateTime today)
+    public IEnumerable<XElement> Write(int column, RelativeDatePeriod period, DateTime today, CalculationSettings calculation)
     {
         var bounds = _periods.Bounds(period, today);
         var token = Token(period);
-        yield return Bound(column, ">=", bounds.Start, token);
-        yield return Bound(column, "<", bounds.End, token);
+        yield return Bound(column, ">=", calculation.SerialOf(bounds.Start), token);
+        yield return Bound(column, "<", calculation.SerialOf(bounds.End), token);
     }
 
     public RelativeDatePeriod? Read(XElement condition)
@@ -27,10 +27,10 @@ internal sealed class OdfRelativePeriodCodec
         return null;
     }
 
-    private XElement Bound(int column, string op, DateTime moment, string token) =>
+    private XElement Bound(int column, string op, double serial, string token) =>
         new(Namespaces.Table + "filter-condition",
             new XAttribute(Namespaces.Table + "field-number", column),
-            new XAttribute(Namespaces.Table + "value", moment.ToOADate().ToString("R", CultureInfo.InvariantCulture)),
+            new XAttribute(Namespaces.Table + "value", serial.ToString("R", CultureInfo.InvariantCulture)),
             new XAttribute(Namespaces.Table + "operator", op),
             new XAttribute(Namespaces.Table + "data-type", "number"),
             new XAttribute(_period, token));

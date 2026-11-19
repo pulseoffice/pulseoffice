@@ -22,7 +22,8 @@ public enum RelativeDatePeriod
 
 public sealed record RelativeDateBounds(DateTime Start, DateTime End)
 {
-    public bool Contains(double serial) => serial >= Start.ToOADate() && serial < End.ToOADate();
+    public bool Contains(double serial, CalculationSettings calculation) =>
+        calculation.TryDateOf(serial, out var moment) && moment >= Start && moment < End;
 }
 
 public sealed class RelativeDatePeriods

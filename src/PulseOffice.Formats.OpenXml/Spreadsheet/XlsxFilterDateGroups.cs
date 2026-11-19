@@ -7,9 +7,6 @@ namespace PulseOffice.Formats.OpenXml;
 
 internal sealed class XlsxFilterDateGroups
 {
-    private const double FirstSerial = -657435;
-    private const double LastSerial = 2958465;
-
     public IEnumerable<string> Matching(Filters filters, Sheet? sheet, CellRange range, int columnOffset)
     {
         var groups = filters.Elements<DateGroupItem>().ToList();
@@ -17,12 +14,12 @@ internal sealed class XlsxFilterDateGroups
 
         var column = range.Start.Column + columnOffset;
         if (column > range.End.Column) yield break;
+        var calculation = sheet.Owner?.Calculation ?? PulseOffice.Sheets.CalculationSettings.Default;
 
         for (int row = range.Start.Row + 1, last = Math.Min(range.End.Row, sheet.LastUsedRow); row <= last; row++)
         {
             var value = sheet[new CellAddress(row, column)].Value;
-            if (value.Kind != ValueKind.Number || value.AsNumber() is not (> FirstSerial and < LastSerial and var serial)) continue;
-            var moment = DateTime.FromOADate(serial);
+            if (value.Kind != ValueKind.Number || !calculation.TryDateOf(value.AsNumber(), out var moment)) continue;
             if (groups.Any(group => Matches(group, moment))) yield return value.ToString();
         }
     }

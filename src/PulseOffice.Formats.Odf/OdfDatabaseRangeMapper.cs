@@ -140,13 +140,13 @@ internal sealed class OdfDatabaseRangeMapper
         if (buttons) element.Add(new XAttribute(Namespaces.Table + "display-filter-buttons", "true"));
         var conditions = filters.SelectMany(filter => Conditions(filter, filter.AllowedValues is { Count: > 0 }
             ? _dates.Read(workbook, workbook.Sheets[sheetIndex], range, filter.ColumnOffset, header)
-            : new Dictionary<string, DateTime>())).ToList();
+            : new Dictionary<string, DateTime>(), workbook.Calculation)).ToList();
         if (_rangeFilters.Filter(workbook, sheetIndex, range, header, conditions, stored) is { } filter) element.Add(filter);
         if (_sorts.Build(sort, range) is { } sorting) element.Add(_sorts.Orientation(sort), sorting);
         return element;
     }
 
-    private IEnumerable<XElement> Conditions(ColumnFilter filter, IReadOnlyDictionary<string, DateTime> dates)
+    private IEnumerable<XElement> Conditions(ColumnFilter filter, IReadOnlyDictionary<string, DateTime> dates, CalculationSettings calculation)
     {
         if (filter.Color is { } color)
             yield return new XElement(Namespaces.Table + "filter-condition",
@@ -180,7 +180,7 @@ internal sealed class OdfDatabaseRangeMapper
                 new XAttribute(Namespaces.Table + "data-type", "number"));
 
         if (filter.Period is { } period)
-            foreach (var bound in _periods.Write(filter.ColumnOffset, period, DateTime.Today)) yield return bound;
+            foreach (var bound in _periods.Write(filter.ColumnOffset, period, DateTime.Today, calculation)) yield return bound;
 
         var criteria = filter.Conditions.Select(condition => Condition(filter.ColumnOffset, condition)).ToList();
         if (criteria.Count > 1 && filter.Join == CriteriaJoin.Or)

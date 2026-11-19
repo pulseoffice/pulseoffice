@@ -117,6 +117,8 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
     {
         if (request.Frame(item.Id) is not { } frame) return rect;
         var height = frame.Height + 2 * request.FrameInset(item.Id);
+        if (item.Content is EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject { Style.Text.Autofit: PulseOffice.Text.Rich.TextAutofit.ResizeShape } } && frame.Atoms.Count > 0)
+            return rect with { Height = Math.Max(1, height) };
         return rect.Height < height ? rect with { Height = height } : rect;
     }
 

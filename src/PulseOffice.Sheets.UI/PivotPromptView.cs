@@ -20,6 +20,8 @@ public interface IPivotPreviewer
 
     IReadOnlyList<string> Items(PivotField field);
 
+    string ItemLabel(PivotField field, string key);
+
     bool IsNumeric(int column);
 }
 
@@ -256,12 +258,12 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
 
     private Control Chip(int column, PivotArea area)
     {
-        var label = area == PivotArea.Value
-            ? _kit.Texts.Format("pivot.valueChip", _kit["pivot.aggregation." + Camel(Model.AggregationOf(column).ToString())], Model.Columns[column])
-            : Model.Columns[column];
+        var label = area == PivotArea.Value && !Model.IsCalculated(column)
+            ? _kit.Texts.Format("pivot.valueChip", _kit["pivot.aggregation." + Camel(Model.AggregationOf(column).ToString())], Model.NameOf(column))
+            : Model.NameOf(column);
         var menu = new ContextMenu();
         var items = new List<MenuItem>();
-        foreach (var target in Model.Areas.Where(target => target != area))
+        foreach (var target in Model.Areas.Where(target => target != area && !Model.IsCalculated(column)))
         {
             var item = new MenuItem { Header = _kit.Texts.Format("pivot.moveTo", _kit["pivot.zone." + AreaKey(target)]) };
             item.Click += (_, _) => Model.Place(column, target);
@@ -271,7 +273,7 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
         var remove = new MenuItem { Header = _kit["pivot.removeField"] };
         remove.Click += (_, _) => Model.Place(column, PivotArea.Unused);
         items.Add(remove);
-        if (area == PivotArea.Value)
+        if (area == PivotArea.Value && !Model.IsCalculated(column))
             foreach (var aggregation in _aggregations)
             {
                 var item = new MenuItem { Header = _kit["pivot.aggregation." + Camel(aggregation.ToString())] };
@@ -355,6 +357,15 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
 
 public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource source, PivotLabels labels) : IPivotPreviewer
 {
+    private readonly PivotItemCells _cells = new();
+
+    public string ItemLabel(PivotField field, string key)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(key);
+        return _cells.Display(key, field, labels);
+    }
+
     public bool IsNumeric(int column)
     {
         var numbers = 0;
@@ -377,13 +388,15 @@ public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource sourc
             Fields = fields,
         }, source);
         if (table.IsEmpty) return [];
+        var rowFields = fields.Where(field => field.Area == PivotArea.Row).OrderBy(field => field.AreaOrder).ToList();
+        var columnFields = fields.Where(field => field.Area == PivotArea.Column).OrderBy(field => field.AreaOrder).ToList();
 
         var result = new List<IReadOnlyList<string>>
         {
-            (List<string>)[string.Empty, .. table.Columns.Take(columns - 1).Select(column => fields.Any(field => field.Area == PivotArea.Column) ? Header(column) : column.Field.Label)],
+            (List<string>)[string.Empty, .. table.Columns.Take(columns - 1).Select(column => fields.Any(field => field.Area == PivotArea.Column) ? Header(column, columnFields) : column.Field.Label)],
         };
         for (var row = 0; row < Math.Min(table.Rows.Count, rows - 1); row++)
-            result.Add((List<string>)[new string(' ', table.Rows[row].Depth * 2) + Label(table.Rows[row]),
+            result.Add((List<string>)[new string(' ', table.Rows[row].Depth * 2) + Label(table.Rows[row], rowFields),
                 .. Enumerable.Range(0, Math.Min(table.Columns.Count, columns - 1)).Select(column => table.Value(row, column).ToString())]);
         return result;
     }
@@ -409,15 +422,18 @@ public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource sourc
         return [.. table.Rows.Where(row => row.Kind == PivotNodeKind.Item).Select(row => row.Label).Distinct(StringComparer.Ordinal)];
     }
 
-    private string Header(PivotColumn column) =>
+    private string Header(PivotColumn column, IReadOnlyList<PivotField> columnFields) =>
         column.Node.Kind == PivotNodeKind.Item
-            ? string.Join(" · ", column.Node.Path.Append(column.Field.Label).Where(part => part.Length > 0))
-            : Label(column.Node);
+            ? string.Join(" · ", column.Node.Path.Select((part, level) => Shown(part, level, columnFields)).Append(column.Field.Label).Where(part => part.Length > 0))
+            : Label(column.Node, columnFields);
 
-    private string Label(PivotNode node) => node.Kind switch
+    private string Label(PivotNode node, IReadOnlyList<PivotField> axis) => node.Kind switch
     {
         PivotNodeKind.GrandTotal => labels.GrandTotal,
-        PivotNodeKind.Subtotal => string.Format(System.Globalization.CultureInfo.CurrentCulture, labels.SubtotalFormat, node.Label),
-        _ => node.Label,
+        PivotNodeKind.Subtotal => string.Format(System.Globalization.CultureInfo.CurrentCulture, labels.SubtotalFormat, Shown(node.Label, node.Depth, axis)),
+        _ => Shown(node.Label, node.Depth, axis),
     };
+
+    private string Shown(string key, int level, IReadOnlyList<PivotField> axis) =>
+        level < axis.Count ? _cells.Display(key, axis[level], labels) : key;
 }

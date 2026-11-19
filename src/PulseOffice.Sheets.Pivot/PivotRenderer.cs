@@ -188,7 +188,7 @@ public sealed class PivotRenderer : IPivotRenderer
     }
 }
 
-internal sealed class PivotItemCells
+public sealed class PivotItemCells
 {
     private readonly PivotDateLabels _dates = new();
 

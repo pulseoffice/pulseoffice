@@ -5,20 +5,22 @@ namespace PulseOffice.Sheets.Queries;
 
 public interface IQueryValueConverter
 {
-    CellValue Convert(object? value);
+    CellValue Convert(object? value, CalculationSettings calculation);
+
+    CellValue Convert(object? value) => Convert(value, CalculationSettings.Default);
 }
 
 public sealed class QueryValueConverter(Func<DateTime, double>? toSerial = null) : IQueryValueConverter
 {
-    private readonly Func<DateTime, double> _toSerial = toSerial ?? (moment => (moment - new DateTime(1899, 12, 30)).TotalDays);
+    public CellValue Convert(object? value) => Convert(value, CalculationSettings.Default);
 
-    public CellValue Convert(object? value) => value switch
+    public CellValue Convert(object? value, CalculationSettings calculation) => value switch
     {
         null or DBNull => CellValue.Empty,
         bool flag => CellValue.Boolean(flag),
-        DateTime moment => CellValue.Number(_toSerial(moment)),
-        DateTimeOffset moment => CellValue.Number(_toSerial(moment.DateTime)),
-        DateOnly day => CellValue.Number(_toSerial(day.ToDateTime(TimeOnly.MinValue))),
+        DateTime moment => CellValue.Number(Serial(moment, calculation)),
+        DateTimeOffset moment => CellValue.Number(Serial(moment.DateTime, calculation)),
+        DateOnly day => CellValue.Number(Serial(day.ToDateTime(TimeOnly.MinValue), calculation)),
         TimeOnly time => CellValue.Number(time.ToTimeSpan().TotalDays),
         TimeSpan span => CellValue.Number(span.TotalDays),
         string text => CellValue.Text(text),
@@ -26,4 +28,7 @@ public sealed class QueryValueConverter(Func<DateTime, double>? toSerial = null)
             CellValue.Number(System.Convert.ToDouble(value, CultureInfo.InvariantCulture)),
         _ => CellValue.Text(value.ToString() ?? string.Empty),
     };
+
+    private double Serial(DateTime moment, CalculationSettings calculation) =>
+        toSerial is null ? calculation.SerialOf(moment) : toSerial(moment);
 }

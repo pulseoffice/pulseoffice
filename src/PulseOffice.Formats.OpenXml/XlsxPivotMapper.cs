@@ -20,6 +20,7 @@ public sealed class XlsxPivotMapper
     private readonly XlsxPivotExternalSources _external = new();
     private readonly XlsxPivotGroupReader _groups = new();
     private readonly XlsxPivotGroupWriter _groupWriter = new();
+    private PulseOffice.Sheets.CalculationSettings _calendar = PulseOffice.Sheets.CalculationSettings.Default;
     private const int DataLayoutField = -2;
 
     private readonly IReadOnlyDictionary<PivotAggregation, DataConsolidateFunctionValues> _aggregations =
@@ -86,6 +87,7 @@ public sealed class XlsxPivotMapper
         ArgumentNullException.ThrowIfNull(workbookPart);
         ArgumentNullException.ThrowIfNull(workbook);
         ArgumentNullException.ThrowIfNull(parts);
+        _calendar = workbook.Calculation;
 
         var caches = new PivotCaches();
         var cacheId = 1u;
@@ -98,7 +100,7 @@ public sealed class XlsxPivotMapper
             if (!parts.TryGetValue(destination, out var destinationPart)) continue;
 
             var columns = source is null ? CachedColumns(pivot) : Columns(source, pivot);
-            var groups = _groupWriter.Plan(pivot, columns.Count, field => IndexOf(field, columns), index => columns[index].Values);
+            var groups = _groupWriter.Plan(pivot, columns.Count, field => IndexOf(field, columns), index => columns[index].Values, _calendar);
             var cachePart = workbookPart.AddNewPart<PivotTableCacheDefinitionPart>();
             var saved = columns.Count > 0 && columns[0].Values.Count > 0;
             var recordsPart = saved ? cachePart.AddNewPart<PivotTableCacheRecordsPart>() : null;
@@ -223,14 +225,14 @@ public sealed class XlsxPivotMapper
             shared.ContainsInteger = null;
             shared.MinValue = null;
             shared.MaxValue = null;
-            shared.MinDate = DateTime.FromOADate(numbers.Min());
-            shared.MaxDate = DateTime.FromOADate(numbers.Max());
+            shared.MinDate = _calendar.DateOf(numbers.Min());
+            shared.MaxDate = _calendar.DateOf(numbers.Max());
         }
 
         if (column.IsAxis)
         {
             foreach (var value in column.Items)
-                shared.AppendChild(dates && value.Kind == ValueKind.Number ? new DateTimeItem { Val = DateTime.FromOADate(value.AsNumber()) } : Item(value));
+                shared.AppendChild(dates && value.Kind == ValueKind.Number ? new DateTimeItem { Val = _calendar.DateOf(value.AsNumber()) } : Item(value));
             shared.Count = (uint)column.Items.Count;
         }
 
@@ -606,6 +608,7 @@ public sealed class XlsxPivotMapper
     {
         ArgumentNullException.ThrowIfNull(workbookPart);
         ArgumentNullException.ThrowIfNull(workbook);
+        _calendar = workbook.Calculation;
 
         var sheets = workbookPart.Workbook?.Sheets?.Elements<DocumentFormat.OpenXml.Spreadsheet.Sheet>().ToList() ?? [];
         var sources = new XlsxPivotSourceResolver(workbookPart);
@@ -623,7 +626,7 @@ public sealed class XlsxPivotMapper
                 var cachePart = tablePart.PivotTableCacheDefinitionPart;
                 if (cachePart?.PivotCacheDefinition?.CacheSource is { } cacheSource && sources.IsExternal(cacheSource))
                 {
-                    if (_external.Read(cachePart, workbookPart) is not { } read) external++;
+                    if (_external.Read(cachePart, workbookPart, _calendar) is not { } read) external++;
                     else if (ReadOne(tablePart, formatCodes, sheetName, (read.Sheet, read.Range), read.Source) is { } outside) workbook.Pivots.Add(outside);
                 }
                 else if (cachePart?.PivotCacheDefinition?.CacheSource?.WorksheetSource is { } local
@@ -782,7 +785,7 @@ public sealed class XlsxPivotMapper
         NumberItem number => KeyOf(CellValue.Number(number.Val?.Value ?? 0)),
         BooleanItem boolean => KeyOf(CellValue.Boolean(boolean.Val?.Value == true)),
         StringItem text => PivotValues.TextKeyOf(_escape.Decode(text.Val?.Value ?? string.Empty)),
-        DateTimeItem date => KeyOf(CellValue.Number(date.Val?.Value.ToOADate() ?? 0)),
+        DateTimeItem date => KeyOf(CellValue.Number(date.Val?.Value is { } moment ? _calendar.SerialOf(moment) : 0)),
         ErrorItem error => error.Val?.Value ?? string.Empty,
         _ => string.Empty,
     };

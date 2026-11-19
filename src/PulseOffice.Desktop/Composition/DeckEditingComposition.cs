@@ -66,6 +66,8 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Text.Rich.ITextFrameResize, PulseOffice.Text.Rich.TextFrameResize>();
         services.AddSingleton<PulseOffice.Text.Rich.IListLabels>(_ => new PulseOffice.Text.Rich.ListLabels());
         services.AddSingleton<PulseOffice.UI.Controls.Text.Rich.ITextFrameMeasure, PulseOffice.UI.Controls.Text.Rich.TextFrameMeasure>();
+        services.AddSingleton<PulseOffice.UI.Controls.Shapes.IShapeTextFit>(provider => new PulseOffice.UI.Controls.Shapes.ShapeTextFit(
+            provider.GetRequiredService<PulseOffice.UI.Controls.Text.Rich.ITextFrameMeasure>(), new PulseOffice.UI.Controls.Shapes.ShapeListText(), new PulseOffice.Drawing.Shapes.ShapeTextArea()));
         services.AddSingleton<PulseOffice.Presentations.UI.Rendering.ITextFrameFitting, PulseOffice.Presentations.UI.Rendering.TextFrameFitting>();
         services.AddSingleton<PulseOffice.Text.Rich.ICaretRowNavigation, PulseOffice.Text.Rich.CaretRowNavigation>();
         services.AddSingleton<PulseOffice.Text.Input.IPreeditComposer, PulseOffice.Text.Input.PreeditComposer>();

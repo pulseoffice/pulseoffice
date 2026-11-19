@@ -23,19 +23,18 @@ internal sealed class XlsxPivotExternalSources
 
     private readonly OoxmlTextEscape _escape = new();
     private readonly ExternalTargetUris _targets = new();
-    private readonly DateTime _epoch = new(1899, 12, 30, 0, 0, 0, DateTimeKind.Unspecified);
     private readonly Dictionary<string, CellError> _errors = Enum.GetValues<CellError>()
         .Where(error => CellValue.FromError(error).ErrorText.Length > 0)
         .GroupBy(error => CellValue.FromError(error).ErrorText, StringComparer.OrdinalIgnoreCase)
         .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-    public XlsxExternalPivotRead? Read(PivotTableCacheDefinitionPart cachePart, WorkbookPart workbookPart)
+    public XlsxExternalPivotRead? Read(PivotTableCacheDefinitionPart cachePart, WorkbookPart workbookPart, PulseOffice.Sheets.CalculationSettings calendar)
     {
         ArgumentNullException.ThrowIfNull(cachePart);
         ArgumentNullException.ThrowIfNull(workbookPart);
 
         if (cachePart.PivotCacheDefinition is not { CacheSource: { } cacheSource } definition) return null;
-        var cache = Records(cachePart, definition);
+        var cache = Records(cachePart, definition, calendar);
 
         if (cacheSource.Type?.Value == SourceValues.Worksheet && cacheSource.WorksheetSource is { Id.Value: { Length: > 0 } id } worksheet)
         {
@@ -136,11 +135,11 @@ internal sealed class XlsxPivotExternalSources
 
     private string Unique(string name, uint id) => name + " (" + id.ToString(CultureInfo.InvariantCulture) + ")";
 
-    private PivotRecordCache Records(PivotTableCacheDefinitionPart cachePart, PivotCacheDefinition definition)
+    private PivotRecordCache Records(PivotTableCacheDefinitionPart cachePart, PivotCacheDefinition definition, PulseOffice.Sheets.CalculationSettings calendar)
     {
         var fields = definition.CacheFields?.Elements<CacheField>().Where(field => field.DatabaseField?.Value != false).ToList() ?? [];
         if (fields.Count == 0 || cachePart.PivotTableCacheRecordsPart is null) return PivotRecordCache.Empty;
-        var shared = fields.Select(field => field.SharedItems?.ChildElements.Select(Item).ToList() ?? []).ToList();
+        var shared = fields.Select(field => field.SharedItems?.ChildElements.Select(item => Item(item, calendar)).ToList() ?? []).ToList();
         var records = new List<IReadOnlyList<CellValue>>();
         foreach (var record in cachePart.PivotTableCacheRecordsPart?.PivotCacheRecords?.Elements<PivotCacheRecord>() ?? [])
         {
@@ -151,20 +150,20 @@ internal sealed class XlsxPivotExternalSources
                 var column = values.Count;
                 values.Add(item is FieldItem index
                     ? index.Val?.Value is { } at && at < shared[column].Count ? shared[column][(int)at] : CellValue.Empty
-                    : Item(item));
+                    : Item(item, calendar));
             }
             records.Add(values);
         }
         return new PivotRecordCache { Headers = [.. fields.Select(field => _escape.Decode(field.Name?.Value ?? string.Empty))], Records = records };
     }
 
-    private CellValue Item(OpenXmlElement item) => item switch
+    private CellValue Item(OpenXmlElement item, PulseOffice.Sheets.CalculationSettings calendar) => item switch
     {
         NumberItem number when number.Val?.Value is { } value && double.IsFinite(value) => CellValue.Number(value),
         BooleanItem boolean => CellValue.Boolean(boolean.Val?.Value == true),
         StringItem text => CellValue.Text(_escape.Decode(text.Val?.Value ?? string.Empty)),
         ErrorItem error => CellValue.FromError(_errors.TryGetValue(error.Val?.Value ?? string.Empty, out var known) ? known : CellError.Value),
-        DateTimeItem date when date.Val?.Value is { } moment => CellValue.Number((moment - _epoch).TotalDays),
+        DateTimeItem date when date.Val?.Value is { } moment => CellValue.Number(calendar.SerialOf(moment)),
         _ => CellValue.Empty,
     };
 

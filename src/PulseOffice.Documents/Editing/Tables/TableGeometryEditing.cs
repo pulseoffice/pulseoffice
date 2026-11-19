@@ -13,6 +13,8 @@ public interface ITableGeometryEditing
 
     DocumentEdit SetTableWidth(TextDocument document, UndoStack history, TableBlock table, TableWidthChoice width);
 
+    double StoredColumnDelta(TableBlock table, double displayedDelta, double displayedWidth);
+
     DocumentEdit DistributeColumns(TextDocument document, UndoStack history, TableSelection selection);
 
     DocumentEdit FitColumns(TextDocument document, UndoStack history, TableSelection selection, IReadOnlyList<double> wanted, double? limit, string description);
@@ -44,6 +46,12 @@ public sealed class TableGeometryEditing(IColumnWidths widths) : ITableGeometryE
         var after = resized.Sum();
         if (table.WidthPercent is { } percent && before > 0 && after > 0) table.WidthPercent = Math.Clamp(percent * after / before, 1, 1000);
         return recorder.Commit(history);
+    }
+
+    public double StoredColumnDelta(TableBlock table, double displayedDelta, double displayedWidth)
+    {
+        var stored = Points(table).Sum();
+        return stored > 0 && displayedWidth > 0 ? displayedDelta * stored / displayedWidth : displayedDelta;
     }
 
     public DocumentEdit SetTableWidth(TextDocument document, UndoStack history, TableBlock table, TableWidthChoice width)

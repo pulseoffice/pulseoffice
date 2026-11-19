@@ -41,6 +41,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly FormattedShapeTextLines _lines = new();
     private readonly PlainShapeTextLines _paintedLines = new();
     private readonly IShapeTextShrink _shrink;
+    private readonly IShapeTextArea _textArea;
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -53,8 +54,9 @@ public sealed class ShapeRenderer : IShapeRenderer
         IShapeGeometry geometry, IShapeBrushes? brushes = null, IArrowGeometry? arrows = null,
         PulseOffice.UI.Controls.Text.Rich.IHyperlinkAppearance? links = null, IShapeTextInk? ink = null, IShapeEffectBounds? effects = null,
         IDimensionLineGeometry? dimensions = null, IShapeListText? listText = null,
-        PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null, IShapeTextShrink? shrink = null)
+        PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null, IShapeTextShrink? shrink = null, IShapeTextArea? textArea = null)
     {
+        _textArea = textArea ?? new ShapeTextArea();
         _shrink = shrink ?? new ShapeTextShrink();
         _decorations = decorations ?? new PulseOffice.UI.Controls.Text.TextDecorationFactory();
         _listText = listText ?? new ShapeListText();
@@ -88,7 +90,7 @@ public sealed class ShapeRenderer : IShapeRenderer
         }
 
         Paint(context, _geometry.Outline(shape, bounds.Width, bounds.Height), shape.Style, TransformOf(shape, bounds), shape.Text, shape.Runs, bounds, backdrop, shape.RotationDegrees,
-            _listText.Draws(shape) ? shape : null);
+            _listText.Draws(shape) ? shape : null, _textArea.Margins(shape, bounds.Width, bounds.Height));
     }
 
     public void Render(
@@ -98,7 +100,7 @@ public sealed class ShapeRenderer : IShapeRenderer
         Matrix transform,
         string? text,
         Rect bounds) => Paint(context, outline, style, transform, text, null, bounds, new ShapeSurroundings(), 0,
-            new ShapeObject { Id = "preview", Shape = ShapeKind.Rectangle, Style = style, Text = text } is var preview && _listText.Draws(preview) ? preview : null);
+            new ShapeObject { Id = "preview", Shape = ShapeKind.Rectangle, Style = style, Text = text } is var preview && _listText.Draws(preview) ? preview : null, ShapeTextMargins.None);
 
     private void Paint(
         DrawingContext context,
@@ -110,7 +112,8 @@ public sealed class ShapeRenderer : IShapeRenderer
         Rect bounds,
         ShapeSurroundings backdrop,
         double shapeRotation,
-        ShapeObject? listed)
+        ShapeObject? listed,
+        ShapeTextMargins margins)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(outline);
@@ -142,9 +145,9 @@ public sealed class ShapeRenderer : IShapeRenderer
                 {
                     foreach (var shaded in scaled.Figures.Where(figure => figure.Filled).GroupBy(figure => figure.Shade))
                     {
-                        var area = Build(new ShapeOutline([.. shaded]));
-                        context.DrawGeometry(fill, null, area);
-                        if (fill is not null && _shades.TryGetValue(shaded.Key, out var veil)) context.DrawGeometry(veil, null, area);
+                        var shadedArea = Build(new ShapeOutline([.. shaded]));
+                        context.DrawGeometry(fill, null, shadedArea);
+                        if (fill is not null && _shades.TryGetValue(shaded.Key, out var veil)) context.DrawGeometry(veil, null, shadedArea);
                     }
                     var stroked = scaled.Figures.Where(figure => figure.Stroked).ToList();
                     if (stroked.Count > 0 && pen is not null) context.DrawGeometry(null, pen, Build(new ShapeOutline(stroked)));
@@ -158,8 +161,9 @@ public sealed class ShapeRenderer : IShapeRenderer
 
         var content = runs is { Count: > 0 } ? string.Concat(runs.Select(run => run.Text)) : text;
         if (string.IsNullOrEmpty(content) || bounds.Width <= 0 || bounds.Height <= 0) return;
-        if (listed is not null) DrawListText(context, listed, style, bounds, backdrop, shapeRotation);
-        else DrawText(context, content, runs, style, bounds, backdrop, shapeRotation);
+        var area = new Rect(bounds.X + margins.Left, bounds.Y + margins.Top, margins.Width(bounds.Width), margins.Height(bounds.Height));
+        if (listed is not null) DrawListText(context, listed, style, area, backdrop, shapeRotation);
+        else DrawText(context, content, runs, style, area, backdrop, shapeRotation);
     }
 
     private void DrawListText(DrawingContext context, ShapeObject shape, ShapeStyle shapeStyle, Rect bounds, ShapeSurroundings backdrop, double shapeRotation)

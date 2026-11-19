@@ -155,6 +155,7 @@ public sealed class XlsxReader
                 DynamicArrays = new XlsxDynamicArrays().DynamicCells(workbookPart),
             };
 
+            workbook.Calculation = workbook.Calculation with { DateEpoch = _epochs.Read(workbookPart.Workbook.WorkbookProperties?.Date1904?.Value == true) };
             context.Tables.Load(workbookPart);
             var chartSheets = 0;
             var activeXControls = 0;

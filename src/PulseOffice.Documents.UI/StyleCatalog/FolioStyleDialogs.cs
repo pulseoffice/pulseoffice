@@ -37,6 +37,7 @@ public sealed class FolioStyleDialogs(
     ITextFormatPreviews previews,
     ICharacterSampleLayout samples,
     PulseOffice.UI.Controls.StylePanels.IStyleRenamePrompt renames,
+    IFolioTableStyleForm tableStyles,
     ITextCatalog texts) : IFolioStyleDialogs
 {
     public async Task<string?> NameAsync(FolioEditor editor, StyleFamily family, string? suggestion, string? basis, CancellationToken ct)
@@ -116,7 +117,20 @@ public sealed class FolioStyleDialogs(
             case StyleFamily.Page when sheet.Page.Contains(name):
                 await pages.EditAsync(editor, name, ct).ConfigureAwait(true);
                 break;
+            case StyleFamily.Table when sheet.Table.Find(name) is { } table:
+                await TableAsync(editor, table, ct).ConfigureAwait(true);
+                break;
         }
+    }
+
+    private async Task TableAsync(FolioEditor editor, TableStyle style, CancellationToken ct)
+    {
+        var sheet = editor.Document.Styles;
+        var effective = resolver.ResolveTableStyle(sheet, style.Name);
+        if (await tabbed.AskAsync("folio.styles.edit.title", tableStyles.Tabs(effective), ct).ConfigureAwait(true) is not { } values) return;
+        var changed = tableStyles.Read(effective, style.Table, values);
+        if (changed == style.Table) return;
+        Commit(editor, () => styles.Change(editor.Document, editor.History, sheet.Table, style.Name, edited => edited.Table = changed, "style-edit"));
     }
 
     private async Task ParagraphAsync(FolioEditor editor, ParagraphStyle style, CancellationToken ct)

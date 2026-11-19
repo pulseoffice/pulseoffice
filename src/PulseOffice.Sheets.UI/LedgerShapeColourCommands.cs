@@ -10,7 +10,8 @@ public sealed class LedgerShapeColourCommands(
     IShapeStyling styling,
     IShapeColourCommands colours,
     IRibbonPaletteBuilder palettes,
-    ITextCatalog texts) : LedgerCommandSet(context)
+    ITextCatalog texts,
+    ShapeText.ILedgerShapeFitting? fitting = null) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands()
     {
@@ -43,7 +44,7 @@ public sealed class LedgerShapeColourCommands(
         var index = sheet.Objects.IndexOf(placed);
         if (index < 0 || styling.Restyle(placed.Content, change) is not { } content || Equals(content, placed.Content)) return;
 
-        var replacement = placed with { Content = content };
+        var replacement = (fitting ?? new ShapeText.LedgerShapeFitting()).Fit(placed with { Content = content });
         sheet.Objects[index] = replacement;
 
         Context.History?.Push(new Document.Commands.DelegateAction(

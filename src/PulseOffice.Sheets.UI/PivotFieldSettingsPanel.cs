@@ -78,7 +78,7 @@ public sealed class PivotFieldSettingsPanel : UserControl
         _choices.Clear();
         _choices.AddRange(used);
         _field.ItemsSource = used.Select(column => _kit.Texts.Format("pivot.settings.fieldInArea",
-            _model.Columns[column], _kit["pivot.zone." + Camel(_model.AreaOf(column).ToString())])).ToList();
+            _model.NameOf(column), _kit["pivot.zone." + Camel(_model.AreaOf(column).ToString())])).ToList();
         _field.SelectedIndex = selected is { } kept && used.Contains(kept) ? used.IndexOf(kept) : used.Count > 0 ? 0 : -1;
         _filling = false;
 
@@ -142,11 +142,29 @@ public sealed class PivotFieldSettingsPanel : UserControl
             _model.Configure(column, current => current with { BaseField = bases[baseField.Box.SelectedIndex] });
         };
 
+        if (field.IsCalculated) BuildCalculation(column, field);
+
         var format = Text("pivot.settings.numberFormat", field.NumberFormat, text =>
             _model.Configure(column, current => current with { NumberFormat = string.IsNullOrWhiteSpace(text) ? null : text.Trim() }));
         _editor.Children.Add(mode.Row);
         _editor.Children.Add(baseField.Row);
         _editor.Children.Add(format);
+    }
+
+    private void BuildCalculation(int column, PivotField field)
+    {
+        _editor.Children.Add(Text("pivot.calculated.name", field.SourceName, text =>
+        {
+            var name = text.Trim();
+            if (name.Length == 0 || _model.Columns.Contains(name, StringComparer.CurrentCultureIgnoreCase)) return;
+            _model.Configure(column, current => current with { SourceName = name });
+        }));
+        _editor.Children.Add(Text("pivot.calculated.formula", field.Formula, text =>
+        {
+            var formula = text.Trim();
+            if (formula.Length == 0) return;
+            _model.Configure(column, current => current with { Formula = formula.StartsWith('=') ? formula : "=" + formula });
+        }));
     }
 
     private void BuildGrouping(int column, PivotField field)
@@ -179,7 +197,7 @@ public sealed class PivotFieldSettingsPanel : UserControl
 
     private void BuildSorting(int column, PivotField field)
     {
-        var values = _model.In(PivotArea.Value).Select(index => _model.Columns[index]).ToList();
+        var values = _model.In(PivotArea.Value).Select(_model.NameOf).ToList();
         var sorts = new List<string> { _kit["pivot.sort.labelAscending"], _kit["pivot.sort.labelDescending"] };
         foreach (var value in values)
         {
@@ -237,7 +255,7 @@ public sealed class PivotFieldSettingsPanel : UserControl
         foreach (var item in items.Take(MaximumItems))
         {
             var key = item;
-            var box = new CheckBox { Content = key.Length == 0 ? _kit["pivot.blank"] : key, IsChecked = !field.ExcludedValues.Contains(key) };
+            var box = new CheckBox { Content = key.Length == 0 ? _kit["pivot.blank"] : _previewer.ItemLabel(field, key), IsChecked = !field.ExcludedValues.Contains(key) };
             box.IsCheckedChanged += (_, _) => _model.Configure(column, settings => settings with
             {
                 ExcludedValues = box.IsChecked == true

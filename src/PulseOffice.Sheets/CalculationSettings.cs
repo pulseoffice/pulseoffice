@@ -17,6 +17,23 @@ public sealed record CalculationSettings
 
     public bool UsesStandardDateEpoch => DateEpoch == StandardDateEpoch;
 
+    public bool TryDateOf(double serial, out DateTime moment)
+    {
+        moment = default;
+        if (!double.IsFinite(serial)) return false;
+        var start = DateEpoch.ToDateTime(TimeOnly.MinValue);
+        var earliest = (DateTime.MinValue.AddYears(99) - start).TotalDays;
+        var latest = (DateTime.MaxValue.Date - start).TotalDays + 1;
+        if (serial < earliest || serial >= latest) return false;
+        moment = start.AddTicks((long)Math.Round(serial * TimeSpan.TicksPerDay / 10000d) * 10000);
+        return true;
+    }
+
+    public DateTime DateOf(double serial) =>
+        TryDateOf(serial, out var moment) ? moment : throw new ArgumentOutOfRangeException(nameof(serial));
+
+    public double SerialOf(DateTime moment) => (moment - DateEpoch.ToDateTime(TimeOnly.MinValue)).TotalDays;
+
     public bool Iterative { get; init; }
 
     public int MaxIterations { get; init => field = Math.Clamp(value, 1, MaximumIterations); } = DefaultMaxIterations;

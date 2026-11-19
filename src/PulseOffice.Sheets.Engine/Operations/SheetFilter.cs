@@ -258,7 +258,7 @@ public sealed class SheetFilterService(NumericText numbers, IFilterRowKey rowKey
             return false;
 
         if (filter.Period is { } period
-            && (value.Kind != ValueKind.Number || !_periods.Bounds(period, Clock.GetLocalNow().DateTime).Contains(value.AsNumber())))
+            && (value.Kind != ValueKind.Number || !_periods.Bounds(period, Clock.GetLocalNow().DateTime).Contains(value.AsNumber(), sheet.Owner?.Calculation ?? CalculationSettings.Default)))
             return false;
 
         return matcher?.Matches(value) ?? true;

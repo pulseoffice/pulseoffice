@@ -14095,3 +14095,28 @@ Ledger engine: MAP broadcasts and pads mismatched arrays with #N/A as Excel does
   axis (`BandAxes`, `FirstBandAxes`, DOCX horizontal and vertical bands, ODT `pt:band-axes`); the table dialog sets
   fixed, percent or automatic width; automatic tables fit their contents; the TOC styles tab is limited to used or
   assigned styles under localized names. Log: docs/deep-audit/round-269-folio-table-leftovers.md.
+
+### Round 270: date epoch reach and pivot dialog leftovers (2026-11-19)
+- The workbook epoch now reaches autofilter date groups and dynamic filters (XLSX and ODF), relative periods, series
+  fill and its preview, duplicate removal, query values, external and local XLSX pivot caches and CSV export; the XLSX
+  reader sets the epoch before reading sheets. The pivot settings panel and preview show localized item labels;
+  calculated value fields keep their position and are editable. Log: docs/deep-audit/round-270-date-epoch-reach-and-pivot-dialog.md.
+
+### Round 271: Folio table and TOC leftovers from round 269 (2026-11-19)
+- Column edge drags on percent tables stay under the pointer; a table style property editor (borders, header, first
+  and second bands with their axes) answers Edit in the styles panel; DOCX explicit empty cell sides hide the
+  neighbour's inherited table line; merged cells with differing segments leave them to their neighbours; automatic
+  width measures spanning cells, nested tables and `tcW`; the TOC styles tab can add an unused style. Log:
+  docs/deep-audit/round-271-folio-table-leftovers.md.
+
+### Round 272: shape autofit across modules (2026-11-19)
+
+Shared shape text fit for Deck and Ledger, Folio shapes fitted to their story in layout, preset inner text rectangles
+in drawing, editing and fitting, shrink for stacked and multi-column composed text, recomputed font scale stored on
+shrinking Deck text boxes, Tab inserting a tab in plain shape text, live headless walk of the list keys. Log:
+docs/deep-audit/round-272-shape-autofit-modules.md.
+
+### Round 273: Deck transitions and animations (2026-11-19)
+- PPTX transition speeds read and written as PowerPoint plays them (fast 0.5 s by default, medium 0.75 s, slow 1 s);
+  the rest of the area (ODP animations, slide show runtime, sounds) is queued. Log:
+  docs/deep-audit/round-273-deck-animations-transitions.md.

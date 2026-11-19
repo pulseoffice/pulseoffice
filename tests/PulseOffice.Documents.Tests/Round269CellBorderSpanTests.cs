@@ -48,4 +48,24 @@ public sealed class Round269CellBorderSpanTests
         Assert.Equal(heavy, looks[1][0]!.Borders.Top);
         Assert.Equal(heavy, looks[1][1]!.Borders.Top);
     }
+
+    [Fact]
+    public void A_merged_cell_whose_segments_differ_leaves_each_segment_to_its_neighbour()
+    {
+        var heavy = new BorderLine(3, 0xFF000000);
+        var light = new BorderLine(0.5, 0xFF888888);
+        var merged = Cell(new BoxBorders { Right = light });
+        merged.RowSpan = 2;
+        var covered = Cell(new BoxBorders());
+        covered.Covered = true;
+        var table = new TableBlock("t",
+            [new TableRow([merged, Cell(new BoxBorders { Left = heavy })]), new TableRow([covered, Cell(new BoxBorders { Left = light })])],
+            [new Twip(1000), new Twip(1000)]);
+
+        var looks = new TableAppearance(new StyleResolver()).Cells(table, TableProperties.None);
+
+        Assert.Equal(heavy, looks[0][1]!.Borders.Left);
+        Assert.Equal(light, looks[1][1]!.Borders.Left);
+        Assert.Null(looks[0][0]!.Borders.Right);
+    }
 }

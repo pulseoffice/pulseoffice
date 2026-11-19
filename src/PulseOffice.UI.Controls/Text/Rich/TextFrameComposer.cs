@@ -12,6 +12,8 @@ public sealed record ComposedTextFrame(TextFrameArea Area, IReadOnlyList<Typeset
 
     public bool Stacked { get; init; }
 
+    public double FontFactor { get; init; } = 1.0;
+
     public double Shift(int line) => Shifts is { } shifts && line < shifts.Count ? shifts[line] : 0;
 
     public double Left(int line) => Area.Inner.X + Shift(line);
@@ -58,16 +60,26 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
         var upright = layout.Flow == TextFlow.EastAsianVertical && !stacked;
         var mirrored = layout.LinesLeftToRight && !stacked;
         var lines = block.Typeset(paragraphs, area, fields, 1.0, frame.WordWrap, stacked, upright, mirrored);
-        if (stacked) return _stacks.Arrange(area, lines, frame.Anchor, layout.Flow == TextFlow.StackedRightToLeft) with { Placement = placement, Stacked = true };
+        var factor = 1.0;
+        if (stacked)
+        {
+            if (frame.Autofit == TextAutofit.ShrinkText && !_stacks.Fits(area, lines))
+                (lines, factor) = Shrink(attempt => block.Typeset(paragraphs, area, fields, attempt, frame.WordWrap, true, false, false), attempt => _stacks.Fits(area, attempt));
+            return _stacks.Arrange(area, lines, frame.Anchor, layout.Flow == TextFlow.StackedRightToLeft) with { Placement = placement, Stacked = true, FontFactor = factor };
+        }
 
         var height = block.Height(lines);
-        if (frame.Autofit == TextAutofit.ShrinkText && height > area.Inner.Height)
-            (lines, height) = Shrink(block, paragraphs, area, fields, frame.WordWrap, upright, mirrored);
+        var room = area.Inner.Height * columns;
+        if (frame.Autofit == TextAutofit.ShrinkText && height > room)
+        {
+            (lines, factor) = Shrink(attempt => block.Typeset(paragraphs, area, fields, attempt, frame.WordWrap, false, upright, mirrored), attempt => block.Height(attempt) <= room);
+            height = block.Height(lines);
+        }
 
         var composed = columns == 1
             ? new ComposedTextFrame(area, mirrored ? _mirror.Bands(lines) : lines, Ordered(lines, _placement.Tops(lines, area, frame.Anchor, height), mirrored))
             : _columns.Distribute(area, lines, _placement.Tops(lines, area, TextAnchor.Top, height), columns, area.Inner.Width + spacing);
-        return composed with { Placement = placement };
+        return composed with { Placement = placement, FontFactor = factor };
     }
 
     private IReadOnlyList<double> Ordered(IReadOnlyList<TypesetLine> lines, IReadOnlyList<double> tops, bool mirrored)
@@ -78,23 +90,22 @@ public sealed class TextFrameComposer(IListLabels labels) : ITextFrameComposer
         return [.. Enumerable.Range(0, lines.Count).Select(index => first + last - tops[index] - lines[index].Height)];
     }
 
-    private (IReadOnlyList<TypesetLine> Lines, double Height) Shrink(
-        TextBlockTypesetter block, IReadOnlyList<TextParagraph> paragraphs, TextFrameArea area, TextFields fields, bool wrap, bool upright, bool mirrored)
+    private (IReadOnlyList<TypesetLine> Lines, double Factor) Shrink(Func<double, IReadOnlyList<TypesetLine>> typeset, Func<IReadOnlyList<TypesetLine>, bool> fits)
     {
         var (low, high) = (SmallestFactor, 1.0);
-        var best = block.Typeset(paragraphs, area, fields, low, wrap, false, upright, mirrored);
+        var best = typeset(low);
         for (var step = 0; step < 7; step++)
         {
             var middle = (low + high) / 2;
-            var attempt = block.Typeset(paragraphs, area, fields, middle, wrap, false, upright, mirrored);
-            if (block.Height(attempt) <= area.Inner.Height)
+            var attempt = typeset(middle);
+            if (fits(attempt))
             {
                 low = middle;
                 best = attempt;
             }
             else high = middle;
         }
-        return (best, block.Height(best));
+        return (best, low);
     }
 }
 
@@ -168,6 +179,14 @@ public sealed class TextStacks
             TextAlign.Right when !rightToLeft => free,
             _ => 0,
         };
+    }
+
+    public bool Fits(TextFrameArea area, IReadOnlyList<TypesetLine> lines)
+    {
+        if (lines.Count == 0) return true;
+        var tallest = lines.Max(line => line.Before + line.Height);
+        var across = lines.Sum(Width) + area.Points(GapPoints) * (lines.Count - 1);
+        return tallest <= area.Inner.Height + 0.01 && across <= area.Inner.Width + 0.01;
     }
 
     public double Width(TypesetLine line) =>

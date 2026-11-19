@@ -223,7 +223,7 @@ public sealed class SheetSeriesPreviewer(ISeriesFill series, Worksheet sheet, Ad
     }
 
     private string Shown(double value, SeriesKind kind) =>
-        kind == SeriesKind.Date && value is > -657435 and < 2958465
-            ? DateTime.FromOADate(value).ToString("d", CultureInfo.CurrentCulture)
+        kind == SeriesKind.Date && (sheet.Owner?.Calculation ?? CalculationSettings.Default).TryDateOf(value, out var moment)
+            ? moment.ToString("d", CultureInfo.CurrentCulture)
             : value.ToString("G10", CultureInfo.CurrentCulture);
 }

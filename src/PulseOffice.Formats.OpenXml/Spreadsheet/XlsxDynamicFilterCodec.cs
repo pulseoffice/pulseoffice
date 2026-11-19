@@ -9,9 +9,6 @@ namespace PulseOffice.Formats.OpenXml;
 
 internal sealed class XlsxDynamicFilterCodec
 {
-    private const double FirstSerial = -657435;
-    private const double LastSerial = 2958465;
-
     private static readonly (DynamicFilterValues Type, int[] Months)[] Periods =
     [
         (DynamicFilterValues.January, [1]), (DynamicFilterValues.February, [2]), (DynamicFilterValues.March, [3]),
@@ -36,14 +33,14 @@ internal sealed class XlsxDynamicFilterCodec
 
     private readonly RelativeDatePeriods _periods = new();
 
-    public DynamicFilter Build(RelativeDatePeriod period, DateTime today)
+    public DynamicFilter Build(RelativeDatePeriod period, DateTime today, PulseOffice.Sheets.CalculationSettings calculation)
     {
         var bounds = _periods.Bounds(period, today);
         return new DynamicFilter
         {
             Type = _relative.First(entry => entry.Period == period).Type,
-            Val = bounds.Start.ToOADate(),
-            MaxVal = bounds.End.ToOADate(),
+            Val = calculation.SerialOf(bounds.Start),
+            MaxVal = calculation.SerialOf(bounds.End),
         };
     }
 
@@ -66,11 +63,12 @@ internal sealed class XlsxDynamicFilterCodec
         var allowed = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
         var column = range.Start.Column + columnOffset;
         if (sheet is null || column > range.End.Column) return allowed;
+        var calculation = sheet.Owner?.Calculation ?? PulseOffice.Sheets.CalculationSettings.Default;
         for (int row = range.Start.Row + 1, last = Math.Min(range.End.Row, sheet.LastUsedRow); row <= last; row++)
         {
             var cell = sheet[new CellAddress(row, column)].Value;
-            if (cell.Kind != ValueKind.Number || cell.AsNumber() is not (> FirstSerial and < LastSerial and var serial)) continue;
-            if (months.Contains(DateTime.FromOADate(serial).Month)) allowed.Add(cell.ToString());
+            if (cell.Kind != ValueKind.Number || !calculation.TryDateOf(cell.AsNumber(), out var moment)) continue;
+            if (months.Contains(moment.Month)) allowed.Add(cell.ToString());
         }
         return allowed;
     }

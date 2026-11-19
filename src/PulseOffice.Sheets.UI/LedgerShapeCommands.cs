@@ -38,7 +38,8 @@ public sealed class LedgerShapeCommands(
     IDimensionLineTemplate dimensions,
     PulseOffice.UI.Controls.Drawing.IDrawingToolState drawing,
     IShapeChooser shapes,
-    IConnectorSitesDialog connectorSites) : LedgerCommandSet(context)
+    IConnectorSitesDialog connectorSites,
+    ShapeText.ILedgerShapeFitting? fitting = null) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() => ShapeCommands();
 
@@ -592,7 +593,7 @@ public sealed class LedgerShapeCommands(
         var content = styling.Apply(placed.Content, updated);
         if (content is null) return;
 
-        var replacement = placed with { Content = content };
+        var replacement = (fitting ?? new ShapeText.LedgerShapeFitting()).Fit(placed with { Content = content });
 
         sheet.Objects[index] = replacement;
 

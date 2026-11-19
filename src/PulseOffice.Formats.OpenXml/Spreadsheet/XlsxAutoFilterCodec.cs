@@ -30,6 +30,8 @@ internal sealed class XlsxAutoFilterCodec
 
     private readonly XlsxDynamicFilterCodec _dynamic = new();
 
+    private readonly XlsxDateEpochs _epochs = new();
+
     public AutoFilter? Build(Workbook workbook, Sheet sheet, XlsxConditionalMapper formats)
     {
         if (sheet.AutoFilter.Range is not { } range) return null;
@@ -70,7 +72,7 @@ internal sealed class XlsxAutoFilterCodec
                     Val = top.Count,
                 });
             else if (column.Period is { } period)
-                element.Append(_dynamic.Build(period, DateTime.Today));
+                element.Append(_dynamic.Build(period, DateTime.Today, FileCalculation(source)));
             else if (column.Conditions is { Count: > 0 } conditions)
             {
                 var custom = new CustomFilters(conditions.Select(Custom));
@@ -88,6 +90,9 @@ internal sealed class XlsxAutoFilterCodec
         }
         return filter;
     }
+
+    private PulseOffice.Sheets.CalculationSettings FileCalculation(XlsxFilterSource? source) =>
+        source?.Workbook.Calculation is { } calculation && _epochs.IsNative(calculation.DateEpoch) ? calculation : PulseOffice.Sheets.CalculationSettings.Default;
 
     public void Read(AutoFilter? element, Sheet sheet, IReadOnlyList<DifferentialFormat> formats)
     {

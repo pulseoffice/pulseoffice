@@ -35,4 +35,19 @@ public sealed class Round269IndexStyleCandidatesTests
         Assert.DoesNotContain("Unused", names);
         Assert.Equal("T:Used", candidates.Title(document.Styles.Paragraph.Find("Used")!));
     }
+
+    [Fact]
+    public void A_style_not_yet_used_is_offered_for_assignment()
+    {
+        var document = new TextDocument();
+        document.Styles.Paragraph.Add(new ParagraphStyle("Used"));
+        document.Styles.Paragraph.Add(new ParagraphStyle("Unused"));
+        document.Body.Add(new ParagraphBlock("p", "x", "Used"));
+        var candidates = new FolioIndexStyleCandidates(new ShoutingNames(), new StyleUsage(new BlockTree()));
+
+        var others = candidates.Others(document, IndexSourceStyles.None).Select(style => style.Name).ToList();
+
+        Assert.Contains("Unused", others);
+        Assert.DoesNotContain("Used", others);
+    }
 }

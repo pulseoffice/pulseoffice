@@ -43,6 +43,7 @@ public sealed class LayoutFixture
             .AddDocumentsLayout();
         replace?.Invoke(collection);
         var services = collection.BuildServiceProvider();
+        Services = services;
         Engine = services.GetRequiredService<IDocumentLayoutEngine>();
         Queries = services.GetRequiredService<ILayoutQueries>();
         Document = new TextDocument { InitialPageStyle = Page };
@@ -54,6 +55,8 @@ public sealed class LayoutFixture
     public FixedHyphenation Hyphenation { get; } = new();
 
     public IDocumentLayoutEngine Engine { get; }
+
+    public IServiceProvider Services { get; }
 
     public ILayoutQueries Queries { get; }
 

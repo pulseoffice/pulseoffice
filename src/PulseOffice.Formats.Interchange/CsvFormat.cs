@@ -255,16 +255,15 @@ public sealed class CsvSpreadsheetWriter(
         var number = value.AsNumber();
         var format = formats.Get(workbook.Styles.Get(cell.StyleId).NumberFormatId);
 
-        if (double.IsFinite(number) && number > -657435 && number < 2958466
+        if (workbook.Calculation.TryDateOf(number, out var moment)
             && format.Select(number).ValueKind == FormatValueKind.DateTime)
-            return Moment(number);
+            return Moment(number, moment);
 
         return number.ToString("R", _options.Culture);
     }
 
-    private string Moment(double serial)
+    private string Moment(double serial, DateTime moment)
     {
-        var moment = new DateTime(1899, 12, 30).AddDays(serial);
         var invariant = CultureInfo.InvariantCulture.Equals(_options.Culture);
         var hasTime = moment.TimeOfDay != TimeSpan.Zero;
 

@@ -42,15 +42,20 @@ public sealed class CellBorderConflicts : ICellBorderConflicts
         var right = column + Math.Max(1, cell.ColumnSpan);
         var own = looks[row][column]!.Borders.Right;
         var winners = new List<BorderLine?>();
+        var complete = true;
         for (var r = row; r < Math.Min(looks.Length, row + Math.Max(1, cell.RowSpan)); r++)
         {
-            if (right >= looks[r].Length || looks[r][right] is not { } neighbour || table.Cell(r, right).Covered) continue;
+            if (right >= looks[r].Length || looks[r][right] is not { } neighbour || table.Cell(r, right).Covered)
+            {
+                complete = false;
+                continue;
+            }
             var winner = Winner(own, neighbour.Borders.Left);
             looks[r][right] = neighbour with { Borders = neighbour.Borders with { Left = winner } };
             winners.Add(winner);
         }
         if (winners.Count == 0) return;
-        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : own ?? winners[0];
+        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : complete ? null : own ?? winners[0];
         looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Right = shared } };
     }
 
@@ -60,15 +65,20 @@ public sealed class CellBorderConflicts : ICellBorderConflicts
         if (below >= looks.Length) return;
         var own = looks[row][column]!.Borders.Bottom;
         var winners = new List<BorderLine?>();
+        var complete = true;
         for (var c = column; c < Math.Min(looks[below].Length, column + Math.Max(1, cell.ColumnSpan)); c++)
         {
-            if (looks[below][c] is not { } neighbour || table.Cell(below, c).Covered) continue;
+            if (looks[below][c] is not { } neighbour || table.Cell(below, c).Covered)
+            {
+                complete = false;
+                continue;
+            }
             var winner = Winner(own, neighbour.Borders.Top);
             looks[below][c] = neighbour with { Borders = neighbour.Borders with { Top = winner } };
             winners.Add(winner);
         }
         if (winners.Count == 0) return;
-        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : own ?? winners[0];
+        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : complete ? null : own ?? winners[0];
         looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Bottom = shared } };
     }
 

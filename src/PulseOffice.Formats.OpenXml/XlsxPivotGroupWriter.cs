@@ -38,7 +38,7 @@ public sealed class XlsxPivotGroupWriter
         return field.NumericGroupInterval is > 0;
     }
 
-    public XlsxPivotGroups Plan(PivotDefinition pivot, int columnCount, Func<PivotField, int> indexOf, Func<int, IReadOnlyList<CellValue>> valuesOf)
+    public XlsxPivotGroups Plan(PivotDefinition pivot, int columnCount, Func<PivotField, int> indexOf, Func<int, IReadOnlyList<CellValue>> valuesOf, PulseOffice.Sheets.CalculationSettings calendar)
     {
         ArgumentNullException.ThrowIfNull(pivot);
         ArgumentNullException.ThrowIfNull(indexOf);
@@ -53,7 +53,7 @@ public sealed class XlsxPivotGroupWriter
             var values = valuesOf(column);
             if (field.DateGrouping == DateGrouping.None && field.NumericGroupInterval is null || !CanWrite(field, values)) continue;
             var numbers = values.Where(value => value.Kind == ValueKind.Number).Select(value => value.AsNumber()).ToList();
-            if (field.DateGrouping != DateGrouping.None) PlanDates(groups, column, field.DateGrouping, numbers);
+            if (field.DateGrouping != DateGrouping.None) PlanDates(groups, column, field.DateGrouping, numbers, calendar);
             else PlanRange(groups, column, field.NumericGroupInterval!.Value, numbers);
         }
 
@@ -78,10 +78,10 @@ public sealed class XlsxPivotGroupWriter
         }, items));
     }
 
-    private void PlanDates(XlsxPivotGroups groups, int column, DateGrouping grouping, List<double> numbers)
+    private void PlanDates(XlsxPivotGroups groups, int column, DateGrouping grouping, List<double> numbers, PulseOffice.Sheets.CalculationSettings calendar)
     {
-        var first = DateTime.FromOADate(Math.Floor(numbers.Min()));
-        var last = DateTime.FromOADate(Math.Floor(numbers.Max()) + 1);
+        var first = calendar.DateOf(Math.Floor(numbers.Min()));
+        var last = calendar.DateOf(Math.Floor(numbers.Max()) + 1);
         var chain = new List<DateGrouping> { grouping };
         if (grouping < DateGrouping.Days) chain.Add(DateGrouping.Days);
         if (grouping != DateGrouping.Years) chain.Add(DateGrouping.Years);

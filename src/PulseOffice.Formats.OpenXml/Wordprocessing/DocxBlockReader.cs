@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed record DocxSectionSpan(int FirstBlock, W.SectionProperties Properties);
 
-public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphCodec paragraphs, DocxInlineReader inlines, DocxValues values, DocxDropCaps drops, DocxPageBreaks breaks, DocxBorders borders, DocxCellFormulas formulas, ITableAppearance appearance, DocxIndexCodec indexes, DocxContentControls controls, DocxTableStyleParagraphs tableParagraphs, DocxTableStyleCodec tableStyles, DocxFloatingTables floatingTables, DocxParagraphMarkJoins markJoins, DocxParagraphFrames frames, DocxRowChanges rowChanges, DocxCellGeometry geometry)
+public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphCodec paragraphs, DocxInlineReader inlines, DocxValues values, DocxDropCaps drops, DocxPageBreaks breaks, DocxBorders borders, DocxCellFormulas formulas, ITableAppearance appearance, DocxIndexCodec indexes, DocxContentControls controls, DocxTableStyleParagraphs tableParagraphs, DocxTableStyleCodec tableStyles, DocxFloatingTables floatingTables, DocxParagraphMarkJoins markJoins, DocxParagraphFrames frames, DocxRowChanges rowChanges, DocxCellGeometry geometry, ICellInheritedEdges cellEdges)
 {
     public List<Block> Read(IEnumerable<OpenXmlElement> elements, DocxReadContext context, List<DocxSectionSpan>? sections = null)
     {
@@ -461,6 +461,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
     private void Grid(List<Twip> columns, int width, List<(int Column, int Span, W.TableCellWidth Width)> cellWidths, W.TableWidth? tableWidth)
     {
         while (columns.Count < width) columns.Add(new Twip(0));
+        if (tableWidth?.Type?.Value == W.TableWidthUnitValues.Auto) PreferredCells(columns, cellWidths);
         if (columns.All(column => column.Value > 0)) return;
         var total = tableWidth?.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(tableWidth.Width?.Value) ?? 0 : 0;
         int Dxa(W.TableCellWidth cell) =>
@@ -481,6 +482,13 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var share = left > 0 ? values.Bounded(left / missing, 1, LargestLength) : Twip.FromCentimeters(2).Value;
         for (var index = 0; index < columns.Count; index++)
             if (columns[index].Value == 0) columns[index] = new Twip(share);
+    }
+
+    private void PreferredCells(List<Twip> columns, List<(int Column, int Span, W.TableCellWidth Width)> cellWidths)
+    {
+        foreach (var (column, _, cell) in cellWidths.Where(entry => entry.Span == 1 && entry.Column < columns.Count && entry.Width.Type?.Value == W.TableWidthUnitValues.Dxa))
+            if (columns[column].Value > 0 && values.Integer(cell.Width?.Value) is { } preferred && preferred > columns[column].Value)
+                columns[column] = new Twip(values.Bounded(preferred, 1, LargestLength));
     }
 
     private void PreferredWidth(TableBlock table, W.TableWidth? width)
@@ -533,6 +541,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var style = direct.Over(appearance.Style(context.Document.Styles, table));
         var first = new Dictionary<TableCell, W.TableCellBorders>(ReferenceEqualityComparer.Instance);
         foreach (var (owner, edges) in own) first.TryAdd(owner, edges);
+        var explicitSides = new Dictionary<(TableCell, BorderSide), bool>();
         for (var r = 0; r < table.Rows.Count; r++)
         {
             for (var c = 0; c < table.Rows[r].Cells.Count; c++)
@@ -546,6 +555,10 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
                     continue;
                 }
                 var read = borders.Read(element);
+                explicitSides.Add((cell, BorderSide.Left), element.GetFirstChild<W.LeftBorder>() is not null || element.GetFirstChild<W.StartBorder>() is not null);
+                explicitSides.Add((cell, BorderSide.Right), element.GetFirstChild<W.RightBorder>() is not null || element.GetFirstChild<W.EndBorder>() is not null);
+                explicitSides.Add((cell, BorderSide.Top), element.GetFirstChild<W.TopBorder>() is not null);
+                explicitSides.Add((cell, BorderSide.Bottom), element.GetFirstChild<W.BottomBorder>() is not null);
                 cell.Borders = new PulseOffice.Text.Rich.BoxBorders
                 {
                     Top = element.GetFirstChild<W.TopBorder>() is null ? inherited.Top : read.Top,
@@ -555,6 +568,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
                 };
             }
         }
+        cellEdges.SuppressInherited(table, (cell, side) => explicitSides.TryGetValue((cell, side), out var set) && set);
     }
 
     private TableCell? Continued(List<(TableCell Origin, int Column)?> open, int column, int span) =>

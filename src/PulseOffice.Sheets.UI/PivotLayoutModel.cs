@@ -40,6 +40,7 @@ public sealed class PivotLayoutModel
     private readonly Dictionary<int, PivotAggregation> _aggregations = [];
     private readonly Dictionary<int, PivotField> _settings = [];
     private readonly List<PivotField> _calculated = [];
+    private readonly List<PivotField> _unplacedCalculated = [];
     private PivotTableOptions _options = PivotTableOptions.Default;
 
     public PivotLayoutModel(IReadOnlyList<string> columns) => _columns = columns ?? throw new ArgumentNullException(nameof(columns));
@@ -53,7 +54,12 @@ public sealed class PivotLayoutModel
             {
                 if (field.IsCalculated || field.SourceColumnIndex < 0 || field.SourceColumnIndex >= _columns.Count)
                 {
-                    _calculated.Add(field);
+                    if (field.IsCalculated && area == PivotArea.Value)
+                    {
+                        _zones[area].Add(_columns.Count + _calculated.Count);
+                        _calculated.Add(field);
+                    }
+                    else _unplacedCalculated.Add(field);
                     continue;
                 }
 
@@ -82,6 +88,14 @@ public sealed class PivotLayoutModel
         }
     }
 
+    public bool IsCalculated(int column) => column >= _columns.Count && column - _columns.Count < _calculated.Count;
+
+    public string NameOf(int column)
+    {
+        if (IsCalculated(column)) return _calculated[column - _columns.Count].SourceName;
+        return column >= 0 && column < _columns.Count ? _columns[column] : string.Empty;
+    }
+
     public IReadOnlyList<int> In(PivotArea area) => _zones.TryGetValue(area, out var zone) ? zone : [];
 
     public PivotArea AreaOf(int column)
@@ -94,24 +108,27 @@ public sealed class PivotLayoutModel
     public PivotAggregation AggregationOf(int column) => _aggregations.GetValueOrDefault(column, PivotAggregation.Sum);
 
     public PivotField SettingsOf(int column) =>
-        _settings.TryGetValue(column, out var field)
+        IsCalculated(column) ? _calculated[column - _columns.Count]
+        : _settings.TryGetValue(column, out var field)
             ? field
             : new PivotField { SourceName = _columns[column], SourceColumnIndex = column };
 
     public void Configure(int column, Func<PivotField, PivotField> change)
     {
         ArgumentNullException.ThrowIfNull(change);
-        if (column < 0 || column >= _columns.Count) return;
+        if (column < 0 || (column >= _columns.Count && !IsCalculated(column))) return;
         var before = SettingsOf(column);
         var after = change(before);
         if (after == before) return;
-        _settings[column] = after;
+        if (IsCalculated(column)) _calculated[column - _columns.Count] = after;
+        else _settings[column] = after;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void Place(int column, PivotArea area, int index = int.MaxValue)
     {
-        if (column < 0 || column >= _columns.Count) return;
+        if (column < 0 || (column >= _columns.Count && !IsCalculated(column))) return;
+        if (IsCalculated(column) && area is not (PivotArea.Value or PivotArea.Unused)) return;
         var valuesBefore = _zones[PivotArea.Value].ToList();
         foreach (var zone in _zones.Values) zone.Remove(column);
         if (area != PivotArea.Unused)
@@ -153,15 +170,16 @@ public sealed class PivotLayoutModel
 
     public IReadOnlyList<PivotField> Fields()
     {
-        var placed = Areas.SelectMany(area => In(area).Select((column, order) => SettingsOf(column) with
-        {
-            SourceName = _columns[column],
-            SourceColumnIndex = column,
-            Area = area,
-            AreaOrder = order,
-            Aggregation = AggregationOf(column),
-        })).ToList();
-        var values = In(PivotArea.Value).Count;
-        return [.. placed, .. _calculated.Select((field, index) => field.Area == PivotArea.Value ? field with { AreaOrder = values + index } : field)];
+        var placed = Areas.SelectMany(area => In(area).Select((column, order) => IsCalculated(column)
+            ? SettingsOf(column) with { Area = area, AreaOrder = order }
+            : SettingsOf(column) with
+            {
+                SourceName = _columns[column],
+                SourceColumnIndex = column,
+                Area = area,
+                AreaOrder = order,
+                Aggregation = AggregationOf(column),
+            })).ToList();
+        return [.. placed, .. _unplacedCalculated];
     }
 }

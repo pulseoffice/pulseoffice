@@ -22,6 +22,8 @@ internal sealed class LedgerObjectEditing(
 
     public IFormEventRunner? FormEvents { get; set; }
 
+    public ShapeText.ILedgerShapeFitting Fitting { get; set; } = new ShapeText.LedgerShapeFitting();
+
     public DocumentState ObjectFacts(DocumentState state, PlacedObject? placed)
     {
         state &= ~(DocumentState.ObjectSelected
@@ -68,7 +70,7 @@ internal sealed class LedgerObjectEditing(
         if (!CanEditObjects(sheet)) return null;
         var current = sheet.Objects.FirstOrDefault(candidate => candidate.Id == placed.Id);
         if (current is null) return null;
-        var replacement = current with { Content = shape };
+        var replacement = Fitting.Fit(current with { Content = shape });
         var previous = current;
         ReplaceById(sheet, replacement);
         history.Push(new PulseOffice.Document.Commands.DelegateAction(

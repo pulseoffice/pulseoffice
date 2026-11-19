@@ -20,14 +20,22 @@ public interface IDuplicateRemover
     DuplicateRemovalPlan Plan(Worksheet sheet, DuplicateRemovalRequest request);
 }
 
-public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sheets.Formatting.ICellPresenter presenter) : IDuplicateRemover
+public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sheets.Formatting.ICellPresenter presenter, IDateEpoch epochs) : IDuplicateRemover
 {
     private const double UnboundedWidth = 1000;
 
-    private static readonly DateTime Epoch = new(1899, 12, 30, 0, 0, 0, DateTimeKind.Unspecified);
+    public DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sheets.Formatting.ICellPresenter presenter)
+        : this(workArea, presenter, new AmbientDateEpoch())
+    {
+    }
 
     public DuplicateRemover(ISelectionWorkArea workArea)
-        : this(workArea, new PulseOffice.Sheets.Formatting.CellPresenter(new PulseOffice.Sheets.Formatting.NumberFormatter(CultureInfo.CurrentCulture, Date)))
+        : this(workArea, new AmbientDateEpoch())
+    {
+    }
+
+    private DuplicateRemover(ISelectionWorkArea workArea, IDateEpoch epochs)
+        : this(workArea, new PulseOffice.Sheets.Formatting.CellPresenter(new PulseOffice.Sheets.Formatting.NumberFormatter(CultureInfo.CurrentCulture, new EpochDates(epochs).Date)), epochs)
     {
     }
 
@@ -37,6 +45,7 @@ public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sh
         ArgumentNullException.ThrowIfNull(request);
 
         if (workArea.Bound(request.Range, sheet.UsedRange()) is not { } range) return new DuplicateRemovalPlan([], 0);
+        using var epoch = epochs.Enter((sheet.Owner?.Calculation ?? CalculationSettings.Default).DateEpoch);
         var first = request.HasHeader ? range.Start.Row + 1 : range.Start.Row;
 
         var columns = request.KeyColumns
@@ -59,9 +68,6 @@ public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sh
         return new DuplicateRemovalPlan(duplicates, kept);
     }
 
-    private static DateTime Date(double serial) =>
-        serial is >= -657434 and <= 2958465 ? Epoch.AddDays(serial) : Epoch;
-
     private string Shown(Worksheet sheet, CellAddress address)
     {
         if (sheet.Owner is not { } workbook || !sheet.TryGetCell(address, out var cell)) return Describe(sheet.GetValue(address));
@@ -78,6 +84,15 @@ public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sh
         ValueKind.Error => value.ErrorText,
         _ => value.AsNumber().ToString("R", CultureInfo.InvariantCulture),
     };
+}
+
+internal sealed class EpochDates(IDateEpoch epochs)
+{
+    public DateTime Date(double serial)
+    {
+        var calculation = new CalculationSettings { DateEpoch = epochs.Current };
+        return calculation.TryDateOf(serial, out var moment) ? moment : calculation.DateEpoch.ToDateTime(TimeOnly.MinValue);
+    }
 }
 
 public sealed record TextToColumnsRequest(CellRange Range)

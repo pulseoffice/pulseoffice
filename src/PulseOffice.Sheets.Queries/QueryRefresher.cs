@@ -207,7 +207,7 @@ public sealed class QueryRefresher : IQueryRefresher
                 var address = anchor.Offset(row + headerRows, column);
                 var value = result.Rows[row][column];
 
-                Set(sheet, binding, address, _values.Convert(value));
+                Set(sheet, binding, address, _values.Convert(value, workbook.Calculation));
 
                 if (DateFormatFor(value) is { } formatId)
                     sheet.SetStyle(address, workbook.Styles.Derive(

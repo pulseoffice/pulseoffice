@@ -46,4 +46,18 @@ public sealed class Round269TableWidthEditingTests
         Assert.Equal(80, table.WidthPercent);
         Assert.False(table.AutoWidth);
     }
+
+    [Fact]
+    public void A_drag_on_a_scaled_percent_table_keeps_the_edge_under_the_pointer()
+    {
+        var (document, history, table) = Percent();
+        var displayed = 400.0;
+
+        var delta = _geometry.StoredColumnDelta(table, 40, displayed);
+        _geometry.ResizeColumn(document, history, table, 1, 100 + delta);
+
+        var shown = table.Columns[1].ToPoints() * displayed * (table.WidthPercent!.Value / 50) / table.Columns.Sum(column => column.ToPoints());
+        Assert.Equal(20, delta, 3);
+        Assert.Equal(240, shown, 1);
+    }
 }

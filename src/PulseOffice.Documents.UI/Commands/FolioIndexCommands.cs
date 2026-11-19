@@ -224,9 +224,9 @@ public sealed class FolioIndexCommands(
         var tabs = new List<FormTab> { new(texts["folio.index.tab.general"], texts["folio.index.general.explanation"], general) };
         if (specific.Count > 0) tabs.Add(new(Kind(current.Kind), texts["folio.index.specific.explanation"], specific));
         List<PulseOffice.Documents.Styles.ParagraphStyle> styles = current.Kind == IndexKind.Contents ? SourceStyleCandidates(editor, current) : [];
-        if (styles.Count > 0)
-            tabs.Add(new(texts["folio.index.tab.styles"], texts["folio.index.styles.explanation"],
-                [.. styles.Select((style, i) => (FormField)new NumberField("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), candidates.Title(style), current.SourceStyles.LevelOf(style.Name) ?? 0, 0, 10) { Integer = true })]));
+        List<PulseOffice.Documents.Styles.ParagraphStyle> others = current.Kind == IndexKind.Contents ? [.. candidates.Others(editor.Document, current.SourceStyles)] : [];
+        if (styles.Count > 0 || others.Count > 0)
+            tabs.Add(new(texts["folio.index.tab.styles"], texts["folio.index.styles.explanation"], StyleFields(styles, others, current)));
         if (await tabbed.AskAsync(titleKey, tabs, ct, 0, 520).ConfigureAwait(true) is not { } values) return null;
         return current with
         {
@@ -235,7 +235,7 @@ public sealed class FolioIndexCommands(
             Hyperlinks = values.Flag("links"),
             Levels = current.Kind == IndexKind.Contents ? (int)Math.Round(values.Number("levels", current.Levels)) : current.Levels,
             FirstLevel = current.Kind == IndexKind.Contents ? Math.Min((int)Math.Round(values.Number("firstLevel", current.FirstLevel)), (int)Math.Round(values.Number("levels", current.Levels))) : current.FirstLevel,
-            SourceStyles = current.Kind == IndexKind.Contents ? SourceStyles(styles, values, current.SourceStyles) : current.SourceStyles,
+            SourceStyles = current.Kind == IndexKind.Contents ? AddedStyle(others, values, SourceStyles(styles, values, current.SourceStyles)) : current.SourceStyles,
             FromOutline = current.Kind != IndexKind.Contents || values.Flag("outline"),
             FromMarks = current.Kind != IndexKind.Contents ? current.FromMarks : values.Flag("marks"),
             LetterSeparators = current.Kind == IndexKind.Alphabetical ? values.Flag("letters") : current.LetterSeparators,
@@ -253,6 +253,23 @@ public sealed class FolioIndexCommands(
 
     private List<PulseOffice.Documents.Styles.ParagraphStyle> SourceStyleCandidates(FolioEditor editor, IndexDefinition current) =>
         [.. candidates.Candidates(editor.Document, current.SourceStyles)];
+
+    private List<FormField> StyleFields(List<PulseOffice.Documents.Styles.ParagraphStyle> styles, List<PulseOffice.Documents.Styles.ParagraphStyle> others, IndexDefinition current)
+    {
+        List<FormField> fields = [.. styles.Select((style, i) => (FormField)new NumberField("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), candidates.Title(style), current.SourceStyles.LevelOf(style.Name) ?? 0, 0, 10) { Integer = true })];
+        if (others.Count == 0) return fields;
+        fields.Add(new ChoiceField("style.add", texts["folio.index.styles.add"], [texts["folio.index.styles.addNone"], .. others.Select(candidates.Title)]));
+        fields.Add(new NumberField("style.addLevel", texts["folio.index.styles.addLevel"], 1, 1, 10) { Integer = true });
+        return fields;
+    }
+
+    private static IndexSourceStyles AddedStyle(List<PulseOffice.Documents.Styles.ParagraphStyle> others, IReadOnlyDictionary<string, object> values, IndexSourceStyles assigned)
+    {
+        var chosen = others.Count == 0 ? 0 : values.Choice("style.add", others.Count + 1);
+        if (chosen <= 0) return assigned;
+        var level = (int)Math.Round(values.Number("style.addLevel", 1));
+        return level > 0 ? assigned.With(others[chosen - 1].Name, level) : assigned;
+    }
 
     private IndexSourceStyles SourceStyles(List<PulseOffice.Documents.Styles.ParagraphStyle> styles, IReadOnlyDictionary<string, object> values, IndexSourceStyles current)
         => current.Assign(styles.Select((style, i) => new KeyValuePair<string, int>(style.Name,

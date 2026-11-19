@@ -11,12 +11,13 @@ public interface IFilterValueText
     string Display(string canonical, bool dates);
 }
 
-public sealed class FilterValueText(ISpreadsheetLocale locale) : IFilterValueText
+public sealed class FilterValueText(ISpreadsheetLocale locale, IDateEpoch epochs) : IFilterValueText
 {
-    private const double FirstSerial = -657434;
-    private const double LastSerial = 2958465;
+    private readonly NumericText _typed = new(locale, epochs);
 
-    private readonly NumericText _typed = new(locale);
+    public FilterValueText(ISpreadsheetLocale locale) : this(locale, new AmbientDateEpoch())
+    {
+    }
 
     public string Canonical(string typed)
     {
@@ -34,9 +35,8 @@ public sealed class FilterValueText(ISpreadsheetLocale locale) : IFilterValueTex
         if (!double.TryParse(canonical, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
             return canonical;
         var culture = locale.Culture;
-        if (dates && number is > FirstSerial and < LastSerial)
+        if (dates && new CalculationSettings { DateEpoch = epochs.Current }.TryDateOf(number, out var moment))
         {
-            var moment = DateTime.FromOADate(number);
             return moment.ToString(moment.TimeOfDay == TimeSpan.Zero ? "d" : "g", culture);
         }
         return number.ToString("R", culture);

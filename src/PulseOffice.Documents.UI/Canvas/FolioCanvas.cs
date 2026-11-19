@@ -525,7 +525,7 @@ public sealed class FolioCanvas : Control
         InvalidateVisual();
     }
 
-    private sealed record ColumnDrag(PulseOffice.Documents.Blocks.TableBlock Table, int Column, double Edge, double Top, double Bottom, PageSlot Slot)
+    private sealed record ColumnDrag(PulseOffice.Documents.Blocks.TableBlock Table, int Column, double Edge, double Top, double Bottom, double Width, PageSlot Slot)
     {
         public double Preview { get; init; } = Edge;
     }
@@ -677,7 +677,7 @@ public sealed class FolioCanvas : Control
                 if (y < cell.Bounds.Y || y > cell.Bounds.Bottom || Math.Abs(x - cell.Bounds.Right) > reach) continue;
                 if (cell.Lines.FirstOrDefault() is not { } line || _editor.Tables.Editing.Locate(_editor.Document, line.ParagraphId) is not { } at) continue;
                 var column = at.Column + Math.Max(1, at.Table.Cell(at.Row, at.Column).ColumnSpan) - 1;
-                return new ColumnDrag(at.Table, column, cell.Bounds.Right, table.Bounds.Y, table.Bounds.Bottom, slot);
+                return new ColumnDrag(at.Table, column, cell.Bounds.Right, table.Bounds.Y, table.Bounds.Bottom, table.Bounds.Width, slot);
             }
         }
         return null;
@@ -705,7 +705,7 @@ public sealed class FolioCanvas : Control
             _column = null;
             e.Pointer.Capture(null);
             var current = column.Column < column.Table.Columns.Count ? column.Table.Columns[column.Column].ToPoints() : 0;
-            if (Math.Abs(column.Preview - column.Edge) > 0.5) _editor.Cells.ResizeColumn(column.Table, column.Column, current + column.Preview - column.Edge);
+            if (Math.Abs(column.Preview - column.Edge) > 0.5) _editor.Cells.ResizeColumn(column.Table, column.Column, current + _editor.Tables.Geometry.StoredColumnDelta(column.Table, column.Preview - column.Edge, column.Width));
             InvalidateVisual();
             e.Handled = true;
             return;
