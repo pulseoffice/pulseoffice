@@ -54,19 +54,24 @@ public sealed class MapForm(IRangeMaterializer ranges) : HigherOrderForm(ranges)
             grids.Add(Grid(arguments[i], scope, context, services));
 
         if (lambda.Arity != grids.Count) return EvalValue.Error(CellError.Value);
-        if (grids[0].IsEmpty) return EvalValue.Error(CellError.Value);
 
-        if (grids.Any(g => g.RowCount != grids[0].RowCount || g.ColumnCount != grids[0].ColumnCount))
-            return EvalValue.Error(CellError.Value);
+        if (grids.Any(g => g.IsEmpty)) return EvalValue.Error(CellError.Value);
 
-        var result = new List<IReadOnlyList<CellValue>>(grids[0].RowCount);
+        var rows = grids.Max(g => g.RowCount);
+        var columns = grids.Max(g => g.ColumnCount);
+        var result = new List<IReadOnlyList<CellValue>>(rows);
 
-        for (var row = 0; row < grids[0].RowCount; row++)
+        for (var row = 0; row < rows; row++)
         {
-            var line = new List<CellValue>(grids[0].ColumnCount);
-            for (var column = 0; column < grids[0].ColumnCount; column++)
+            var line = new List<CellValue>(columns);
+            for (var column = 0; column < columns; column++)
             {
-                var parameters = grids.Select(g => (EvalValue)EvalValue.Scalar(g[row, column])).ToList();
+                if (grids.Any(g => !Reaches(g, row, column)))
+                {
+                    line.Add(CellValue.FromError(CellError.NotAvailable));
+                    continue;
+                }
+                var parameters = grids.Select(g => (EvalValue)EvalValue.Scalar(Broadcast(g, row, column))).ToList();
                 line.Add(Element(services.Invoke(lambda, parameters, context), context));
             }
             result.Add(line);
@@ -74,6 +79,12 @@ public sealed class MapForm(IRangeMaterializer ranges) : HigherOrderForm(ranges)
 
         return new ArrayValue(result);
     }
+
+    private static bool Reaches(ValueGrid grid, int row, int column) =>
+        (grid.RowCount == 1 || row < grid.RowCount) && (grid.ColumnCount == 1 || column < grid.ColumnCount);
+
+    private static CellValue Broadcast(ValueGrid grid, int row, int column) =>
+        grid[grid.RowCount == 1 ? 0 : row, grid.ColumnCount == 1 ? 0 : column];
 }
 
 public sealed class ReduceForm(IRangeMaterializer ranges) : HigherOrderForm(ranges)
@@ -205,6 +216,8 @@ public sealed class MakeArrayForm(IRangeMaterializer ranges) : HigherOrderForm(r
         var rowValue = Scalar(services.Evaluate(arguments[0], scope, context), context);
         var columnValue = Scalar(services.Evaluate(arguments[1], scope, context), context);
 
+        if (rowValue.IsError) return EvalValue.Scalar(rowValue);
+        if (columnValue.IsError) return EvalValue.Scalar(columnValue);
         if (!rowValue.TryCoerceToNumber(out var rowCount) ||
             !columnValue.TryCoerceToNumber(out var columnCount))
             return EvalValue.Error(CellError.Value);

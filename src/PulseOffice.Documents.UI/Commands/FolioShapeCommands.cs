@@ -162,6 +162,8 @@ public sealed class FolioShapeCommands(IActiveFolioContext context, FolioShapeSe
             VerticalRelation.PageArea => page.Content.Height,
             VerticalRelation.Margin => page.Content.Y,
             VerticalRelation.BottomMargin => Math.Max(0, page.Height - page.Content.Y - page.Content.Height),
+            VerticalRelation.InsideMargin or VerticalRelation.OutsideMargin => (item.Placement.Vertical == VerticalRelation.InsideMargin) == (index % 2 == 1)
+                ? Math.Max(0, page.Height - page.Content.Y - page.Content.Height) : page.Content.Y,
             _ => lines.Count > 0 ? lines.Max(line => line.Top + line.Line.Height) - lines.Min(line => line.Top) : page.Content.Height,
         };
         var y = (height - item.Size.Height.ToPoints()) * fraction;

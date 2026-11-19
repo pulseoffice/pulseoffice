@@ -54,4 +54,16 @@ public class Round235ObjectPositionTests
         Assert.Equal(150, _placement.Place(paragraph, _frame).Y, 3);
         Assert.Equal(105, _placement.Place(line, _frame).Y, 3);
     }
+
+    [Fact]
+    public void Inside_and_outside_margin_relations_mirror_on_even_pages()
+    {
+        var inside = Placed(new(Twip.FromPoints(2), Twip.FromPoints(3)) { Horizontal = HorizontalRelation.InsideMargin, Vertical = VerticalRelation.OutsideMargin });
+        var even = _frame with { EvenPage = true };
+
+        Assert.Equal(2, _placement.Place(inside, _frame).X, 3);
+        Assert.Equal(731, _placement.Place(inside, _frame).Y, 3);
+        Assert.Equal(530, _placement.Place(inside, even).X, 3);
+        Assert.Equal(3, _placement.Place(inside, even).Y, 3);
+    }
 }

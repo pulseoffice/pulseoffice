@@ -189,6 +189,12 @@ public sealed record PrintFormField(string Name, PrintFormFieldKind Kind)
     public IReadOnlyList<string> Options { get; init; } = [];
 
     public string? Identity { get; init; }
+
+    public PrintFont? Font { get; init; }
+
+    public string? FirstSegment { get; init; }
+
+    public string? LastSegment { get; init; }
 }
 
 public sealed record PrintMarkedField(DocumentRect Area, PrintFormField Field);

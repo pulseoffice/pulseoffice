@@ -89,6 +89,8 @@ public sealed class AnchoredObjectConverter : SnapshotConverter<AnchoredObject>
             ZOrder = node.Get("z", 0),
             RotationDegrees = node.Get("rotation", 0.0),
             InBackground = node.Get("background", false),
+            LayoutInCell = node.Get("layoutInCell", true),
+            AllowOverlap = node.Get("allowOverlap", true),
             WrapContour = node.Get("contourWrap", false),
             Contour = node.Get<ObjectContour>("contour"),
             WrapFirstParagraph = node.Get("firstParagraph", false),
@@ -101,6 +103,7 @@ public sealed class AnchoredObjectConverter : SnapshotConverter<AnchoredObject>
         node.Put("id", value.Id).Put("anchor", value.Anchor).Put("content", value.Content).Put("size", value.Size)
             .Put("placement", value.Placement).Put("wrap", value.Wrap).Put("wrapSpacing", value.WrapSpacing).Put("style", value.StyleName)
             .Put("name", value.Name).Put("z", value.ZOrder).Put("rotation", value.RotationDegrees).Put("background", value.InBackground)
+            .Put("layoutInCell", value.LayoutInCell).Put("allowOverlap", value.AllowOverlap)
             .Put("contourWrap", value.WrapContour).Put("contour", value.Contour).Put("firstParagraph", value.WrapFirstParagraph)
             .Put("flipH", value.FlipHorizontal).Put("flipV", value.FlipVertical).Put("hyperlink", value.Hyperlink);
 }

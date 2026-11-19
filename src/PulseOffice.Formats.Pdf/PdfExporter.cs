@@ -89,6 +89,7 @@ public sealed class PdfExporter(
             var pagesId = file.Reserve();
             var tree = new PdfStructureTree { AnnotationKeyBase = selected.Count };
             var formFields = forms.Begin();
+            var widgetFonts = new PdfWidgetFonts(set, fontObjects, file);
 
             foreach (var index in selected)
             {
@@ -160,7 +161,7 @@ public sealed class PdfExporter(
 
                 marks.Collect(pageId, canvas, height, options);
                 var tagging = options.Tagged ? structure.Annotations(tree, slot) : null;
-                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, formFields, tagging);
+                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, formFields, tagging, widgetFonts);
                 var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height, tagging).Concat(widgets).ToList();
                 var annots = annotations.Count == 0 ? string.Empty : " /Annots [" + string.Join(' ', annotations.Select(id => $"{id} 0 R")) + "]";
 

@@ -23,6 +23,24 @@ public sealed class DocxFloatingTables
         (VerticalRelation.Page, W.VerticalAnchorValues.Page),
     ];
 
+    private readonly (ObjectAlignment Alignment, W.HorizontalAlignmentValues Word)[] _horizontalAlign =
+    [
+        (ObjectAlignment.Start, W.HorizontalAlignmentValues.Left),
+        (ObjectAlignment.Center, W.HorizontalAlignmentValues.Center),
+        (ObjectAlignment.End, W.HorizontalAlignmentValues.Right),
+        (ObjectAlignment.Inside, W.HorizontalAlignmentValues.Inside),
+        (ObjectAlignment.Outside, W.HorizontalAlignmentValues.Outside),
+    ];
+
+    private readonly (ObjectAlignment Alignment, W.VerticalAlignmentValues Word)[] _verticalAlign =
+    [
+        (ObjectAlignment.Start, W.VerticalAlignmentValues.Top),
+        (ObjectAlignment.Center, W.VerticalAlignmentValues.Center),
+        (ObjectAlignment.End, W.VerticalAlignmentValues.Bottom),
+        (ObjectAlignment.Inside, W.VerticalAlignmentValues.Inside),
+        (ObjectAlignment.Outside, W.VerticalAlignmentValues.Outside),
+    ];
+
     private readonly double _largestFloatingHeightPoints = 560;
     private readonly double _estimatedLinePoints = 14;
 
@@ -49,6 +67,8 @@ public sealed class DocxFloatingTables
             {
                 Horizontal = _horizontal.FirstOrDefault(pair => pair.Word == position.HorizontalAnchor?.Value, (HorizontalRelation.PageArea, default)).Relation,
                 Vertical = _vertical.FirstOrDefault(pair => pair.Word == position.VerticalAnchor?.Value, (VerticalRelation.PageArea, default)).Relation,
+                HorizontalAlign = position.TablePositionXAlignment?.Value is { } x ? _horizontalAlign.FirstOrDefault(pair => pair.Word == x, (ObjectAlignment.None, default)).Alignment : ObjectAlignment.None,
+                VerticalAlign = position.TablePositionYAlignment?.Value is { } y ? _verticalAlign.FirstOrDefault(pair => pair.Word == y, (ObjectAlignment.None, default)).Alignment : ObjectAlignment.None,
             },
             Wrap = WrapMode.Parallel,
             WrapSpacing = new Margins(
@@ -74,5 +94,11 @@ public sealed class DocxFloatingTables
         VerticalAnchor = _vertical.First(pair => pair.Relation == item.Placement.Vertical).Word,
         TablePositionX = item.Placement.X.Value,
         TablePositionY = item.Placement.Y.Value,
+        TablePositionXAlignment = _horizontalAlign.Any(pair => pair.Alignment == item.Placement.HorizontalAlign)
+            ? new DocumentFormat.OpenXml.EnumValue<W.HorizontalAlignmentValues>(_horizontalAlign.First(pair => pair.Alignment == item.Placement.HorizontalAlign).Word)
+            : null,
+        TablePositionYAlignment = _verticalAlign.Any(pair => pair.Alignment == item.Placement.VerticalAlign)
+            ? new DocumentFormat.OpenXml.EnumValue<W.VerticalAlignmentValues>(_verticalAlign.First(pair => pair.Alignment == item.Placement.VerticalAlign).Word)
+            : null,
     };
 }

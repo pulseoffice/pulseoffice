@@ -70,6 +70,26 @@ public sealed class StyleCollection<TStyle>(StyleStamp stamp) where TStyle : Doc
         stamp.Advance();
     }
 
+    public void BreakInheritanceCycles()
+    {
+        var settled = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var style in _styles)
+        {
+            var path = new HashSet<string>(StringComparer.Ordinal);
+            for (var current = style; current is not null && !settled.Contains(current.Name) && path.Add(current.Name);)
+            {
+                var parent = Find(current.ParentName);
+                if (parent is not null && path.Contains(parent.Name))
+                {
+                    current.ParentName = null;
+                    break;
+                }
+                current = parent;
+            }
+            settled.UnionWith(path);
+        }
+    }
+
     private void Reindex()
     {
         _byName.Clear();
@@ -168,6 +188,16 @@ public sealed class StyleSheet
     } = new(OutlineStyleName, [.. Enumerable.Range(0, ListStyle.LevelCount).Select(_ => new ListLevel(NumberFormat.None) { Suffix = string.Empty, Hanging = 0 })]);
 
     public const string OutlineStyleName = "Outline";
+
+    public void BreakInheritanceCycles()
+    {
+        Paragraph.BreakInheritanceCycles();
+        Character.BreakInheritanceCycles();
+        List.BreakInheritanceCycles();
+        Page.BreakInheritanceCycles();
+        Frame.BreakInheritanceCycles();
+        Table.BreakInheritanceCycles();
+    }
 
     public void DropDanglingLinks(IEnumerable<DocumentStyle> added)
     {

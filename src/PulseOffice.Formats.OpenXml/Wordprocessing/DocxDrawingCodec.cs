@@ -633,8 +633,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         (HorizontalRelation.Margin, DW.HorizontalRelativePositionValues.LeftMargin),
         (HorizontalRelation.Character, DW.HorizontalRelativePositionValues.Character),
         (HorizontalRelation.EndMargin, DW.HorizontalRelativePositionValues.RightMargin),
-        (HorizontalRelation.Margin, DW.HorizontalRelativePositionValues.InsideMargin),
-        (HorizontalRelation.EndMargin, DW.HorizontalRelativePositionValues.OutsideMargin),
+        (HorizontalRelation.InsideMargin, DW.HorizontalRelativePositionValues.InsideMargin),
+        (HorizontalRelation.OutsideMargin, DW.HorizontalRelativePositionValues.OutsideMargin),
     ];
 
     private readonly IReadOnlyList<(VerticalRelation Relation, DW.VerticalRelativePositionValues Word)> _vertical =
@@ -647,8 +647,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         (VerticalRelation.Line, DW.VerticalRelativePositionValues.Line),
         (VerticalRelation.Character, DW.VerticalRelativePositionValues.Line),
         (VerticalRelation.BottomMargin, DW.VerticalRelativePositionValues.BottomMargin),
-        (VerticalRelation.Margin, DW.VerticalRelativePositionValues.InsideMargin),
-        (VerticalRelation.BottomMargin, DW.VerticalRelativePositionValues.OutsideMargin),
+        (VerticalRelation.InsideMargin, DW.VerticalRelativePositionValues.InsideMargin),
+        (VerticalRelation.OutsideMargin, DW.VerticalRelativePositionValues.OutsideMargin),
     ];
 
     public bool Writes(AnchoredObject item) =>
@@ -702,8 +702,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
             RelativeHeight = (uint)Math.Max(0, item.ZOrder + 1) * 1024,
             BehindDoc = item.InBackground,
             Locked = false,
-            LayoutInCell = true,
-            AllowOverlap = true,
+            LayoutInCell = item.LayoutInCell,
+            AllowOverlap = item.AllowOverlap,
         };
         return new W.Run(new W.Drawing(anchor));
     }
@@ -767,6 +767,8 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
                 VerticalAlign = _alignments.Vertical(vertical?.VerticalAlignment?.Text),
             };
             item.InBackground = anchor.BehindDoc?.Value ?? false;
+            item.LayoutInCell = anchor.LayoutInCell?.Value ?? true;
+            item.AllowOverlap = anchor.AllowOverlap?.Value ?? true;
             item.ZOrder = (int)Math.Min(anchor.RelativeHeight?.Value ?? 0, int.MaxValue);
             item.Wrap = Wrap(anchor);
             var polygon = anchor.GetFirstChild<DW.WrapTight>()?.WrapPolygon ?? anchor.GetFirstChild<DW.WrapThrough>()?.WrapPolygon;

@@ -23,8 +23,14 @@ public sealed class ObjectPlacement : IObjectPlacement
     {
         var width = item.Size.Width.ToPoints();
         var height = item.Size.Height.ToPoints();
+        var start = (0d, frame.Page.Content.X);
+        var end = (frame.Page.Content.X + frame.Page.Content.Width, Math.Max(0, frame.Page.Width - frame.Page.Content.X - frame.Page.Content.Width));
+        var topMargin = (0d, frame.Page.Content.Y);
+        var bottomMargin = (frame.Page.Content.Y + frame.Page.Content.Height, Math.Max(0, frame.Page.Height - frame.Page.Content.Y - frame.Page.Content.Height));
         var (left, across) = item.Placement.Horizontal switch
         {
+            HorizontalRelation.InsideMargin => frame.EvenPage ? end : start,
+            HorizontalRelation.OutsideMargin => frame.EvenPage ? start : end,
             HorizontalRelation.Page => (0d, frame.Page.Width),
             HorizontalRelation.Margin => (0d, frame.Page.Content.X),
             HorizontalRelation.PageArea => (frame.Page.Content.X, frame.Page.Content.Width),
@@ -33,6 +39,8 @@ public sealed class ObjectPlacement : IObjectPlacement
         };
         var (top, down) = item.Placement.Vertical switch
         {
+            VerticalRelation.InsideMargin => frame.EvenPage ? bottomMargin : topMargin,
+            VerticalRelation.OutsideMargin => frame.EvenPage ? topMargin : bottomMargin,
             VerticalRelation.Page => (0d, frame.Page.Height),
             VerticalRelation.Margin => (0d, frame.Page.Content.Y),
             VerticalRelation.PageArea => (frame.Page.Content.Y, frame.Page.Content.Height),

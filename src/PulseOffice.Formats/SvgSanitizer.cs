@@ -62,7 +62,66 @@ public sealed partial class SvgSanitizer : ISvgSanitizer
             }
         }
 
+        LimitReferences(document);
         return document;
+    }
+
+    private const int DeepestReference = 32;
+    private const long LargestExpansion = 1_000_000;
+
+    private void LimitReferences(XDocument document)
+    {
+        var uses = document.Descendants().Where(element => element.Name.LocalName == "use").ToList();
+        if (uses.Count == 0) return;
+
+        var ids = document.Descendants()
+            .Select(element => (Id: element.Attribute("id")?.Value, Element: element))
+            .Where(pair => pair.Id is { Length: > 0 })
+            .GroupBy(pair => pair.Id!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Element, StringComparer.Ordinal);
+
+        var costs = new Dictionary<XElement, long>();
+        foreach (var use in uses)
+        {
+            if (Target(use, ids) is not { } target) continue;
+            if (use.Ancestors().Contains(target) || Cost(target, ids, costs, [], 0) < 0) use.Remove();
+        }
+
+        if (Cost(document.Root!, ids, [], [], 0) is < 0 or > LargestExpansion)
+            document.Descendants().Where(element => element.Name.LocalName == "use").ToList().ForEach(element => element.Remove());
+    }
+
+    private long Cost(XElement element, Dictionary<string, XElement> ids, Dictionary<XElement, long> costs, HashSet<XElement> visiting, int depth)
+    {
+        if (costs.TryGetValue(element, out var known)) return known;
+        if (depth > DeepestReference || !visiting.Add(element)) return -1;
+
+        long total = 0;
+        foreach (var node in element.DescendantsAndSelf())
+        {
+            total++;
+            if (node.Name.LocalName == "use" && Target(node, ids) is { } target)
+            {
+                var nested = Cost(target, ids, costs, visiting, depth + 1);
+                if (nested < 0)
+                {
+                    visiting.Remove(element);
+                    return -1;
+                }
+                total += nested;
+            }
+            if (total > LargestExpansion) break;
+        }
+
+        visiting.Remove(element);
+        costs[element] = total;
+        return total;
+    }
+
+    private XElement? Target(XElement use, Dictionary<string, XElement> ids)
+    {
+        var reference = use.Attributes().FirstOrDefault(attribute => attribute.Name.LocalName == "href")?.Value.Trim();
+        return reference is { Length: > 1 } && reference[0] == '#' && ids.TryGetValue(reference[1..], out var target) ? target : null;
     }
 
     private string Neutral(string css) => ExternalUrl().Replace(css.Replace("\\", string.Empty, StringComparison.Ordinal), "none");

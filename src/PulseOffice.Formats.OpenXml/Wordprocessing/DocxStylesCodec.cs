@@ -182,6 +182,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
                     break;
             }
         }
+        sheet.BreakInheritanceCycles();
     }
 
     private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next, string? linked)

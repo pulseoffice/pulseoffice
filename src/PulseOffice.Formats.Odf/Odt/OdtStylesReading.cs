@@ -126,6 +126,7 @@ internal sealed class OdtStylesReader(
             else context.Document.Notes.FootnoteSettings = settings with { Placement = FootnotePlacement((string?)configuration.Attribute(Text + "footnotes-position")) };
         }
 
+        sheet.BreakInheritanceCycles();
         Resolve(sheet, relative);
     }
 
@@ -166,6 +167,7 @@ internal sealed class OdtStylesReader(
             context.Document.Styles.Page.Add(page);
         }
 
+        context.Document.Styles.Page.BreakInheritanceCycles();
         if (context.Document.Styles.Page.All.Count > 0) return;
         context.Document.Styles.Page.Add(new PageStyle(PulseOffice.Documents.Styles.DefaultStyleNames.Standard));
         context.Document.InitialPageStyle = PulseOffice.Documents.Styles.DefaultStyleNames.Standard;

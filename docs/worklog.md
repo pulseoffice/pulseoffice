@@ -14008,3 +14008,22 @@ paragraph tagging by position stays queued. Log: [deep-audit/round-252-pdf-form-
 - Cutting the last outline block also removes the line break before it; ODS sorted validation lists stay sorted and
   show sorted (XLSX writes typed entries sorted, declared XLSX244); remove duplicates compares shown values.
   Log: docs/deep-audit/round-253-leftovers-validation.md.
+
+### Round 254 (2026-11-19): Folio and PDF form leftovers
+DOCX layout-in-cell and allow-overlap are modelled and round trip (ODT `style:flow-with-text`); Word's inside and outside
+margin relations are their own relations, mirrored on even pages; PDF field fragments from different paragraphs join
+with a line break and widget appearances use the control's font and size from the export's font set; section blocks
+restart section note numbering. Log: docs/deep-audit/round-254-folio-pdf-leftovers.md.
+
+### Round 255: reader robustness (2026-11-19)
+- Style inheritance cycles read from ODT and DOCX are cut at load (`StyleSheet.BreakInheritanceCycles`).
+- The SVG sanitizer removes cyclic, over-deep and exponentially expanding `<use>` references.
+  Log: docs/deep-audit/round-255-reader-robustness.md.
+
+## Round 256 (2026-11-19)
+
+Ledger engine: MAP broadcasts and pads mismatched arrays with #N/A as Excel does; MAKEARRAY propagates size errors. Log: docs/deep-audit/round-256-lambda-helpers.md.
+
+### Round 257: Folio tables and tables of contents (2026-11-19)
+- DOCX floating tables keep `tblpXSpec`/`tblpYSpec` alignment; `TOC \o` without a range reads nine levels.
+  Log: docs/deep-audit/round-257-folio-tables-toc.md.

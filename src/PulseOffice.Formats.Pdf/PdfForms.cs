@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using PulseOffice.Formats.Pdf.Fonts;
 using PulseOffice.Printing;
 
 namespace PulseOffice.Formats.Pdf;
@@ -8,9 +9,21 @@ public interface IPdfFormWriter
 {
     PdfFormFields Begin();
 
-    IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, PdfFormFields form, IPdfAnnotationTagging? tagging = null);
+    IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, PdfFormFields form, IPdfAnnotationTagging? tagging = null, PdfWidgetFonts? fonts = null);
 
     string? AcroForm(PdfFile file, PdfFormFields form);
+}
+
+public sealed class PdfWidgetFonts(IPdfFontSet set, IDictionary<IPdfFontResource, int> objects, PdfFile file)
+{
+    public IPdfFontSet Set { get; } = set;
+
+    public int Id(IPdfFontResource font)
+    {
+        ArgumentNullException.ThrowIfNull(font);
+        if (!objects.TryGetValue(font, out var id)) objects[font] = id = file.Reserve();
+        return id;
+    }
 }
 
 public sealed class PdfFormFields
@@ -18,6 +31,11 @@ public sealed class PdfFormFields
     private readonly HashSet<string> _names = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PdfFieldGroup> _byIdentity = new(StringComparer.Ordinal);
     private readonly List<PdfFieldGroup> _groups = [];
+    private readonly Dictionary<string, int> _fonts = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, int> Fonts => _fonts;
+
+    public void UseFont(string name, int id) => _fonts[name] = id;
 
     public IReadOnlyList<PdfFieldGroup> Groups => _groups;
 
@@ -50,6 +68,10 @@ public sealed class PdfFieldGroup(string name, PrintFormField field)
 
     public string Name { get; } = name;
 
+    public string? Appearance { get; private set; }
+
+    public void Appear(string appearance) => Appearance ??= appearance;
+
     public PrintFormField Field { get; private set; } = field;
 
     public IReadOnlyList<(int Id, string Entries)> Widgets => _widgets;
@@ -57,7 +79,8 @@ public sealed class PdfFieldGroup(string name, PrintFormField field)
     public void Extend(PrintFormField next)
     {
         ArgumentNullException.ThrowIfNull(next);
-        Field = Field with { Value = Field.Value + next.Value, Checked = Field.Checked || next.Checked };
+        var separator = Field.LastSegment is { } last && next.FirstSegment is { } first && last != first && Field.Value.Length > 0 && next.Value.Length > 0 ? "\n" : "";
+        Field = Field with { Value = Field.Value + separator + next.Value, Checked = Field.Checked || next.Checked, LastSegment = next.LastSegment ?? Field.LastSegment };
     }
 
     public void Add(int id, string entries) => _widgets.Add((id, entries));
@@ -73,11 +96,10 @@ public sealed class PdfFormWriter : IPdfFormWriter
     private const double FontSize = 10;
     private const double Padding = 2;
     private const string DefaultAppearance = "/Helv 10 Tf 0 g";
-    private const string FontResource = "<< /Font << /Helv << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> >> >>";
 
     public PdfFormFields Begin() => new();
 
-    public IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, PdfFormFields form, IPdfAnnotationTagging? tagging = null)
+    public IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, PdfFormFields form, IPdfAnnotationTagging? tagging = null, PdfWidgetFonts? fonts = null)
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(fields);
@@ -96,14 +118,15 @@ public sealed class PdfFormWriter : IPdfFormWriter
             entries.Append(CultureInfo.InvariantCulture, $"/Type /Annot /Subtype /Widget /Rect {rect} /F 4 /P {pageId} 0 R");
             if (field.Kind != PrintFormFieldKind.Picture) entries.Append(" /MK << /BG [1 1 1] >>");
             if (tagging is not null) entries.Append(tagging.Field(id, marked));
+            var group = form.Group(field);
             entries.Append(field.Kind switch
             {
                 PrintFormFieldKind.CheckBox => FormattableString.Invariant(
                     $" /AS {(field.Checked ? "/Yes" : "/Off")} /AP << /N << /Yes {CheckAppearance(file, width, height, true)} 0 R /Off {CheckAppearance(file, width, height, false)} 0 R >> >>"),
                 PrintFormFieldKind.Picture => FormattableString.Invariant($" /MK << /TP 1 >> /AP << /N {Blank(file, width, height)} 0 R >>"),
-                _ => FormattableString.Invariant($" /AP << /N {TextAppearance(file, width, height, field)} 0 R >>"),
+                _ => FormattableString.Invariant($" /AP << /N {TextAppearance(file, width, height, field, fonts, form, group)} 0 R >>"),
             });
-            form.Group(field).Add(id, entries.ToString());
+            group.Add(id, entries.ToString());
             ids.Add(id);
         }
         return ids;
@@ -132,7 +155,14 @@ public sealed class PdfFormWriter : IPdfFormWriter
         }
         if (roots.Count == 0) return null;
         return "<< /Fields [" + string.Join(' ', roots.Select(id => id.ToString(CultureInfo.InvariantCulture) + " 0 R")) +
-               "] /DA " + PdfFile.TextString(DefaultAppearance) + " /DR " + FontResource + " >>";
+               "] /DA " + PdfFile.TextString(DefaultAppearance) + " /DR " + Resources(form.Fonts) + " >>";
+    }
+
+    private static string Resources(IEnumerable<KeyValuePair<string, int>> fonts)
+    {
+        var result = new StringBuilder("<< /Font << /Helv << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+        foreach (var (name, id) in fonts) result.Append(CultureInfo.InvariantCulture, $" /{name} {id} 0 R");
+        return result.Append(" >> >>").ToString();
     }
 
     private static string FieldEntries(PdfFieldGroup group)
@@ -155,36 +185,55 @@ public sealed class PdfFormWriter : IPdfFormWriter
                 var options = field.Options.Count > 0 || field.Value.Length == 0 ? field.Options : [field.Value];
                 result.Append(CultureInfo.InvariantCulture, $" /FT /Ch /Ff {flags} /Opt [");
                 result.Append(string.Join(' ', options.Select(PdfFile.TextString)));
-                result.Append("] /V ").Append(PdfFile.TextString(field.Value)).Append(" /DA ").Append(PdfFile.TextString(DefaultAppearance));
+                result.Append("] /V ").Append(PdfFile.TextString(field.Value)).Append(" /DA ").Append(PdfFile.TextString(group.Appearance ?? DefaultAppearance));
                 break;
             default:
                 if (field.MultiLine) flags |= MultiLineFlag;
                 result.Append(CultureInfo.InvariantCulture, $" /FT /Tx /Ff {flags} /V ").Append(PdfFile.TextString(field.Value))
-                    .Append(" /DA ").Append(PdfFile.TextString(DefaultAppearance));
+                    .Append(" /DA ").Append(PdfFile.TextString(group.Appearance ?? DefaultAppearance));
                 break;
         }
         return result.ToString();
     }
 
-    private static int TextAppearance(PdfFile file, double width, double height, PrintFormField field)
+    private static int TextAppearance(PdfFile file, double width, double height, PrintFormField field, PdfWidgetFonts? fonts, PdfFormFields form, PdfFieldGroup group)
     {
         var content = new StringBuilder(FormattableString.Invariant($"1 g 0 0 {Number(width)} {Number(height)} re f /Tx BMC"));
         var lines = field.Value.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var font = fonts is null ? null : field.Font;
+        var size = font is { SizePoints: > 0 } sized ? sized.SizePoints : FontSize;
+        var used = new Dictionary<string, int>(StringComparer.Ordinal);
         if (field.Value.Length > 0)
         {
-            var leading = FontSize * 1.15;
+            var leading = size * 1.15;
             var first = lines.Length == 1 && !field.MultiLine
-                ? (height - FontSize * 0.7) / 2
-                : height - Padding - FontSize * 0.8;
+                ? (height - size * 0.7) / 2
+                : height - Padding - size * 0.8;
             content.Append(FormattableString.Invariant(
-                $" q {Number(Padding / 2)} {Number(Padding / 2)} {Number(Math.Max(0, width - Padding))} {Number(Math.Max(0, height - Padding))} re W n BT /Helv {Number(FontSize)} Tf 0 g {Number(Padding)} {Number(first)} Td {Number(leading)} TL"));
+                $" q {Number(Padding / 2)} {Number(Padding / 2)} {Number(Math.Max(0, width - Padding))} {Number(Math.Max(0, height - Padding))} re W n BT 0 g {Number(Padding)} {Number(first)} Td {Number(leading)} TL"));
+            if (font is null || fonts is null) content.Append(FormattableString.Invariant($" /Helv {Number(size)} Tf"));
             for (var index = 0; index < lines.Length; index++)
-                content.Append(index == 0 ? " " : " T* ").Append(PdfEncoding.Literal(lines[index])).Append(" Tj");
+            {
+                if (index > 0) content.Append(" T*");
+                if (font is null || fonts is null)
+                {
+                    content.Append(' ').Append(PdfEncoding.Literal(lines[index])).Append(" Tj");
+                    continue;
+                }
+                foreach (var part in fonts.Set.Show(lines[index], font))
+                {
+                    var id = fonts.Id(part.Font);
+                    used[part.Font.Name] = id;
+                    form.UseFont(part.Font.Name, id);
+                    group.Appear(FormattableString.Invariant($"/{part.Font.Name} {Number(size)} Tf 0 g"));
+                    content.Append(FormattableString.Invariant($" /{part.Font.Name} {Number(size)} Tf ")).Append(part.Font.Show(part.Glyphs)).Append(" Tj");
+                }
+            }
             content.Append(" ET Q");
         }
         content.Append(" EMC\n");
         return file.WriteStream(Encoding.Latin1.GetBytes(content.ToString()), false,
-            FormattableString.Invariant($"/Type /XObject /Subtype /Form /BBox [0 0 {Number(width)} {Number(height)}] /Resources {FontResource}"));
+            FormattableString.Invariant($"/Type /XObject /Subtype /Form /BBox [0 0 {Number(width)} {Number(height)}] /Resources ") + Resources(used));
     }
 
     private static int Blank(PdfFile file, double width, double height) =>

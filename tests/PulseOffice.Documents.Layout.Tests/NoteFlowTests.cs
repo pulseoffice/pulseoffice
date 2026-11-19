@@ -111,4 +111,22 @@ public sealed class NoteFlowTests
 
         Assert.Equal(["1", "2", "1"], citations);
     }
+
+    [Fact]
+    public void Note_numbering_restarts_where_a_section_block_starts_and_ends()
+    {
+        var f = new LayoutFixture(width: 200, height: 400);
+        f.Document.Notes.FootnoteSettings = f.Document.Notes.FootnoteSettings with { Restart = NoteNumbering.Section };
+        var a = f.Add("riga");
+        var inside = new ParagraphBlock("s1", "dentro");
+        f.Document.Body.Add(new SectionBlock("sec", "S", new BlockContainer([inside])));
+        var after = f.Add("dopo");
+        Note(f, a, "a");
+        Note(f, inside, "b");
+        Note(f, after, "c");
+
+        var citations = f.Layout().Pages.SelectMany(page => page.Lines.Where(line => line.Line.Notes.Any()).Select(Citation));
+
+        Assert.Equal(["1", "1", "1"], citations);
+    }
 }

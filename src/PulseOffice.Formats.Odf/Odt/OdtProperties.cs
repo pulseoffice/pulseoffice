@@ -326,15 +326,21 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
 
     private readonly TokenMap<HorizontalRelation> _horizontal = new(HorizontalRelation.Paragraph, "paragraph",
         (HorizontalRelation.Paragraph, "paragraph"), (HorizontalRelation.PageArea, "page-content"), (HorizontalRelation.Page, "page"),
-        (HorizontalRelation.Margin, "page-start-margin"), (HorizontalRelation.Character, "char"), (HorizontalRelation.Column, "paragraph-content"), (HorizontalRelation.EndMargin, "page-end-margin"));
+        (HorizontalRelation.Margin, "page-start-margin"), (HorizontalRelation.Character, "char"), (HorizontalRelation.Column, "paragraph-content"), (HorizontalRelation.EndMargin, "page-end-margin"),
+        (HorizontalRelation.InsideMargin, "page-start-margin"), (HorizontalRelation.OutsideMargin, "page-end-margin"));
 
     private readonly TokenMap<VerticalRelation> _vertical = new(VerticalRelation.Paragraph, "paragraph",
         (VerticalRelation.Paragraph, "paragraph"), (VerticalRelation.PageArea, "page-content"), (VerticalRelation.Page, "page"),
-        (VerticalRelation.ParagraphArea, "paragraph-content"), (VerticalRelation.Margin, "page"), (VerticalRelation.Line, "line"), (VerticalRelation.Character, "char"), (VerticalRelation.BottomMargin, "page"));
+        (VerticalRelation.ParagraphArea, "paragraph-content"), (VerticalRelation.Margin, "page"), (VerticalRelation.Line, "line"), (VerticalRelation.Character, "char"), (VerticalRelation.BottomMargin, "page"),
+        (VerticalRelation.InsideMargin, "page"), (VerticalRelation.OutsideMargin, "page"));
 
     private const string TopMargin = "top-margin";
 
     private const string BottomMargin = "bottom-margin";
+
+    private const string InsideMargin = "inside-margin";
+
+    private const string OutsideMargin = "outside-margin";
 
     private readonly TokenMap<ObjectAlignment> _horizontalPosition = new(ObjectAlignment.None, "from-left",
         (ObjectAlignment.None, "from-left"), (ObjectAlignment.Start, "left"), (ObjectAlignment.Center, "center"), (ObjectAlignment.End, "right"),
@@ -360,6 +366,18 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
 
     public HorizontalRelation Horizontal(string? token) => _horizontal.Value(token);
 
+    public void WriteHorizontal(XElement graphic, HorizontalRelation relation)
+    {
+        graphic.SetAttributeValue(Style + "horizontal-rel", Horizontal(relation));
+        if (relation == HorizontalRelation.InsideMargin) graphic.SetAttributeValue(Pt + "horizontal-rel", InsideMargin);
+        if (relation == HorizontalRelation.OutsideMargin) graphic.SetAttributeValue(Pt + "horizontal-rel", OutsideMargin);
+    }
+
+    public HorizontalRelation? ReadHorizontal(XElement? graphic) =>
+        (string?)graphic?.Attribute(Pt + "horizontal-rel") == InsideMargin ? HorizontalRelation.InsideMargin
+        : (string?)graphic?.Attribute(Pt + "horizontal-rel") == OutsideMargin ? HorizontalRelation.OutsideMargin
+        : (string?)graphic?.Attribute(Style + "horizontal-rel") is { } token ? Horizontal(token) : null;
+
     public string Vertical(VerticalRelation relation) => _vertical.Token(relation);
 
     public VerticalRelation Vertical(string? token) => _vertical.Value(token);
@@ -369,11 +387,15 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
         graphic.SetAttributeValue(Style + "vertical-rel", Vertical(relation));
         if (relation == VerticalRelation.Margin) graphic.SetAttributeValue(Pt + "vertical-rel", TopMargin);
         if (relation == VerticalRelation.BottomMargin) graphic.SetAttributeValue(Pt + "vertical-rel", BottomMargin);
+        if (relation == VerticalRelation.InsideMargin) graphic.SetAttributeValue(Pt + "vertical-rel", InsideMargin);
+        if (relation == VerticalRelation.OutsideMargin) graphic.SetAttributeValue(Pt + "vertical-rel", OutsideMargin);
     }
 
     public VerticalRelation? ReadVertical(XElement? graphic) =>
         (string?)graphic?.Attribute(Pt + "vertical-rel") == TopMargin ? VerticalRelation.Margin
         : (string?)graphic?.Attribute(Pt + "vertical-rel") == BottomMargin ? VerticalRelation.BottomMargin
+        : (string?)graphic?.Attribute(Pt + "vertical-rel") == InsideMargin ? VerticalRelation.InsideMargin
+        : (string?)graphic?.Attribute(Pt + "vertical-rel") == OutsideMargin ? VerticalRelation.OutsideMargin
         : (string?)graphic?.Attribute(Style + "vertical-rel") is { } token ? Vertical(token) : null;
 
     public XElement Graphic(FrameProperties properties)
@@ -388,7 +410,7 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
         if (properties.BorderWidth is not null || properties.BorderColor is not null)
             element.Add(new XAttribute(Fo + "border", $"{measure.Points(properties.BorderWidth ?? 0.5)} solid {measure.Hex(properties.BorderColor ?? 0xFF000000)}"));
         if (properties.Padding is { } padding) element.Add(new XAttribute(Fo + "padding", measure.Points(padding)));
-        if (properties.Horizontal is { } horizontal) element.Add(new XAttribute(Style + "horizontal-rel", Horizontal(horizontal)));
+        if (properties.Horizontal is { } horizontal) WriteHorizontal(element, horizontal);
         if (properties.Vertical is { } vertical) WriteVertical(element, vertical);
         return element;
     }
@@ -432,7 +454,7 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
             BorderWidth = parts.Select(part => measure.Points(part)).FirstOrDefault(points => points is not null),
             BorderColor = parts.Select(part => measure.Color(part)).FirstOrDefault(c => c is not null),
             Padding = measure.Points((string?)graphic.Attribute(Fo + "padding")),
-            Horizontal = (string?)graphic.Attribute(Style + "horizontal-rel") is { } horizontal ? Horizontal(horizontal) : null,
+            Horizontal = ReadHorizontal(graphic),
             Vertical = ReadVertical(graphic),
         };
     }

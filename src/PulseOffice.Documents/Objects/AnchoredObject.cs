@@ -24,6 +24,8 @@ public enum HorizontalRelation
     Character,
     Column,
     EndMargin,
+    InsideMargin,
+    OutsideMargin,
 }
 
 public enum VerticalRelation
@@ -36,6 +38,8 @@ public enum VerticalRelation
     Character,
     ParagraphArea,
     BottomMargin,
+    InsideMargin,
+    OutsideMargin,
 }
 
 public abstract record ObjectAnchor
@@ -199,6 +203,10 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
 
     public bool InBackground { get; set; }
 
+    public bool LayoutInCell { get; set; } = true;
+
+    public bool AllowOverlap { get; set; } = true;
+
     public bool WrapContour { get; set; }
 
     public ObjectContour? Contour { get; set; }
@@ -227,6 +235,8 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
         ZOrder = source.ZOrder;
         RotationDegrees = source.RotationDegrees;
         InBackground = source.InBackground;
+        LayoutInCell = source.LayoutInCell;
+        AllowOverlap = source.AllowOverlap;
         WrapContour = source.WrapContour;
         Contour = source.Contour;
         WrapFirstParagraph = source.WrapFirstParagraph;
@@ -239,7 +249,7 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
     public bool SameState(AnchoredObject other) =>
         Anchor == other.Anchor && Size == other.Size && Placement == other.Placement && Wrap == other.Wrap && WrapSpacing == other.WrapSpacing
         && StyleName == other.StyleName && Name == other.Name && ZOrder == other.ZOrder && RotationDegrees.Equals(other.RotationDegrees)
-        && InBackground == other.InBackground && WrapContour == other.WrapContour && Equals(Contour, other.Contour)
+        && InBackground == other.InBackground && LayoutInCell == other.LayoutInCell && AllowOverlap == other.AllowOverlap && WrapContour == other.WrapContour && Equals(Contour, other.Contour)
         && WrapFirstParagraph == other.WrapFirstParagraph && FlipHorizontal == other.FlipHorizontal && FlipVertical == other.FlipVertical && Hyperlink == other.Hyperlink
         && HyperlinkTip == other.HyperlinkTip;
 
@@ -253,6 +263,8 @@ public sealed class AnchoredObject(string id, ObjectAnchor anchor, AnchoredConte
         ZOrder = ZOrder,
         RotationDegrees = RotationDegrees,
         InBackground = InBackground,
+        LayoutInCell = LayoutInCell,
+        AllowOverlap = AllowOverlap,
         WrapContour = WrapContour,
         Contour = Contour,
         WrapFirstParagraph = WrapFirstParagraph,

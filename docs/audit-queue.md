@@ -54,8 +54,7 @@ the round that fixes it is joined and the join run is green.
 - Folio notes (232, 250): a page style run starts only at a top-level paragraph with a page style (not at a table); Word
   has one footnote separator per document, so a page style's own line is declared (DOCX273). Continuation notices are
   now selectable read-only text by a click, but a drag or Shift+click from body text does not extend into them and
-  Select All does not include them (250). Section note restarts follow page style runs only; a section block is not a
-  restart point (250). None of this has been opened in Word or the reference suite.
+  Select All does not include them (250, 254). None of this has been opened in Word or the reference suite.
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
@@ -63,11 +62,18 @@ the round that fixes it is joined and the join run is green.
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
   alignment relative to a paragraph now settles on the wrapped height in up to four passes (246) and, for a paragraph
   broken across pages, on its last line on the anchor page (250). Not opened in Word.
-- Folio objects (251): `wp:anchor/@layoutInCell` and `@allowOverlap` are always written true and not read (no model
-  property); the bottom-margin vertical relation goes to ODT as `page` plus `pt:vertical-rel`, so other applications
-  measure from the page top; Word's inside and outside margin relations are read as left and right margin. Not opened
-  in Word or the reference suite.
+- Folio objects (251, 254): the bottom-margin, inside-margin and outside-margin relations go to ODT as the nearest
+  native relation plus `pt:vertical-rel`/`pt:horizontal-rel`, so other applications measure from the page top or the
+  start or end margin; a native form needs the anchor page geometry in the ODT writer. Allow-overlap goes to ODT only as
+  our attribute. Not opened in Word or the reference suite. (254)
 
+- Folio TOC (257): the `\t` switch (additional styles with levels) and the first level of `\o "2-4"` have no model
+  property and are lost on DOCX reading (ODT `text:index-source-styles` likewise); a TOC without `\o` is still read as
+  built from the outline. (257)
+- (257) Re-audit Folio tables in depth: nested tables, cell margins and vertical alignment, merged cells, column widths
+  (auto, fixed, percent), table styles and band formatting, border conflicts, ODT table round trips, and TOC
+  hyperlinks, page numbers and update after edits; round 257 covered only floating tables, row splitting, repeated
+  headers, table look and the TOC switches.
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
@@ -76,12 +82,11 @@ the round that fixes it is joined and the join run is green.
 - Tagged PDF: Deck paragraphs are still matched to drawn text by text, not by layout position (the shape text layout
   does not expose line boxes to the print path); table cells are now tagged by position. (243, 247)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
-- PDF form fields: a field crossing pages joins its page fragments in `/V` without a separator, so a break between
-  paragraphs loses its line break. (252)
-- PDF form fields: widget appearances use Helvetica 10 pt with WinAnsi encoding: characters outside it show as `?`, and
-  the control's own font and size are not used. (252)
+- PDF form fields: a widget drawn with an embedded subset holds only the glyphs printed; a viewer that regenerates the
+  appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
 
 ## Ledger
+- XLSX date-group and dynamic month filters scan every row of the filter range at load; clip to the used range. (255)
 - Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell
   order in Excel (declared XLSX244). Not opened in Excel or the reference suite. (253)
 - Remove duplicates now compares shown text, so the text "1" and the number 1 shown as "1" are duplicates; Excel's
@@ -97,6 +102,7 @@ the round that fixes it is joined and the join run is green.
   which other ODF applications ignore (they keep objects locked); Folio's exact character hit skips rotated text frames; none of this was
   built, run or opened in Excel, Word, PowerPoint or the reference suite. (236)
 
+- (256) Re-audit spill ranges, `@` and `#` references, iterative calculation, volatile dirty tracking, 1904 dates and the XLSX `cm` dynamic array metadata in depth; round 256 covered only the LAMBDA helpers and IFERROR/IFNA.
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
   the ribbon, dialogs or panels, nor over the new polite live region of the status bar. (201, 203)

@@ -122,16 +122,16 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
     private sealed class MarkVisitor(IPageCanvas canvas, FolioMarkIndex index) : ILayoutVisitor
     {
         private readonly ObjectTurns _turns = new();
-        private readonly Dictionary<string, (FolioFormSpan Span, LayoutRect Area, System.Text.StringBuilder Text, string Paragraph)> _fields = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (FolioFormSpan Span, LayoutRect Area, System.Text.StringBuilder Text, string Paragraph, string First, PrintFont? Font)> _fields = new(StringComparer.Ordinal);
         private readonly List<string> _fieldOrder = [];
 
         public void MarkFields()
         {
             foreach (var id in _fieldOrder)
             {
-                var (span, area, text, _) = _fields[id];
+                var (span, area, text, last, first, font) = _fields[id];
                 var value = span.Field.Kind is PrintFormFieldKind.CheckBox or PrintFormFieldKind.Picture || span.ShowsPlaceholder ? "" : text.ToString();
-                canvas.MarkField(Rect(area), span.Field with { Value = value });
+                canvas.MarkField(Rect(area), span.Field with { Value = value, FirstSegment = first, LastSegment = last, Font = font });
             }
         }
 
@@ -148,15 +148,18 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
                 if (_fields.TryGetValue(span.Id, out var known))
                 {
                     if (known.Paragraph != line.ParagraphId) known.Text.Append('\n');
-                    _fields[span.Id] = (span, Union(known.Area, area), known.Text.Append(shown), line.ParagraphId);
+                    _fields[span.Id] = (span, Union(known.Area, area), known.Text.Append(shown), line.ParagraphId, known.First, known.Font ?? Font(run));
                 }
                 else
                 {
                     _fieldOrder.Add(span.Id);
-                    _fields[span.Id] = (span, area, new System.Text.StringBuilder().Append(shown), line.ParagraphId);
+                    _fields[span.Id] = (span, area, new System.Text.StringBuilder().Append(shown), line.ParagraphId, line.ParagraphId, Font(run));
                 }
             }
         }
+
+        private static PrintFont? Font(LayoutGlyphRun run) =>
+            run.ObjectId is null && run.Text.Length > 0 ? new PrintFont(run.Font.Family, run.Font.Size, run.Font.Bold, run.Font.Italic) : null;
 
         private static LayoutRect Union(LayoutRect first, LayoutRect second)
         {

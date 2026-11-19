@@ -71,7 +71,9 @@ public sealed class DocxIndexCodec(IIndexStyles styles, DocxIndexSettings settin
                 }
                 if (switches.TryGetValue("f", out var name) && name.Length > 0 && !switches.ContainsKey("o"))
                     return new IndexDefinition(IndexKind.User) { UserName = name, Hyperlinks = common.Hyperlinks, PageNumbers = common.Pages };
-                var levels = switches.TryGetValue("o", out var range) && range.Split('-') is [_, var last] && int.TryParse(last, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 3;
+                var levels = !switches.TryGetValue("o", out var range) ? 3
+                    : range.Split('-') is [_, var last] && int.TryParse(last, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? Math.Clamp(parsed, 1, 9)
+                    : 9;
                 return new IndexDefinition(IndexKind.Contents)
                 {
                     Levels = levels,

@@ -15,7 +15,7 @@ public sealed class DocxFloatingTableTests
     private const string Namespace = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"";
     private readonly DocxComposer _composer = new(new DirectFormatting(), new DefaultStyleSheetFactory());
 
-    private MemoryStream Package()
+    private MemoryStream Package(string position = "w:tblpX=\"2880\" w:tblpY=\"360\"")
     {
         var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
@@ -23,7 +23,7 @@ public sealed class DocxFloatingTableTests
             var main = package.AddMainDocumentPart();
             main.Document = new W.Document($"<w:document {Namespace}><w:body>"
                 + "<w:p><w:r><w:t>Prima</w:t></w:r></w:p>"
-                + "<w:tbl><w:tblPr><w:tblpPr w:leftFromText=\"180\" w:rightFromText=\"180\" w:topFromText=\"0\" w:bottomFromText=\"0\" w:vertAnchor=\"text\" w:horzAnchor=\"margin\" w:tblpX=\"2880\" w:tblpY=\"360\"/><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr>"
+                + "<w:tbl><w:tblPr><w:tblpPr w:leftFromText=\"180\" w:rightFromText=\"180\" w:topFromText=\"0\" w:bottomFromText=\"0\" w:vertAnchor=\"text\" w:horzAnchor=\"margin\" " + position + "/><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr>"
                 + "<w:tblGrid><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"1440\"/></w:tblGrid>"
                 + "<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
                 + "<w:p><w:r><w:t>Testo che scorre accanto</w:t></w:r></w:p>"
@@ -74,5 +74,22 @@ public sealed class DocxFloatingTableTests
         }
         written.Position = 0;
         AssertFloating(_composer.Reader(DocxFlavour.Document).Read(written).Value!);
+    }
+
+    [Fact]
+    public void A_floating_table_aligned_by_tblpXSpec_and_tblpYSpec_keeps_its_alignment_through_DOCX()
+    {
+        var document = _composer.Reader(DocxFlavour.Document).Read(Package("w:tblpXSpec=\"center\" w:tblpYSpec=\"bottom\"")).Value!;
+        Assert.Equal((ObjectAlignment.Center, ObjectAlignment.End), (document.Objects.All.Single().Placement.HorizontalAlign, document.Objects.All.Single().Placement.VerticalAlign));
+
+        using var written = new MemoryStream();
+        Assert.True(_composer.Writer(DocxFlavour.Document).Write(document, written).Succeeded);
+        written.Position = 0;
+        using (var package = WordprocessingDocument.Open(written, false))
+        {
+            var position = package.MainDocumentPart!.Document!.Body!.Elements<W.Table>().Single().GetFirstChild<W.TableProperties>()!.TablePositionProperties!;
+            Assert.Equal(W.HorizontalAlignmentValues.Center, position.TablePositionXAlignment!.Value);
+            Assert.Equal(W.VerticalAlignmentValues.Bottom, position.TablePositionYAlignment!.Value);
+        }
     }
 }

@@ -148,11 +148,11 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var footnoteSettings = document.Notes.FootnoteSettings;
         var endnoteSettings = document.Notes.EndnoteSettings;
         var runs = RunStarts(document);
-        foreach (var (paragraph, section, block) in NoteOrder(document, runs))
+        foreach (var (paragraph, section, block, boundary) in NoteOrder(document, runs))
         {
             var chapter = (footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
                 && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1;
-            var run = runs.Contains(paragraph.Id, StringComparer.Ordinal);
+            var run = boundary || runs.Contains(paragraph.Id, StringComparer.Ordinal);
             if (Restarts(footnoteSettings.Restart, chapter, run)) footnoteCount = 0;
             if (Restarts(endnoteSettings.Restart, chapter, run)) endnoteCount = 0;
             foreach (var mark in paragraph.Marks.OfType<NoteMark>().OrderBy(mark => mark.Offset))
@@ -184,22 +184,27 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
 
     private string RunKey(int index) => "#page-run-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    private IEnumerable<(ParagraphBlock Paragraph, string? Section, SectionBlock? Block)> NoteOrder(TextDocument document, List<string> runStarts)
+    private IEnumerable<(ParagraphBlock Paragraph, string? Section, SectionBlock? Block, bool Boundary)> NoteOrder(TextDocument document, List<string> runStarts)
     {
         var sections = new Dictionary<string, SectionBlock>(StringComparer.Ordinal);
         foreach (var section in document.Body.Blocks.OfType<SectionBlock>().Where(section => !section.Hidden))
             foreach (var paragraph in tree.Paragraphs(section.Content)) sections.TryAdd(paragraph.Id, section);
         var starts = runStarts.ToHashSet(StringComparer.Ordinal);
         var run = 0;
+        var first = true;
+        SectionBlock? previous = null;
         foreach (var paragraph in tree.Paragraphs(document.Body))
         {
             if (starts.Contains(paragraph.Id)) run++;
             var block = sections.GetValueOrDefault(paragraph.Id);
             var section = block?.Id ?? (run < runStarts.Count ? RunKey(run) : null);
-            yield return (paragraph, section, block);
+            var boundary = !first && !ReferenceEquals(block, previous);
+            first = false;
+            previous = block;
+            yield return (paragraph, section, block, boundary);
             foreach (var item in document.Objects.AnchoredTo(paragraph.Id))
                 if (item.Content.Story is { } story)
-                    foreach (var inner in tree.Paragraphs(story)) yield return (inner, section, block);
+                    foreach (var inner in tree.Paragraphs(story)) yield return (inner, section, block, false);
         }
     }
 

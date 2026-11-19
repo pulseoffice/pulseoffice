@@ -5878,6 +5878,8 @@
   "folio.object.relation.topMargin": "Oberer Rand",
   "folio.object.relation.endMargin": "Rechter Rand",
   "folio.object.relation.bottomMargin": "Unterer Rand",
+  "folio.object.relation.insideMargin": "Innerer Rand",
+  "folio.object.relation.outsideMargin": "Äußerer Rand",
   "folio.object.relation.column": "Spalte",
   "folio.object.relation.paragraphArea": "Absatztextbereich",
   "folio.object.align.horizontal": "Horizontale Position",

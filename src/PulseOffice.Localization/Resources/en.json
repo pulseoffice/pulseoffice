@@ -5878,6 +5878,8 @@
   "folio.object.relation.topMargin": "Top margin",
   "folio.object.relation.endMargin": "Right margin",
   "folio.object.relation.bottomMargin": "Bottom margin",
+  "folio.object.relation.insideMargin": "Inside margin",
+  "folio.object.relation.outsideMargin": "Outside margin",
   "folio.object.relation.column": "Column",
   "folio.object.relation.paragraphArea": "Paragraph text area",
   "folio.object.align.horizontal": "Horizontal position",

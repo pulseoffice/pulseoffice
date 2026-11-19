@@ -456,15 +456,17 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
         var graphic = new XElement(Style + "graphic-properties",
             new XAttribute(Style + "wrap", frames.Wrap(item.Wrap)),
             new XAttribute(Style + "horizontal-pos", frames.HorizontalPosition(item.Placement.HorizontalAlign)),
-            new XAttribute(Style + "horizontal-rel", frames.Horizontal(item.Placement.Horizontal)),
             new XAttribute(Style + "vertical-pos", frames.VerticalPosition(item.Placement.VerticalAlign)),
             new XAttribute(Fo + "margin-left", measure.Length(item.WrapSpacing.Left)),
             new XAttribute(Fo + "margin-right", measure.Length(item.WrapSpacing.Right)),
             new XAttribute(Fo + "margin-top", measure.Length(item.WrapSpacing.Top)),
             new XAttribute(Fo + "margin-bottom", measure.Length(item.WrapSpacing.Bottom)));
+        frames.WriteHorizontal(graphic, item.Placement.Horizontal);
         frames.WriteVertical(graphic, item.Placement.Vertical);
         if (item.Wrap == WrapMode.TopAndBottom) graphic.Add(new XAttribute(Pt + "wrap", "top-and-bottom"));
         if (item.InBackground) graphic.Add(new XAttribute(Style + "run-through", "background"));
+        if (!item.LayoutInCell) graphic.Add(new XAttribute(Style + "flow-with-text", "false"));
+        if (!item.AllowOverlap) graphic.Add(new XAttribute(Pt + "allow-overlap", "false"));
         if (item.WrapContour && item.Content is EmbeddedContent && item.Anchor is not AsCharacterAnchor) graphic.Add(new XAttribute(Style + "wrap-contour", "true"), new XAttribute(Style + "wrap-contour-mode", "full"));
         if (item.WrapFirstParagraph) graphic.Add(new XAttribute(Style + "number-wrapped-paragraphs", "1"));
         if (contours.Mirror(item) is { } mirror) graphic.Add(new XAttribute(Style + "mirror", mirror));

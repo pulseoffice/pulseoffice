@@ -5878,6 +5878,8 @@
   "folio.object.relation.topMargin": "Margine superiore",
   "folio.object.relation.endMargin": "Margine destro",
   "folio.object.relation.bottomMargin": "Margine inferiore",
+  "folio.object.relation.insideMargin": "Margine interno",
+  "folio.object.relation.outsideMargin": "Margine esterno",
   "folio.object.relation.column": "Colonna",
   "folio.object.relation.paragraphArea": "Area del testo del paragrafo",
   "folio.object.align.horizontal": "Posizione orizzontale",
