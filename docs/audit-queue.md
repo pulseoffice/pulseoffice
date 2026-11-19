@@ -26,10 +26,10 @@ the round that fixes it is joined and the join run is green.
   Excel or the reference suite here. (213, 214)
 - Deck's Connector Ends dialog (shared `ConnectorSitesDialog`) has not been seen live; it is now also in the slide
   object context menu. (225, 227, 231)
-- Outline blocks identical in title and body cannot be told apart when swapped by hand. (240)
-- A single empty section is renamed or removed only through its header (double click or context menu); the registry
-  has Remove Empty Sections for all of them. Dropping a slide on an empty section has no drop indicator, and the
-  filmstrip has no other slide drag. (240)
+- Outline blocks identical in title and body swapped by cut and paste (Alt+Shift moves now keep identity) are still
+  matched in order. (240, 245)
+- The slide drag indicator in filmstrip and sorter, and the Rename/Remove Empty Section Here commands, have not been
+  seen in the running app; slide drag has no movement threshold. (245)
 - The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
   as no section. ODP empty sections are `urn:pulseoffice:presentation-section` elements inside `draw:page`. None of
   this has been opened in PowerPoint or the reference suite here. (229, 231)
@@ -51,7 +51,7 @@ the round that fixes it is joined and the join run is green.
   paragraph that defers a page style change, and any restart when numbering restarts on every page (DOCX248). A restart
   on the first paragraph is now the first section's starting number (235). Not yet opened in Word. (204, 209, 212)
 - Folio notes: continuation notices have their own "Footnote Continuation" style and texts set in the note settings,
-  but they are still layout-only text: no caret, no selection, no copy (235; 241: still open). A page style run starts only at a
+  but they are still layout-only text: no caret, no selection, no copy (235; 241, 242: still open). A page style run starts only at a
   top-level paragraph with a page style (not at a table); Word has one footnote separator per document, so a page
   style's own line is declared (DOCX273); none of this has been opened in Word or the reference suite. (232)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
@@ -59,32 +59,32 @@ the round that fixes it is joined and the join run is green.
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
   ODT as top/bottom; the vertical top-margin relation is written to ODT as `page` plus our own `pt:vertical-rel`, so
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
-  incremental layout's page-parity stability check does not consider inside/outside objects; alignment relative to a
-  paragraph uses its unwrapped height (241: still open). Not opened in Word.
+  alignment relative to a paragraph uses its unwrapped height (241, 242: still open; the wrapped height depends on the
+  object itself). Not opened in Word.
 
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- PDF export writes no form fields for Folio content controls and form controls. (237)
-- Deck PDF: text elements with several different run links and links inside shape text have no link area; slide
-  navigation actions (go to slide, next, previous, first, last) are not internal PDF links. (238)
-- PDF page labels are written only for Folio; Deck slide numbering start and Ledger first page number are not labels. (238)
-- Tagged PDF: link and comment annotations are not linked into the structure tree (no `/StructParent`, no `OBJR`), so
-  no PDF/UA identifier is written; the output has not been run through a PDF/UA checker. (239)
-- Tagged PDF: figures carry no `BBox`, merged cells no `ColSpan`/`RowSpan`, row headers are never detected (Ledger tags
-  only print title rows as `TH`), and a sheet printed over several pages becomes one table per page. (239)
-- Tagged PDF: Folio change bars, line numbers, field shading and spotlights are painted inside the paragraph's marked
-  content instead of as artifacts; soft hyphens at line ends are read as hyphens (no `ActualText`). (239)
-- Tagged PDF: a Deck text box is one `P` element (no element per paragraph, slide lists not tagged as `L`), and Deck
-  tables are tagged as figures. (239)
+- Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
+  condition for writing it. (239, 243)
+- Tagged PDF: Deck paragraphs and table cells are matched to drawn text by a sequential text match; table values whose
+  shown format differs from the stored value advance to the next cell, so a cell drawn in several runs can be split
+  across cells, and autofit or field text that differs from the paragraph text stays with the previous paragraph. (243)
+- Tagged PDF: a Deck table gets no `BBox` (its fills and borders are artifacts) and data-table header scope follows the
+  style's header row and first column only. (243)
+- Tagged PDF: a link annotation whose target has no tagged run on its page (Ledger cell links, Deck link areas) gets its
+  own root-level `Link` element instead of joining the cell or shape it covers. (243)
+- Tagged PDF: a figure's `BBox` ignores rotation and covers only its first page. (243)
+- PDF form fields: widgets carry no `/StructParent`; rich text, picture and multi-paragraph content controls are not
+  exported as fields; the PDF export dialog has no switch for `PdfExportOptions.Forms`; not yet opened in an external
+  PDF viewer. (244)
 
 ## Ledger
 
 - The relative-period list of the AutoFilter menu has not been seen in the running app nor walked with the keyboard.
   (216)
-- The chart editor's table column picker and the missing-table placeholder and status warning have not been seen in
-  the running app; the warning is checked after each history step, so a table lost outside the history (file reload)
-  is not announced, only drawn as the placeholder. (220)
+- The chart editor's table column picker and the missing-table placeholder and status warning (also announced when a
+  workbook opens) have not been seen in the running app. (220, 245)
 - XLSX table-reference rule forms with equal range and flat formula are matched by their rank in priority order (241);
   a reordering that changes their relative priority can still swap them. Not opened in Excel. (236, 241)
 - Round 236 (Ledger tips and notes), open: the "edit objects and notes" permission rides on our own ODS attribute,

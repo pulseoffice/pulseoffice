@@ -76,6 +76,7 @@ internal static class PrintingAndCloudComposition
         services.AddSingleton<IPdfEncryptionFactory, Aes256EncryptionFactory>();
         services.AddSingleton<IPdfBidiText, PdfBidiText>();
         services.AddSingleton<IPdfPageLabels, PdfPageLabels>();
+        services.AddSingleton<IPdfFormWriter, PdfFormWriter>();
         services.AddSingleton<IPdfStructureRoles, PdfStructureRoles>();
         services.AddSingleton<IPdfStructureWriter, PdfStructureWriter>();
         services.AddSingleton<IPdfExporter, PdfExporter>();

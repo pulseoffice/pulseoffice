@@ -4233,6 +4233,8 @@
   "context.slide.order": "Order",
   "command.deck.section.add.title": "Add section",
   "command.deck.section.remove.title": "Remove section",
+  "command.deck.section.removeEmptyHere.title": "Remove empty section here",
+  "command.deck.section.renameEmptyHere.title": "Rename empty section here",
   "command.deck.section.removeEmpty.title": "Remove empty sections",
   "deck.action.addSection": "Add section",
   "deck.action.renameSection": "Rename section",

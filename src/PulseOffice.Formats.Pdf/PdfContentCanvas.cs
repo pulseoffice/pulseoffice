@@ -13,7 +13,14 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
     public void EndMarkedContent() => marked?.Close(_content);
 
+    public void BeginArtifact() => marked?.BeginArtifact();
+
+    public void EndArtifact() => marked?.EndArtifact();
+
     private void Mark() => marked?.Enter(_content);
+
+    private void Mark(DocumentRect area) =>
+        marked?.Enter(_content, new PdfBox(0, area.Left.ToPoints(), Flip(area.Bottom).ToPoints(), area.Right.ToPoints(), Flip(area.Top).ToPoints()));
 
     private readonly ITextDecorationPainter _decorations = decorations ?? new TextDecorationPainter();
 
@@ -41,6 +48,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
     private readonly List<PrintDestination> _destinations = [];
     private readonly List<PrintLink> _links = [];
     private readonly List<PrintMarkedNote> _notes = [];
+    private readonly List<PrintMarkedField> _fields = [];
 
     public IReadOnlyList<PrintHeading> Headings => _headings;
 
@@ -49,6 +57,8 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
     public IReadOnlyList<PrintLink> Links => _links;
 
     public IReadOnlyList<PrintMarkedNote> Notes => _notes;
+
+    public IReadOnlyList<PrintMarkedField> Fields => _fields;
 
     public void MarkHeading(int level, string title, double topPoints)
     {
@@ -71,6 +81,12 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         _notes.Add(new PrintMarkedNote(area, note));
     }
 
+    public void MarkField(DocumentRect area, PrintFormField field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        if (!area.IsEmpty) _fields.Add(new PrintMarkedField(area, field));
+    }
+
     public Twip MeasureText(string text, PrintFont font)
     {
         ArgumentNullException.ThrowIfNull(font);
@@ -82,7 +98,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
     {
         if (rect.IsEmpty) return;
 
-        Mark();
+        Mark(rect);
         Color(color, stroke: false);
 
         _content.Append(CultureInfo.InvariantCulture,
@@ -113,7 +129,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
         var outline = _flattener.Flatten(path.Outline).Scaled(width, height);
 
-        Mark();
+        Mark(path.Bounds);
         if (path.Shadow is { } shadow) DrawShadow(path, shadow, width, height);
 
         _content.Append("q\n");
@@ -165,7 +181,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         if (bounds.IsEmpty || image.Width <= 0 || image.Height <= 0) return;
         if (image.Rgb is null || image.Rgb.LongLength < (long)image.Width * image.Height * 3) return;
 
-        Mark();
+        Mark(bounds);
         var name = $"Img{_images.Count + 1}";
         _images.Add((name, new PdfImagePlacement(image, bounds.Width.ToPoints(), bounds.Height.ToPoints())));
 

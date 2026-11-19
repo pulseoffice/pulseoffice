@@ -39,6 +39,14 @@ public interface IPageSurface
     void EndObject()
     {
     }
+
+    void BeginArtifact()
+    {
+    }
+
+    void EndArtifact()
+    {
+    }
 }
 
 public interface IPageSurfaceFactory
@@ -124,6 +132,10 @@ public sealed class CanvasSurface(IPageCanvas canvas, IEmbeddedRasterizer raster
     public void BeginObject(LayoutRect bounds, double rotationDegrees) => _turns.Push(bounds, rotationDegrees);
 
     public void EndObject() => _turns.Pop();
+
+    public void BeginArtifact() => canvas.BeginArtifact();
+
+    public void EndArtifact() => canvas.EndArtifact();
 
     private (double X, double Y) Turned(double x, double y) => _turns.Apply(x, y);
 
@@ -235,6 +247,10 @@ public sealed class PathlessCanvas(IPageCanvas inner) : IPageCanvas
 
     public void Tag(PrintTag? tag) => inner.Tag(tag);
 
+    public void BeginArtifact() => inner.BeginArtifact();
+
+    public void EndArtifact() => inner.EndArtifact();
+
     public void MarkHeading(int level, string title, double topPoints) => inner.MarkHeading(level, title, topPoints);
 
     public void MarkTarget(string name, double topPoints) => inner.MarkTarget(name, topPoints);
@@ -242,6 +258,8 @@ public sealed class PathlessCanvas(IPageCanvas inner) : IPageCanvas
     public void MarkLink(DocumentRect area, string target) => inner.MarkLink(area, target);
 
     public void MarkNote(DocumentRect area, PrintNote note) => inner.MarkNote(area, note);
+
+    public void MarkField(DocumentRect area, PrintFormField field) => inner.MarkField(area, field);
 }
 
 public readonly record struct ObjectTurn(double CenterX, double CenterY, double Degrees)

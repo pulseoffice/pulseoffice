@@ -70,6 +70,13 @@ public sealed class DeckPrintable : IPrintableDocument
 
     public string? Language { get; init; }
 
+    public IReadOnlyList<int> Numbers { get; init; } = [];
+
+    public PrintPageLabel? PageLabel(int index) =>
+        _layout is DeckExportLayout.Slides or DeckExportLayout.Notes && index >= 0 && index < Numbers.Count && Numbers[index] != index + 1
+            ? new PrintPageLabel(PageLabelStyle.Decimal, Numbers[index])
+            : null;
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);

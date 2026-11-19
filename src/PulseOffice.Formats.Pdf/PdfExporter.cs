@@ -26,6 +26,8 @@ public sealed record PdfExportOptions(
 
     public bool Notes { get; init; } = true;
 
+    public bool Forms { get; init; } = true;
+
     public bool Archive { get; init; }
 
     public bool Tagged { get; init; } = true;
@@ -44,17 +46,17 @@ public interface IPdfExporter
 
 public sealed class PdfExporter(
     IPdfFontSetFactory fonts, IPdfArchiveParts archive, IPdfNavigationWriter navigation,
-    IPdfImageWriter images, IPdfEncryptionFactory encryption, IPdfBidiText bidi, IPdfPageLabels labels, IPdfStructureWriter structure) : IPdfExporter
+    IPdfImageWriter images, IPdfEncryptionFactory encryption, IPdfBidiText bidi, IPdfPageLabels labels, IPdfStructureWriter structure, IPdfFormWriter forms) : IPdfExporter
 {
     public PdfExporter(IPdfFontSetFactory fonts)
-        : this(fonts, new PdfArchiveParts(new SrgbProfile()), new PdfNavigationWriter(), new PdfImageWriter(), new Aes256EncryptionFactory(), new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter())
+        : this(fonts, new PdfArchiveParts(new SrgbProfile()), new PdfNavigationWriter(), new PdfImageWriter(), new Aes256EncryptionFactory(), new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter(), new PdfFormWriter())
     {
     }
 
     public PdfExporter(
         IPdfFontSetFactory fonts, IPdfArchiveParts archive, IPdfNavigationWriter navigation,
         IPdfImageWriter images, IPdfEncryptionFactory encryption)
-        : this(fonts, archive, navigation, images, encryption, new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter())
+        : this(fonts, archive, navigation, images, encryption, new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter(), new PdfFormWriter())
     {
     }
 
@@ -85,7 +87,9 @@ public sealed class PdfExporter(
             var written = new Dictionary<(string Fingerprint, int Width, int Height), int>();
             var marks = new PdfDocumentMarks();
             var pagesId = file.Reserve();
-            var tree = new PdfStructureTree();
+            var tree = new PdfStructureTree { AnnotationKeyBase = selected.Count };
+            var fieldIds = new List<int>();
+            var fieldNames = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var index in selected)
             {
@@ -156,13 +160,15 @@ public sealed class PdfExporter(
                 resources.Append(">>");
 
                 marks.Collect(pageId, canvas, height, options);
-                var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height);
+                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, fieldNames);
+                fieldIds.AddRange(widgets);
+                var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height, options.Tagged ? structure.Annotations(tree, slot) : null).Concat(widgets).ToList();
                 var annots = annotations.Count == 0 ? string.Empty : " /Annots [" + string.Join(' ', annotations.Select(id => $"{id} 0 R")) + "]";
 
                 file.WriteObject(pageId,
                     $"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 " +
                     $"{Points(pageSize.Width)} {Points(pageSize.Height)}] " +
-                    $"/Resources {resources} /Contents {contentId} 0 R{annots}{structure.PageEntries(options.Tagged && tree.Pages[slot].Count > 0, slot)} >>");
+                    $"/Resources {resources} /Contents {contentId} 0 R{annots}{structure.PageEntries(options.Tagged && tree.HasPageContent(slot), slot)} >>");
                 pageObjects.Add(pageId);
             }
 
@@ -195,6 +201,8 @@ public sealed class PdfExporter(
                 catalog.Append(CultureInfo.InvariantCulture, $" /Names << /Dests {names} 0 R >>");
             if (labels.Write([.. selected.Select(document.PageLabel)]) is { } pageLabels)
                 catalog.Append(" /PageLabels ").Append(pageLabels);
+            if (forms.AcroForm(fieldIds) is { } acroForm)
+                catalog.Append(" /AcroForm ").Append(acroForm);
             if (!string.IsNullOrWhiteSpace(options.Language)) catalog.Append(" /Lang ").Append(PdfFile.TextString(options.Language));
             catalog.Append(" /ViewerPreferences << /DisplayDocTitle true >>");
             if (structureRoot is { } root)

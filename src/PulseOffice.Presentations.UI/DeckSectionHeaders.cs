@@ -34,6 +34,9 @@ public sealed class DeckSectionHeaders(DeckActions actions, ITextCatalog texts, 
             .FirstOrDefault(entry => entry.Control.TranslatePoint(default, root) is { } origin
                 && new Rect(origin, entry.Control.Bounds.Size).Contains(position))?.Header.Empty;
 
+    public Control? ControlOf(EmptySection section) =>
+        _entries.Values.FirstOrDefault(entry => Equals(entry.Header.Empty, section))?.Control;
+
     public bool DropInto(Slide slide, Visual root, Point position)
     {
         if (EmptyAt(root, position) is not { } section) return false;

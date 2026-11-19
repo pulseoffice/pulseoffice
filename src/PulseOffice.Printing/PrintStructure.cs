@@ -19,6 +19,15 @@ public enum PrintRole
     Figure,
     Link,
     Note,
+    Span,
+    Annotation,
+}
+
+public enum PrintHeaderScope
+{
+    Column,
+    Row,
+    Both,
 }
 
 public sealed record PrintTag(string Key, PrintRole Role, PrintTag? Parent = null)
@@ -28,6 +37,16 @@ public sealed record PrintTag(string Key, PrintRole Role, PrintTag? Parent = nul
     public string? Alternate { get; init; }
 
     public string? Language { get; init; }
+
+    public string? ActualText { get; init; }
+
+    public string? Target { get; init; }
+
+    public int ColumnSpan { get; init; } = 1;
+
+    public int RowSpan { get; init; } = 1;
+
+    public PrintHeaderScope Scope { get; init; }
 
     public IEnumerable<PrintTag> Lineage()
     {

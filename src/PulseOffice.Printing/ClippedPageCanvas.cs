@@ -117,6 +117,10 @@ public sealed class ClippedPageCanvas(IPageCanvas inner, DocumentRect clip) : IP
 
     public void Tag(PrintTag? tag) => _inner.Tag(tag);
 
+    public void BeginArtifact() => _inner.BeginArtifact();
+
+    public void EndArtifact() => _inner.EndArtifact();
+
     public void MarkHeading(int level, string title, double topPoints) => _inner.MarkHeading(level, title, topPoints);
 
     public void MarkTarget(string name, double topPoints) => _inner.MarkTarget(name, topPoints);
@@ -129,6 +133,11 @@ public sealed class ClippedPageCanvas(IPageCanvas inner, DocumentRect clip) : IP
     public void MarkNote(DocumentRect area, PrintNote note)
     {
         if (area.IntersectsWith(clip)) _inner.MarkNote(area, note);
+    }
+
+    public void MarkField(DocumentRect area, PrintFormField field)
+    {
+        if (Intersection(area) is { } visible) _inner.MarkField(visible, field);
     }
 
     private bool InsidePoint(double x, double y) =>

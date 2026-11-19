@@ -15,6 +15,7 @@ public sealed class PdfDocumentMarks
     private readonly List<PdfDestination> _destinations = [];
     private readonly Dictionary<int, IReadOnlyList<PrintLink>> _links = [];
     private readonly Dictionary<int, IReadOnlyList<PrintMarkedNote>> _notes = [];
+    private readonly Dictionary<int, IReadOnlyList<PrintMarkedField>> _fields = [];
 
     public IReadOnlyList<PdfHeading> Headings => _headings;
 
@@ -23,6 +24,8 @@ public sealed class PdfDocumentMarks
     public IReadOnlyList<PrintLink> PageLinks(int page) => _links.GetValueOrDefault(page, []);
 
     public IReadOnlyList<PrintMarkedNote> PageNotes(int page) => _notes.GetValueOrDefault(page, []);
+
+    public IReadOnlyList<PrintMarkedField> PageFields(int page) => _fields.GetValueOrDefault(page, []);
 
     public void Collect(int page, PdfContentCanvas canvas, double pageHeight, PdfExportOptions options)
     {
@@ -36,12 +39,13 @@ public sealed class PdfDocumentMarks
             _links[page] = canvas.Links;
         }
         if (options.Notes) _notes[page] = canvas.Notes;
+        if (options.Forms) _fields[page] = canvas.Fields;
     }
 }
 
 public interface IPdfNavigationWriter
 {
-    IReadOnlyList<int> Annotations(PdfFile file, IReadOnlyList<PrintLink> links, IReadOnlyList<PrintMarkedNote> notes, double pageHeight);
+    IReadOnlyList<int> Annotations(PdfFile file, IReadOnlyList<PrintLink> links, IReadOnlyList<PrintMarkedNote> notes, double pageHeight, IPdfAnnotationTagging? tagging = null);
 
     int? Outline(PdfFile file, IReadOnlyList<PdfHeading> headings);
 
@@ -52,7 +56,7 @@ public sealed class PdfNavigationWriter : IPdfNavigationWriter
 {
     private const double NoteSize = 16;
 
-    public IReadOnlyList<int> Annotations(PdfFile file, IReadOnlyList<PrintLink> links, IReadOnlyList<PrintMarkedNote> notes, double pageHeight)
+    public IReadOnlyList<int> Annotations(PdfFile file, IReadOnlyList<PrintLink> links, IReadOnlyList<PrintMarkedNote> notes, double pageHeight, IPdfAnnotationTagging? tagging = null)
     {
         ArgumentNullException.ThrowIfNull(file);
         var ids = new List<int>();
@@ -61,7 +65,9 @@ public sealed class PdfNavigationWriter : IPdfNavigationWriter
             var action = link.Target.StartsWith('#')
                 ? "/Dest " + PdfFile.TextString(link.Target[1..])
                 : "/A << /S /URI /URI " + Ascii(link.Target) + " >>";
-            ids.Add(file.WriteObject($"<< /Type /Annot /Subtype /Link /Rect {Rect(link.Area, pageHeight)} /Border [0 0 0] /F 4 {action} >>"));
+            var id = file.Reserve();
+            file.WriteObject(id, $"<< /Type /Annot /Subtype /Link /Rect {Rect(link.Area, pageHeight)} /Border [0 0 0] /F 4 {action}{tagging?.Link(id, link)} >>");
+            ids.Add(id);
         }
         if (notes.Count > 0)
         {
@@ -73,9 +79,11 @@ public sealed class PdfNavigationWriter : IPdfNavigationWriter
                 var top = pageHeight - area.Top.ToPoints();
                 var rect = FormattableString.Invariant($"[{Number(left)} {Number(top - NoteSize)} {Number(left + NoteSize)} {Number(top)}]");
                 var when = note.When is { } moment ? " /M " + PdfFile.DateString(moment) : string.Empty;
-                ids.Add(file.WriteObject(
+                var id = file.Reserve();
+                file.WriteObject(id,
                     $"<< /Type /Annot /Subtype /Text /Rect {rect} /F 4 /Name /Comment /Contents {PdfFile.TextString(note.Text)} " +
-                    $"/T {PdfFile.TextString(note.Author)}{when} /AP << /N {appearance} 0 R >> >>"));
+                    $"/T {PdfFile.TextString(note.Author)}{when} /AP << /N {appearance} 0 R >>{tagging?.Note(id, new PrintMarkedNote(area, note))} >>");
+                ids.Add(id);
             }
         }
         return ids;

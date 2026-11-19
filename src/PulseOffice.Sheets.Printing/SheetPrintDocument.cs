@@ -208,6 +208,9 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     public string? Language => _sheet.Owner?.TextLanguage;
 
+    public PrintPageLabel? PageLabel(int index) =>
+        index >= 0 && index < PageCount ? new PrintPageLabel(PageLabelStyle.Decimal, Math.Max(1, _numbering.For(this, index).Number)) : null;
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);
@@ -241,8 +244,9 @@ public sealed class SheetPrintDocument : IPrintableDocument
         canvas.Tag(null);
         if (Setup.PrintHeadings) PaintHeadings(canvas, page, origin);
 
-        var tableTag = new PrintTag($"sheet:{_sheet.Name}:table:{index}", PrintRole.Table, sheetTag);
+        var tableTag = new PrintTag($"sheet:{_sheet.Name}:table", PrintRole.Table, sheetTag);
         var titleRows = Area is { } printed && RepeatedRows(printed) is { } repeated ? repeated : (BandSlice?)null;
+        var titleColumns = Area is { } columnArea && RepeatedColumns(columnArea) is { } repeatedColumns ? repeatedColumns : (BandSlice?)null;
 
         var y = origin.Top;
         var firstRow = true;
@@ -261,6 +265,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
             rowTops[row] = y;
             var rowTag = new PrintTag($"{tableTag.Key}:r{row}", PrintRole.TableRow, tableTag);
             var header = titleRows is { } titles && row >= titles.First && row <= titles.Last;
+            var repeatedRow = row < page.Rows.First;
 
             for (var position = 0; position < columns.Count; position++)
             {
@@ -269,6 +274,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
                 columnLefts[column] = x;
 
                 var address = new CellAddress(row, column);
+                var rowHeader = titleColumns is { } sideTitles && column >= sideTitles.First && column <= sideTitles.Last;
+                var cellTag = repeatedRow || column < page.Columns.First ? null : CellTag(rowTag, column, header, rowHeader);
 
                 if (_sheet.Merges.At(address) is { } region)
                 {
@@ -284,13 +291,13 @@ public sealed class SheetPrintDocument : IPrintableDocument
                             Visible(region.Start.Column, region.End.Column, _sheet.Layout.IsColumnHidden, ColumnWidthOf),
                             Visible(region.Start.Row, region.End.Row, _sheet.Layout.IsRowHidden, RowHeightOf));
 
-                        PaintCell(new ClippedPageCanvas(canvas, visible), region.Start, whole, firstRow, firstColumn, [], CellTag(rowTag, column, header));
+                        PaintCell(new ClippedPageCanvas(canvas, visible), region.Start, whole, firstRow, firstColumn, [], Spanned(cellTag, region));
                     }
                 }
                 else
                 {
                     PaintCell(canvas, address, new DocumentRect(x, y, width, height), firstRow, firstColumn,
-                        columns.Skip(position + 1), CellTag(rowTag, column, header));
+                        columns.Skip(position + 1), cellTag);
                 }
 
                 firstColumn = false;
@@ -308,8 +315,17 @@ public sealed class SheetPrintDocument : IPrintableDocument
         canvas.Tag(null);
     }
 
-    private PrintTag CellTag(PrintTag row, int column, bool header) =>
-        new($"{row.Key}:c{column}", header ? PrintRole.TableHeader : PrintRole.TableCell, row);
+    private PrintTag CellTag(PrintTag row, int column, bool header, bool rowHeader) =>
+        new($"{row.Key}:c{column}", header || rowHeader ? PrintRole.TableHeader : PrintRole.TableCell, row)
+        {
+            Scope = header && rowHeader ? PrintHeaderScope.Both : rowHeader ? PrintHeaderScope.Row : PrintHeaderScope.Column,
+        };
+
+    private PrintTag? Spanned(PrintTag? tag, CellRange region) => tag is null ? null : tag with
+    {
+        ColumnSpan = Math.Max(1, Enumerable.Range(region.Start.Column, region.End.Column - region.Start.Column + 1).Count(column => !_sheet.Layout.IsColumnHidden(column))),
+        RowSpan = Math.Max(1, Enumerable.Range(region.Start.Row, region.End.Row - region.Start.Row + 1).Count(row => !_sheet.Layout.IsRowHidden(row))),
+    };
 
     private DocumentPoint Centring(SheetPage page)
     {
@@ -490,7 +506,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     private void PaintCell(
         IPageCanvas canvas, CellAddress address, DocumentRect bounds, bool firstRow, bool firstColumn,
-        IEnumerable<int> followingColumns, PrintTag tag)
+        IEnumerable<int> followingColumns, PrintTag? tag)
     {
         canvas.Tag(tag);
         canvas.Tag(null);

@@ -184,6 +184,12 @@ public sealed class DeckIcons() : DictionaryIconCatalog(Shapes)
         ("deck.insert.headerFooter", "M4 5h16v14H4z M4 9h16 M4 15h16 M6 17h5 M15 17h3"),
         ("deck.insert.field", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
         ("deck.insert.symbol", "M7 8a5 5 0 0 1 10 0c0 3-3 4-3 7h-4c0-3-3-4-3-7 M10 19h4"),
+        ("deck.section.add", "M4 5h16 M4 9h16v10H4z M12 11v6 M9 14h6"),
+        ("deck.section.rename", "M4 5h16 M4 9h16v10H4z M8 16l6-6 2 2-6 6H8z"),
+        ("deck.section.remove", "M4 5h16 M4 9h16v10H4z M9 14h6"),
+        ("deck.section.removeEmpty", "M4 5h16 M4 9h16v10H4z M9 12l6 4 M15 12l-6 4"),
+        ("deck.section.renameEmptyHere", "M4 5h16 M4 9h16v10H4z M8 16l6-6 2 2-6 6H8z"),
+        ("deck.section.removeEmptyHere", "M4 5h16 M4 9h16v10H4z M10 12l4 4 M14 12l-4 4"),
         ("deck.slide.hide", "M4 6h16v12H4z M3 3l18 18 M9.5 9.5a2 2 0 0 0 2.8 2.8"),
 
         ("deck.order.front", "M8 8h8v8H8z M5 5h6v3H8v3H5z M13 13h3v-3h3v6h-6z"),

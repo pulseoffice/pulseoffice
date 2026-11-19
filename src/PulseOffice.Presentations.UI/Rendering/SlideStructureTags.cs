@@ -11,10 +11,23 @@ public interface ISlideStructureTags
     IReadOnlyList<PrintTag> ReadingOrder(Slide slide);
 
     PrintTag? For(Slide slide, SlideElement? element);
+
+    IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element);
 }
 
-public sealed class SlideStructureTags : ISlideStructureTags
+public sealed class SlideStructureTags(ISlideTextSegments segments, ITextSegmentTagging tagging) : ISlideStructureTags
 {
+    public SlideStructureTags() : this(new SlideTextSegments(), new TextSegmentTagging())
+    {
+    }
+
+    public IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element)
+    {
+        ArgumentNullException.ThrowIfNull(canvas);
+        if (element is null || For(slide, element) is not { } container || segments.For(container, element) is not { } found) return canvas;
+        return tagging.Wrap(canvas, found);
+    }
+
     public PrintTag SlideTag(Slide slide)
     {
         ArgumentNullException.ThrowIfNull(slide);
@@ -41,7 +54,8 @@ public sealed class SlideStructureTags : ISlideStructureTags
         {
             TextElement text when IsTitle(text) => new PrintTag(key, PrintRole.Title, parent),
             TextElement text when text.Text.PlainText.Trim().Length == 0 => null,
-            TextElement => new PrintTag(key, PrintRole.Paragraph, parent),
+            TextElement => new PrintTag(key, PrintRole.Section, parent),
+            ObjectElement { Content: PulseOffice.Document.Embedding.DataTableObject } => new PrintTag(key, PrintRole.Table, parent),
             ObjectElement { Content: var content } => new PrintTag(key, PrintRole.Figure, parent)
             {
                 Alternate = new[] { content.Description, content.Title, content.Name }.FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)),

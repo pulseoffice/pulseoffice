@@ -60,13 +60,5 @@ public sealed class SlideSorterStrip
         }
     }
 
-    public bool DropIntoSection(Slide slide, Point position) => _headers.DropInto(slide, _rows, position);
-
-    public int DropTarget(Point position)
-    {
-        for (var i = 0; i < _frames.Count; i++)
-            if (_frames[i].TranslatePoint(default, _rows) is { } origin && new Rect(origin, _frames[i].Bounds.Size).Contains(position))
-                return i;
-        return -1;
-    }
+    public IReadOnlyList<Control> Frames => _frames;
 }

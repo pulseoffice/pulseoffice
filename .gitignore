@@ -69,4 +69,5 @@ tools/uiprobe/windowshot
 tools/uiprobe/topmost
 
 .claude/worktrees/
+.worktrees/
 __pycache__

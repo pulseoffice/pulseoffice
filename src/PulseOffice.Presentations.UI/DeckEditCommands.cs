@@ -156,6 +156,28 @@ public sealed class DeckEditCommands(
                 return Task.CompletedTask;
             },
         },
+        Prototype("deck.section.renameEmptyHere") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            ContextPaths = ["slide/section"],
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => NearEmptySection() is not null,
+            Execute = (_, ct) => RenameEmptySectionAsync(ct),
+        },
+        Prototype("deck.section.removeEmptyHere") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            ContextPaths = ["slide/section"],
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => NearEmptySection() is not null,
+            Execute = (_, _) =>
+            {
+                if (Context.Target is { } t && NearEmptySection() is { } empty) t.Actions.RemoveEmptySection(empty);
+                return Task.CompletedTask;
+            },
+        },
         Prototype("deck.section.removeEmpty") with
         {
             Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
@@ -183,6 +205,21 @@ public sealed class DeckEditCommands(
             ct).ConfigureAwait(true);
 
         if (!string.IsNullOrWhiteSpace(name)) t.Actions.SetSection(start, name.Trim());
+    }
+
+    private EmptySection? NearEmptySection() =>
+        Context.Target is { } t && t.CurrentSlide() is { } s ? new SlideSections().EmptyNear(t.Deck, s) : null;
+
+    private async Task RenameEmptySectionAsync(CancellationToken ct)
+    {
+        if (Context.Target is not { } t || NearEmptySection() is not { } empty) return;
+
+        var name = await dialogs.ShowAsync<string>(
+            new PulseOffice.UI.Controls.TextPromptView(texts["deck.section.renamePrompt"], empty.Name, texts),
+            new PulseOffice.UI.Controls.Services.DialogOptions { TitleKey = "command.deck.section.renameEmptyHere.title" },
+            ct).ConfigureAwait(true);
+
+        if (!string.IsNullOrWhiteSpace(name) && t.Deck.EmptySections.Contains(empty)) t.Actions.RenameEmptySection(empty, name.Trim());
     }
 
     private string DefaultSectionName(Presentation deck) =>

@@ -48,7 +48,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         if (_outlineEditor is { } outline && TopLevel.GetTopLevel(outline) is not null) ApplyOutline(outline.Text ?? string.Empty);
     }
 
-    private int _dragFrom = -1;
+    private SlideDragSession? _drag;
 
     private SlideSorterStrip? _sorterStrip;
     private ScrollViewer? _sorterView;
@@ -58,6 +58,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         if (_sorterStrip is null || _sorterView is null)
         {
             _sorterStrip = new SlideSorterStrip(new Thickness(_metrics.SpacingLarge), SorterFrame, sectionHeaders, stripLayout);
+            _drag = new SlideDragSession(sectionHeaders, _deck, _actions, horizontal: true);
             _sorterView = new ScrollViewer
             {
                 Content = _sorterStrip.Panel,
@@ -101,20 +102,19 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
 
         frame = frame.Themed(Border.BorderBrushProperty, current ? PulseOffice.UI.Theming.AccentService.AccentKey : Palette.Keys.Border);
 
-        frame.PointerPressed += (_, _) => _dragFrom = _deck.IndexOf(slide);
+        frame.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed) _drag?.Begin(slide);
+        };
+        frame.PointerMoved += (_, e) =>
+        {
+            if (_sorterStrip is not null && _drag is { From: >= 0 } drag) drag.Track(_sorterStrip.Panel, e.GetPosition(_sorterStrip.Panel), _sorterStrip.Frames);
+        };
+        frame.PointerCaptureLost += (_, _) => _drag?.Cancel();
         frame.PointerReleased += (_, e) =>
         {
-            if (_sorterStrip is null) return;
-            if (_dragFrom >= 0 && _dragFrom < _deck.Slides.Count
-                && _sorterStrip.DropIntoSection(_deck.Slides[_dragFrom], e.GetPosition(_sorterStrip.Panel)))
-            {
-                _dragFrom = -1;
-                return;
-            }
-            var dropIndex = _sorterStrip.DropTarget(e.GetPosition(_sorterStrip.Panel));
-            if (dropIndex < 0 || dropIndex == _dragFrom) _host.Select(slide);
-            else if (_dragFrom >= 0 && _dragFrom < _deck.Slides.Count) _actions.MoveSlide(_deck.Slides[_dragFrom], dropIndex);
-            _dragFrom = -1;
+            if (_sorterStrip is null || _drag is null) return;
+            if (!_drag.Finish(_sorterStrip.Panel, e.GetPosition(_sorterStrip.Panel), _sorterStrip.Frames)) _host.Select(slide);
         };
         frame.DoubleTapped += (_, _) => { _host.Select(slide); _host.SetViewMode(DeckViewMode.Normal); };
         return frame;
@@ -206,11 +206,22 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         var caret = Math.Clamp(editor.CaretIndex, 0, text.Length);
         var normalized = text.Replace("\r\n", "\n");
         var line = text[..caret].Replace("\r\n", "\n").Count(c => c == '\n');
+        var (block, blocks) = _outlineMove.Locate(normalized, line);
         var (moved, at) = _outlineMove.Move(normalized, line, up);
         if (moved == normalized) return;
+        FollowBlockMove(block, up ? block - 1 : block + 1, blocks);
         editor.Text = moved;
         var lines = moved.Split('\n');
         editor.CaretIndex = lines.Take(at).Sum(part => part.Length + 1);
+    }
+
+    private void FollowBlockMove(int block, int other, int blocks)
+    {
+        if (blocks != _outlineSlides.Count || blocks != _outlineEntries.Count || block < 0 || other < 0 || block >= blocks || other >= blocks) return;
+        (_outlineSlides[block], _outlineSlides[other]) = (_outlineSlides[other], _outlineSlides[block]);
+        var entries = _outlineEntries.ToList();
+        (entries[block], entries[other]) = (entries[other], entries[block]);
+        _outlineEntries = entries;
     }
 
     private string CorrectedLine(string line) => _outlineOriginal.Contains(line) ? line : _correction.Corrected(line);
@@ -231,7 +242,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
             if (matches[i] is { } kept) changes.Add((_outlineSlides[kept], entries[i].Title, entries[i].Body));
         var used = matches.OfType<int>().ToHashSet();
         var removed = _outlineSlides.Where((_, index) => !used.Contains(index)).ToList();
-        if (removed.Count == 0 && changes.Count == entries.Count && changes.Select(change => change.Slide).SequenceEqual(_outlineSlides)
+        if (removed.Count == 0 && changes.Count == entries.Count && changes.Select(change => change.Slide).SequenceEqual(_deck.Slides)
             && entries.Count == _outlineSlides.Count && OutlineUnchanged(entries)) return;
 
         using var step = _actions.History.BeginTransaction(_texts["deck.action.editText"]);

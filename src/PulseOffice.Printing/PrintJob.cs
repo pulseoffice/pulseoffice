@@ -344,6 +344,10 @@ public sealed class FilteredPageCanvas(IPageCanvas inner, bool graphics, bool bl
 
     public void Tag(PrintTag? tag) => inner.Tag(tag);
 
+    public void BeginArtifact() => inner.BeginArtifact();
+
+    public void EndArtifact() => inner.EndArtifact();
+
     public void MarkHeading(int level, string title, double topPoints) => inner.MarkHeading(level, title, topPoints);
 
     public void MarkTarget(string name, double topPoints) => inner.MarkTarget(name, topPoints);
@@ -351,4 +355,6 @@ public sealed class FilteredPageCanvas(IPageCanvas inner, bool graphics, bool bl
     public void MarkLink(DocumentRect area, string target) => inner.MarkLink(area, target);
 
     public void MarkNote(DocumentRect area, PrintNote note) => inner.MarkNote(area, note);
+
+    public void MarkField(DocumentRect area, PrintFormField field) => inner.MarkField(area, field);
 }

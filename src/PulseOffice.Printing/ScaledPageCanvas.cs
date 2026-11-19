@@ -61,6 +61,10 @@ public sealed class ScaledPageCanvas(IPageCanvas inner, double scale, DocumentPo
 
     public void Tag(PrintTag? tag) => _inner.Tag(tag);
 
+    public void BeginArtifact() => _inner.BeginArtifact();
+
+    public void EndArtifact() => _inner.EndArtifact();
+
     public void MarkHeading(int level, string title, double topPoints) => _inner.MarkHeading(level, title, Vertical(topPoints));
 
     public void MarkTarget(string name, double topPoints) => _inner.MarkTarget(name, Vertical(topPoints));
@@ -68,6 +72,8 @@ public sealed class ScaledPageCanvas(IPageCanvas inner, double scale, DocumentPo
     public void MarkLink(DocumentRect area, string target) => _inner.MarkLink(Rect(area), target);
 
     public void MarkNote(DocumentRect area, PrintNote note) => _inner.MarkNote(Rect(area), note);
+
+    public void MarkField(DocumentRect area, PrintFormField field) => _inner.MarkField(Rect(area), field);
 
     private double Vertical(double points) => origin.Y.ToPoints() + offset.Y.ToPoints() + (points - origin.Y.ToPoints()) * _scale;
 

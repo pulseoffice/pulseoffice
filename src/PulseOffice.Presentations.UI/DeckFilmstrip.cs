@@ -17,6 +17,8 @@ namespace PulseOffice.Presentations.UI;
 
 internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IContextMenuFactory contextMenus, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, DeckSectionHeaders sectionHeaders, SlideStripLayout layout)
 {
+    private readonly SlideDragSession _drag = new(sectionHeaders, state.Deck, state.Actions, horizontal: false);
+    private IReadOnlyList<Control> _frames = [];
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
     private readonly Presentation _deck = state.Deck;
@@ -98,6 +100,7 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
         _currentThumbnailFrame = null;
 
         var entries = _thumbnails.Refresh(_deck, _state.Current, Thumbnail);
+        _frames = [.. entries.Select(entry => entry.Frame)];
         var children = new List<Control>(entries.Count);
         _headers.Begin();
         foreach (var item in _layout.Items(_deck))
@@ -207,11 +210,20 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
 
         frame = frame.Themed(Border.BorderBrushProperty, active ? PulseOffice.UI.Theming.AccentService.AccentKey : Palette.Keys.Border);
 
+        frame.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed) _drag.Begin(slide);
+        };
+        frame.PointerMoved += (_, e) =>
+        {
+            if (_drag.From >= 0) _drag.Track(_filmstrip, e.GetPosition(_filmstrip), _frames);
+        };
+        frame.PointerCaptureLost += (_, _) => _drag.Cancel();
         frame.PointerReleased += (_, e) =>
         {
             _filmstripHadFocus = true;
             if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Left
-                && _headers.DropInto(slide, _filmstrip, e.GetPosition(_filmstrip))) return;
+                && _drag.Finish(_filmstrip, e.GetPosition(_filmstrip), _frames)) return;
             _host.Select(slide);
             if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Right) _contextMenus.Open("slide", _host.View);
         };

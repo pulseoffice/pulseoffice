@@ -32,6 +32,12 @@ public sealed class ChartTableLossWatch
         if (lost.Count > 0) TablesLost?.Invoke(this, new ChartTablesLostEventArgs(lost));
     }
 
+    public void AnnounceStanding()
+    {
+        _missing = Missing();
+        if (_missing.Count > 0) TablesLost?.Invoke(this, new ChartTablesLostEventArgs(_missing.Order(StringComparer.OrdinalIgnoreCase).ToList()));
+    }
+
     private HashSet<string> Missing() =>
         new(_workbook.Sheets
             .SelectMany(sheet => sheet.Objects)

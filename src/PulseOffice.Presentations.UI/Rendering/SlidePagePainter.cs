@@ -38,6 +38,8 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
 
     public double RasterDpi { get; init; } = 220;
 
+    public Func<Slide, bool> Exported { get; init; } = _ => true;
+
     public IPrintableSlide For(Presentation deck, Slide slide)
     {
         ArgumentNullException.ThrowIfNull(deck);
@@ -60,16 +62,12 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         foreach (var layer in layers)
         {
             canvas.Tag(layer.Fill is null ? structure.For(slide, layer.Element) : null);
-            PaintLayer(clipped, layer, target, scale);
+            PaintLayer(layer.Fill is null ? structure.Tagged(clipped, slide, layer.Element) : clipped, layer, target, scale);
         }
         canvas.Tag(null);
-        foreach (var link in links.For(slide))
-        {
-            var bounds = new DocumentRect(
-                Twip.FromPoints(target.X + link.Bounds.Left.Value * scale), Twip.FromPoints(target.Y + link.Bounds.Top.Value * scale),
-                Twip.FromPoints(link.Bounds.Width.Value * scale), Twip.FromPoints(link.Bounds.Height.Value * scale));
-            canvas.MarkLink(bounds, link.Target);
-        }
+        canvas.MarkTarget(links.Anchor(slide), area.Top.ToPoints());
+        foreach (var link in links.For(new SlideLinkPlacement(deck, slide, target, Exported)))
+            canvas.MarkLink(link.Area, link.Target);
     }
 
     private void PaintLayer(IPageCanvas canvas, SlideLayer layer, Rect target, double scale)

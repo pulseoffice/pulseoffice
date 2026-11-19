@@ -76,6 +76,8 @@ public sealed class OutlineSlideMatching : IOutlineSlideMatching
 public interface IOutlineBlockMove
 {
     (string Text, int Line) Move(string text, int line, bool up);
+
+    (int Block, int Count) Locate(string text, int line);
 }
 
 public sealed class OutlineBlockMove(IDeckOutlineText outline) : IOutlineBlockMove
@@ -102,6 +104,15 @@ public sealed class OutlineBlockMove(IDeckOutlineText outline) : IOutlineBlockMo
         var offset = line - starts[block];
         var moved = up ? range.Start + offset : range.Start + lower.Count + offset;
         return (string.Join("\n", reordered), moved);
+    }
+
+    public (int Block, int Count) Locate(string text, int line)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        var starts = Enumerable.Range(0, lines.Length).Where(index => IsTitle(lines[index])).ToList();
+        if (starts.Count == 0 || starts[0] != 0) starts.Insert(0, 0);
+        return (starts.FindLastIndex(start => start <= line), starts.Count);
     }
 
     private (int Start, int Count) Block(List<int> starts, int block, int total)

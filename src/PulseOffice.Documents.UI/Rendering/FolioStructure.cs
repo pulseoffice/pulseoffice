@@ -106,7 +106,11 @@ public sealed class FolioStructureIndex(IDocumentOutline outline) : IFolioStruct
                 {
                     var cell = table.Rows[row].Cells[column];
                     if (cell.Covered) continue;
-                    var cellTag = new PrintTag($"c:{table.Id}:{row}:{column}", row < table.HeaderRows ? PrintRole.TableHeader : PrintRole.TableCell, tr);
+                    var cellTag = new PrintTag($"c:{table.Id}:{row}:{column}", row < table.HeaderRows ? PrintRole.TableHeader : PrintRole.TableCell, tr)
+                    {
+                        ColumnSpan = Math.Max(1, cell.ColumnSpan),
+                        RowSpan = Math.Max(1, cell.RowSpan),
+                    };
                     Cells[(table.Id, row, column)] = cellTag;
                     Walk(cell.Content, cellTag);
                 }
@@ -138,8 +142,10 @@ public sealed class FolioStructureIndex(IDocumentOutline outline) : IFolioStruct
         {
             if (_line is null) return;
             if (run.Kind == GlyphRunKind.Label && structure.Labels.TryGetValue(line.ParagraphId, out var label)) canvas.Tag(label);
+            else if (run.Kind == GlyphRunKind.Hyphen)
+                canvas.Tag(new PrintTag(FormattableString.Invariant($"hy:{_line.Key}:{run.SourceOffset}"), PrintRole.Span, _line) { ActualText = string.Empty });
             else if (run.Style?.Hyperlink is { Length: > 0 } target)
-                canvas.Tag(new PrintTag("a:" + _line.Key + ":" + target, PrintRole.Link, _line));
+                canvas.Tag(new PrintTag("a:" + _line.Key + ":" + target, PrintRole.Link, _line) { Target = target });
             else canvas.Tag(_line);
         }
 

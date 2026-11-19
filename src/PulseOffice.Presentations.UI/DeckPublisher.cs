@@ -75,7 +75,7 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
 
     private DeckPrintable Build(Presentation deck, DeckExportLayout layout, PageSetup setup, Func<Slide, bool> included)
     {
-        var painter = new PulseOffice.Presentations.UI.Rendering.SlidePagePainter(new SlideRenderer(objectRenderer, texts));
+        var painter = new PulseOffice.Presentations.UI.Rendering.SlidePagePainter(new SlideRenderer(objectRenderer, texts)) { Exported = included };
         var shown = deck.Slides.Where(included).ToList();
         var images = shown.Select(slide => painter.For(deck, slide)).ToList();
         var notes = shown.Select(slide => slide.Notes ?? string.Empty).ToList();
@@ -85,6 +85,7 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
         {
             Titles = [.. shown.Select(slide => fields.For(deck, slide).Title)],
             Language = deck.TextLanguage,
+            Numbers = [.. shown.Select(deck.NumberOf)],
         };
     }
 

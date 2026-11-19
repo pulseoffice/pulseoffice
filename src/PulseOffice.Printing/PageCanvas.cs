@@ -106,7 +106,19 @@ public interface IPageCanvas
     {
     }
 
+    void MarkField(DocumentRect area, PrintFormField field)
+    {
+    }
+
     void Tag(PrintTag? tag)
+    {
+    }
+
+    void BeginArtifact()
+    {
+    }
+
+    void EndArtifact()
     {
     }
 
@@ -152,6 +164,31 @@ public sealed record PrintDestination(string Name, double TopPoints);
 public sealed record PrintLink(DocumentRect Area, string Target);
 
 public sealed record PrintMarkedNote(DocumentRect Area, PrintNote Note);
+
+public enum PrintFormFieldKind
+{
+    Text,
+    CheckBox,
+    ComboBox,
+    ListBox,
+}
+
+public sealed record PrintFormField(string Name, PrintFormFieldKind Kind)
+{
+    public string Value { get; init; } = "";
+
+    public bool Checked { get; init; }
+
+    public bool MultiLine { get; init; }
+
+    public bool ReadOnly { get; init; }
+
+    public string? Tooltip { get; init; }
+
+    public IReadOnlyList<string> Options { get; init; } = [];
+}
+
+public sealed record PrintMarkedField(DocumentRect Area, PrintFormField Field);
 
 public sealed record PrintGlyphRun(string Text, double X, double Baseline, PrintFont Font, PrintColor Color, IReadOnlyList<double> Advances)
 {

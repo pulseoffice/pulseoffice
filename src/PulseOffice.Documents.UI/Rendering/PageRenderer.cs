@@ -196,6 +196,7 @@ public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRe
 
         public void VisitLine(LineBox line)
         {
+            surface.BeginArtifact();
             if (marks.ParagraphSpotlight?.Invoke(line.ParagraphId) is { } tint)
             {
                 surface.Fill(new LayoutRect(line.Left, line.Top, Math.Max(line.Line.Width, 4), line.Line.Height), (tint & 0x00FFFFFF) | 0x30000000);
@@ -204,8 +205,9 @@ public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRe
             if (marks.FormattingMarks) FormattingMarks(line);
             if (marks.Numbering is { } numbering && marks.LineNumber?.Invoke(line) is { } number && number % Math.Max(1, numbering.Increment) == 0)
                 LineNumber(line, number, numbering);
-            if (line.Story != StoryKind.Body && line.Story != StoryKind.Cell) return;
-            if (marks.ChangeBar?.Invoke(line) is { } color) surface.Line(_barX, line.Top, _barX, line.Top + line.Line.Height, color, 1.5);
+            if ((line.Story == StoryKind.Body || line.Story == StoryKind.Cell) && marks.ChangeBar?.Invoke(line) is { } color)
+                surface.Line(_barX, line.Top, _barX, line.Top + line.Line.Height, color, 1.5);
+            surface.EndArtifact();
         }
 
         private void FormattingMarks(LineBox line)
@@ -300,13 +302,17 @@ public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRe
             if (style?.Hidden == true && run.Kind is not GlyphRunKind.Label) return;
             var x = line.Left + run.X;
             var baseline = line.Baseline - run.BaselineShift;
+            surface.BeginArtifact();
             if (marks.FieldShadings && style?.Field is { } field && field != PulseOffice.Text.Rich.TextFieldKind.None && run.Kind == GlyphRunKind.Text)
                 surface.Fill(new LayoutRect(x, line.Top, run.Width, line.Line.Height), FieldShade);
+            surface.EndArtifact();
             if (style?.Highlight is { } highlight && highlight >> 24 != 0) surface.Fill(new LayoutRect(x, line.Top, run.Width, line.Line.Height), highlight);
+            surface.BeginArtifact();
             if (run.Kind == GlyphRunKind.Text && style?.Field is { } named && named != PulseOffice.Text.Rich.TextFieldKind.None && marks.FieldName?.Invoke(style) is { Length: > 0 } label)
                 FieldLabel(run, label, x, line);
             if (run.Kind == GlyphRunKind.Text && marks.RunSpotlight?.Invoke(line.ParagraphId, run.SourceOffset) is { } spot)
                 surface.Fill(new LayoutRect(x, line.Top, run.Width, line.Line.Height), (spot & 0x00FFFFFF) | 0x50000000);
+            surface.EndArtifact();
             if (run.Kind == GlyphRunKind.Label && run.Picture is { } picture)
             {
                 BulletPicture(picture, x, baseline);

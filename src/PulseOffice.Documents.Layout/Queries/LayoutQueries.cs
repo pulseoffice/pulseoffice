@@ -50,10 +50,21 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
     public DocumentPosition? CharacterAt(DocumentLayout layout, int page, double x, double y)
     {
         if (page < 0 || page >= layout.Pages.Count) return null;
-        var turned = new HashSet<LineBox>(layout.Pages[page].TurnedFrames.SelectMany(frame => frame.Lines), ReferenceEqualityComparer.Instance);
-        foreach (var line in layout.Pages[page].AllLines)
+        var frames = layout.Pages[page].TurnedFrames.ToList();
+        foreach (var frame in frames.Where(frame => frame.RotatedBounds.Contains(x, y)))
         {
-            if (turned.Contains(line) || y < line.Top || y >= line.Top + line.Line.Height || x < line.Left || x > line.Left + line.Line.Width) continue;
+            var (localX, localY) = Untwisted(frame, x, y);
+            if (CharacterIn(frame.Lines, localX, localY) is { } inside) return inside;
+        }
+        var turned = new HashSet<LineBox>(frames.SelectMany(frame => frame.Lines), ReferenceEqualityComparer.Instance);
+        return CharacterIn(layout.Pages[page].AllLines.Where(line => !turned.Contains(line)), x, y);
+    }
+
+    private DocumentPosition? CharacterIn(IEnumerable<LineBox> lines, double x, double y)
+    {
+        foreach (var line in lines)
+        {
+            if (y < line.Top || y >= line.Top + line.Line.Height || x < line.Left || x > line.Left + line.Line.Width) continue;
             var start = offsets.StartOf(line);
             var end = offsets.EndOf(line);
             var near = offsets.OffsetAt(line, x);

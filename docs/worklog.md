@@ -13939,3 +13939,24 @@ thread-time trace.
 - Annotated spans map through the shown text by an end-aligned longest common subsequence, not greedily.
 - XLSX table-reference rule forms with equal flat formulas are matched by their priority rank. Log:
   docs/deep-audit/round-241-notes-rules.md.
+
+### Audit round 242: Folio notes and anchored objects (2026-11-19)
+Incremental layout now relayouts from scratch past an edit when an object is aligned inside or outside, so it follows
+the page parity. Continuation notices, paragraph-relative alignment height and rotated frame hits remain queued. Log:
+docs/deep-audit/round-242-folio-notes-objects.md.
+
+### Round 243 (2026-11-19): tagged PDF follow-ups
+- Link and comment annotations join the structure tree (`/StructParent`, `OBJR`, `ParentTree`); figures carry a `BBox`;
+  cells carry spans and header scope; a Ledger sheet is one table across pages with repeated titles as artifacts.
+- Folio marks are artifacts and line-end hyphens have empty `ActualText`; Deck text boxes tag each paragraph and lists,
+  and data tables as tables, through the shared `ITextSegmentTagging`. Log: docs/deep-audit/round-243-tagged-pdf.md.
+
+### Round 244 (2026-11-19): PDF interactivity
+- Deck per-run link areas and shape-text links, slide navigation as internal `GoTo` links, page labels for Deck and
+  Ledger, Folio content controls as AcroForm fields. Log: docs/deep-audit/round-244-pdf-interactivity.md.
+
+### Round 245 (2026-11-19): Deck section commands, filmstrip drag, outline identity, chart table warning
+- Rename and remove the empty section next to the current slide from the registry; icons for the section commands.
+- Filmstrip drag to reorder and a shared drop indicator for filmstrip and sorter (`SlideDragSession`).
+- Alt+Shift block moves in the outline keep slide identity for identical blocks; missing chart tables are announced
+  when a workbook opens. Log: docs/deep-audit/round-245-deck-sections-drag.md.

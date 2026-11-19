@@ -129,7 +129,7 @@ public sealed class DocumentLayoutEngine(
         }
         resumePage = Math.Max(0, resumePage - 1);
         var resume = previous.Pages.Count == 0 ? new PageStart(0, 0, document.InitialPageStyle) : previous.Pages[resumePage].Start;
-        var stable = !document.Styles.Page.All.Any(style => style.EvenPagesDifferent || style.Usage == PageUsage.Mirrored) && !document.Objects.All.Any(item => item.Anchor is PageAnchor);
+        var stable = !document.Styles.Page.All.Any(style => style.EvenPagesDifferent || style.Usage == PageUsage.Mirrored) && !document.Objects.All.Any(item => item.Anchor is PageAnchor || item.Placement.HorizontalAlign is ObjectAlignment.Inside or ObjectAlignment.Outside);
         var probe = new SuffixProbe(previous, keys.Count - suffix, keys.Count - old.Count, stable);
         var pages = paginator.Paginate(Request(document, flow, notes, body, [.. previous.Pages.Take(resumePage)], resume, probe, estimate));
         if (pages.Count != estimate && counts.Present(document)) return Layout(document, pages.Count);

@@ -53,6 +53,21 @@ public sealed class SlideSections
         return sections;
     }
 
+    public EmptySection? EmptyNear(Presentation deck, Slide slide)
+    {
+        ArgumentNullException.ThrowIfNull(deck);
+        ArgumentNullException.ThrowIfNull(slide);
+        var index = deck.Slides.Select((each, position) => (Slide: each, Position: position)).FirstOrDefault(pair => ReferenceEquals(pair.Slide, slide), (Slide: slide, Position: -1)).Position;
+        if (index < 0) return null;
+        var nextId = index + 1 < deck.Slides.Count ? deck.Slides[index + 1].Id : null;
+        var ids = deck.Slides.Select(each => each.Id).ToHashSet(StringComparer.Ordinal);
+        bool After(EmptySection section) => nextId is null
+            ? section.BeforeSlideId is null || !ids.Contains(section.BeforeSlideId)
+            : section.BeforeSlideId == nextId;
+        return deck.EmptySections.FirstOrDefault(After)
+            ?? deck.EmptySections.LastOrDefault(section => section.BeforeSlideId == slide.Id);
+    }
+
     public Slide? StartOf(IReadOnlyList<Slide> slides, Slide slide)
     {
         ArgumentNullException.ThrowIfNull(slides);

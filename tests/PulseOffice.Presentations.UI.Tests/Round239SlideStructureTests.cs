@@ -22,7 +22,7 @@ public sealed class Round239SlideStructureTests
 
         var order = tags.ReadingOrder(slide);
 
-        Assert.Equal(new[] { PrintRole.Title, PrintRole.Paragraph }, order.Select(tag => tag.Role).ToArray());
+        Assert.Equal(new[] { PrintRole.Title, PrintRole.Section }, order.Select(tag => tag.Role).ToArray());
         Assert.All(order, tag => Assert.Equal(PrintRole.Slide, tag.Parent?.Role));
         Assert.Null(tags.For(slide, Text("master", PlaceholderRole.Free, "Logo", 0)));
         Assert.Null(tags.For(slide, null));

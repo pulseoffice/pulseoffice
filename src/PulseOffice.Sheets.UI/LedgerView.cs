@@ -310,6 +310,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         chartTables.TablesLost += (_, lost) => _status.Report(
             _texts.Format("status.chart.tableMissing", string.Join(", ", lost.Tables)), NotificationSeverity.Warning);
         _history.Changed += (_, _) => chartTables.Check();
+        chartTables.AnnounceStanding();
         _grid.EditRequested += (_, _) => _editing.BeginEdit(replaceContent: null);
         _grid.ChoicesAvailable = _editing.HasChoices;
         _grid.ChoicesRequested += (_, address) => _editing.ShowChoices(address);
