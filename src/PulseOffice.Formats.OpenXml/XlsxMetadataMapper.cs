@@ -91,7 +91,7 @@ public sealed class XlsxMetadataMapper
                     Range = range,
                     Kind = kind,
                     Operator = _vocabulary.Operators.Model(element.Operator?.Value),
-                    AllowBlank = element.AllowBlank?.Value ?? true,
+                    AllowBlank = element.AllowBlank?.Value ?? false,
                     FirstFormula = kind == ValidationKind.List && IsLiteralList(first) ? null : ToInternal(first),
                     SecondFormula = kind is ValidationKind.List or ValidationKind.Custom
                         || element.Operator?.Value is { } op && op != DataValidationOperatorValues.Between && op != DataValidationOperatorValues.NotBetween

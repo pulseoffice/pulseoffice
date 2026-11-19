@@ -135,7 +135,8 @@ public sealed class TextToColumns(IDelimitedText delimited, PulseOffice.Sheets.F
     }
 
     private CellValue Interpret(string text, bool detectNumbers) =>
-        detectNumbers && _numbers.TryRead(text, out var number)
+        text.Length == 0 ? CellValue.Empty
+        : detectNumbers && _numbers.TryRead(text, out var number)
             ? CellValue.Number(number)
             : CellValue.Text(text);
 }

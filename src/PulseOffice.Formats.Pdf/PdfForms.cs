@@ -6,7 +6,7 @@ namespace PulseOffice.Formats.Pdf;
 
 public interface IPdfFormWriter
 {
-    IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, ISet<string> names);
+    IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, ISet<string> names, IPdfAnnotationTagging? tagging = null);
 
     string? AcroForm(IReadOnlyList<int> fieldIds);
 }
@@ -15,11 +15,12 @@ public sealed class PdfFormWriter : IPdfFormWriter
 {
     private const int ReadOnlyFlag = 1;
     private const int MultiLineFlag = 1 << 12;
+    private const int PushButtonFlag = 1 << 16;
     private const int ComboFlag = 1 << 17;
     private const int EditFlag = 1 << 18;
     private const string DefaultAppearance = "/Helv 10 Tf 0 g";
 
-    public IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, ISet<string> names)
+    public IReadOnlyList<int> Widgets(PdfFile file, int pageId, IReadOnlyList<PrintMarkedField> fields, double pageHeight, ISet<string> names, IPdfAnnotationTagging? tagging = null)
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(fields);
@@ -32,11 +33,14 @@ public sealed class PdfFormWriter : IPdfFormWriter
             var width = Math.Max(1, area.Width.ToPoints());
             var height = Math.Max(1, area.Height.ToPoints());
             var rect = FormattableString.Invariant($"[{Number(left)} {Number(top - height)} {Number(left + width)} {Number(top)}]");
+            var id = file.Reserve();
+            var name = Unique(field.Name, names);
             var common = new StringBuilder();
             common.Append(CultureInfo.InvariantCulture,
-                $"<< /Type /Annot /Subtype /Widget /Rect {rect} /F 4 /P {pageId} 0 R /T {PdfFile.TextString(Unique(field.Name, names))}");
-            if (field.Tooltip is { Length: > 0 } tooltip) common.Append(" /TU ").Append(PdfFile.TextString(tooltip));
-            common.Append(" /MK << /BG [1 1 1] >>");
+                $"<< /Type /Annot /Subtype /Widget /Rect {rect} /F 4 /P {pageId} 0 R /T {PdfFile.TextString(name)}");
+            common.Append(" /TU ").Append(PdfFile.TextString(field.Tooltip is { Length: > 0 } tooltip ? tooltip : name));
+            if (field.Kind != PrintFormFieldKind.Picture) common.Append(" /MK << /BG [1 1 1] >>");
+            if (tagging is not null) common.Append(tagging.Field(id, field));
             var flags = field.ReadOnly ? ReadOnlyFlag : 0;
             switch (field.Kind)
             {
@@ -46,6 +50,10 @@ public sealed class PdfFormWriter : IPdfFormWriter
                     var state = field.Checked ? "/Yes" : "/Off";
                     common.Append(CultureInfo.InvariantCulture,
                         $" /FT /Btn /Ff {flags} /V {state} /AS {state} /AP << /N << /Yes {on} 0 R /Off {off} 0 R >> >>");
+                    break;
+                case PrintFormFieldKind.Picture:
+                    common.Append(CultureInfo.InvariantCulture,
+                        $" /FT /Btn /Ff {flags | PushButtonFlag} /MK << /TP 1 >> /AP << /N {Blank(file, width, height)} 0 R >>");
                     break;
                 case PrintFormFieldKind.ComboBox or PrintFormFieldKind.ListBox:
                     flags |= ComboFlag;
@@ -64,7 +72,8 @@ public sealed class PdfFormWriter : IPdfFormWriter
                     break;
             }
             common.Append(" >>");
-            ids.Add(file.WriteObject(common.ToString()));
+            file.WriteObject(id, common.ToString());
+            ids.Add(id);
         }
         return ids;
     }

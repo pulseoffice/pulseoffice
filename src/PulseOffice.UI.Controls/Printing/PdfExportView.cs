@@ -27,6 +27,8 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
     private readonly CheckBox _notes = new();
     private readonly CheckBox _hidden = new();
     private readonly CheckBox _links = new();
+    private readonly CheckBox _forms = new() { IsChecked = true };
+    private readonly CheckBox _tagged = new() { IsChecked = true };
     private readonly CheckBox _archive = new();
     private readonly TextBox _title = new();
     private readonly TextBox _author = new();
@@ -131,6 +133,8 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
         structure.Add(null, Check(_bookmarks, texts["pdf.export.bookmarks"]), DialogRowKind.Indented);
         if (defaults.HasComments) structure.Add(null, Check(_notes, texts["pdf.export.notes"]), DialogRowKind.Indented);
         structure.Add(null, Check(_links, texts["pdf.export.links"]), DialogRowKind.Indented);
+        structure.Add(null, Check(_forms, texts["pdf.export.forms"]), DialogRowKind.Indented);
+        structure.Add(null, Check(_tagged, texts["pdf.export.tagged"]), DialogRowKind.Indented);
 
         var security = layout.AddSection(texts["pdf.section.security"]);
         _securityArchive = Note(texts["pdf.security.archive"], metrics);
@@ -212,6 +216,18 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
             _range.Text = value;
             Refilter();
         }
+    }
+
+    public bool FormsChecked
+    {
+        get => _forms.IsChecked == true;
+        set => _forms.IsChecked = value;
+    }
+
+    public bool TaggedChecked
+    {
+        get => _tagged.IsChecked == true;
+        set => _tagged.IsChecked = value;
     }
 
     public bool ArchiveChecked
@@ -305,6 +321,8 @@ public sealed class PdfExportView : UserControl, IDialogContent, IDialogFooterOw
             Bookmarks = _bookmarks.IsChecked == true,
             Links = _links.IsChecked == true,
             Notes = _defaults.HasComments && _notes.IsChecked == true,
+            Forms = _forms.IsChecked == true,
+            Tagged = _tagged.IsChecked == true,
             Archive = ArchiveChecked,
             Language = _defaults.Language,
             Images = Images,

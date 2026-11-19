@@ -55,4 +55,26 @@ public sealed class Round244PdfFormFieldTests
         Assert.DoesNotContain("/AcroForm", pdf, StringComparison.Ordinal);
         Assert.DoesNotContain("/Widget", pdf, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Round248TaggedWidgetsAreFormElementsReachedThroughObjectReferences()
+    {
+        var pdf = Write(canvas => canvas.MarkField(Box, new PrintFormField("Nome", PrintFormFieldKind.Text) { Tooltip = "Il tuo nome" }),
+            new PdfExportOptions("Prova", Compress: false) { Tagged = true });
+
+        Assert.Contains("/TU (Il tuo nome) /MK << /BG [1 1 1] >> /StructParent 1", pdf, StringComparison.Ordinal);
+        Assert.Contains("/S /Form", pdf, StringComparison.Ordinal);
+        Assert.Contains("/Type /OBJR", pdf, StringComparison.Ordinal);
+        Assert.Contains("/ParentTreeNextKey 2", pdf, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Round248PictureFieldsArePushButtonsWithAnAppearanceAndUntaggedWidgetsHaveNoStructParent()
+    {
+        var pdf = Write(canvas => canvas.MarkField(Box, new PrintFormField("Foto", PrintFormFieldKind.Picture)),
+            new PdfExportOptions("Prova", Compress: false) { Tagged = false });
+
+        Assert.Contains("/TU (Foto) /FT /Btn /Ff 65536 /MK << /TP 1 >> /AP << /N ", pdf, StringComparison.Ordinal);
+        Assert.DoesNotContain("/StructParent", pdf, StringComparison.Ordinal);
+    }
 }

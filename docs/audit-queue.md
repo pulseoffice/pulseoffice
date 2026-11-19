@@ -26,10 +26,10 @@ the round that fixes it is joined and the join run is green.
   Excel or the reference suite here. (213, 214)
 - Deck's Connector Ends dialog (shared `ConnectorSitesDialog`) has not been seen live; it is now also in the slide
   object context menu. (225, 227, 231)
-- Outline blocks identical in title and body swapped by cut and paste (Alt+Shift moves now keep identity) are still
-  matched in order. (240, 245)
-- The slide drag indicator in filmstrip and sorter, and the Rename/Remove Empty Section Here commands, have not been
-  seen in the running app; slide drag has no movement threshold. (245)
+- The slide drag indicator and threshold in filmstrip and sorter, outline cut and paste identity, and the Rename/Remove
+  Empty Section Here commands, have not been seen in the running app. (245, 249)
+- Cutting the last outline block leaves a trailing empty line, so its paste is not recognised and the slide is
+  recreated instead of kept. (249)
 - The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
   as no section. ODP empty sections are `urn:pulseoffice:presentation-section` elements inside `draw:page`. None of
   this has been opened in PowerPoint or the reference suite here. (229, 231)
@@ -59,27 +59,32 @@ the round that fixes it is joined and the join run is green.
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
   ODT as top/bottom; the vertical top-margin relation is written to ODT as `page` plus our own `pt:vertical-rel`, so
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
-  alignment relative to a paragraph uses its unwrapped height (241, 242: still open; the wrapped height depends on the
-  object itself). Not opened in Word.
+  alignment relative to a paragraph now settles on the wrapped height in up to four passes (246); a paragraph that
+  breaks across pages still aligns against the height measured down to the column bottom. Not opened in Word.
+- Folio notes (246): the wider audit of footnote and endnote numbering, restart, separators and their DOCX/ODT round
+  trips, and of anchored-object wrapping and anchoring round trips, was not done in round 246; carry it to the next cycle.
 
 
 ## Shell and formats
+- Avalonia's static `TextDecorations.Underline`/`Strikethrough` collections belong to the first UI thread that uses
+  them; `ShapeRenderer` now builds its own (join of 246-249), but `VersionComparisonView`, `ReviewPanel`, `ChoiceSlot`
+  and `TableCellTextStyles` still apply the static ones. `SlideDragSession.PlatformSlop` keeps an unused `visual`
+  parameter. (join 246-249)
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
-- Tagged PDF: Deck paragraphs and table cells are matched to drawn text by a sequential text match; table values whose
-  shown format differs from the stored value advance to the next cell, so a cell drawn in several runs can be split
-  across cells, and autofit or field text that differs from the paragraph text stays with the previous paragraph. (243)
-- Tagged PDF: a Deck table gets no `BBox` (its fills and borders are artifacts) and data-table header scope follows the
-  style's header row and first column only. (243)
-- Tagged PDF: a link annotation whose target has no tagged run on its page (Ledger cell links, Deck link areas) gets its
-  own root-level `Link` element instead of joining the cell or shape it covers. (243)
-- Tagged PDF: a figure's `BBox` ignores rotation and covers only its first page. (243)
-- PDF form fields: widgets carry no `/StructParent`; rich text, picture and multi-paragraph content controls are not
-  exported as fields; the PDF export dialog has no switch for `PdfExportOptions.Forms`; not yet opened in an external
-  PDF viewer. (244)
+- Tagged PDF: Deck paragraphs are still matched to drawn text by text, not by layout position (the shape text layout
+  does not expose line boxes to the print path); table cells are now tagged by position. (243, 247)
+- PDF form fields: not yet opened in an external PDF viewer. (244)
+- PDF form fields: text and choice widgets have blank appearance streams over values drawn in the page content, so a
+  viewer that regenerates appearances draws the value twice. (248)
+- PDF form fields: `Form` structure elements are root-level, not children of the paragraph or cell they sit in. (248)
+- PDF form fields: a field crossing a page break becomes one field per page with numbered names instead of one field
+  with several widgets. (248)
 
 ## Ledger
+- ODS `table:display-list="sorted"` is read as a dropdown but written back as `unsorted`. (249)
+- Remove duplicates compares stored values, not shown (formatted) values as Excel does. (249)
 
 - The relative-period list of the AutoFilter menu has not been seen in the running app nor walked with the keyboard.
   (216)

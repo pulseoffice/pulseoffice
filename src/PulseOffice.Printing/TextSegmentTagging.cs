@@ -7,7 +7,15 @@ public sealed record PrintTextSegment(PrintTag Tag, string Text)
     public PrintTag? Label { get; init; }
 }
 
-public sealed record PrintTextSegments(IReadOnlyList<PrintTextSegment> Segments, bool AdvanceOnMiss);
+public sealed record PrintTextSegments(IReadOnlyList<PrintTextSegment> Segments, bool AdvanceOnMiss)
+{
+    public IPrintSegmentLocator? Locator { get; init; }
+}
+
+public interface IPrintSegmentLocator
+{
+    PrintTag? At(double xPoints, double yPoints);
+}
 
 public interface ITextSegmentTagging
 {
@@ -42,14 +50,16 @@ public sealed class SegmentTaggingCanvas(IPageCanvas inner, PrintTextSegments se
         string text, DocumentRect bounds, PrintFont font, PrintColor color,
         TextAlignment alignment = TextAlignment.Left, TextBaseline baseline = TextBaseline.Middle)
     {
-        inner.Tag(Select(text));
+        var centre = bounds.IsEmpty ? null : segments.Locator?.At(
+            (bounds.Left.Value + bounds.Width.Value / 2.0) / Twip.PerPoint, (bounds.Top.Value + bounds.Height.Value / 2.0) / Twip.PerPoint);
+        inner.Tag(centre ?? Select(text));
         inner.DrawText(text, bounds, font, color, alignment, baseline);
     }
 
     public void DrawGlyphs(PrintGlyphRun run)
     {
         ArgumentNullException.ThrowIfNull(run);
-        inner.Tag(Select(run.Text));
+        inner.Tag(Located(run) ?? Select(run.Text));
         inner.DrawGlyphs(run);
     }
 
@@ -78,6 +88,16 @@ public sealed class SegmentTaggingCanvas(IPageCanvas inner, PrintTextSegments se
         inner.BeginArtifact();
         paint();
         inner.EndArtifact();
+    }
+
+    private PrintTag? Located(PrintGlyphRun run)
+    {
+        if (segments.Locator is not { } locator || !double.IsFinite(run.X) || !double.IsFinite(run.Baseline)) return null;
+        var radians = double.IsFinite(run.RotationDegrees) ? -run.RotationDegrees * Math.PI / 180 : 0;
+        var along = run.Width / 2;
+        var above = -run.Font.SizePoints * 0.3;
+        var (cos, sin) = (Math.Cos(radians), Math.Sin(radians));
+        return locator.At(run.X + along * cos - above * sin, run.Baseline + along * sin + above * cos);
     }
 
     private PrintTag Select(string? text)
@@ -110,8 +130,14 @@ public sealed class SegmentTaggingCanvas(IPageCanvas inner, PrintTextSegments se
             return label;
         }
 
-        if (segments.AdvanceOnMiss && _offset > 0 && _position + 1 < list.Count) _position++;
-        _offset = segments.AdvanceOnMiss ? list[_position].Text.Length : _offset;
+        var consumed = _offset >= list[_position].Text.TrimEnd().Length;
+        if (_offset > 0 && _position + 1 < list.Count && (segments.AdvanceOnMiss || consumed))
+        {
+            _position++;
+            _offset = segments.AdvanceOnMiss ? list[_position].Text.Length : 0;
+            return list[_position].Tag;
+        }
+        if (segments.AdvanceOnMiss) _offset = list[_position].Text.Length;
         return list[_position].Tag;
     }
 }

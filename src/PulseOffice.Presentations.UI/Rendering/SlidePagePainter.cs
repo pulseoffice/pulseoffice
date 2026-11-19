@@ -62,7 +62,7 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         foreach (var layer in layers)
         {
             canvas.Tag(layer.Fill is null ? structure.For(slide, layer.Element) : null);
-            PaintLayer(layer.Fill is null ? structure.Tagged(clipped, slide, layer.Element) : clipped, layer, target, scale);
+            PaintLayer(layer.Fill is null ? structure.Tagged(clipped, slide, layer.Element, Placement(layer.Element, target, scale)) : clipped, layer, target, scale);
         }
         canvas.Tag(null);
         canvas.MarkTarget(links.Anchor(slide), area.Top.ToPoints());
@@ -101,6 +101,13 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
 
         parts.PaintVector(canvas);
     }
+
+    private SlideElementPlacement? Placement(SlideElement? element, Rect target, double scale) =>
+        element is null
+            ? null
+            : new SlideElementPlacement(
+                target.X + element.Bounds.Left.Value * scale, target.Y + element.Bounds.Top.Value * scale,
+                element.Bounds.Width.Value * scale, element.Bounds.Height.Value * scale, scale, element.RotationDegrees);
 
     private PrintTag SlideTag(Slide slide) => structure.SlideTag(slide);
 

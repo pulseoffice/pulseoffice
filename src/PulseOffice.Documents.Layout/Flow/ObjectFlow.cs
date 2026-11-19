@@ -41,14 +41,19 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
         _placedObjects.Clear();
     }
 
-    public IReadOnlyList<Obstacle> Candidates(ParagraphEntry entry, double top)
+    public bool HeightDependent(ParagraphEntry entry) =>
+        entry.AnchoredObjects.Any(id => !_placedObjects.Contains(id) && request.Object(id) is { } item
+            && item.Placement.Vertical is VerticalRelation.Paragraph or VerticalRelation.ParagraphArea
+            && item.Placement.VerticalAlign is ObjectAlignment.Center or ObjectAlignment.End or ObjectAlignment.Outside);
+
+    public IReadOnlyList<Obstacle> Candidates(ParagraphEntry entry, double top, double? wrappedHeight = null)
     {
         var result = new List<Obstacle>();
         ObjectFrame? frame = null;
         foreach (var id in entry.AnchoredObjects)
         {
             if (_placedObjects.Contains(id) || request.Object(id) is not { } item) continue;
-            frame ??= Frame(entry, top);
+            frame ??= Frame(entry, top, wrappedHeight);
             var rect = Grown(item, placement.Place(item, frame));
             var turned = RotatedRect.Around(rect, item.RotationDegrees);
             result.Add(Obstacle(item, rect, turned));
@@ -56,12 +61,12 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
         return result;
     }
 
-    private ObjectFrame Frame(ParagraphEntry entry, double top)
+    private ObjectFrame Frame(ParagraphEntry entry, double top, double? wrappedHeight)
     {
         var lines = entry.Lines(pagination.ColumnWidth);
         return new ObjectFrame(pagination.Geometry, pagination.ColumnLeft, pagination.ColumnWidth, top)
         {
-            ParagraphHeight = lines.Sum(line => line.Height),
+            ParagraphHeight = wrappedHeight ?? lines.Sum(line => line.Height),
             LineHeight = lines.Count > 0 ? lines[0].Height : double.NaN,
             EvenPage = pagination.EvenPage,
         };

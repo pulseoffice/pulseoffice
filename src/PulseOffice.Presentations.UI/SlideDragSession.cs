@@ -20,19 +20,40 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
 {
     private const double IndicatorThickness = 3;
     private Control? _marked;
+    private Point _origin;
+    private Size _slop;
 
     public int From { get; private set; } = -1;
 
-    public void Begin(Slide slide) => From = deck.IndexOf(slide);
+    public bool Dragging { get; private set; }
+
+    public void Begin(Slide slide, Point origin, Size slop)
+    {
+        From = deck.IndexOf(slide);
+        _origin = origin;
+        _slop = slop;
+        Dragging = false;
+    }
+
+    public bool Arm(Point position)
+    {
+        if (From < 0) return false;
+        if (!Dragging
+            && (Math.Abs(position.X - _origin.X) > _slop.Width / 2 || Math.Abs(position.Y - _origin.Y) > _slop.Height / 2))
+            Dragging = true;
+        return Dragging;
+    }
 
     public SlideDrop Resolve(EmptySection? section, int hit) =>
         From < 0 || From >= deck.Slides.Count ? new SlideDrop(SlideDropKind.None)
+        : !Dragging ? new SlideDrop(SlideDropKind.Select)
         : section is not null ? new SlideDrop(SlideDropKind.IntoSection, Section: section)
         : hit < 0 || hit == From ? new SlideDrop(SlideDropKind.Select)
         : new SlideDrop(SlideDropKind.Move, hit);
 
     public void Track(Visual root, Point position, IReadOnlyList<Control> frames)
     {
+        if (!Arm(position)) return;
         var drop = Resolve(headers.EmptyAt(root, position), Hit(root, position, frames));
         var target = drop.Kind switch
         {
@@ -45,10 +66,12 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
 
     public bool Finish(Visual root, Point position, IReadOnlyList<Control> frames)
     {
+        Arm(position);
         var drop = Resolve(headers.EmptyAt(root, position), Hit(root, position, frames));
         var slide = drop.Kind is SlideDropKind.None ? null : deck.Slides[From];
         Mark(null, drop);
         From = -1;
+        Dragging = false;
         switch (drop.Kind)
         {
             case SlideDropKind.IntoSection:
@@ -66,7 +89,11 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
     {
         Mark(null, new SlideDrop(SlideDropKind.None));
         From = -1;
+        Dragging = false;
     }
+
+    public Size PlatformSlop(Visual visual, Avalonia.Input.PointerType pointer) =>
+        Application.Current?.PlatformSettings?.GetTapSize(pointer) ?? new Size(4, 4);
 
     private static int Hit(Visual root, Point position, IReadOnlyList<Control> frames)
     {

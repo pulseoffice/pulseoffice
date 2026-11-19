@@ -69,6 +69,22 @@ public sealed class PdfExportPromptTests
         window.Close();
     }, CancellationToken.None);
 
+    [Fact]
+    public Task Round248FormsAndTaggingSwitchesReachTheExporterOptions() => MacroEventsViewTests.Session.Dispatch(() =>
+    {
+        var view = new PdfExportView(new PdfExportDefaults("t", "a", "s", "k", 1), new PulseOffice.Printing.PageRangeParser(), new TextCatalog(UiLanguage.English), new AvaloniaPageCanvasFactory(new DefaultDisplayFonts()));
+        object? result = null;
+        view.Completed += (_, value) => result = value;
+        Assert.True(view.FormsChecked);
+        Assert.True(view.TaggedChecked);
+        view.FormsChecked = false;
+        view.TaggedChecked = false;
+        view.Confirm();
+        var options = Assert.IsType<PdfExportChoice>(result).Options;
+        Assert.False(options.Forms);
+        Assert.False(options.Tagged);
+    }, CancellationToken.None);
+
     private sealed class DefaultDisplayFonts : PulseOffice.UI.Controls.Fonts.IDisplayFonts
     {
         public Avalonia.Media.FontFamily Resolve(string? family) => Avalonia.Media.FontFamily.Default;

@@ -160,9 +160,10 @@ public sealed class PdfExporter(
                 resources.Append(">>");
 
                 marks.Collect(pageId, canvas, height, options);
-                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, fieldNames);
+                var tagging = options.Tagged ? structure.Annotations(tree, slot) : null;
+                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, fieldNames, tagging);
                 fieldIds.AddRange(widgets);
-                var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height, options.Tagged ? structure.Annotations(tree, slot) : null).Concat(widgets).ToList();
+                var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height, tagging).Concat(widgets).ToList();
                 var annots = annotations.Count == 0 ? string.Empty : " /Annots [" + string.Join(' ', annotations.Select(id => $"{id} 0 R")) + "]";
 
                 file.WriteObject(pageId,

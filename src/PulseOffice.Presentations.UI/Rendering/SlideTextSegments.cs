@@ -8,18 +8,22 @@ namespace PulseOffice.Presentations.UI.Rendering;
 
 public interface ISlideTextSegments
 {
-    PrintTextSegments? For(PrintTag container, SlideElement element);
+    PrintTextSegments? For(PrintTag container, SlideElement element, SlideElementPlacement? placement = null);
 }
 
-public sealed class SlideTextSegments : ISlideTextSegments
+public sealed class SlideTextSegments(TableGeometry geometry) : ISlideTextSegments
 {
-    public PrintTextSegments? For(PrintTag container, SlideElement element)
+    public SlideTextSegments() : this(new TableGeometry())
+    {
+    }
+
+    public PrintTextSegments? For(PrintTag container, SlideElement element, SlideElementPlacement? placement = null)
     {
         ArgumentNullException.ThrowIfNull(container);
         return element switch
         {
             TextElement text when container.Role == PrintRole.Section => Paragraphs(container, text.Text),
-            ObjectElement { Content: DataTableObject table } when container.Role == PrintRole.Table => Cells(container, table),
+            ObjectElement { Content: DataTableObject table } when container.Role == PrintRole.Table => Cells(container, table, placement),
             _ => null,
         };
     }
@@ -48,16 +52,24 @@ public sealed class SlideTextSegments : ISlideTextSegments
         return segments.Count == 0 ? null : new PrintTextSegments(segments, AdvanceOnMiss: false);
     }
 
-    private PrintTextSegments? Cells(PrintTag container, DataTableObject table)
+    private PrintTextSegments? Cells(PrintTag container, DataTableObject table, SlideElementPlacement? placement)
     {
         var snapshot = table.Snapshot;
+        var index = new TableCellIndex(table);
         var segments = new List<PrintTextSegment>();
+        var cells = new Dictionary<(int Row, int Column), PrintTag>();
         var row = 0;
         if (table.Style.HeaderRow && snapshot.Columns.Count > 0)
         {
             var header = Row(container, row++);
             for (var column = 0; column < snapshot.Columns.Count; column++)
-                segments.Add(new PrintTextSegment(Cell(header, column, PrintRole.TableHeader, PrintHeaderScope.Column, null), snapshot.Columns[column].Name));
+            {
+                if (index.Cover(TableCellFormat.HeaderRow, column) is not null) continue;
+                var scope = table.Style.FirstColumn && column == 0 ? PrintHeaderScope.Both : PrintHeaderScope.Column;
+                var tag = Cell(header, column, PrintRole.TableHeader, scope, index.Origin(TableCellFormat.HeaderRow, column));
+                cells[(TableCellFormat.HeaderRow, column)] = tag;
+                segments.Add(new PrintTextSegment(tag, snapshot.Columns[column].Name));
+            }
         }
         for (var data = 0; data < snapshot.Rows.Count; data++)
         {
@@ -65,13 +77,18 @@ public sealed class SlideTextSegments : ISlideTextSegments
             var values = snapshot.Rows[data];
             for (var column = 0; column < values.Count; column++)
             {
-                if (table.Merges.Any(merge => merge.Covers(data, column))) continue;
+                if (index.Cover(data, column) is not null) continue;
                 var role = table.Style.FirstColumn && column == 0 ? PrintRole.TableHeader : PrintRole.TableCell;
-                var origin = table.Merges.FirstOrDefault(span => span.IsOrigin(data, column));
-                segments.Add(new PrintTextSegment(Cell(tr, column, role, PrintHeaderScope.Row, origin), Convert.ToString(values[column], CultureInfo.CurrentCulture) ?? string.Empty));
+                var tag = Cell(tr, column, role, PrintHeaderScope.Row, index.Origin(data, column));
+                cells[(data, column)] = tag;
+                segments.Add(new PrintTextSegment(tag, Convert.ToString(values[column], CultureInfo.CurrentCulture) ?? string.Empty));
             }
         }
-        return segments.Count == 0 ? null : new PrintTextSegments(segments, AdvanceOnMiss: true);
+        if (segments.Count == 0) return null;
+        return new PrintTextSegments(segments, AdvanceOnMiss: true)
+        {
+            Locator = placement is null ? null : new SlideTableCellLocator(table, placement, cells, geometry),
+        };
     }
 
     private PrintTag Row(PrintTag table, int row) =>

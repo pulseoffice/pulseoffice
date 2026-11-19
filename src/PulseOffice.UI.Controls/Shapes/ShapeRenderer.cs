@@ -366,7 +366,7 @@ public sealed class ShapeRenderer : IShapeRenderer
         };
 
         if (style.Underline)
-            text.SetTextDecorations(TextDecorations.Underline);
+            text.SetTextDecorations(FreshUnderline());
         if (runs is { Count: > 0 }) Format(text, runs, style);
 
         using (context.PushTransform(_flow.Turn(bounds, _flow.Degrees(layout, style.RotationDegrees, shapeRotation))))
@@ -411,7 +411,7 @@ public sealed class ShapeRenderer : IShapeRenderer
                 if (Legible(run.Size) is { } size) text.SetFontSize(size, start, length);
                 if (run.Family is { Length: > 0 } family) text.SetFontFamily(new FontFamily(family), start, length);
                 if (_links.ColorHex(run) is { } colour) text.SetForegroundBrush(new SolidColorBrush(_brushes.Colour(colour, Colors.Black)), start, length);
-                if (_links.Underlined(run) && !style.Underline) text.SetTextDecorations(TextDecorations.Underline, start, length);
+                if (_links.Underlined(run) && !style.Underline) text.SetTextDecorations(FreshUnderline(), start, length);
             }
             start += length;
         }
@@ -422,4 +422,7 @@ public sealed class ShapeRenderer : IShapeRenderer
 
     public static StreamGeometry Build(ShapeOutline outline) => new OutlineGeometry().Build(outline);
 
+
+    private static TextDecorationCollection FreshUnderline() =>
+        [new TextDecoration { Location = TextDecorationLocation.Underline }];
 }

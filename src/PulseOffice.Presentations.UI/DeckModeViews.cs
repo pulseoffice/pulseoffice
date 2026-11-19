@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText, IOutlineSlideMatching outlineMatching, IOutlineBlockMove outlineMove, DeckSectionHeaders sectionHeaders, SlideStripLayout stripLayout)
+internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, DeckMasterViews masters, DeckTextCorrection correction, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, IDeckOutlineText outlineText, IOutlineSlideMatching outlineMatching, IOutlineBlockMove outlineMove, IOutlineBlockTransfer outlineTransfer, DeckSectionHeaders sectionHeaders, SlideStripLayout stripLayout)
 {
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -104,7 +104,8 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
 
         frame.PointerPressed += (_, e) =>
         {
-            if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed) _drag?.Begin(slide);
+            if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed && _sorterStrip is not null && _drag is { } drag)
+                drag.Begin(slide, e.GetPosition(_sorterStrip.Panel), drag.PlatformSlop(frame, e.Pointer.Type));
         };
         frame.PointerMoved += (_, e) =>
         {
@@ -174,6 +175,8 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
             MoveOutlineBlock(editor, e.Key == Key.Up);
             e.Handled = true;
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        editor.AddHandler(TextBox.CuttingToClipboardEvent, (_, _) => DetachCutBlocks(editor), Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
+        editor.TextChanged += (_, _) => ReattachCutBlocks(editor.Text ?? string.Empty);
         _outlineEditor = editor;
 
         return new Border { Child = editor }.Themed(Border.BackgroundProperty, Palette.Keys.Canvas);
@@ -182,6 +185,8 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
     private string BuildOutlineText()
     {
         var text = _outlineText.Render(_deck.Slides);
+        _outlineCut = [];
+        _outlineDetached = [];
         _outlineSlides = [.. _deck.Slides];
         _outlineEntries = _outlineText.Parse(text);
         _outlineOriginal = [.. _outlineText.Parse(text).SelectMany(entry => entry.Body.Select(line => line.Text).Prepend(entry.Title))];
@@ -199,6 +204,47 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
     private List<Slide> _outlineSlides = [];
 
     private IReadOnlyList<OutlineEntry> _outlineEntries = [];
+
+    private readonly IOutlineBlockTransfer _outlineTransfer = outlineTransfer;
+
+    private List<(Slide Slide, OutlineEntry Original, OutlineEntry Shown)> _outlineCut = [];
+
+    private List<Slide> _outlineDetached = [];
+
+    private IReadOnlyList<OutlineEntry> _outlineAfterCut = [];
+
+    private void DetachCutBlocks(TextBox editor)
+    {
+        var text = editor.Text ?? string.Empty;
+        var start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
+        var length = Math.Abs(editor.SelectionEnd - editor.SelectionStart);
+        var shown = _outlineText.Parse(text);
+        if (_outlineTransfer.Covered(text, start, length) is not { } range
+            || shown.Count != _outlineSlides.Count || shown.Count != _outlineEntries.Count) return;
+        _outlineCut = [.. Enumerable.Range(range.First, range.Count).Select(index => (_outlineSlides[index], _outlineEntries[index], shown[index]))];
+        _outlineDetached.AddRange(_outlineCut.Select(cut => cut.Slide));
+        _outlineSlides.RemoveRange(range.First, range.Count);
+        var entries = _outlineEntries.ToList();
+        entries.RemoveRange(range.First, range.Count);
+        _outlineEntries = entries;
+        _outlineAfterCut = [.. shown.Take(range.First).Concat(shown.Skip(range.First + range.Count))];
+    }
+
+    private void ReattachCutBlocks(string text)
+    {
+        if (_outlineCut.Count == 0) return;
+        var shown = _outlineText.Parse(text);
+        if (shown.Count == _outlineAfterCut.Count) return;
+        var cut = _outlineCut;
+        _outlineCut = [];
+        if (_outlineAfterCut.Count != _outlineSlides.Count
+            || _outlineTransfer.InsertedAt(_outlineAfterCut, shown, [.. cut.Select(item => item.Shown)]) is not { } at) return;
+        _outlineSlides.InsertRange(at, cut.Select(item => item.Slide));
+        var entries = _outlineEntries.ToList();
+        entries.InsertRange(at, cut.Select(item => item.Original));
+        _outlineEntries = entries;
+        foreach (var item in cut) _outlineDetached.Remove(item.Slide);
+    }
 
     private void MoveOutlineBlock(TextBox editor, bool up)
     {
@@ -241,7 +287,10 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         for (var i = 0; i < entries.Count; i++)
             if (matches[i] is { } kept) changes.Add((_outlineSlides[kept], entries[i].Title, entries[i].Body));
         var used = matches.OfType<int>().ToHashSet();
-        var removed = _outlineSlides.Where((_, index) => !used.Contains(index)).ToList();
+        var removed = _outlineSlides.Where((_, index) => !used.Contains(index))
+            .Concat(_outlineDetached.Where(slide => _deck.IndexOf(slide) >= 0)).ToList();
+        _outlineDetached = [];
+        _outlineCut = [];
         if (removed.Count == 0 && changes.Count == entries.Count && changes.Select(change => change.Slide).SequenceEqual(_deck.Slides)
             && entries.Count == _outlineSlides.Count && OutlineUnchanged(entries)) return;
 

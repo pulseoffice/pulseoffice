@@ -20,7 +20,11 @@ public sealed class Round245SlideDragSessionTests
         var empty = new EmptySection("Later", "s1", null);
 
         Assert.Equal(SlideDropKind.None, session.Resolve(null, 2).Kind);
-        session.Begin(deck.Slides[1]);
+        session.Begin(deck.Slides[1], new Avalonia.Point(10, 10), new Avalonia.Size(4, 4));
+        Assert.Equal(SlideDropKind.Select, session.Resolve(null, 0).Kind);
+        Assert.False(session.Arm(new Avalonia.Point(11, 11)));
+        Assert.Equal(SlideDropKind.Select, session.Resolve(null, 0).Kind);
+        Assert.True(session.Arm(new Avalonia.Point(10, 13)));
 
         Assert.Equal(SlideDropKind.Select, session.Resolve(null, 1).Kind);
         Assert.Equal(SlideDropKind.Select, session.Resolve(null, -1).Kind);
@@ -29,5 +33,6 @@ public sealed class Round245SlideDragSessionTests
 
         session.Cancel();
         Assert.Equal(-1, session.From);
+        Assert.False(session.Dragging);
     }
 }

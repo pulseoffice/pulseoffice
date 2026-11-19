@@ -1,6 +1,7 @@
 using PulseOffice.Documents.Blocks;
 using PulseOffice.Documents.Commenting;
 using PulseOffice.Documents.Controls;
+using PulseOffice.Documents.Editing;
 using PulseOffice.Documents.Fields;
 using PulseOffice.Documents.Layout.Tree;
 using PulseOffice.Foundation.Units;
@@ -29,7 +30,7 @@ public interface IFolioPrintMarks
     void Mark(IPageCanvas canvas, PageBox page, FolioMarkIndex index);
 }
 
-public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog bookmarks, ICommentAnchors anchors, IContentControlCatalog controls) : IFolioPrintMarks
+public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog bookmarks, ICommentAnchors anchors, IContentControlCatalog controls, IStoryCatalog stories) : IFolioPrintMarks
 {
     private const double NoteMargin = 18;
 
@@ -43,11 +44,7 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
         var notes = anchors.All(document)
             .GroupBy(anchor => anchor.Start.ParagraphId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<(int, PrintNote)>)[.. group.Select(anchor => (anchor.Start.Offset, Note(document, anchor.Comment)))], StringComparer.Ordinal);
-        var fields = controls.All(document)
-            .Where(span => span.InOneParagraph && Kind(span.Control.Kind) is not null)
-            .GroupBy(span => span.Start.ParagraphId, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<FolioFormSpan>)[.. group.Select(Field)], StringComparer.Ordinal);
-        return new FolioMarkIndex(headings, targets, notes) { Fields = fields };
+        return new FolioMarkIndex(headings, targets, notes) { Fields = Fields(document) };
     }
 
     public void Mark(IPageCanvas canvas, PageBox page, FolioMarkIndex index)
@@ -59,9 +56,38 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
         visitor.MarkFields();
     }
 
+    private Dictionary<string, IReadOnlyList<FolioFormSpan>> Fields(TextDocument document)
+    {
+        var all = controls.All(document);
+        var exported = all.Where(span => Kind(span.Control.Kind) is not null && !Encloses(span, all)).ToList();
+        var fields = new Dictionary<string, List<FolioFormSpan>>(StringComparer.Ordinal);
+        if (exported.Count == 0) return new Dictionary<string, IReadOnlyList<FolioFormSpan>>(StringComparer.Ordinal);
+        var paragraphs = stories.Paragraphs(document).Select(paragraph => paragraph.Id).ToList();
+        foreach (var span in exported)
+        {
+            var field = Field(span);
+            for (var order = span.StartOrder; order <= span.EndOrder && order - 1 < paragraphs.Count; order++)
+            {
+                if (order < 1) continue;
+                var id = order == span.StartOrder ? span.Start.ParagraphId : order == span.EndOrder ? span.End.ParagraphId : paragraphs[order - 1];
+                var start = order == span.StartOrder ? span.Start.Offset : 0;
+                var end = order == span.EndOrder ? span.End.Offset : int.MaxValue;
+                if (!fields.TryGetValue(id, out var list)) fields[id] = list = [];
+                list.Add(field with { Start = start, End = end });
+            }
+        }
+        return fields.ToDictionary(entry => entry.Key, entry => (IReadOnlyList<FolioFormSpan>)entry.Value, StringComparer.Ordinal);
+    }
+
+    private static bool Encloses(ContentControlSpan span, IReadOnlyList<ContentControlSpan> all) =>
+        span.Control.Kind == ContentControlKind.RichText && all.Any(other => !ReferenceEquals(other, span) && Kind(other.Control.Kind) is not null &&
+            (span.StartOrder, span.Start.Offset).CompareTo((other.StartOrder, other.Start.Offset)) <= 0 &&
+            (other.EndOrder, other.End.Offset).CompareTo((span.EndOrder, span.End.Offset)) <= 0);
+
     private static PrintFormFieldKind? Kind(ContentControlKind kind) => kind switch
     {
-        ContentControlKind.PlainText or ContentControlKind.Date => PrintFormFieldKind.Text,
+        ContentControlKind.PlainText or ContentControlKind.Date or ContentControlKind.RichText => PrintFormFieldKind.Text,
+        ContentControlKind.Picture => PrintFormFieldKind.Picture,
         ContentControlKind.CheckBox => PrintFormFieldKind.CheckBox,
         ContentControlKind.DropDownList => PrintFormFieldKind.ListBox,
         ContentControlKind.ComboBox => PrintFormFieldKind.ComboBox,
@@ -74,7 +100,7 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
         var field = new PrintFormField(control.Title ?? control.Tag ?? "field-" + span.Id, Kind(control.Kind)!.Value)
         {
             Checked = control.Checked,
-            MultiLine = control.MultiLine,
+            MultiLine = control.MultiLine || control.Kind == ContentControlKind.RichText || !span.InOneParagraph,
             ReadOnly = control.ContentLocked,
             Tooltip = control.Title,
             Options = [.. control.Items.Select(item => item.DisplayText)],
@@ -95,15 +121,15 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
     private sealed class MarkVisitor(IPageCanvas canvas, FolioMarkIndex index) : ILayoutVisitor
     {
         private readonly ObjectTurns _turns = new();
-        private readonly Dictionary<string, (FolioFormSpan Span, LayoutRect Area, System.Text.StringBuilder Text)> _fields = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (FolioFormSpan Span, LayoutRect Area, System.Text.StringBuilder Text, string Paragraph)> _fields = new(StringComparer.Ordinal);
         private readonly List<string> _fieldOrder = [];
 
         public void MarkFields()
         {
             foreach (var id in _fieldOrder)
             {
-                var (span, area, text) = _fields[id];
-                var value = span.Field.Kind == PrintFormFieldKind.CheckBox || span.ShowsPlaceholder ? "" : text.ToString();
+                var (span, area, text, _) = _fields[id];
+                var value = span.Field.Kind is PrintFormFieldKind.CheckBox or PrintFormFieldKind.Picture || span.ShowsPlaceholder ? "" : text.ToString();
                 canvas.MarkField(Rect(area), span.Field with { Value = value });
             }
         }
@@ -117,12 +143,16 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
                 var end = Math.Min(span.End, run.SourceOffset + run.SourceLength);
                 if (start >= end) continue;
                 var area = _turns.Bounds(new LayoutRect(line.Left + run.X, line.Top, run.Width, line.Line.Height));
+                var shown = run.ObjectId is null ? run.Text.AsSpan(Math.Min(run.Text.Length, start - run.SourceOffset), Math.Max(0, Math.Min(end, run.SourceOffset + run.Text.Length) - start)) : ReadOnlySpan<char>.Empty;
                 if (_fields.TryGetValue(span.Id, out var known))
-                    _fields[span.Id] = (span, Union(known.Area, area), known.Text.Append(run.Text.AsSpan(start - run.SourceOffset, end - start)));
+                {
+                    if (known.Paragraph != line.ParagraphId) known.Text.Append('\n');
+                    _fields[span.Id] = (span, Union(known.Area, area), known.Text.Append(shown), line.ParagraphId);
+                }
                 else
                 {
                     _fieldOrder.Add(span.Id);
-                    _fields[span.Id] = (span, area, new System.Text.StringBuilder().Append(run.Text.AsSpan(start - run.SourceOffset, end - start)));
+                    _fields[span.Id] = (span, area, new System.Text.StringBuilder().Append(shown), line.ParagraphId);
                 }
             }
         }

@@ -21,6 +21,7 @@ public enum PrintRole
     Note,
     Span,
     Annotation,
+    Form,
 }
 
 public enum PrintHeaderScope

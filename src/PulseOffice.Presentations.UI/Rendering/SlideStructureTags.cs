@@ -12,7 +12,7 @@ public interface ISlideStructureTags
 
     PrintTag? For(Slide slide, SlideElement? element);
 
-    IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element);
+    IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element, SlideElementPlacement? placement = null);
 }
 
 public sealed class SlideStructureTags(ISlideTextSegments segments, ITextSegmentTagging tagging) : ISlideStructureTags
@@ -21,10 +21,10 @@ public sealed class SlideStructureTags(ISlideTextSegments segments, ITextSegment
     {
     }
 
-    public IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element)
+    public IPageCanvas Tagged(IPageCanvas canvas, Slide slide, SlideElement? element, SlideElementPlacement? placement = null)
     {
         ArgumentNullException.ThrowIfNull(canvas);
-        if (element is null || For(slide, element) is not { } container || segments.For(container, element) is not { } found) return canvas;
+        if (element is null || For(slide, element) is not { } container || segments.For(container, element, placement) is not { } found) return canvas;
         return tagging.Wrap(canvas, found);
     }
 

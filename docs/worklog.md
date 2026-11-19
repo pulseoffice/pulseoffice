@@ -13960,3 +13960,23 @@ docs/deep-audit/round-242-folio-notes-objects.md.
 - Filmstrip drag to reorder and a shared drop indicator for filmstrip and sorter (`SlideDragSession`).
 - Alt+Shift block moves in the outline keep slide identity for identical blocks; missing chart tables are announced
   when a workbook opens. Log: docs/deep-audit/round-245-deck-sections-drag.md.
+
+## Round 246 (2026-11-19): Folio wrapped paragraph alignment
+Middle and bottom alignment relative to a wrapped paragraph now settles on the wrapped height (bounded passes). Continuation notice selection and the wider notes audit stay queued. Log: docs/deep-audit/round-246-folio-wrapped-alignment.md.
+### Round 247 (2026-11-19): tagged PDF accuracy
+- Deck table cells are tagged by position (`IPrintSegmentLocator`, `SlideTableCellLocator` over `TableGeometry`), not by
+  text; links without a tagged run join the element they cover; tables get a `BBox` from their text and artifacts
+  (none when spread over pages); rotated figures get the rotated box; header merges and corner scope in Deck tables.
+  Log: docs/deep-audit/round-247-tagged-pdf-accuracy.md.
+
+### Round 248 (2026-11-19): PDF form fields tagged, more controls as fields, export switches
+- Widgets are `Form` structure elements reached through `OBJR` with a `/StructParent`; `/TU` falls back to the name.
+- Rich text and multi-paragraph content controls become multiline text fields; picture controls become push buttons.
+- The PDF export dialog gains "form fields" and "tagged PDF" switches; printing no longer writes form fields.
+  Log: docs/deep-audit/round-248-pdf-forms.md.
+
+### Round 249 (2026-11-19): Deck outline cut and paste, slide drag threshold, Ledger data tools
+- Outline cut and paste of whole blocks keeps slide identity (`OutlineBlockTransfer`); filmstrip and sorter drags use
+  the platform tap size as threshold.
+- XLSX validations without `allowBlank` no longer ignore blanks; text to columns leaves empty parts blank.
+  Log: docs/deep-audit/round-249-deck-outline-ledger-data.md.

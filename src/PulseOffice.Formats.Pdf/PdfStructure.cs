@@ -21,7 +21,10 @@ public sealed class PdfStructureElement(PrintTag tag, PdfStructureElement? paren
         ArgumentNullException.ThrowIfNull(area);
         if (Bounds is null) Bounds = area;
         else if (Bounds.PageSlot == pageSlot) Bounds = Bounds.Union(area);
+        else SpansPages = true;
     }
+
+    public bool SpansPages { get; private set; }
 }
 
 public sealed record PdfBox(int PageSlot, double Left, double Bottom, double Right, double Top)
@@ -33,6 +36,11 @@ public sealed record PdfBox(int PageSlot, double Left, double Bottom, double Rig
         Right = Math.Max(Right, other.Right),
         Top = Math.Max(Top, other.Top),
     };
+
+    public double Size => Math.Max(0, Right - Left) * Math.Max(0, Top - Bottom);
+
+    public double Overlap(PdfBox other) =>
+        Math.Max(0, Math.Min(Right, other.Right) - Math.Max(Left, other.Left)) * Math.Max(0, Math.Min(Top, other.Top) - Math.Max(Bottom, other.Bottom));
 }
 
 public sealed record PdfMarkedReference(int PageSlot, int Mcid);
@@ -46,6 +54,8 @@ public sealed class PdfStructureTree
     private readonly List<List<PdfStructureElement>> _pages = [];
     private readonly List<PdfStructureElement> _annotations = [];
     private readonly Dictionary<(int PageSlot, string Target), PdfStructureElement> _links = [];
+    private readonly Dictionary<int, Dictionary<PdfStructureElement, PdfBox>> _covered = [];
+    private readonly Dictionary<int, double> _heights = [];
 
     public int AnnotationKeyBase { get; init; }
 
@@ -65,6 +75,32 @@ public sealed class PdfStructureTree
         _pages[pageSlot].Count > 0 || _annotations.SelectMany(element => element.Kids.OfType<PdfAnnotationReference>()).Any(kid => kid.PageSlot == pageSlot);
 
     public PdfStructureElement? LinkAt(int pageSlot, string target) => _links.GetValueOrDefault((pageSlot, target));
+
+    public void Measure(int pageSlot, double heightPoints) => _heights[pageSlot] = heightPoints;
+
+    public double? HeightOf(int pageSlot) => _heights.TryGetValue(pageSlot, out var height) ? height : null;
+
+    public void Cover(PdfStructureElement element, int pageSlot, PdfBox area)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(area);
+        if (!_covered.TryGetValue(pageSlot, out var boxes)) _covered[pageSlot] = boxes = [];
+        for (var covering = element; covering is not null; covering = covering.Parent)
+            boxes[covering] = boxes.TryGetValue(covering, out var box) ? box.Union(area) : area;
+    }
+
+    public PdfStructureElement? CoveringAt(int pageSlot, PdfBox area)
+    {
+        ArgumentNullException.ThrowIfNull(area);
+        if (!_covered.TryGetValue(pageSlot, out var boxes)) return null;
+        return boxes.Where(entry => entry.Key.Tag.Role is not (PrintRole.Link or PrintRole.Annotation or PrintRole.Span))
+            .Select(entry => (entry.Key, Shared: entry.Value.Overlap(area), entry.Value.Size))
+            .Where(entry => entry.Shared > 0 && entry.Size > 0)
+            .OrderByDescending(entry => Math.Round(entry.Shared / entry.Size, 2))
+            .ThenByDescending(entry => entry.Shared)
+            .Select(entry => entry.Key)
+            .FirstOrDefault();
+    }
 
     public int Annotate(PdfStructureElement element, int pageSlot, int objectId)
     {
@@ -119,6 +155,8 @@ public sealed class PdfMarkedContent(PdfStructureTree tree, int pageSlot, IPdfSt
 
     public void Tag(PrintTag? tag) => _current = tag is null ? null : tree.Declare(tag);
 
+    public void Measure(double pageHeightPoints) => tree.Measure(pageSlot, pageHeightPoints);
+
     public void BeginArtifact() => _artifactDepth++;
 
     public void EndArtifact() => _artifactDepth = Math.Max(0, _artifactDepth - 1);
@@ -126,21 +164,37 @@ public sealed class PdfMarkedContent(PdfStructureTree tree, int pageSlot, IPdfSt
     public void Enter(StringBuilder content, PdfBox? area = null)
     {
         ArgumentNullException.ThrowIfNull(content);
+        var box = area is null ? null : area with { PageSlot = pageSlot };
         if (_current is null || _artifactDepth > 0)
         {
+            if (box is not null && _current is not null) TableOf(_current)?.Extend(pageSlot, box);
             if (_artifactOpen) return;
             Close(content);
             content.Append("/Artifact BMC\n");
             _artifactOpen = true;
             return;
         }
-        if (area is not null && _current.Tag.Role is PrintRole.Figure or PrintRole.Table) _current.Extend(pageSlot, area with { PageSlot = pageSlot });
+        if (box is not null)
+        {
+            Bounded(_current)?.Extend(pageSlot, box);
+            tree.Cover(_current, pageSlot, box);
+        }
         if (ReferenceEquals(_open, _current)) return;
         Close(content);
         var mcid = tree.Mark(_current, pageSlot);
         content.Append(CultureInfo.InvariantCulture, $"/{roles.Name(_current.Tag)} <</MCID {mcid}>> BDC\n");
         _open = _current;
     }
+
+    private static PdfStructureElement? Bounded(PdfStructureElement element)
+    {
+        for (var bounded = element; bounded is not null; bounded = bounded.Parent)
+            if (bounded.Tag.Role is PrintRole.Figure or PrintRole.Table) return bounded;
+        return null;
+    }
+
+    private static PdfStructureElement? TableOf(PdfStructureElement element) =>
+        Bounded(element) is { Tag.Role: PrintRole.Table } table ? table : null;
 
     public void Close(StringBuilder content)
     {
@@ -190,6 +244,7 @@ public sealed class PdfStructureRoles : IPdfStructureRoles
             PrintRole.Note => "Note",
             PrintRole.Span => "Span",
             PrintRole.Annotation => "Annot",
+            PrintRole.Form => "Form",
             _ => "Sect",
         };
     }
@@ -309,7 +364,7 @@ public sealed class PdfStructureWriter(IPdfStructureRoles roles) : IPdfStructure
         }
         var dictionaries = new List<string>();
         if (table.Length > 0) dictionaries.Add("<< /O /Table" + table + " >>");
-        if (tag.Role is PrintRole.Figure or PrintRole.Table && element.Bounds is { } box)
+        if (tag.Role is PrintRole.Figure or PrintRole.Table && element.Bounds is { } box && !(tag.Role == PrintRole.Table && element.SpansPages))
             dictionaries.Add(string.Create(CultureInfo.InvariantCulture,
                 $"<< /O /Layout /BBox [{Number(box.Left)} {Number(box.Bottom)} {Number(box.Right)} {Number(box.Top)}] >>"));
         return dictionaries.Count switch
@@ -328,6 +383,8 @@ public interface IPdfAnnotationTagging
     string Link(int objectId, PrintLink link);
 
     string Note(int objectId, PrintMarkedNote note);
+
+    string Field(int objectId, PrintFormField field);
 }
 
 public sealed class PdfAnnotationTagging(PdfStructureTree tree, int pageSlot) : IPdfAnnotationTagging
@@ -335,8 +392,9 @@ public sealed class PdfAnnotationTagging(PdfStructureTree tree, int pageSlot) : 
     public string Link(int objectId, PrintLink link)
     {
         ArgumentNullException.ThrowIfNull(link);
+        var key = FormattableString.Invariant($"annotation:link:{objectId}");
         var element = tree.LinkAt(pageSlot, link.Target)
-            ?? tree.Declare(new PrintTag(FormattableString.Invariant($"annotation:link:{objectId}"), PrintRole.Link) { Alternate = link.Target });
+            ?? tree.Declare(new PrintTag(key, PrintRole.Link, Covering(link)?.Tag) { Alternate = link.Target });
         return Entry(element, objectId) + " /Contents " + PdfFile.TextString(link.Target);
     }
 
@@ -344,6 +402,23 @@ public sealed class PdfAnnotationTagging(PdfStructureTree tree, int pageSlot) : 
     {
         ArgumentNullException.ThrowIfNull(note);
         return Entry(tree.Declare(new PrintTag(FormattableString.Invariant($"annotation:note:{objectId}"), PrintRole.Annotation)), objectId);
+    }
+
+    private PdfStructureElement? Covering(PrintLink link)
+    {
+        if (tree.HeightOf(pageSlot) is not { } height) return null;
+        var area = new PdfBox(pageSlot, link.Area.Left.ToPoints(), height - link.Area.Bottom.ToPoints(), link.Area.Right.ToPoints(), height - link.Area.Top.ToPoints());
+        return tree.CoveringAt(pageSlot, area);
+    }
+
+    public string Field(int objectId, PrintFormField field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        var tag = new PrintTag(FormattableString.Invariant($"annotation:form:{objectId}"), PrintRole.Form)
+        {
+            Alternate = string.IsNullOrWhiteSpace(field.Tooltip) ? field.Name : field.Tooltip,
+        };
+        return Entry(tree.Declare(tag), objectId);
     }
 
     private string Entry(PdfStructureElement element, int objectId) =>

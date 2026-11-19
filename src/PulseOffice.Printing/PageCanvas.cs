@@ -171,6 +171,7 @@ public enum PrintFormFieldKind
     CheckBox,
     ComboBox,
     ListBox,
+    Picture,
 }
 
 public sealed record PrintFormField(string Name, PrintFormFieldKind Kind)

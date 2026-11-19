@@ -226,7 +226,7 @@ public sealed class ShellPrintCommands(
         {
             var chosen = await files.SaveFileAsync(texts["print.toPdf"], name + ".pdf", [new FileFilter("PDF", ["pdf"])], ct).ConfigureAwait(true);
             if (chosen is null) return;
-            Report(await atomic.WriteAsync(chosen, output => exporter.Write(imposed, output, new PdfExportOptions(Title: name) { Bookmarks = false, Links = false, Notes = false }), written => written.Succeeded, ct).ConfigureAwait(true));
+            Report(await atomic.WriteAsync(chosen, output => exporter.Write(imposed, output, new PdfExportOptions(Title: name) { Bookmarks = false, Links = false, Notes = false, Forms = false }), written => written.Succeeded, ct).ConfigureAwait(true));
             return;
         }
 
@@ -234,7 +234,7 @@ public sealed class ShellPrintCommands(
 
         await using (var stream = File.Create(file))
         {
-            if (!exporter.Write(imposed, stream, new PdfExportOptions(Title: name) { Bookmarks = false, Links = false, Notes = false }).Succeeded)
+            if (!exporter.Write(imposed, stream, new PdfExportOptions(Title: name) { Bookmarks = false, Links = false, Notes = false, Forms = false }).Succeeded)
             {
                 status.Report(texts["status.export.failed"], NotificationSeverity.Error);
                 return;

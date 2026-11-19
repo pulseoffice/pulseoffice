@@ -19,8 +19,42 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
     private void Mark() => marked?.Enter(_content);
 
-    private void Mark(DocumentRect area) =>
-        marked?.Enter(_content, new PdfBox(0, area.Left.ToPoints(), Flip(area.Bottom).ToPoints(), area.Right.ToPoints(), Flip(area.Top).ToPoints()));
+    private void Mark(DocumentRect area) => Mark(area.Left.ToPoints(), area.Top.ToPoints(), area.Right.ToPoints(), area.Bottom.ToPoints());
+
+    private void Mark(double left, double top, double right, double bottom)
+    {
+        if (marked is null) return;
+        var height = PageSize.Height.ToPoints();
+        marked.Measure(height);
+        marked.Enter(_content, new PdfBox(0, left, height - bottom, right, height - top));
+    }
+
+    private void Mark(DocumentRect area, double rotationDegrees)
+    {
+        if (Math.Abs(rotationDegrees) <= 0.001 || !double.IsFinite(rotationDegrees))
+        {
+            Mark(area);
+            return;
+        }
+        var radians = rotationDegrees * Math.PI / 180;
+        var (cos, sin) = (Math.Abs(Math.Cos(radians)), Math.Abs(Math.Sin(radians)));
+        var (width, height) = (area.Width.ToPoints(), area.Height.ToPoints());
+        var (halfWidth, halfHeight) = ((width * cos + height * sin) / 2, (width * sin + height * cos) / 2);
+        var (centreX, centreY) = (area.Left.ToPoints() + width / 2, area.Top.ToPoints() + height / 2);
+        Mark(centreX - halfWidth, centreY - halfHeight, centreX + halfWidth, centreY + halfHeight);
+    }
+
+    private void Mark(PrintGlyphRun run)
+    {
+        var radians = double.IsFinite(run.RotationDegrees) ? -run.RotationDegrees * Math.PI / 180 : 0;
+        var (cos, sin) = (Math.Cos(radians), Math.Sin(radians));
+        var size = run.Font.SizePoints;
+        double[] along = [0, run.Width];
+        double[] across = [-size * 0.8, size * 0.2];
+        var xs = along.SelectMany(a => across.Select(b => run.X + a * cos - b * sin)).ToArray();
+        var ys = along.SelectMany(a => across.Select(b => run.Baseline + a * sin + b * cos)).ToArray();
+        Mark(xs.Min(), ys.Min(), xs.Max(), ys.Max());
+    }
 
     private readonly ITextDecorationPainter _decorations = decorations ?? new TextDecorationPainter();
 
@@ -129,7 +163,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
         var outline = _flattener.Flatten(path.Outline).Scaled(width, height);
 
-        Mark(path.Bounds);
+        Mark(path.Bounds, path.RotationDegrees);
         if (path.Shadow is { } shadow) DrawShadow(path, shadow, width, height);
 
         _content.Append("q\n");
@@ -339,7 +373,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         foreach (var part in bidi is null ? fonts.Show(visible, font) : bidi.Show(visible, font, fonts)) composer.Add(part);
         if (composer.FirstFont is not { } first) return;
 
-        Mark();
+        Mark(new Twip((int)x).ToPoints(), new Twip(y - (int)(size * 0.8)).ToPoints(), new Twip((int)x).ToPoints() + visibleWidth.ToPoints(), new Twip(y + (int)(size * 0.2)).ToPoints());
         Color(color, stroke: false);
         var synthetic = Synthetic(first, font, color);
 
@@ -390,7 +424,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
             index += length;
         }
         if (composer.FirstFont is not { } first) return;
-        Mark();
+        Mark(run);
         Color(run.Color, stroke: false);
         var synthetic = Synthetic(first, run.Font, run.Color);
         var radians = double.IsFinite(run.RotationDegrees) ? run.RotationDegrees * Math.PI / 180 : 0;

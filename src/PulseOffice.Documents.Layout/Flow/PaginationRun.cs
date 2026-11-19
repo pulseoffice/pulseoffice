@@ -155,6 +155,7 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         var candidates = _line == 0 && _offset == 0 ? _anchored.Candidates(entry, _y + gap) : [];
         if (_anchored.Wrapped(candidates))
         {
+            if (_line == 0 && _offset == 0 && _anchored.HeightDependent(entry)) candidates = Settled(entry, _y + gap, candidates);
             Dynamic(entry, gap, candidates);
             return true;
         }
@@ -254,6 +255,65 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         }
         _flowIndex++;
         return true;
+    }
+
+    private const int SettlePasses = 4;
+    private const double SettleTolerance = 0.5;
+
+    private IReadOnlyList<Obstacle> Settled(ParagraphEntry entry, double top, IReadOnlyList<Obstacle> candidates)
+    {
+        for (var pass = 0; pass < SettlePasses; pass++)
+        {
+            var height = WrappedHeight(entry, top, candidates);
+            var next = _anchored.Candidates(entry, top, height);
+            var moved = next.Count != candidates.Count || next.Where((obstacle, i) => Math.Abs(obstacle.Area.Y - candidates[i].Area.Y) > SettleTolerance).Any();
+            candidates = next;
+            if (!moved) break;
+        }
+        return candidates;
+    }
+
+    private double WrappedHeight(ParagraphEntry entry, double top, IReadOnlyList<Obstacle> candidates)
+    {
+        var width = ColumnWidth;
+        var left = ColumnLeft;
+        var all = _anchored.Blocking(candidates, entry.Block.Id).Select(obstacle => obstacle.Shape).ToList();
+        var y = top;
+        var offset = 0;
+        var index = 0;
+        while (y <= Bottom)
+        {
+            var probe = entry.LineIn(width, 0, width, offset, index);
+            var segments = _owner.Wrap.Free(all, left, width, y, probe.Height);
+            if (segments.Count == 0)
+            {
+                var below = all.Where(shape => shape.Rect.Y < y + probe.Height && shape.Rect.Bottom > y).Select(shape => shape.Rect.Bottom).DefaultIfEmpty(y + probe.Height).Min();
+                y = Math.Max(below, y + 1);
+                continue;
+            }
+            var height = 0.0;
+            var last = false;
+            var placed = 0;
+            for (var s = 0; s < segments.Count; s++)
+            {
+                var line = entry.LineIn(width, segments[s].Left, segments[s].Right, offset, index);
+                if (line.Broken && segments.Count > 1 && (s < segments.Count - 1 || placed > 0)) continue;
+                placed++;
+                index++;
+                offset = line.Next;
+                height = Math.Max(height, line.Height);
+                last = line.IsLast;
+                if (line.IsLast || line.Forced || offset >= entry.Shaped.Text.Length) break;
+            }
+            if (placed == 0)
+            {
+                y += probe.Height;
+                continue;
+            }
+            y += height;
+            if (last) break;
+        }
+        return y - top;
     }
 
     private void Dynamic(ParagraphEntry entry, double gap, IReadOnlyList<Obstacle> candidates)
