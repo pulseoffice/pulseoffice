@@ -187,6 +187,8 @@ public sealed record PrintFormField(string Name, PrintFormFieldKind Kind)
     public string? Tooltip { get; init; }
 
     public IReadOnlyList<string> Options { get; init; } = [];
+
+    public string? Identity { get; init; }
 }
 
 public sealed record PrintMarkedField(DocumentRect Area, PrintFormField Field);

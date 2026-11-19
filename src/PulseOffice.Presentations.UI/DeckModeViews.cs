@@ -105,7 +105,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         frame.PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed && _sorterStrip is not null && _drag is { } drag)
-                drag.Begin(slide, e.GetPosition(_sorterStrip.Panel), drag.PlatformSlop(frame, e.Pointer.Type));
+                drag.Begin(slide, e.GetPosition(_sorterStrip.Panel), drag.PlatformSlop(e.Pointer.Type));
         };
         frame.PointerMoved += (_, e) =>
         {
@@ -228,6 +228,11 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         entries.RemoveRange(range.First, range.Count);
         _outlineEntries = entries;
         _outlineAfterCut = [.. shown.Take(range.First).Concat(shown.Skip(range.First + range.Count))];
+        if (_outlineTransfer.RemovalStart(text, start, length) is var removal && removal != start)
+        {
+            editor.SelectionStart = removal;
+            editor.SelectionEnd = start + length;
+        }
     }
 
     private void ReattachCutBlocks(string text)

@@ -324,6 +324,11 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
         if (commaChoices > 0)
             losses.Add(Diagnostic.Warning("XLSX034", $"{commaChoices} validation lists have entries containing a comma: in XLSX the comma separates entries, which split in two.").With(commaChoices));
 
+        var sortedChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
+            validation => validation.Kind == ValidationKind.List && validation.ShowDropdown && validation.SortDropdown));
+        if (sortedChoices > 0)
+            losses.Add(Diagnostic.Info("XLSX244", $"{sortedChoices} validation lists show their entries sorted: XLSX has no sort setting, so typed entries are written already sorted and entries taken from cells appear in cell order in Excel. ODS keeps the setting.").With(sortedChoices));
+
         var longChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
             validation => validation.ListValues.Count > 0 && validation.ListValues.Sum(value => value.Length + 1) - 1 > 255));
         if (longChoices > 0)

@@ -264,8 +264,8 @@ public sealed class FolioFieldCommands(
             new ChoiceField(prefix + "format", texts["folio.note.format"], [.. _numberFormats], Math.Max(0, _numberFormats.ToList().IndexOf(settings.FormatName))),
             new NumberField(prefix + "start", texts["folio.note.start"], settings.StartAt, 0, 9999) { Integer = true },
             new ChoiceField(prefix + "restart", texts["folio.note.restart"],
-                footnote ? [texts["folio.note.restart.document"], texts["folio.note.restart.chapter"], texts["folio.note.restart.page"]] : [texts["folio.note.restart.document"], texts["folio.note.restart.chapter"]],
-                (int)settings.Restart),
+                [.. Restarts(footnote).Select(restart => texts[RestartKey(restart)])],
+                Math.Max(0, Array.IndexOf(Restarts(footnote), settings.Restart))),
             new ChoiceField(prefix + "position", texts["folio.note.position"],
                 [.. Placements(footnote).Select(placement => texts[PlacementKey(placement)])],
                 Math.Max(0, Array.IndexOf(Placements(footnote), settings.Placement))),
@@ -287,16 +287,16 @@ public sealed class FolioFieldCommands(
         {
             FormatName = _numberFormats[values.Choice(prefix + "format", _numberFormats.Count)],
             StartAt = (int)Math.Round(values.Number(prefix + "start", settings.StartAt)),
-            Restart = (NoteNumbering)values.Choice(prefix + "restart", restarts),
+            Restart = Restarts(prefix == "foot.")[values.Choice(prefix + "restart", restarts, Math.Max(0, Array.IndexOf(Restarts(prefix == "foot."), settings.Restart)))],
             Placement = Placements(prefix == "foot.")[values.Choice(prefix + "position", Placements(prefix == "foot.").Length, Math.Max(0, Array.IndexOf(Placements(prefix == "foot."), settings.Placement)))],
         };
         var shown = values.Flag("foot.notices");
-        var footnotes = Read("foot.", notes.FootnoteSettings, 3) with
+        var footnotes = Read("foot.", notes.FootnoteSettings, Restarts(true).Length) with
         {
             ContinuationForward = shown ? Notice(values.Text("foot.forward")) : null,
             ContinuationBackward = shown ? Notice(values.Text("foot.backward")) : null,
         };
-        var endnotes = Read("end.", notes.EndnoteSettings, 2);
+        var endnotes = Read("end.", notes.EndnoteSettings, Restarts(false).Length);
         editor.Change(() =>
         {
             var recorder = new EditRecorder(editor.Document, "note-settings").Touch<NoteSettings>(notes, () => [notes.FootnoteSettings, notes.EndnoteSettings], state =>
@@ -311,6 +311,18 @@ public sealed class FolioFieldCommands(
     }
 
     private string? Notice(string text) => text.Trim() is { Length: > 0 } trimmed ? trimmed : null;
+
+    private NoteNumbering[] Restarts(bool footnote) => footnote
+        ? [NoteNumbering.Document, NoteNumbering.Chapter, NoteNumbering.Section, NoteNumbering.Page]
+        : [NoteNumbering.Document, NoteNumbering.Chapter, NoteNumbering.Section];
+
+    private string RestartKey(NoteNumbering restart) => restart switch
+    {
+        NoteNumbering.Chapter => "folio.note.restart.chapter",
+        NoteNumbering.Section => "folio.note.restart.section",
+        NoteNumbering.Page => "folio.note.restart.page",
+        _ => "folio.note.restart.document",
+    };
 
     private NotePlacement[] Placements(bool footnote) => footnote
         ? [NotePlacement.PageBottom, NotePlacement.BelowText, NotePlacement.SectionEnd, NotePlacement.DocumentEnd]

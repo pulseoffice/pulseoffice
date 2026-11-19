@@ -17,8 +17,12 @@ public interface ILayoutQueries
     IReadOnlyList<DocumentRange> Block(DocumentLayout layout, int page, double left, double top, double right, double bottom);
 }
 
-public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
+public sealed class LayoutQueries(ILineOffsets offsets, ILayoutReadOnlyText readOnly) : ILayoutQueries
 {
+    public LayoutQueries(ILineOffsets offsets) : this(offsets, new LayoutReadOnlyText())
+    {
+    }
+
     private readonly ConditionalWeakTable<DocumentLayout, Dictionary<string, List<(int Page, LineBox Line)>>> _index = [];
 
     public DocumentPosition? HitTest(DocumentLayout layout, int page, double x, double y)
@@ -33,9 +37,9 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
             var hit = Nearest(own, localX, localY);
             return new DocumentPosition(hit.ParagraphId, offsets.OffsetAt(hit, localX));
         }
-        var area = new[] { box.Header, box.Footer, box.Footnotes }.FirstOrDefault(candidate => candidate is not null && candidate.Lines.Any() && y >= candidate.Bounds.Y && y <= candidate.Bounds.Bottom);
-        var lines = area is null ? box.Lines : [.. area.Lines];
-        if (lines.Count == 0) lines = [.. box.AllLines];
+        var area = new[] { box.Header, box.Footer, box.Footnotes }.FirstOrDefault(candidate => candidate is not null && Editable(candidate.Lines).Any() && y >= candidate.Bounds.Y && y <= candidate.Bounds.Bottom);
+        IReadOnlyList<LineBox> lines = area is null ? box.Lines : [.. Editable(area.Lines)];
+        if (lines.Count == 0) lines = [.. Editable(box.AllLines)];
         if (frames.Count > 0)
         {
             var hidden = new HashSet<LineBox>(frames.SelectMany(frame => frame.Lines), ReferenceEqualityComparer.Instance);
@@ -57,7 +61,7 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
             if (CharacterIn(frame.Lines, localX, localY) is { } inside) return inside;
         }
         var turned = new HashSet<LineBox>(frames.SelectMany(frame => frame.Lines), ReferenceEqualityComparer.Instance);
-        return CharacterIn(layout.Pages[page].AllLines.Where(line => !turned.Contains(line)), x, y);
+        return CharacterIn(Editable(layout.Pages[page].AllLines).Where(line => !turned.Contains(line)), x, y);
     }
 
     private DocumentPosition? CharacterIn(IEnumerable<LineBox> lines, double x, double y)
@@ -111,6 +115,8 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
         return ranges;
     }
 
+    private IEnumerable<LineBox> Editable(IEnumerable<LineBox> lines) => lines.Where(line => !readOnly.IsReadOnly(line));
+
     private (double X, double Y) Untwisted(ITurnedFrame frame, double x, double y)
     {
         var radians = -frame.RotationDegrees * Math.PI / 180;
@@ -148,7 +154,7 @@ public sealed class LayoutQueries(ILineOffsets offsets) : ILayoutQueries
         var index = new Dictionary<string, List<(int, LineBox)>>(StringComparer.Ordinal);
         foreach (var page in layout.Pages)
         {
-            foreach (var line in page.AllLines)
+            foreach (var line in Editable(page.AllLines))
             {
                 if (!index.TryGetValue(line.ParagraphId, out var list)) index[line.ParagraphId] = list = [];
                 list.Add((page.Index, line));

@@ -55,8 +55,8 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
 {
     private readonly ObjectAnchorKind[] _anchors = [ObjectAnchorKind.Page, ObjectAnchorKind.Paragraph, ObjectAnchorKind.Character, ObjectAnchorKind.AsCharacter];
     private readonly WrapMode[] _wraps = [WrapMode.None, WrapMode.Left, WrapMode.Right, WrapMode.Parallel, WrapMode.Through, WrapMode.Optimal];
-    private readonly HorizontalRelation[] _horizontal = [HorizontalRelation.Paragraph, HorizontalRelation.Column, HorizontalRelation.PageArea, HorizontalRelation.Page, HorizontalRelation.Margin, HorizontalRelation.Character];
-    private readonly VerticalRelation[] _vertical = [VerticalRelation.Paragraph, VerticalRelation.ParagraphArea, VerticalRelation.PageArea, VerticalRelation.Page, VerticalRelation.Margin, VerticalRelation.Line];
+    private readonly HorizontalRelation[] _horizontal = [HorizontalRelation.Paragraph, HorizontalRelation.Column, HorizontalRelation.PageArea, HorizontalRelation.Page, HorizontalRelation.Margin, HorizontalRelation.EndMargin, HorizontalRelation.Character];
+    private readonly VerticalRelation[] _vertical = [VerticalRelation.Paragraph, VerticalRelation.ParagraphArea, VerticalRelation.PageArea, VerticalRelation.Page, VerticalRelation.Margin, VerticalRelation.BottomMargin, VerticalRelation.Line];
     private readonly (ObjectAlignment Value, string Key)[] _horizontalAligns = [(ObjectAlignment.None, "offset"), (ObjectAlignment.Start, "left"), (ObjectAlignment.Center, "center"), (ObjectAlignment.End, "right"), (ObjectAlignment.Inside, "inside"), (ObjectAlignment.Outside, "outside")];
     private readonly (ObjectAlignment Value, string Key)[] _verticalAligns = [(ObjectAlignment.None, "offset"), (ObjectAlignment.Start, "top"), (ObjectAlignment.Center, "middle"), (ObjectAlignment.End, "bottom"), (ObjectAlignment.Inside, "inside"), (ObjectAlignment.Outside, "outside")];
 
@@ -236,6 +236,7 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
         HorizontalRelation.PageArea => "pageArea",
         HorizontalRelation.Page => "page",
         HorizontalRelation.Margin => "margin",
+        HorizontalRelation.EndMargin => "endMargin",
         HorizontalRelation.Character => "character",
         _ => "paragraph",
     };
@@ -246,6 +247,7 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
         VerticalRelation.PageArea => "pageArea",
         VerticalRelation.Page => "page",
         VerticalRelation.Margin => "topMargin",
+        VerticalRelation.BottomMargin => "bottomMargin",
         VerticalRelation.Line => "line",
         _ => "paragraph",
     };

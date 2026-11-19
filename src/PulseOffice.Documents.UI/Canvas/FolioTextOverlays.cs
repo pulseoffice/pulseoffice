@@ -39,7 +39,7 @@ internal sealed class FolioTextOverlays(FolioEditor editor, FolioCanvasServices 
     public void PaintSelection(DrawingContext context, PageBox page, Dictionary<string, (int From, int To)> selection, IBrush? accent)
     {
         if (selection.Count == 0) return;
-        var brush = new SolidColorBrush(accent is ISolidColorBrush solid ? solid.Color : Colors.DodgerBlue, 0.28);
+        var brush = SelectionBrush(accent);
         foreach (var line in page.AllLines)
         {
             if (!selection.TryGetValue(line.ParagraphId, out var span)) continue;
@@ -54,6 +54,15 @@ internal sealed class FolioTextOverlays(FolioEditor editor, FolioCanvasServices 
             using (Turn(context, page, line)) context.FillRectangle(brush, new Rect(left, line.Top, Math.Max(1, right - left), composed.CaretHeight));
         }
     }
+
+    public void PaintLayoutText(DrawingContext context, PageBox page, IBrush? accent)
+    {
+        if (editor.LayoutText is not { } text || text.Page != page.Index) return;
+        var brush = SelectionBrush(accent);
+        foreach (var line in text.Lines) context.FillRectangle(brush, new Rect(line.X, line.Y, Math.Max(1, line.Width), line.Height));
+    }
+
+    private IBrush SelectionBrush(IBrush? accent) => new SolidColorBrush(accent is ISolidColorBrush solid ? solid.Color : Colors.DodgerBlue, 0.28);
 
     public bool Covers(PulseOffice.Documents.Commenting.CommentAnchor anchor, PulseOffice.Documents.Editing.DocumentPosition caret)
     {

@@ -104,6 +104,7 @@ public sealed class FolioPrintMarks(IDocumentOutline outline, IBookmarkCatalog b
             ReadOnly = control.ContentLocked,
             Tooltip = control.Title,
             Options = [.. control.Items.Select(item => item.DisplayText)],
+            Identity = span.Id,
         };
         return new FolioFormSpan(span.Id, span.Start.Offset, span.End.Offset, field, control.ShowingPlaceholder);
     }

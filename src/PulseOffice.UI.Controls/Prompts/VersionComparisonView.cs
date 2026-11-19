@@ -9,6 +9,7 @@ using PulseOffice.Localization;
 using PulseOffice.UI.Controls.Dialogs;
 using PulseOffice.UI.Controls.Panels;
 using PulseOffice.UI.Controls.Services;
+using PulseOffice.UI.Controls.Text;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
@@ -20,9 +21,11 @@ public sealed class VersionComparisonView : UserControl, IDialogContent, IDialog
 {
     private const int ShownLimit = 500;
     private readonly StackPanel _rows = new() { Spacing = 2 };
+    private readonly ITextDecorationFactory _decorations;
 
-    public VersionComparisonView(VersionComparison comparison, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact)
+    public VersionComparisonView(VersionComparison comparison, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact, ITextDecorationFactory? decorations = null)
     {
+        _decorations = decorations ?? new TextDecorationFactory();
         ArgumentNullException.ThrowIfNull(comparison);
         ArgumentNullException.ThrowIfNull(texts);
         var metrics = DesignTokens.For(density);
@@ -125,12 +128,12 @@ public sealed class VersionComparisonView : UserControl, IDialogContent, IDialog
         switch (run.Kind)
         {
             case VersionRunKind.Added:
-                inline.TextDecorations = TextDecorations.Underline;
+                inline.TextDecorations = _decorations.Underline();
                 inline.FontWeight = FontWeight.SemiBold;
                 inline.ThemedInline(TextElement.ForegroundProperty, Palette.Keys.Success);
                 break;
             case VersionRunKind.Removed:
-                inline.TextDecorations = TextDecorations.Strikethrough;
+                inline.TextDecorations = _decorations.Strikethrough();
                 inline.ThemedInline(TextElement.ForegroundProperty, Palette.Keys.Danger);
                 break;
         }

@@ -606,7 +606,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             ?? Twip.Zero;
         var size = new DocumentSize(Length(frame, "width"), height);
         var style = context.Automatic.Find("graphic", (string?)frame.Attribute(Draw + "style-name"));
-        var graphic = style?.Element(Style + "graphic-properties");
+        var graphic = context.Automatic.GraphicPlacement((string?)frame.Attribute(Draw + "style-name"));
         var placement = new ObjectPlacement(Length(frame, "x"), Length(frame, "y"));
         var rotation = double.TryParse((string?)frame.Attribute(Pt + "rotation"), NumberStyles.Float, CultureInfo.InvariantCulture, out var stored) ? stored : 0;
         if (frame.Name == Draw + "frame" && contours.Transform(frame, size) is { } transformed)

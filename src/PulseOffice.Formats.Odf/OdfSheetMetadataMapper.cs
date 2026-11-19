@@ -50,7 +50,7 @@ public sealed class OdfSheetMetadataMapper
                 element.Add(new XAttribute(Namespaces.Table + "condition", condition),
                     new XAttribute(Namespaces.Table + "allow-empty-cell", validation.AllowBlank ? "true" : "false"));
                 if (validation.Kind == ValidationKind.List)
-                    element.Add(new XAttribute(Namespaces.Table + "display-list", validation.ShowDropdown ? "unsorted" : "no"));
+                    element.Add(new XAttribute(Namespaces.Table + "display-list", !validation.ShowDropdown ? "no" : validation.SortDropdown ? "sorted" : "unsorted"));
             }
 
             element.Add(new XAttribute(Namespaces.Table + "base-cell-address", _ranges.WriteAddress(sheet.Name, validation.Range.Start)));
@@ -148,6 +148,7 @@ public sealed class OdfSheetMetadataMapper
             Range = range,
             AllowBlank = element.Attribute(Namespaces.Table + "allow-empty-cell")?.Value != "false",
             ShowDropdown = element.Attribute(Namespaces.Table + "display-list")?.Value != "no",
+            SortDropdown = element.Attribute(Namespaces.Table + "display-list")?.Value == "sorted",
             ErrorTitle = error?.Attribute(Namespaces.Table + "title")?.Value,
             ErrorMessage = MessageText(error),
             InputTitle = help?.Attribute(Namespaces.Table + "title")?.Value,

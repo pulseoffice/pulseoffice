@@ -28,6 +28,7 @@ public sealed class ObjectPlacement : IObjectPlacement
             HorizontalRelation.Page => (0d, frame.Page.Width),
             HorizontalRelation.Margin => (0d, frame.Page.Content.X),
             HorizontalRelation.PageArea => (frame.Page.Content.X, frame.Page.Content.Width),
+            HorizontalRelation.EndMargin => (frame.Page.Content.X + frame.Page.Content.Width, Math.Max(0, frame.Page.Width - frame.Page.Content.X - frame.Page.Content.Width)),
             _ => (frame.ColumnLeft, frame.ColumnWidth),
         };
         var (top, down) = item.Placement.Vertical switch
@@ -35,6 +36,7 @@ public sealed class ObjectPlacement : IObjectPlacement
             VerticalRelation.Page => (0d, frame.Page.Height),
             VerticalRelation.Margin => (0d, frame.Page.Content.Y),
             VerticalRelation.PageArea => (frame.Page.Content.Y, frame.Page.Content.Height),
+            VerticalRelation.BottomMargin => (frame.Page.Content.Y + frame.Page.Content.Height, Math.Max(0, frame.Page.Height - frame.Page.Content.Y - frame.Page.Content.Height)),
             VerticalRelation.Line or VerticalRelation.Character => (frame.ParagraphTop, double.IsFinite(frame.LineHeight) ? frame.LineHeight : frame.ParagraphHeight),
             _ => (frame.ParagraphTop, frame.ParagraphHeight),
         };

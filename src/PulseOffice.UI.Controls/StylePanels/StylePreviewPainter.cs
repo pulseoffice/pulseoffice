@@ -2,13 +2,16 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using PulseOffice.UI.Controls.Text;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
 namespace PulseOffice.UI.Controls.StylePanels;
 
-public sealed class StylePreviewPainter(DesignTokens.Metrics metrics)
+public sealed class StylePreviewPainter(DesignTokens.Metrics metrics, ITextDecorationFactory? decorations = null)
 {
+    private readonly ITextDecorationFactory _decorations = decorations ?? new TextDecorationFactory();
+
     private const double Indent = 14;
     private const double SmallestSize = 11;
     private const double LargestSize = 17;
@@ -101,11 +104,7 @@ public sealed class StylePreviewPainter(DesignTokens.Metrics metrics)
 
     private TextDecorationCollection? Decorations(StylePreview? preview)
     {
-        if (preview is null) return null;
-        var decorations = new TextDecorationCollection();
-        if (preview.Underline) decorations.AddRange(TextDecorations.Underline);
-        if (preview.Strikethrough) decorations.AddRange(TextDecorations.Strikethrough);
-        return decorations.Count > 0 ? decorations : null;
+        return preview is null ? null : _decorations.Create(preview.Underline, preview.Strikethrough);
     }
 
     private Color? Parse(string text) => Color.TryParse(text, out var color) ? color : null;

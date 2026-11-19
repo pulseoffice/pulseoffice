@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using PulseOffice.Foundation.Units;
 using PulseOffice.Printing;
 
 namespace PulseOffice.Formats.Pdf;
@@ -384,7 +385,7 @@ public interface IPdfAnnotationTagging
 
     string Note(int objectId, PrintMarkedNote note);
 
-    string Field(int objectId, PrintFormField field);
+    string Field(int objectId, PrintMarkedField field);
 }
 
 public sealed class PdfAnnotationTagging(PdfStructureTree tree, int pageSlot) : IPdfAnnotationTagging
@@ -404,17 +405,20 @@ public sealed class PdfAnnotationTagging(PdfStructureTree tree, int pageSlot) : 
         return Entry(tree.Declare(new PrintTag(FormattableString.Invariant($"annotation:note:{objectId}"), PrintRole.Annotation)), objectId);
     }
 
-    private PdfStructureElement? Covering(PrintLink link)
+    private PdfStructureElement? Covering(PrintLink link) => Covering(link.Area);
+
+    private PdfStructureElement? Covering(DocumentRect rect)
     {
         if (tree.HeightOf(pageSlot) is not { } height) return null;
-        var area = new PdfBox(pageSlot, link.Area.Left.ToPoints(), height - link.Area.Bottom.ToPoints(), link.Area.Right.ToPoints(), height - link.Area.Top.ToPoints());
+        var area = new PdfBox(pageSlot, rect.Left.ToPoints(), height - rect.Bottom.ToPoints(), rect.Right.ToPoints(), height - rect.Top.ToPoints());
         return tree.CoveringAt(pageSlot, area);
     }
 
-    public string Field(int objectId, PrintFormField field)
+    public string Field(int objectId, PrintMarkedField marked)
     {
-        ArgumentNullException.ThrowIfNull(field);
-        var tag = new PrintTag(FormattableString.Invariant($"annotation:form:{objectId}"), PrintRole.Form)
+        ArgumentNullException.ThrowIfNull(marked);
+        var field = marked.Field;
+        var tag = new PrintTag(FormattableString.Invariant($"annotation:form:{objectId}"), PrintRole.Form, Covering(marked.Area)?.Tag)
         {
             Alternate = string.IsNullOrWhiteSpace(field.Tooltip) ? field.Name : field.Tooltip,
         };

@@ -32,6 +32,8 @@ public sealed record DataValidation
 
     public bool ShowDropdown { get; init; } = true;
 
+    public bool SortDropdown { get; init; }
+
     public string? InputTitle { get; init; }
 
     public string? InputMessage { get; init; }

@@ -150,12 +150,11 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var runs = RunStarts(document);
         foreach (var (paragraph, section, block) in NoteOrder(document, runs))
         {
-            if ((footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
-                && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1)
-            {
-                if (footnoteSettings.Restart == NoteNumbering.Chapter) footnoteCount = 0;
-                if (endnoteSettings.Restart == NoteNumbering.Chapter) endnoteCount = 0;
-            }
+            var chapter = (footnoteSettings.Restart == NoteNumbering.Chapter || endnoteSettings.Restart == NoteNumbering.Chapter)
+                && entries.Effective(document.Styles, paragraph, paragraph.Content).OutlineLevel == 1;
+            var run = runs.Contains(paragraph.Id, StringComparer.Ordinal);
+            if (Restarts(footnoteSettings.Restart, chapter, run)) footnoteCount = 0;
+            if (Restarts(endnoteSettings.Restart, chapter, run)) endnoteCount = 0;
             foreach (var mark in paragraph.Marks.OfType<NoteMark>().OrderBy(mark => mark.Offset))
             {
                 var note = document.Notes.Find(mark.NoteId);
@@ -174,6 +173,9 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var breaks = runs.Select((id, index) => (id, index)).ToDictionary(pair => pair.id, pair => RunKey(pair.index), StringComparer.Ordinal);
         return new NoteNumbers(citations, endnotes) { Footnotes = footnotes, Sections = sections, RunBreaks = breaks };
     }
+
+    private bool Restarts(NoteNumbering restart, bool chapter, bool run) =>
+        restart == NoteNumbering.Chapter && chapter || restart == NoteNumbering.Section && run;
 
     private List<string> RunStarts(TextDocument document) =>
         [.. document.Body.Blocks.Skip(1).OfType<ParagraphBlock>()

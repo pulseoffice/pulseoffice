@@ -17,7 +17,7 @@ public sealed class FolioEditCommands(IActiveFolioContext context) : FolioComman
         Prototype("folio.clipboard.copy") with
         {
             DefaultGesture = "Ctrl+C",
-            EnabledWhen = _ => Context.Target?.Editor is { } editor && (editor.HasSelection || editor.SelectedObjectId is not null),
+            EnabledWhen = _ => Context.Target?.Editor is { } editor && (editor.HasSelection || editor.SelectedObjectId is not null || editor.LayoutText is not null),
             Execute = (_, _) => Context.Target?.CopyAsync() ?? Task.CompletedTask,
         },
         Prototype("folio.clipboard.paste") with

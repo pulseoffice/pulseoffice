@@ -284,7 +284,7 @@ internal sealed class OdtDocumentReader(
         styles.RegisterNames(officeStyles, masters, contentAutomatic, stylesRoot?.Element(Office + "automatic-styles"), context);
         styles.Read(officeStyles, contentAutomatic, stylesRoot?.Element(Office + "automatic-styles"), context);
 
-        context.Automatic = new OdtAutomaticStyleIndex().Read(stylesRoot?.Element(Office + "automatic-styles"));
+        context.Automatic = new OdtAutomaticStyleIndex().Read(stylesRoot?.Element(Office + "automatic-styles"), officeStyles);
         styles.ReadPages(stylesRoot?.Element(Office + "automatic-styles"), masters, context, reader);
         context.Automatic = new OdtAutomaticStyleIndex().Read(contentAutomatic, officeStyles);
         return context;

@@ -153,9 +153,9 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         }
         var gap = Gap(entry);
         var candidates = _line == 0 && _offset == 0 ? _anchored.Candidates(entry, _y + gap) : [];
+        if (_line == 0 && _offset == 0 && candidates.Count > 0 && _anchored.HeightDependent(entry)) candidates = Settled(entry, _y + gap, candidates);
         if (_anchored.Wrapped(candidates))
         {
-            if (_line == 0 && _offset == 0 && _anchored.HeightDependent(entry)) candidates = Settled(entry, _y + gap, candidates);
             Dynamic(entry, gap, candidates);
             return true;
         }
@@ -310,10 +310,11 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
                 y += probe.Height;
                 continue;
             }
+            if (y + height > Bottom + Epsilon) break;
             y += height;
             if (last) break;
         }
-        return y - top;
+        return Math.Min(y, Bottom) - top;
     }
 
     private void Dynamic(ParagraphEntry entry, double gap, IReadOnlyList<Obstacle> candidates)

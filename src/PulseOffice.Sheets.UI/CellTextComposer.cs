@@ -13,12 +13,13 @@ public interface ICellTextComposer
     TextExtent Extent(FormattedText text, int rotationDegrees);
 }
 
-public sealed class CellTextComposer : ICellTextComposer
+public sealed class CellTextComposer(PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null) : ICellTextComposer
 {
     private const double ScriptScale = 0.68;
     private const int TypefaceLimit = 256;
 
     private readonly Dictionary<(string Family, bool Italic, bool Bold), Typeface> _typefaces = [];
+    private readonly PulseOffice.UI.Controls.Text.ITextDecorationFactory _decorations = decorations ?? new PulseOffice.UI.Controls.Text.TextDecorationFactory();
 
     public FormattedText Compose(string text, CellFont font, IBrush brush)
     {
@@ -32,13 +33,8 @@ public sealed class CellTextComposer : ICellTextComposer
             text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             TypefaceOf(font), size, brush);
 
-        if (!font.Underline && !font.Strikethrough && !font.Overline) return formatted;
-
-        var decorations = new TextDecorationCollection();
-        if (font.Underline) decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
-        if (font.Strikethrough) decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
-        if (font.Overline) decorations.Add(new TextDecoration { Location = TextDecorationLocation.Overline });
-        formatted.SetTextDecorations(decorations);
+        if (_decorations.Create(font.Underline, font.Strikethrough, font.Overline) is { } decorations)
+            formatted.SetTextDecorations(decorations);
 
         return formatted;
     }

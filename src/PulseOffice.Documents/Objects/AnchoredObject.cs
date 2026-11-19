@@ -23,6 +23,7 @@ public enum HorizontalRelation
     Margin,
     Character,
     Column,
+    EndMargin,
 }
 
 public enum VerticalRelation
@@ -34,6 +35,7 @@ public enum VerticalRelation
     Line,
     Character,
     ParagraphArea,
+    BottomMargin,
 }
 
 public abstract record ObjectAnchor

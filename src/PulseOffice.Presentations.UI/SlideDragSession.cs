@@ -92,7 +92,7 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
         Dragging = false;
     }
 
-    public Size PlatformSlop(Visual visual, Avalonia.Input.PointerType pointer) =>
+    public Size PlatformSlop(Avalonia.Input.PointerType pointer) =>
         Application.Current?.PlatformSettings?.GetTapSize(pointer) ?? new Size(4, 4);
 
     private static int Hit(Visual root, Point position, IReadOnlyList<Control> frames)

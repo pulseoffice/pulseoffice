@@ -22,6 +22,8 @@ public sealed record ValidationDraft
 
     public bool ShowDropdown { get; init; } = true;
 
+    public bool SortDropdown { get; init; }
+
     public string InputTitle { get; init; } = string.Empty;
 
     public string InputMessage { get; init; } = string.Empty;
@@ -94,6 +96,7 @@ public sealed class ValidationRules : IValidationRules
             ListRange = fromRange ? rule.FirstFormula! : string.Empty,
             AllowBlank = rule.AllowBlank,
             ShowDropdown = rule.ShowDropdown,
+            SortDropdown = rule.SortDropdown,
             InputTitle = rule.InputTitle ?? string.Empty,
             InputMessage = rule.InputMessage ?? string.Empty,
             ShowInputMessage = rule.ShowInputMessage,
@@ -127,6 +130,7 @@ public sealed class ValidationRules : IValidationRules
                 : [],
             AllowBlank = draft.AllowBlank,
             ShowDropdown = !list || draft.ShowDropdown,
+            SortDropdown = list && draft.ShowDropdown && draft.SortDropdown,
             InputTitle = Blank(draft.InputTitle),
             InputMessage = Blank(draft.InputMessage),
             ShowInputMessage = draft.ShowInputMessage,

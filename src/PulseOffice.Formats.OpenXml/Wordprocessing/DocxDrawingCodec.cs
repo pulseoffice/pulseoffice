@@ -632,6 +632,9 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         (HorizontalRelation.Page, DW.HorizontalRelativePositionValues.Page),
         (HorizontalRelation.Margin, DW.HorizontalRelativePositionValues.LeftMargin),
         (HorizontalRelation.Character, DW.HorizontalRelativePositionValues.Character),
+        (HorizontalRelation.EndMargin, DW.HorizontalRelativePositionValues.RightMargin),
+        (HorizontalRelation.Margin, DW.HorizontalRelativePositionValues.InsideMargin),
+        (HorizontalRelation.EndMargin, DW.HorizontalRelativePositionValues.OutsideMargin),
     ];
 
     private readonly IReadOnlyList<(VerticalRelation Relation, DW.VerticalRelativePositionValues Word)> _vertical =
@@ -643,6 +646,9 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         (VerticalRelation.Margin, DW.VerticalRelativePositionValues.TopMargin),
         (VerticalRelation.Line, DW.VerticalRelativePositionValues.Line),
         (VerticalRelation.Character, DW.VerticalRelativePositionValues.Line),
+        (VerticalRelation.BottomMargin, DW.VerticalRelativePositionValues.BottomMargin),
+        (VerticalRelation.Margin, DW.VerticalRelativePositionValues.InsideMargin),
+        (VerticalRelation.BottomMargin, DW.VerticalRelativePositionValues.OutsideMargin),
     ];
 
     public bool Writes(AnchoredObject item) =>
@@ -761,7 +767,7 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
                 VerticalAlign = _alignments.Vertical(vertical?.VerticalAlignment?.Text),
             };
             item.InBackground = anchor.BehindDoc?.Value ?? false;
-            item.ZOrder = (int)((anchor.RelativeHeight?.Value ?? 1024) / 1024) - 1;
+            item.ZOrder = (int)Math.Min(anchor.RelativeHeight?.Value ?? 0, int.MaxValue);
             item.Wrap = Wrap(anchor);
             var polygon = anchor.GetFirstChild<DW.WrapTight>()?.WrapPolygon ?? anchor.GetFirstChild<DW.WrapThrough>()?.WrapPolygon;
             item.WrapContour = anchor.GetFirstChild<DW.WrapTight>() is not null || anchor.GetFirstChild<DW.WrapThrough>() is not null;

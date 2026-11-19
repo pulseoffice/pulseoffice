@@ -28,8 +28,9 @@ the round that fixes it is joined and the join run is green.
   object context menu. (225, 227, 231)
 - The slide drag indicator and threshold in filmstrip and sorter, outline cut and paste identity, and the Rename/Remove
   Empty Section Here commands, have not been seen in the running app. (245, 249)
-- Cutting the last outline block leaves a trailing empty line, so its paste is not recognised and the slide is
-  recreated instead of kept. (249)
+- The last-block outline cut widens the selection to the line break before it from `CuttingToClipboardEvent`; it
+  relies on the text box copying the selection before raising the event and deleting it after. Not seen in the
+  running app. (253)
 - The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
   as no section. ODP empty sections are `urn:pulseoffice:presentation-section` elements inside `draw:page`. None of
   this has been opened in PowerPoint or the reference suite here. (229, 231)
@@ -50,41 +51,41 @@ the round that fixes it is joined and the join run is green.
 - DOCX still loses line number restarts that no body section can carry: inside tables, frames, notes and comments, on a
   paragraph that defers a page style change, and any restart when numbering restarts on every page (DOCX248). A restart
   on the first paragraph is now the first section's starting number (235). Not yet opened in Word. (204, 209, 212)
-- Folio notes: continuation notices have their own "Footnote Continuation" style and texts set in the note settings,
-  but they are still layout-only text: no caret, no selection, no copy (235; 241, 242: still open). A page style run starts only at a
-  top-level paragraph with a page style (not at a table); Word has one footnote separator per document, so a page
-  style's own line is declared (DOCX273); none of this has been opened in Word or the reference suite. (232)
+- Folio notes (232, 250): a page style run starts only at a top-level paragraph with a page style (not at a table); Word
+  has one footnote separator per document, so a page style's own line is declared (DOCX273). Continuation notices are
+  now selectable read-only text by a click, but a drag or Shift+click from body text does not extend into them and
+  Select All does not include them (250). Section note restarts follow page style runs only; a section block is not a
+  restart point (250). None of this has been opened in Word or the reference suite.
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
   ODT as top/bottom; the vertical top-margin relation is written to ODT as `page` plus our own `pt:vertical-rel`, so
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
-  alignment relative to a paragraph now settles on the wrapped height in up to four passes (246); a paragraph that
-  breaks across pages still aligns against the height measured down to the column bottom. Not opened in Word.
-- Folio notes (246): the wider audit of footnote and endnote numbering, restart, separators and their DOCX/ODT round
-  trips, and of anchored-object wrapping and anchoring round trips, was not done in round 246; carry it to the next cycle.
+  alignment relative to a paragraph now settles on the wrapped height in up to four passes (246) and, for a paragraph
+  broken across pages, on its last line on the anchor page (250). Not opened in Word.
+- Folio objects (251): `wp:anchor/@layoutInCell` and `@allowOverlap` are always written true and not read (no model
+  property); the bottom-margin vertical relation goes to ODT as `page` plus `pt:vertical-rel`, so other applications
+  measure from the page top; Word's inside and outside margin relations are read as left and right margin. Not opened
+  in Word or the reference suite.
 
 
 ## Shell and formats
-- Avalonia's static `TextDecorations.Underline`/`Strikethrough` collections belong to the first UI thread that uses
-  them; `ShapeRenderer` now builds its own (join of 246-249), but `VersionComparisonView`, `ReviewPanel`, `ChoiceSlot`
-  and `TableCellTextStyles` still apply the static ones. `SlideDragSession.PlatformSlop` keeps an unused `visual`
-  parameter. (join 246-249)
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
 - Tagged PDF: Deck paragraphs are still matched to drawn text by text, not by layout position (the shape text layout
   does not expose line boxes to the print path); table cells are now tagged by position. (243, 247)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
-- PDF form fields: text and choice widgets have blank appearance streams over values drawn in the page content, so a
-  viewer that regenerates appearances draws the value twice. (248)
-- PDF form fields: `Form` structure elements are root-level, not children of the paragraph or cell they sit in. (248)
-- PDF form fields: a field crossing a page break becomes one field per page with numbered names instead of one field
-  with several widgets. (248)
+- PDF form fields: a field crossing pages joins its page fragments in `/V` without a separator, so a break between
+  paragraphs loses its line break. (252)
+- PDF form fields: widget appearances use Helvetica 10 pt with WinAnsi encoding: characters outside it show as `?`, and
+  the control's own font and size are not used. (252)
 
 ## Ledger
-- ODS `table:display-list="sorted"` is read as a dropdown but written back as `unsorted`. (249)
-- Remove duplicates compares stored values, not shown (formatted) values as Excel does. (249)
+- Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell
+  order in Excel (declared XLSX244). Not opened in Excel or the reference suite. (253)
+- Remove duplicates now compares shown text, so the text "1" and the number 1 shown as "1" are duplicates; Excel's
+  behaviour for that mixed case has not been checked in Excel. (253)
 
 - The relative-period list of the AutoFilter menu has not been seen in the running app nor walked with the keyboard.
   (216)

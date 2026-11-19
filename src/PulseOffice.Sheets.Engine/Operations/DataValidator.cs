@@ -24,9 +24,14 @@ public interface IDataValidator
     IReadOnlyList<string> ChoicesOf(CalculationEngine engine, int sheetIndex, DataValidation rule);
 }
 
-public sealed class DataValidator : IDataValidator
+public sealed class DataValidator(IValidationChoiceOrder order) : IDataValidator
 {
     private readonly FormulaTranslator _translator = new();
+
+    public DataValidator()
+        : this(new ValidationChoiceOrder())
+    {
+    }
 
     public DataValidation? RuleAt(Worksheet sheet, CellAddress address)
     {
@@ -73,12 +78,12 @@ public sealed class DataValidator : IDataValidator
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(rule);
 
-        if (rule.ListValues.Count > 0) return rule.ListValues;
+        if (rule.ListValues.Count > 0) return order.Arrange(rule.ListValues, rule.SortDropdown);
         if (string.IsNullOrWhiteSpace(rule.FirstFormula)) return [];
 
         var values = Evaluate(engine, sheetIndex, rule, rule.FirstFormula, rule.Range.Start);
 
-        return [.. values.Where(value => !value.IsEmpty).Select(Describe)];
+        return order.Arrange([.. values.Where(value => !value.IsEmpty).Select(Describe)], rule.SortDropdown);
     }
 
     private bool Compare(

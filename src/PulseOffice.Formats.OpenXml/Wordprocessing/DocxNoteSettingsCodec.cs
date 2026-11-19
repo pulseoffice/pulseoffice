@@ -36,6 +36,7 @@ public sealed class DocxNoteSettingsCodec
         var notes = document.Notes;
         bool Known(string format) => _formats.Any(entry => entry.Odf == format);
         return notes.FootnoteSettings.ContinuationBackward is null && notes.EndnoteSettings.ContinuationBackward is null
+            && notes.FootnoteSettings.Restart != NoteNumbering.Chapter && notes.EndnoteSettings.Restart != NoteNumbering.Chapter
             && (!notes.OfKind(NoteKind.Footnote).Any() || Known(notes.FootnoteSettings.FormatName) || notes.OfKind(NoteKind.Footnote).All(note => note.Citation is not null))
             && (!notes.OfKind(NoteKind.Endnote).Any() || Known(notes.EndnoteSettings.FormatName) && notes.EndnoteSettings.Restart != NoteNumbering.Page);
     }
@@ -66,7 +67,7 @@ public sealed class DocxNoteSettingsCodec
             Val = settings.Restart switch
             {
                 NoteNumbering.Page when kind == NoteKind.Footnote => W.RestartNumberValues.EachPage,
-                NoteNumbering.Chapter => W.RestartNumberValues.EachSection,
+                NoteNumbering.Chapter or NoteNumbering.Section => W.RestartNumberValues.EachSection,
                 _ => W.RestartNumberValues.Continuous,
             },
         };
@@ -83,7 +84,7 @@ public sealed class DocxNoteSettingsCodec
             settings = settings with
             {
                 Restart = restart == W.RestartNumberValues.EachPage ? NoteNumbering.Page
-                    : restart == W.RestartNumberValues.EachSection ? NoteNumbering.Chapter
+                    : restart == W.RestartNumberValues.EachSection ? NoteNumbering.Section
                     : NoteNumbering.Document,
             };
         return settings;

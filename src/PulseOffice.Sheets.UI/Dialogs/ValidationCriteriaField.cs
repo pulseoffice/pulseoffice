@@ -46,13 +46,16 @@ public sealed class ValidationCriteriaEditor : UserControl
     private readonly RangeFieldControl _range;
     private readonly CheckBox _blank;
     private readonly CheckBox _dropdown;
+    private readonly CheckBox _sorted;
+    private readonly PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder _order;
     private readonly TextBlock _hint;
     private readonly StackPanel _dropdownItems = new();
     private readonly StackPanel _dropdownPreview = new();
     private readonly TextBlock _dropdownMore;
 
-    public ValidationCriteriaEditor(ValidationCriteriaField field, ITextCatalog texts, DesignTokens.Metrics metrics)
+    public ValidationCriteriaEditor(ValidationCriteriaField field, ITextCatalog texts, DesignTokens.Metrics metrics, PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder? order = null)
     {
+        _order = order ?? new PulseOffice.Sheets.Engine.Operations.ValidationChoiceOrder();
         _field = field ?? throw new ArgumentNullException(nameof(field));
         _texts = texts ?? throw new ArgumentNullException(nameof(texts));
         _metrics = metrics;
@@ -84,6 +87,7 @@ public sealed class ValidationCriteriaEditor : UserControl
 
         _blank = new CheckBox { Content = texts["tools.allowBlank"], IsChecked = initial.AllowBlank };
         _dropdown = new CheckBox { Content = texts["validation.showDropdown"], IsChecked = initial.ShowDropdown };
+        _sorted = new CheckBox { Content = texts["validation.sortDropdown"], IsChecked = initial.SortDropdown };
 
         _hint = new TextBlock { FontSize = metrics.FontSizeSmall, TextWrapping = TextWrapping.Wrap }
             .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
@@ -102,6 +106,7 @@ public sealed class ValidationCriteriaEditor : UserControl
         _optionsSection = layout.AddSection(texts["form.section.options"]);
         _optionsSection.Add(null, _blank, DialogRowKind.Indented);
         _optionsSection.Add(null, _dropdown, DialogRowKind.Indented);
+        _optionsSection.Add(null, _sorted, DialogRowKind.Indented);
         Layout = layout;
 
         _kind.SelectionChanged += (_, _) => Arrange();
@@ -109,6 +114,7 @@ public sealed class ValidationCriteriaEditor : UserControl
         _listSource.SelectionChanged += (_, _) => Arrange();
         _values.Changed += (_, _) => ShowDropdown();
         _dropdown.IsCheckedChanged += (_, _) => ShowDropdown();
+        _sorted.IsCheckedChanged += (_, _) => ShowDropdown();
 
         Content = layout;
         Arrange();
@@ -137,6 +143,7 @@ public sealed class ValidationCriteriaEditor : UserControl
         ListRange = _range.Text,
         AllowBlank = _blank.IsChecked == true,
         ShowDropdown = _dropdown.IsChecked == true,
+        SortDropdown = _sorted.IsChecked == true,
     };
 
     private Control BuildPreview()
@@ -215,6 +222,7 @@ public sealed class ValidationCriteriaEditor : UserControl
         _valuesEditor.IsVisible = layout.List && !draft.ListFromRange;
         _range.IsVisible = layout.List && draft.ListFromRange;
         _dropdown.IsVisible = layout.Dropdown;
+        _sorted.IsVisible = layout.Dropdown;
         _blank.IsVisible = draft.Kind != ValidationKind.Any;
         _optionsSection.IsVisible = _blank.IsVisible || _dropdown.IsVisible;
 
@@ -231,7 +239,7 @@ public sealed class ValidationCriteriaEditor : UserControl
         _dropdownItems.Children.Clear();
         var items = draft.ListFromRange
             ? [_texts.Format("validation.preview.fromRange", draft.ListRange.Length == 0 ? "…" : draft.ListRange)]
-            : draft.ListValues.Take(DropdownPreviewItems).ToList();
+            : _order.Arrange(draft.ListValues, draft.SortDropdown).Take(DropdownPreviewItems).ToList();
         foreach (var item in items)
             _dropdownItems.Children.Add(new TextBlock
             {

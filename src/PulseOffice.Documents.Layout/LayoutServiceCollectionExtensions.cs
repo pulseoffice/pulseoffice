@@ -79,6 +79,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<IPaginator, Paginator>();
         services.TryAddSingleton<ITextClusters, TextClusters>();
         services.AddSingleton<ILineOffsets, LineOffsets>();
+        services.TryAddSingleton<ILayoutReadOnlyText, LayoutReadOnlyText>();
         services.AddSingleton<ILayoutQueries, LayoutQueries>();
         services.AddSingleton<ILineNumbers, LineNumbers>();
         services.AddTransient<IDocumentLayoutEngine, DocumentLayoutEngine>();

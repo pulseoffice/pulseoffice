@@ -414,7 +414,7 @@ internal sealed class OdtStylesReader(
     {
         FormatName = (string?)element.Attribute(Style + "num-format") ?? "1",
         StartAt = Math.Clamp(measure.Integer((string?)element.Attribute(Text + "start-value")) ?? 0, 0, ushort.MaxValue) + 1,
-        Restart = vocabulary.Restart.Value((string?)element.Attribute(Text + "start-numbering-at")),
+        Restart = (string?)element.Attribute(Pt + "start-numbering-at") == "section" ? NoteNumbering.Section : vocabulary.Restart.Value((string?)element.Attribute(Text + "start-numbering-at")),
         CitationStyleName = (string?)element.Attribute(Text + "citation-style-name") is { Length: > 0 } citation ? context.StyleNames.Resolve(citation) : null,
         ParagraphStyleName = (string?)element.Attribute(Text + "default-style-name") is { Length: > 0 } paragraph ? context.StyleNames.Resolve(paragraph) : null,
         ContinuationForward = element.Element(Text + "note-continuation-notice-forward")?.Value is { Length: > 0 } forward ? forward : null,

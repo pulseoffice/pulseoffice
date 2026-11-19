@@ -35,6 +35,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly IShapeEffectBounds _effects;
     private readonly IDimensionLineGeometry _dimensions;
     private readonly IShapeListText _listText;
+    private readonly PulseOffice.UI.Controls.Text.ITextDecorationFactory _decorations;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
     private readonly ShapeTextColumns _columns = new();
     private readonly FormattedShapeTextLines _lines = new();
@@ -49,8 +50,10 @@ public sealed class ShapeRenderer : IShapeRenderer
     public ShapeRenderer(
         IShapeGeometry geometry, IShapeBrushes? brushes = null, IArrowGeometry? arrows = null,
         PulseOffice.UI.Controls.Text.Rich.IHyperlinkAppearance? links = null, IShapeTextInk? ink = null, IShapeEffectBounds? effects = null,
-        IDimensionLineGeometry? dimensions = null, IShapeListText? listText = null)
+        IDimensionLineGeometry? dimensions = null, IShapeListText? listText = null,
+        PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null)
     {
+        _decorations = decorations ?? new PulseOffice.UI.Controls.Text.TextDecorationFactory();
         _listText = listText ?? new ShapeListText();
         _dimensions = dimensions ?? new DimensionLineGeometry();
         _effects = effects ?? new ShapeEffectBounds();
@@ -423,6 +426,5 @@ public sealed class ShapeRenderer : IShapeRenderer
     public static StreamGeometry Build(ShapeOutline outline) => new OutlineGeometry().Build(outline);
 
 
-    private static TextDecorationCollection FreshUnderline() =>
-        [new TextDecoration { Location = TextDecorationLocation.Underline }];
+    private TextDecorationCollection FreshUnderline() => _decorations.Underline();
 }

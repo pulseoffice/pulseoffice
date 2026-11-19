@@ -343,7 +343,7 @@ public sealed class DocumentLayoutEngine(
         document.Styles.Paragraph.Find(DefaultStyleNames.FootnoteContinuation) is not null ? DefaultStyleNames.FootnoteContinuation
         : document.Notes.FootnoteSettings.ParagraphStyleName ?? DefaultStyleNames.Footnote;
 
-    private const string NoticeParagraph = "note-continuation-notice";
+    private const string NoticeParagraph = PulseOffice.Documents.Layout.Queries.LayoutParagraphs.ContinuationNotice;
 
     private sealed class SuffixProbe : IConvergenceProbe
     {

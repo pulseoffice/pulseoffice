@@ -7,6 +7,8 @@ public interface IOutlineBlockTransfer
     OutlineBlockRange? Covered(string text, int start, int length);
 
     int? InsertedAt(IReadOnlyList<OutlineEntry> before, IReadOnlyList<OutlineEntry> after, IReadOnlyList<OutlineEntry> inserted);
+
+    int RemovalStart(string text, int start, int length);
 }
 
 public sealed class OutlineBlockTransfer(IDeckOutlineText outline) : IOutlineBlockTransfer
@@ -55,6 +57,13 @@ public sealed class OutlineBlockTransfer(IDeckOutlineText outline) : IOutlineBlo
             if (candidate.Zip(after).All(pair => Same(pair.First, pair.Second))) return at;
         }
         return null;
+    }
+
+    public int RemovalStart(string text, int start, int length)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (start <= 0 || length <= 0 || start + length != text.Length) return start;
+        return TrimNewline(text, start);
     }
 
     private int TrimNewline(string text, int boundary)

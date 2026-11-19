@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using PulseOffice.Localization;
 using PulseOffice.UI.Controls.Panels;
 using PulseOffice.UI.Controls.Tabs;
+using PulseOffice.UI.Controls.Text;
 using PulseOffice.UI.Icons;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
@@ -18,6 +19,7 @@ namespace PulseOffice.UI.Controls.Review;
 public sealed class ReviewPanel : UserControl
 {
     private readonly IReviewSource _source;
+    private readonly ITextDecorationFactory _decorations;
     private readonly ITextCatalog _texts;
     private readonly DesignTokens.Metrics _metrics;
     private readonly PageTabStrip _tabs;
@@ -37,8 +39,9 @@ public sealed class ReviewPanel : UserControl
     private string? _author;
     private bool _refillPending;
 
-    public ReviewPanel(IReviewSource source, IIconCatalog icons, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact, IReviewPanelRequests? requests = null, MentionPicker? mentions = null)
+    public ReviewPanel(IReviewSource source, IIconCatalog icons, ITextCatalog texts, InterfaceDensity density = InterfaceDensity.Compact, IReviewPanelRequests? requests = null, MentionPicker? mentions = null, ITextDecorationFactory? decorations = null)
     {
+        _decorations = decorations ?? new TextDecorationFactory();
         _requests = requests;
         ArgumentNullException.ThrowIfNull(icons);
         _source = source ?? throw new ArgumentNullException(nameof(source));
@@ -326,8 +329,8 @@ public sealed class ReviewPanel : UserControl
             FontSize = _metrics.FontSize,
             TextWrapping = TextWrapping.Wrap,
             MaxLines = 4,
-            TextDecorations = entry.Kind is ReviewItemKind.Deletion or ReviewItemKind.MovedFrom ? TextDecorations.Strikethrough
-                : entry.Kind == ReviewItemKind.MovedTo ? TextDecorations.Underline : null,
+            TextDecorations = _decorations.Create(
+                entry.Kind == ReviewItemKind.MovedTo, entry.Kind is ReviewItemKind.Deletion or ReviewItemKind.MovedFrom),
             Opacity = entry.Resolved ? 0.55 : 1,
         }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary);
         var content = new StackPanel { Spacing = 2 };

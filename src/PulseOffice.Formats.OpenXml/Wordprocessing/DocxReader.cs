@@ -145,6 +145,7 @@ public sealed class DocxReader : ITextDocumentReader
             var blocks = _blocks.Read(body.ChildElements, context, spans);
             document.Body.Replace(blocks);
             Link(document, context);
+            Stack(document);
             ResolveReferences(document);
             _indexRanges.Join(document, context.IndexRanges, referenced);
             _bibliography.Read(main, document);
@@ -227,6 +228,12 @@ public sealed class DocxReader : ITextDocumentReader
         TableBlock table => table.Rows.SelectMany(row => row.Cells).SelectMany(cell => Paragraphs(cell.Content)),
         _ => [],
     });
+
+    private void Stack(TextDocument document)
+    {
+        var ranked = document.Objects.All.Where(item => item.Anchor is not PulseOffice.Documents.Objects.AsCharacterAnchor).Select((item, index) => (item, index)).OrderBy(pair => pair.item.ZOrder).ThenBy(pair => pair.index).Select(pair => pair.item).ToList();
+        for (var rank = 0; rank < ranked.Count; rank++) ranked[rank].ZOrder = rank;
+    }
 
     private void Link(TextDocument document, DocxReadContext context)
     {

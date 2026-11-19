@@ -48,6 +48,8 @@ public sealed record FolioCanvasServices(
 
     public PulseOffice.Drawing.Shapes.IObjectSnapping Snapping { get; init; } = new PulseOffice.Drawing.Shapes.ObjectSnapping();
 
+    public ILayoutReadOnlyText ReadOnlyText { get; init; } = new LayoutReadOnlyText();
+
     public PulseOffice.UI.Controls.Shapes.IObjectFrameChrome Frame { get; init; } =
         new PulseOffice.UI.Controls.Shapes.ObjectFrameChrome(Manipulator, new PulseOffice.UI.Controls.Shapes.FrameStyles().Dashed);
 }
@@ -305,6 +307,7 @@ public sealed class FolioCanvas : Control
                 if (sheet is not null) _overlays.PaintCommentRanges(context, page, sheet);
                 _overlays.PaintControls(context, page, controls, Accent);
                 _overlays.PaintSelection(context, page, selection, Accent);
+                _overlays.PaintLayoutText(context, page, Accent);
                 _services.Renderer.Paint(_services.Surfaces.Screen(context, _editor.Document.Language), page, Content, marks);
                 _overlays.PaintGrids(context, page, (top - slot.Y) / Scale, (bottom - slot.Y) / Scale, Scale, Accent, _objectGestures.Helpline(page.Index));
                 if (cells is not null) _overlays.PaintCells(context, page, cells, Accent);
@@ -414,6 +417,12 @@ public sealed class FolioCanvas : Control
             _block = (blockSlot.Index, point.Position, point.Position);
             _dragging = true;
             e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+        if (ReadOnlyTextAt(point.Position) is { } notice)
+        {
+            _editor.SelectLayoutText(notice);
             e.Handled = true;
             return;
         }
@@ -730,6 +739,9 @@ public sealed class FolioCanvas : Control
 
     private bool FollowsLink(KeyModifiers modifiers) =>
         (modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Meta)) && !modifiers.HasFlag(KeyModifiers.Shift);
+
+    private LayoutText? ReadOnlyTextAt(Point point) =>
+        SlotAt(point) is { } slot ? _services.ReadOnlyText.At(_editor.DisplayLayout, slot.Index, (point.X - slot.X) / Scale, (point.Y - slot.Y) / Scale) : null;
 
     public DocumentPosition? PositionAt(Point point)
     {

@@ -30,6 +30,13 @@ public sealed class FolioExchange(
     public ExchangePackage? Capture(string id, bool cut)
     {
         if (context.Target?.Editor is not { } editor) return null;
+        if (editor.LayoutText is { } layoutText)
+            return cut ? null : new ExchangePackage
+            {
+                Id = id,
+                Origin = Module,
+                Representations = [new ExchangeRepresentation(ExchangeFlavor.Text, System.Text.Encoding.UTF8.GetBytes(layoutText.Text))],
+            };
         var text = editor.SelectedText();
         var selected = editor.SelectedObjectId is { } objectId ? editor.Document.Objects.Find(objectId) : null;
         var fragment = cut ? editor.Cut() : editor.Copy();

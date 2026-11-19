@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using PulseOffice.Localization;
 using PulseOffice.UI.Controls.Panels;
+using PulseOffice.UI.Controls.Text;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Icons;
 using PulseOffice.UI.Theming;
@@ -15,6 +16,7 @@ namespace PulseOffice.UI.Controls.Spelling;
 public sealed class TextReviewPanel : UserControl
 {
     private readonly ITextReviewSession _session;
+    private readonly ITextDecorationFactory _decorations;
     private readonly ITextCatalog _texts;
     private readonly IIconCatalog _icons;
     private readonly DesignTokens.Metrics _metrics;
@@ -22,8 +24,9 @@ public sealed class TextReviewPanel : UserControl
 
     private readonly Action? _openDictionaries;
 
-    public TextReviewPanel(ITextReviewSession session, ITextCatalog texts, IIconCatalog icons, InterfaceDensity density = InterfaceDensity.Compact, Action? openDictionaries = null)
+    public TextReviewPanel(ITextReviewSession session, ITextCatalog texts, IIconCatalog icons, InterfaceDensity density = InterfaceDensity.Compact, Action? openDictionaries = null, ITextDecorationFactory? decorations = null)
     {
+        _decorations = decorations ?? new TextDecorationFactory();
         _openDictionaries = openDictionaries;
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _texts = texts ?? throw new ArgumentNullException(nameof(texts));
@@ -136,7 +139,7 @@ public sealed class TextReviewPanel : UserControl
             FontSize = _metrics.FontSize + 4,
             FontWeight = FontWeight.SemiBold,
             TextWrapping = TextWrapping.Wrap,
-            TextDecorations = TextDecorations.Underline,
+            TextDecorations = _decorations.Underline(),
         };
         word.Themed(TextBlock.ForegroundProperty, grammar ? Palette.Keys.Info : Palette.Keys.Danger);
         AutomationProperties.SetName(word, finding.Word);

@@ -88,8 +88,7 @@ public sealed class PdfExporter(
             var marks = new PdfDocumentMarks();
             var pagesId = file.Reserve();
             var tree = new PdfStructureTree { AnnotationKeyBase = selected.Count };
-            var fieldIds = new List<int>();
-            var fieldNames = new HashSet<string>(StringComparer.Ordinal);
+            var formFields = forms.Begin();
 
             foreach (var index in selected)
             {
@@ -161,8 +160,7 @@ public sealed class PdfExporter(
 
                 marks.Collect(pageId, canvas, height, options);
                 var tagging = options.Tagged ? structure.Annotations(tree, slot) : null;
-                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, fieldNames, tagging);
-                fieldIds.AddRange(widgets);
+                var widgets = forms.Widgets(file, pageId, marks.PageFields(pageId), height, formFields, tagging);
                 var annotations = navigation.Annotations(file, marks.PageLinks(pageId), marks.PageNotes(pageId), height, tagging).Concat(widgets).ToList();
                 var annots = annotations.Count == 0 ? string.Empty : " /Annots [" + string.Join(' ', annotations.Select(id => $"{id} 0 R")) + "]";
 
@@ -202,7 +200,7 @@ public sealed class PdfExporter(
                 catalog.Append(CultureInfo.InvariantCulture, $" /Names << /Dests {names} 0 R >>");
             if (labels.Write([.. selected.Select(document.PageLabel)]) is { } pageLabels)
                 catalog.Append(" /PageLabels ").Append(pageLabels);
-            if (forms.AcroForm(fieldIds) is { } acroForm)
+            if (forms.AcroForm(file, formFields) is { } acroForm)
                 catalog.Append(" /AcroForm ").Append(acroForm);
             if (!string.IsNullOrWhiteSpace(options.Language)) catalog.Append(" /Lang ").Append(PdfFile.TextString(options.Language));
             catalog.Append(" /ViewerPreferences << /DisplayDocTitle true >>");

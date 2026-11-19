@@ -42,7 +42,8 @@ public sealed class Round244PdfFormFieldTests
         Assert.Contains("/Subtype /Widget", pdf, StringComparison.Ordinal);
         Assert.Contains("/FT /Tx /Ff 0 /V (Anna)", pdf, StringComparison.Ordinal);
         Assert.Contains("/T (Nome_2)", pdf, StringComparison.Ordinal);
-        Assert.Contains("/V /Yes /AS /Yes", pdf, StringComparison.Ordinal);
+        Assert.Contains("/AS /Yes /AP << /N << /Yes", pdf, StringComparison.Ordinal);
+        Assert.Contains("/V /Yes", pdf, StringComparison.Ordinal);
         Assert.Contains("/FT /Ch /Ff 131072 /Opt [(Roma) (Milano)] /V (Roma)", pdf, StringComparison.Ordinal);
     }
 
@@ -62,7 +63,8 @@ public sealed class Round244PdfFormFieldTests
         var pdf = Write(canvas => canvas.MarkField(Box, new PrintFormField("Nome", PrintFormFieldKind.Text) { Tooltip = "Il tuo nome" }),
             new PdfExportOptions("Prova", Compress: false) { Tagged = true });
 
-        Assert.Contains("/TU (Il tuo nome) /MK << /BG [1 1 1] >> /StructParent 1", pdf, StringComparison.Ordinal);
+        Assert.Contains("/MK << /BG [1 1 1] >> /StructParent 1", pdf, StringComparison.Ordinal);
+        Assert.Contains("/TU (Il tuo nome) /FT /Tx", pdf, StringComparison.Ordinal);
         Assert.Contains("/S /Form", pdf, StringComparison.Ordinal);
         Assert.Contains("/Type /OBJR", pdf, StringComparison.Ordinal);
         Assert.Contains("/ParentTreeNextKey 2", pdf, StringComparison.Ordinal);
@@ -74,7 +76,8 @@ public sealed class Round244PdfFormFieldTests
         var pdf = Write(canvas => canvas.MarkField(Box, new PrintFormField("Foto", PrintFormFieldKind.Picture)),
             new PdfExportOptions("Prova", Compress: false) { Tagged = false });
 
-        Assert.Contains("/TU (Foto) /FT /Btn /Ff 65536 /MK << /TP 1 >> /AP << /N ", pdf, StringComparison.Ordinal);
+        Assert.Contains("/MK << /TP 1 >> /AP << /N ", pdf, StringComparison.Ordinal);
+        Assert.Contains("/TU (Foto) /FT /Btn /Ff 65536", pdf, StringComparison.Ordinal);
         Assert.DoesNotContain("/StructParent", pdf, StringComparison.Ordinal);
     }
 }

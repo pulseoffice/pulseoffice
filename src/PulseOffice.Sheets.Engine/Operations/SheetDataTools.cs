@@ -20,8 +20,17 @@ public interface IDuplicateRemover
     DuplicateRemovalPlan Plan(Worksheet sheet, DuplicateRemovalRequest request);
 }
 
-public sealed class DuplicateRemover(ISelectionWorkArea workArea) : IDuplicateRemover
+public sealed class DuplicateRemover(ISelectionWorkArea workArea, PulseOffice.Sheets.Formatting.ICellPresenter presenter) : IDuplicateRemover
 {
+    private const double UnboundedWidth = 1000;
+
+    private static readonly DateTime Epoch = new(1899, 12, 30, 0, 0, 0, DateTimeKind.Unspecified);
+
+    public DuplicateRemover(ISelectionWorkArea workArea)
+        : this(workArea, new PulseOffice.Sheets.Formatting.CellPresenter(new PulseOffice.Sheets.Formatting.NumberFormatter(CultureInfo.CurrentCulture, Date)))
+    {
+    }
+
     public DuplicateRemovalPlan Plan(Worksheet sheet, DuplicateRemovalRequest request)
     {
         ArgumentNullException.ThrowIfNull(sheet);
@@ -41,14 +50,24 @@ public sealed class DuplicateRemover(ISelectionWorkArea workArea) : IDuplicateRe
 
         for (var row = first; row <= range.End.Row; row++)
         {
-            var key = string.Join('\u001f', columns.Select(column =>
-                Describe(sheet.GetValue(new CellAddress(row, column)))));
+            var key = string.Join('\u001f', columns.Select(column => Shown(sheet, new CellAddress(row, column))));
 
             if (seen.Add(key)) kept++;
             else duplicates.Add(row);
         }
 
         return new DuplicateRemovalPlan(duplicates, kept);
+    }
+
+    private static DateTime Date(double serial) =>
+        serial is >= -657434 and <= 2958465 ? Epoch.AddDays(serial) : Epoch;
+
+    private string Shown(Worksheet sheet, CellAddress address)
+    {
+        if (sheet.Owner is not { } workbook || !sheet.TryGetCell(address, out var cell)) return Describe(sheet.GetValue(address));
+        if (cell.Value.Kind is ValueKind.Empty) return string.Empty;
+        if (cell.Value.Kind is ValueKind.Text) return cell.Value.AsText();
+        return presenter.Present(cell, workbook.Styles, workbook.NumberFormats, UnboundedWidth).Text;
     }
 
     private string Describe(CellValue value) => (int)value.Kind + ":" + value.Kind switch

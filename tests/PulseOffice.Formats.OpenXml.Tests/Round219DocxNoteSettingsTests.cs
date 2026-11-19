@@ -35,7 +35,7 @@ public sealed class Round219DocxNoteSettingsTests
             "<w:footnotePr><w:numFmt w:val=\"lowerLetter\"/><w:numStart w:val=\"3\"/><w:numRestart w:val=\"eachPage\"/></w:footnotePr>"
             + "<w:endnotePr><w:numFmt w:val=\"upperRoman\"/><w:numStart w:val=\"2\"/><w:numRestart w:val=\"eachSect\"/></w:endnotePr>", string.Empty);
         Assert.Equal(new NoteSettings { FormatName = "a", StartAt = 3, Restart = NoteNumbering.Page }, document.Notes.FootnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
-        Assert.Equal(new NoteSettings { FormatName = "I", StartAt = 2, Restart = NoteNumbering.Chapter, Placement = NotePlacement.DocumentEnd }, document.Notes.EndnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
+        Assert.Equal(new NoteSettings { FormatName = "I", StartAt = 2, Restart = NoteNumbering.Section, Placement = NotePlacement.DocumentEnd }, document.Notes.EndnoteSettings with { ParagraphStyleName = null, CitationStyleName = null });
 
         var written = new MemoryStream();
         Assert.True(_composer.Writer(DocxFlavour.Document).Write(document, written).Succeeded);
@@ -70,6 +70,19 @@ public sealed class Round219DocxNoteSettingsTests
         Assert.DoesNotContain(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX271");
 
         document.Notes.EndnoteSettings = document.Notes.EndnoteSettings with { Restart = NoteNumbering.Page };
+
+        Assert.Contains(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX271");
+    }
+
+    [Fact]
+    public void Chapter_restarts_are_declared_and_section_restarts_cross_docx()
+    {
+        var document = Read(string.Empty, string.Empty);
+        var writer = _composer.Writer(DocxFlavour.Document);
+        document.Notes.FootnoteSettings = document.Notes.FootnoteSettings with { Restart = NoteNumbering.Section };
+        Assert.DoesNotContain(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX271");
+
+        document.Notes.FootnoteSettings = document.Notes.FootnoteSettings with { Restart = NoteNumbering.Chapter };
 
         Assert.Contains(writer.CheckFidelity(document).Losses, loss => loss.Code == "DOCX271");
     }

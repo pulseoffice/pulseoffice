@@ -213,7 +213,7 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
         frame.PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed)
-                _drag.Begin(slide, e.GetPosition(_filmstrip), _drag.PlatformSlop(frame, e.Pointer.Type));
+                _drag.Begin(slide, e.GetPosition(_filmstrip), _drag.PlatformSlop(e.Pointer.Type));
         };
         frame.PointerMoved += (_, e) =>
         {

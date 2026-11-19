@@ -232,15 +232,20 @@ public sealed class FolioEditor : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Select(DocumentPosition anchor, DocumentPosition caret)
+    public void Select(DocumentPosition anchor, DocumentPosition caret, PulseOffice.Documents.Layout.Queries.LayoutText? layoutText = null)
     {
         BlockRanges = [];
         SelectedObjectId = null;
+        LayoutText = layoutText;
         _anchor.Position = Clamp(anchor);
         _caret.Position = Clamp(caret);
         _preferredX = null;
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    public PulseOffice.Documents.Layout.Queries.LayoutText? LayoutText { get; private set; }
+
+    public void SelectLayoutText(PulseOffice.Documents.Layout.Queries.LayoutText text) => Select(Caret, Caret, text);
 
     public void PlaceCaret(DocumentPosition position, bool extend) => Select(extend ? Anchor : position, position);
 

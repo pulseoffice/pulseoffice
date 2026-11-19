@@ -10,9 +10,10 @@ using PulseOffice.Sheets;
 
 namespace PulseOffice.Formats.OpenXml;
 
-public sealed class XlsxMetadataMapper
+public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder? order = null)
 {
     private readonly ValidationVocabulary _vocabulary = new();
+    private readonly PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder _order = order ?? new PulseOffice.Sheets.Engine.Operations.ValidationChoiceOrder();
     private readonly XlsxValidationExtension _validationExtension = new(new X14Namespaces());
 
     public DataValidations? BuildValidations(IReadOnlyList<Rule> validations)
@@ -47,7 +48,7 @@ public sealed class XlsxMetadataMapper
             {
                 if (!validation.ShowDropdown) element.ShowDropDown = true;
                 element.AppendChild(new Formula1(validation.ListValues.Count > 0
-                    ? "\"" + string.Join(',', validation.ListValues).Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
+                    ? "\"" + string.Join(',', _order.Arrange(validation.ListValues, validation.SortDropdown)).Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
                     : ToOpenXml(validation.FirstFormula)));
             }
             else

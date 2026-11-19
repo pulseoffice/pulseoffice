@@ -10,11 +10,44 @@ internal sealed record AutomaticParagraph(string? Parent, ParagraphProperties Pa
 
 internal sealed record AutomaticText(string? Parent, CharacterProperties Character);
 
-internal sealed class OdtAutomaticStyles(IReadOnlyDictionary<(string Family, string Name), XElement> styles) : OdtXml
+internal sealed class OdtAutomaticStyles(IReadOnlyDictionary<(string Family, string Name), XElement> styles, IReadOnlyDictionary<string, XElement>? graphics = null, XElement? graphicDefault = null) : OdtXml
 {
     public const string DataFamily = "data";
 
     public static readonly OdtAutomaticStyles Empty = new(new Dictionary<(string, string), XElement>());
+
+    private static readonly XName[] PlacementAttributes =
+    [
+        OdfPackage.Namespaces.Style + "wrap", OdfPackage.Namespaces.Style + "horizontal-pos", OdfPackage.Namespaces.Style + "horizontal-rel",
+        OdfPackage.Namespaces.Style + "vertical-pos", OdfPackage.Namespaces.Style + "vertical-rel", OdfPackage.Namespaces.Style + "run-through",
+        OdfPackage.Namespaces.Style + "wrap-contour", OdfPackage.Namespaces.Style + "wrap-contour-mode", OdfPackage.Namespaces.Style + "number-wrapped-paragraphs",
+        OdfPackage.Namespaces.Fo + "margin-left", OdfPackage.Namespaces.Fo + "margin-right", OdfPackage.Namespaces.Fo + "margin-top", OdfPackage.Namespaces.Fo + "margin-bottom",
+    ];
+
+    public XElement? GraphicPlacement(string? styleName)
+    {
+        var own = Find("graphic", styleName);
+        var chain = new List<XElement>();
+        var current = own ?? (styleName is not null && graphics?.TryGetValue(styleName, out var named) == true ? named : null);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        while (current is not null && chain.Count < 64)
+        {
+            chain.Add(current);
+            var parent = (string?)current.Attribute(OdfPackage.Namespaces.Style + "parent-style-name");
+            current = parent is not null && seen.Add(parent) && graphics?.TryGetValue(parent, out var next) == true ? next : null;
+        }
+        if (graphicDefault is not null) chain.Add(graphicDefault);
+        var first = own?.Element(OdfPackage.Namespaces.Style + "graphic-properties");
+        if (chain.Count == (own is null ? 0 : 1)) return first;
+        var merged = first is null ? new XElement(OdfPackage.Namespaces.Style + "graphic-properties") : new XElement(first);
+        foreach (var name in PlacementAttributes)
+        {
+            if (merged.Attribute(name) is not null) continue;
+            var inherited = chain.Select(style => style.Element(OdfPackage.Namespaces.Style + "graphic-properties")?.Attribute(name)).FirstOrDefault(attribute => attribute is not null);
+            if (inherited is not null) merged.SetAttributeValue(name, inherited.Value);
+        }
+        return merged;
+    }
 
     public XElement? Find(string family, string? name) =>
         name is not null && styles.TryGetValue((family, name), out var style) ? style : null;
@@ -39,7 +72,13 @@ internal sealed class OdtAutomaticStyleIndex
             var name = (string?)style.Attribute(OdfPackage.Namespaces.Style + "name");
             if (family is not null && name is not null) map.TryAdd((family, name), style);
         }
-        return new OdtAutomaticStyles(map);
+        var graphics = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        foreach (var style in common?.Elements(OdfPackage.Namespaces.Style + "style") ?? [])
+            if ((string?)style.Attribute(OdfPackage.Namespaces.Style + "family") == "graphic" && (string?)style.Attribute(OdfPackage.Namespaces.Style + "name") is { } graphicName)
+                graphics.TryAdd(graphicName, style);
+        var graphicDefault = common?.Elements(OdfPackage.Namespaces.Style + "default-style")
+            .FirstOrDefault(style => (string?)style.Attribute(OdfPackage.Namespaces.Style + "family") == "graphic");
+        return new OdtAutomaticStyles(map, graphics, graphicDefault);
     }
 }
 

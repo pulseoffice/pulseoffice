@@ -94,4 +94,21 @@ public sealed class NoteFlowTests
 
         Assert.Equal(["1", "2", "1"], layout.Pages[0].Lines.Where(line => line.Line.Notes.Any()).Select(Citation));
     }
+
+    [Fact]
+    public void Note_numbering_restarts_at_each_section()
+    {
+        var f = new LayoutFixture(width: 200, height: 400);
+        f.Document.Notes.FootnoteSettings = f.Document.Notes.FootnoteSettings with { Restart = NoteNumbering.Section };
+        var a = f.Add("riga");
+        var b = f.Add("riga", p => p with { OutlineLevel = 1 });
+        var c = f.Add("riga", p => p with { PageStyleName = LayoutFixture.Page });
+        Note(f, a, "a");
+        Note(f, b, "b");
+        Note(f, c, "c");
+
+        var citations = f.Layout().Pages.SelectMany(page => page.Lines.Where(line => line.Line.Notes.Any()).Select(Citation));
+
+        Assert.Equal(["1", "2", "1"], citations);
+    }
 }

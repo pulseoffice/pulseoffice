@@ -13980,3 +13980,31 @@ Middle and bottom alignment relative to a wrapped paragraph now settles on the w
   the platform tap size as threshold.
 - XLSX validations without `allowBlank` no longer ignore blanks; text to columns leaves empty parts blank.
   Log: docs/deep-audit/round-249-deck-outline-ledger-data.md.
+
+### Round 250 (2026-11-19): Folio footnotes and endnotes
+- Continuation notices are read-only text: never a caret target, selectable by a click and copyable
+  (`ILayoutReadOnlyText`).
+- Note numbering can restart at each section (`NoteNumbering.Section`, DOCX `eachSect`, ODT `pt:start-numbering-at`);
+  chapter restarts are declared in DOCX (DOCX271); the settings dialog picks restarts by value.
+- Paragraph-relative alignment of a paragraph broken across pages stops at its last line on the anchor page.
+  Log: docs/deep-audit/round-250-folio-notes.md.
+
+### Round 251 (2026-11-19): Folio anchored objects
+- DOCX stacking order survives small `relativeHeight` values (ranked after reading).
+- ODT frames inherit wrap, position and relations from their named graphic style and the graphic default style.
+- Right and bottom margin relations in the model, layout, dialog, DOCX and ODT.
+  Log: docs/deep-audit/round-251-folio-anchored-objects.md.
+
+### Round 252 (2026-11-19): PDF form field follow-ups
+Text and choice widgets get real appearance streams (opaque background, value in Helvetica) so the value shows once
+whether or not a viewer regenerates appearances; a content control crossing pages is one parent field with a widget
+per page (`PrintFormField.Identity`, `PdfFormFields`); `Form` elements nest under the paragraph or cell they cover. Deck
+paragraph tagging by position stays queued. Log: [deep-audit/round-252-pdf-form-fields.md](deep-audit/round-252-pdf-form-fields.md).
+
+
+### Round 253 (2026-11-19): small leftovers, sorted validation lists, shown-value duplicates
+- Text decorations come from the shared `ITextDecorationFactory` everywhere (no static Avalonia collections, guarded
+  by an architecture test); the unused slop parameter is gone.
+- Cutting the last outline block also removes the line break before it; ODS sorted validation lists stay sorted and
+  show sorted (XLSX writes typed entries sorted, declared XLSX244); remove duplicates compares shown values.
+  Log: docs/deep-audit/round-253-leftovers-validation.md.

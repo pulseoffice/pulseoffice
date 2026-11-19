@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using PulseOffice.UI.Commands;
+using PulseOffice.UI.Controls.Text;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
@@ -21,13 +22,15 @@ public sealed class ChoiceSlot : RibbonSlot
     private readonly ContentControl _face = new();
     private readonly StackPanel _tiles = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly IColorContrast _contrast;
+    private readonly ITextDecorationFactory _decorations;
     private Flyout? _flyout;
     private IReadOnlyList<RibbonChoice>? _shownChoices;
     private string? _shownCurrent;
 
-    public ChoiceSlot(RibbonItem item, RibbonForm form, RibbonBuildContext context, IColorContrast contrast)
+    public ChoiceSlot(RibbonItem item, RibbonForm form, RibbonBuildContext context, IColorContrast contrast, ITextDecorationFactory? decorations = null)
         : base(item, form, context)
     {
+        _decorations = decorations ?? new TextDecorationFactory();
         _contrast = contrast ?? throw new ArgumentNullException(nameof(contrast));
         Initialise();
         ActualThemeVariantChanged += (_, _) =>
@@ -361,10 +364,7 @@ public sealed class ChoiceSlot : RibbonSlot
 
         if (sample.FontFamily is { Length: > 0 } family) text.FontFamily = Context.FontFamily(family);
 
-        var decorations = new TextDecorationCollection();
-        if (sample.Underline) decorations.AddRange(TextDecorations.Underline);
-        if (sample.Strikethrough) decorations.AddRange(TextDecorations.Strikethrough);
-        if (decorations.Count > 0) text.TextDecorations = decorations;
+        if (_decorations.Create(sample.Underline, sample.Strikethrough) is { } decorations) text.TextDecorations = decorations;
 
         if (Brush(sample.TextHex) is { } ink) text.Foreground = ink;
 

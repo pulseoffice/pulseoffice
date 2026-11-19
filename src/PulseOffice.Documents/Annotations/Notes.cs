@@ -26,6 +26,7 @@ public enum NoteNumbering
     Document,
     Chapter,
     Page,
+    Section,
 }
 
 public enum NotePlacement
