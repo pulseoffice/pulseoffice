@@ -233,6 +233,8 @@ public sealed class PathlessCanvas(IPageCanvas inner) : IPageCanvas
 
     public IDisposable Clip(DocumentRect area) => inner.Clip(area);
 
+    public void Tag(PrintTag? tag) => inner.Tag(tag);
+
     public void MarkHeading(int level, string title, double topPoints) => inner.MarkHeading(level, title, topPoints);
 
     public void MarkTarget(string name, double topPoints) => inner.MarkTarget(name, topPoints);

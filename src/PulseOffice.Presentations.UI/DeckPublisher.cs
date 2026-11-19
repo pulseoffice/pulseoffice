@@ -84,6 +84,7 @@ public sealed class DeckPublisher(IDrawingObjectRenderer objectRenderer, ITextCa
         return new DeckPrintable(setup, images, notes, layout, deck.NotesMaster, deck.Handout)
         {
             Titles = [.. shown.Select(slide => fields.For(deck, slide).Title)],
+            Language = deck.TextLanguage,
         };
     }
 

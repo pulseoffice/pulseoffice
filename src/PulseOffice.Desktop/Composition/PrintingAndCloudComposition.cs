@@ -74,6 +74,10 @@ internal static class PrintingAndCloudComposition
         services.AddSingleton<IPdfImageWriter, PdfImageWriter>();
         services.AddSingleton<IPdfPasswordHash, Revision6PasswordHash>();
         services.AddSingleton<IPdfEncryptionFactory, Aes256EncryptionFactory>();
+        services.AddSingleton<IPdfBidiText, PdfBidiText>();
+        services.AddSingleton<IPdfPageLabels, PdfPageLabels>();
+        services.AddSingleton<IPdfStructureRoles, PdfStructureRoles>();
+        services.AddSingleton<IPdfStructureWriter, PdfStructureWriter>();
         services.AddSingleton<IPdfExporter, PdfExporter>();
         services.AddSingleton<PulseOffice.Platform.IVideoEncoderProvider, VideoEncoderProvider>();
         services.AddSingleton<PulseOffice.Platform.Media.IMediaPlaybackFactory, MediaPlaybackProvider>();

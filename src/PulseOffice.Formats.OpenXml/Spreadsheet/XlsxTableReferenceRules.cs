@@ -64,6 +64,7 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
                 new XAttribute("range", structured.RangeText),
                 new XAttribute("priority", structured.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 new XAttribute("ordinal", RuleOrdinal(sheet.ConditionalRules, index).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new XAttribute("sibling", FlatSibling(rules, index).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 Pair("flat", rules[index].Formula, "formula", structured.Formula),
                 structured.Thresholds.Select((threshold, position) => new XElement(_pulse + "threshold",
                     Pair("flat", rules[index].Thresholds[position].Formula, "formula", threshold.Formula)))));
@@ -112,13 +113,40 @@ internal sealed class XlsxTableReferenceRules(Book workbook, ITableReferenceFlat
         {
             var candidates = Candidates(sheet, entry, used);
             if (candidates.Count == 0) continue;
+            var all = AllCandidates(sheet, entry);
+            var bySibling = BySibling(sheet.ConditionalRules, all, entry);
             var byId = RuleById(sheet.ConditionalRules, entry);
-            Apply(sheet, candidates.Contains(byId) ? byId : candidates[0], entry, used);
+            var chosen = candidates.Contains(bySibling) ? bySibling : candidates.Contains(byId) ? byId : candidates[0];
+            Apply(sheet, chosen, entry, used);
         }
     }
 
     private List<int> Candidates(Sheet sheet, XElement entry, HashSet<int> used) =>
         [.. Enumerable.Range(0, sheet.ConditionalRules.Count).Where(index => !used.Contains(index) && RuleMatches(sheet.ConditionalRules[index], entry))];
+
+    private List<int> AllCandidates(Sheet sheet, XElement entry) =>
+        [.. Enumerable.Range(0, sheet.ConditionalRules.Count).Where(index => RuleMatches(sheet.ConditionalRules[index], entry))];
+
+    private int BySibling(IList<ConditionalRule> rules, List<int> candidates, XElement entry)
+    {
+        if (!int.TryParse((string?)entry.Attribute("sibling"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var sibling)) return -1;
+        var ordered = candidates.OrderBy(index => rules[index].Priority).ThenBy(index => index).ToList();
+        return sibling >= 0 && sibling < ordered.Count ? ordered[sibling] : -1;
+    }
+
+    private int FlatSibling(IReadOnlyList<ConditionalRule> flat, int position)
+    {
+        var rule = flat[position];
+        return Enumerable.Range(0, flat.Count)
+            .Where(index => flat[index].RangeText == rule.RangeText && SameFlat(flat[index], rule))
+            .OrderBy(index => flat[index].Priority).ThenBy(index => index)
+            .ToList().IndexOf(position);
+    }
+
+    private bool SameFlat(ConditionalRule left, ConditionalRule right) =>
+        string.Equals(Normal(left.Formula), Normal(right.Formula), StringComparison.OrdinalIgnoreCase)
+        && left.Thresholds.Count == right.Thresholds.Count
+        && left.Thresholds.Select((threshold, position) => string.Equals(Normal(threshold.Formula), Normal(right.Thresholds[position].Formula), StringComparison.OrdinalIgnoreCase)).All(same => same);
 
     private void Apply(Sheet sheet, int index, XElement entry, HashSet<int> used)
     {

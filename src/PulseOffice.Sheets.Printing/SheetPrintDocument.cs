@@ -206,6 +206,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
     private readonly ISheetObjectImages _images;
     private readonly IJobPageNumbering _numbering;
 
+    public string? Language => _sheet.Owner?.TextLanguage;
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);
@@ -215,11 +217,14 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
         if (index == 0 && !string.IsNullOrWhiteSpace(_sheet.Name)) canvas.MarkHeading(1, _sheet.Name, 0);
 
+        canvas.Tag(null);
+        var sheetTag = new PrintTag("sheet:" + _sheet.Name, PrintRole.Sheet) { Alternate = _sheet.Name };
         var numbered = _numbering.For(this, index);
         if (index >= _pages.Count)
         {
             PaintBand(canvas, Setup.HeaderArea, Setup.HeaderOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Top);
             PaintBand(canvas, Setup.FooterArea, Setup.FooterOn(numbered.StartsSection, numbered.Number), numbered, TextBaseline.Bottom);
+            canvas.Tag(new PrintTag($"sheet:{_sheet.Name}:notes:{index}", PrintRole.Note, sheetTag));
             _comments.PaintEndPage(canvas, _commentPages[index - _pages.Count], Setup.ContentArea);
             return;
         }
@@ -233,7 +238,11 @@ public sealed class SheetPrintDocument : IPrintableDocument
         canvas = new ScaledPageCanvas(canvas, _scale,
             new DocumentPoint(Setup.ContentArea.Left, Setup.ContentArea.Top), Centring(page));
 
+        canvas.Tag(null);
         if (Setup.PrintHeadings) PaintHeadings(canvas, page, origin);
+
+        var tableTag = new PrintTag($"sheet:{_sheet.Name}:table:{index}", PrintRole.Table, sheetTag);
+        var titleRows = Area is { } printed && RepeatedRows(printed) is { } repeated ? repeated : (BandSlice?)null;
 
         var y = origin.Top;
         var firstRow = true;
@@ -250,6 +259,8 @@ public sealed class SheetPrintDocument : IPrintableDocument
             var firstColumn = true;
 
             rowTops[row] = y;
+            var rowTag = new PrintTag($"{tableTag.Key}:r{row}", PrintRole.TableRow, tableTag);
+            var header = titleRows is { } titles && row >= titles.First && row <= titles.Last;
 
             for (var position = 0; position < columns.Count; position++)
             {
@@ -273,13 +284,13 @@ public sealed class SheetPrintDocument : IPrintableDocument
                             Visible(region.Start.Column, region.End.Column, _sheet.Layout.IsColumnHidden, ColumnWidthOf),
                             Visible(region.Start.Row, region.End.Row, _sheet.Layout.IsRowHidden, RowHeightOf));
 
-                        PaintCell(new ClippedPageCanvas(canvas, visible), region.Start, whole, firstRow, firstColumn, []);
+                        PaintCell(new ClippedPageCanvas(canvas, visible), region.Start, whole, firstRow, firstColumn, [], CellTag(rowTag, column, header));
                     }
                 }
                 else
                 {
                     PaintCell(canvas, address, new DocumentRect(x, y, width, height), firstRow, firstColumn,
-                        columns.Skip(position + 1));
+                        columns.Skip(position + 1), CellTag(rowTag, column, header));
                 }
 
                 firstColumn = false;
@@ -290,10 +301,15 @@ public sealed class SheetPrintDocument : IPrintableDocument
             y += height;
         }
 
-        PaintObjects(canvas, page, rows, columns, rowTops, columnLefts, origin);
+        PaintObjects(canvas, page, rows, columns, rowTops, columnLefts, origin, sheetTag);
 
+        canvas.Tag(new PrintTag($"sheet:{_sheet.Name}:notes:{index}", PrintRole.Note, sheetTag));
         if (Setup.PrintComments == CommentPrinting.AsDisplayed) _comments.PaintDisplayed(canvas, _sheet, rowTops, columnLefts);
+        canvas.Tag(null);
     }
+
+    private PrintTag CellTag(PrintTag row, int column, bool header) =>
+        new($"{row.Key}:c{column}", header ? PrintRole.TableHeader : PrintRole.TableCell, row);
 
     private DocumentPoint Centring(SheetPage page)
     {
@@ -351,7 +367,7 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     private void PaintObjects(
         IPageCanvas canvas, SheetPage page, IReadOnlyList<int> rows, IReadOnlyList<int> columns,
-        IReadOnlyDictionary<int, Twip> rowTops, IReadOnlyDictionary<int, Twip> columnLefts, DocumentRect origin)
+        IReadOnlyDictionary<int, Twip> rowTops, IReadOnlyDictionary<int, Twip> columnLefts, DocumentRect origin, PrintTag sheetTag)
     {
         if (_sheet.Objects.Count == 0) return;
 
@@ -378,9 +394,23 @@ public sealed class SheetPrintDocument : IPrintableDocument
             if (bounds.IsEmpty || !bounds.IntersectsWith(body)) continue;
 
             var target = Inside(bounds, body) ? canvas : new ClippedPageCanvas(canvas, body);
+            target.Tag(new PrintTag($"{sheetTag.Key}:object:{placed.Id}", PrintRole.Figure, sheetTag)
+            {
+                Alternate = new[] { placed.Content.Description, placed.Content.Title, placed.Content.Name }.FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)),
+            });
             if (_images.Image(placed.Content, bounds) is { } image) target.DrawImage(image.Image, image.Area);
             else _paths.Paint(target, placed.Content, bounds);
+            if (placed.Hyperlink is { Length: > 0 } link && !link.StartsWith('#')) canvas.MarkLink(Clipped(bounds, body), link);
         }
+    }
+
+    private static DocumentRect Clipped(DocumentRect shape, DocumentRect area)
+    {
+        var left = Math.Max(shape.Left.Value, area.Left.Value);
+        var top = Math.Max(shape.Top.Value, area.Top.Value);
+        var right = Math.Min(shape.Right.Value, area.Right.Value);
+        var bottom = Math.Min(shape.Bottom.Value, area.Bottom.Value);
+        return new DocumentRect(new Twip(left), new Twip(top), new Twip(Math.Max(0, right - left)), new Twip(Math.Max(0, bottom - top)));
     }
 
     private static bool Inside(DocumentRect shape, DocumentRect area) =>
@@ -460,8 +490,10 @@ public sealed class SheetPrintDocument : IPrintableDocument
 
     private void PaintCell(
         IPageCanvas canvas, CellAddress address, DocumentRect bounds, bool firstRow, bool firstColumn,
-        IEnumerable<int> followingColumns)
+        IEnumerable<int> followingColumns, PrintTag tag)
     {
+        canvas.Tag(tag);
+        canvas.Tag(null);
         var cell = _sheet[address] with { StyleId = _sheet.StyleIdAt(address) };
         var appearance = _conditional.At(_sheet, address);
         var style = appearance.Over(_styles.Get(cell.StyleId));
@@ -497,7 +529,9 @@ public sealed class SheetPrintDocument : IPrintableDocument
         var text = new DocumentRect(
             bounds.Left + padding, bounds.Top, available - padding * 2, bounds.Height);
 
+        canvas.Tag(tag);
         _cellText.Paint(canvas, new SheetCellText(formatted, style, bounds, text, color));
+        canvas.Tag(null);
     }
 
     private Twip SpilledWidth(CellAddress address, CellStyle style, Twip width, IEnumerable<int> followingColumns)

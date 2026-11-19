@@ -4233,6 +4233,7 @@
   "context.slide.order": "Ordine",
   "command.deck.section.add.title": "Aggiungi sezione",
   "command.deck.section.remove.title": "Rimuovi sezione",
+  "command.deck.section.removeEmpty.title": "Rimuovi sezioni vuote",
   "deck.action.addSection": "Aggiungi sezione",
   "deck.action.renameSection": "Rinomina sezione",
   "deck.action.removeSection": "Rimuovi sezione",
@@ -6468,6 +6469,7 @@
   "diagnostic.pdf012": "Nessun carattere installato con contorni copre {0} caratteri: {1}.",
   "diagnostic.pdf013": "Parte del testo usa caratteri non incorporati: il file non è conforme a PDF/A.",
   "diagnostic.pdf014": "PDF/A non ammette la cifratura: il file è PDF/A senza password.",
+  "diagnostic.pdf015": "Alcune immagini non hanno un testo alternativo, quindi le utilità di lettura dello schermo non possono descriverle.",
   "diagnostic.pdf020": "La compressione JPEG non è disponibile: le immagini sono state scritte senza perdita.",
   "command.shell.file.exportPdf.title": "Esporta come PDF…",
   "command.shell.file.exportPdf.description": "Esporta il documento in PDF con caratteri incorporati, segnalibri, collegamenti e commenti",
@@ -8775,5 +8777,12 @@
   "settingCategory.spreadsheets": "Fogli di calcolo",
   "setting.ledger.links.followOnClick.title": "Apri i collegamenti delle celle con un clic",
   "setting.ledger.links.followOnClick.description": "Un clic sul testo di una cella collegata segue il collegamento; un clic accanto al testo, o un clic tenuto premuto, seleziona la cella. Se disattivato, usa Ctrl+clic o il comando Apri collegamento.",
-  "history.comment.box": "Sposta o ridimensiona nota"
+  "history.comment.box": "Sposta o ridimensiona nota",
+  "print.paper": "Carta",
+  "print.paper.document": "Come nel documento",
+  "print.paper.size": "{0} ({1} × {2} mm)",
+  "print.orientation": "Orientamento",
+  "print.orientation.automatic": "Automatico",
+  "print.orientation.portrait": "Verticale",
+  "print.orientation.landscape": "Orizzontale"
 }

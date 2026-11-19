@@ -62,4 +62,28 @@ public sealed class Round237SheetBookmarkTests
 
         Assert.Equal(["https://example.org/"], recorder.Links);
     }
+
+    [Fact]
+    public void An_object_hyperlink_becomes_a_link_in_the_printed_page()
+    {
+        var sheet = new Worksheet("Objects");
+        sheet.SetValue(new CellAddress(0, 0), CellValue.Text("x"));
+        sheet.Objects.Add(new PlacedObject
+        {
+            Id = "s1",
+            Content = new PulseOffice.Drawing.Shapes.ShapeObject { Id = "s1", Shape = PulseOffice.Drawing.Shapes.ShapeKind.Rectangle },
+            Anchor = new CellAddress(1, 0),
+            Size = new DocumentSize(Twip.FromPoints(40), Twip.FromPoints(20)),
+            Hyperlink = "https://example.org/object",
+        });
+        var document = new SheetPrintDocument(sheet, new StyleCatalog(),
+            new CellPresenter(new NumberFormatter(CultureInfo.InvariantCulture, serial => DateTime.MinValue)),
+            new HeaderFooterFields(CultureInfo.InvariantCulture),
+            new SheetPrintOptions { Setup = new PageSetup { Paper = new PaperCatalog().Default } });
+
+        var recorder = new Recorder();
+        document.PaintPage(0, recorder);
+
+        Assert.Equal(["https://example.org/object"], recorder.Links);
+    }
 }

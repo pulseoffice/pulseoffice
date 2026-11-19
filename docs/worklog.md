@@ -13906,3 +13906,36 @@ thread-time trace.
 - `DialogRow` used `ColumnSpacing` together with a shared-size label column: the star editor column did not account for
   the spacing and editors overflowed the right edge by it. The gap is now a fixed column, so every form keeps a right
   inset equal to the left one.
+
+## Round 238: PDF export and printing (2026-11-19)
+
+- Imposition fits each page by its own size in N-up and brochure; brochures force short-edge duplex; the print dialog
+  gains Paper and Orientation overrides.
+- PDF: single-line text reordered with the bidirectional algorithm (`PdfBidiText`), page labels (`/PageLabels`, Folio
+  page style formats), link annotations for Deck shape and wholly linked text hyperlinks and Ledger object hyperlinks.
+- Deck notes pages shrink long notes and end them with an ellipsis instead of cutting them silently.
+- Log: docs/deep-audit/round-238-print-pdf.md.
+
+## Round 239: tagged PDF (2026-11-19)
+
+- PDF export now writes tagged PDF: marked content in the page streams, a structure tree with parent tree and role map,
+  `MarkInfo`, `/StructParents`, `/Tabs /S`; PDF/A export claims level A when a structure exists. Painting code tags
+  through `IPageCanvas.Tag(PrintTag?)`; Folio (headings, paragraphs, lists, tables, frames, figures, links, notes),
+  Ledger (sheet tables with title rows as headers, figures, notes) and Deck (slide sections, title first, figures,
+  notes) are wired. Agent and "send as PDF" exports now carry language, keywords and author, and the exporter falls back
+  to the document's own language. Log: [deep-audit/round-239-tagged-pdf.md](deep-audit/round-239-tagged-pdf.md).
+
+## Round 240: Deck sections, outline and shape text (2026-11-19)
+
+- Slides can be dropped onto an empty section header in the filmstrip and the sorter (`MoveSlideIntoSection`, one undo
+  step); a new `deck.section.removeEmpty` command removes all empty sections.
+- The outline pairs edited blocks with slides by title and body before title alone, so swapped blocks with the same
+  title keep their slides; literal pilcrows in titles are written doubled and survive.
+- Deck link tips cover links inside drawn shape text.
+- Long shape text column lines are probed per line instead of per character.
+- Log: docs/deep-audit/round-240-deck-sections-outline.md.
+
+### Round 241 (2026-11-19): Ledger annotated spans and table rule forms
+- Annotated spans map through the shown text by an end-aligned longest common subsequence, not greedily.
+- XLSX table-reference rule forms with equal flat formulas are matched by their priority rank. Log:
+  docs/deep-audit/round-241-notes-rules.md.

@@ -156,6 +156,19 @@ public sealed class DeckEditCommands(
                 return Task.CompletedTask;
             },
         },
+        Prototype("deck.section.removeEmpty") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            ContextPaths = ["slide/section"],
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.Target is { } t && t.Deck.EmptySections.Count > 0,
+            Execute = (_, _) =>
+            {
+                Context.Target?.Actions.RemoveEmptySections();
+                return Task.CompletedTask;
+            },
+        },
     ];
 
     private async Task RenameSectionAsync(CancellationToken ct)

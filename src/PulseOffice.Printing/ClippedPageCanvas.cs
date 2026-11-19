@@ -115,6 +115,8 @@ public sealed class ClippedPageCanvas(IPageCanvas inner, DocumentRect clip) : IP
         }
     }
 
+    public void Tag(PrintTag? tag) => _inner.Tag(tag);
+
     public void MarkHeading(int level, string title, double topPoints) => _inner.MarkHeading(level, title, topPoints);
 
     public void MarkTarget(string name, double topPoints) => _inner.MarkTarget(name, topPoints);

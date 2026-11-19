@@ -187,3 +187,40 @@ public sealed class PdfNavigationWriter : IPdfNavigationWriter
         public List<OutlineNode> Children { get; } = [];
     }
 }
+
+public interface IPdfPageLabels
+{
+    string? Write(IReadOnlyList<PrintPageLabel?> labels);
+}
+
+public sealed class PdfPageLabels : IPdfPageLabels
+{
+    public string? Write(IReadOnlyList<PrintPageLabel?> labels)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        if (labels.All(label => label is null)) return null;
+        var text = new StringBuilder("<< /Nums [");
+        PrintPageLabel? previous = null;
+        for (var index = 0; index < labels.Count; index++)
+        {
+            var label = labels[index] ?? new PrintPageLabel(PageLabelStyle.Decimal, index + 1);
+            var continues = previous is not null && previous.Style == label.Style && previous.Prefix == label.Prefix && previous.Number + 1 == label.Number;
+            previous = label;
+            if (continues) continue;
+            text.Append(CultureInfo.InvariantCulture, $" {index} << /S /{Style(label.Style)}");
+            if (label.Prefix.Length > 0) text.Append(" /P ").Append(PdfFile.TextString(label.Prefix));
+            if (label.Number != 1) text.Append(CultureInfo.InvariantCulture, $" /St {Math.Max(1, label.Number)}");
+            text.Append(" >>");
+        }
+        return text.Append(" ] >>").ToString();
+    }
+
+    private string Style(PageLabelStyle style) => style switch
+    {
+        PageLabelStyle.LowerRoman => "r",
+        PageLabelStyle.UpperRoman => "R",
+        PageLabelStyle.LowerLetter => "a",
+        PageLabelStyle.UpperLetter => "A",
+        _ => "D",
+    };
+}

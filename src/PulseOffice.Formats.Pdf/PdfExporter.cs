@@ -28,6 +28,8 @@ public sealed record PdfExportOptions(
 
     public bool Archive { get; init; }
 
+    public bool Tagged { get; init; } = true;
+
     public DateTimeOffset? Created { get; init; }
 
     public PdfImageOptions Images { get; init; } = new();
@@ -42,10 +44,17 @@ public interface IPdfExporter
 
 public sealed class PdfExporter(
     IPdfFontSetFactory fonts, IPdfArchiveParts archive, IPdfNavigationWriter navigation,
-    IPdfImageWriter images, IPdfEncryptionFactory encryption) : IPdfExporter
+    IPdfImageWriter images, IPdfEncryptionFactory encryption, IPdfBidiText bidi, IPdfPageLabels labels, IPdfStructureWriter structure) : IPdfExporter
 {
     public PdfExporter(IPdfFontSetFactory fonts)
-        : this(fonts, new PdfArchiveParts(new SrgbProfile()), new PdfNavigationWriter(), new PdfImageWriter(), new Aes256EncryptionFactory())
+        : this(fonts, new PdfArchiveParts(new SrgbProfile()), new PdfNavigationWriter(), new PdfImageWriter(), new Aes256EncryptionFactory(), new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter())
+    {
+    }
+
+    public PdfExporter(
+        IPdfFontSetFactory fonts, IPdfArchiveParts archive, IPdfNavigationWriter navigation,
+        IPdfImageWriter images, IPdfEncryptionFactory encryption)
+        : this(fonts, archive, navigation, images, encryption, new PdfBidiText(), new PdfPageLabels(), new PdfStructureWriter())
     {
     }
 
@@ -55,6 +64,8 @@ public sealed class PdfExporter(
         ArgumentNullException.ThrowIfNull(stream);
 
         options ??= new PdfExportOptions();
+        if (string.IsNullOrWhiteSpace(options.Language) && document.Language is { Length: > 0 } language)
+            options = options with { Language = language };
 
         var selected = (options.Pages ?? Enumerable.Range(0, Math.Max(0, document.PageCount)).ToList())
             .Where(index => index >= 0 && index < document.PageCount).ToList();
@@ -74,14 +85,17 @@ public sealed class PdfExporter(
             var written = new Dictionary<(string Fingerprint, int Width, int Height), int>();
             var marks = new PdfDocumentMarks();
             var pagesId = file.Reserve();
+            var tree = new PdfStructureTree();
 
             foreach (var index in selected)
             {
                 var pageId = file.Reserve();
                 var pageSize = document.PageSize(index);
                 var height = pageSize.Height.ToPoints();
-                var canvas = new PdfContentCanvas(pageSize, set);
+                var slot = tree.AddPage();
+                var canvas = new PdfContentCanvas(pageSize, set, bidi: bidi, marked: options.Tagged ? structure.Marker(tree, slot) : null);
                 document.PaintPage(index, canvas);
+                canvas.EndMarkedContent();
 
                 var contentId = file.WriteStream(PdfEncoding.ToBytes(canvas.Content), options.Compress);
 
@@ -148,7 +162,7 @@ public sealed class PdfExporter(
                 file.WriteObject(pageId,
                     $"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 " +
                     $"{Points(pageSize.Width)} {Points(pageSize.Height)}] " +
-                    $"/Resources {resources} /Contents {contentId} 0 R{annots} >>");
+                    $"/Resources {resources} /Contents {contentId} 0 R{annots}{structure.PageEntries(options.Tagged && tree.Pages[slot].Count > 0, slot)} >>");
                 pageObjects.Add(pageId);
             }
 
@@ -157,6 +171,11 @@ public sealed class PdfExporter(
             file.WriteObject(pagesId,
                 $"<< /Type /Pages /Count {pageObjects.Count} /Kids [" +
                 string.Join(' ', pageObjects.Select(id => $"{id} 0 R")) + "] >>");
+
+            var structureRoot = options.Tagged ? structure.Write(file, tree, pageObjects) : null;
+            if (structureRoot is null) options = options with { Tagged = false };
+            else if (tree.Elements.Any(element => element.Tag.Role == PrintRole.Figure && string.IsNullOrWhiteSpace(element.Tag.Alternate)))
+                diagnostics.Add(Diagnostic.Warning("PDF015", "Some pictures have no alternative text, so screen readers cannot describe them."));
 
             var created = options.Created ?? DateTimeOffset.Now;
             var infoId = file.WriteObject(
@@ -174,8 +193,12 @@ public sealed class PdfExporter(
                 catalog.Append(CultureInfo.InvariantCulture, $" /Outlines {outline} 0 R /PageMode /UseOutlines");
             if (navigation.Destinations(file, marks.Destinations) is { } names)
                 catalog.Append(CultureInfo.InvariantCulture, $" /Names << /Dests {names} 0 R >>");
+            if (labels.Write([.. selected.Select(document.PageLabel)]) is { } pageLabels)
+                catalog.Append(" /PageLabels ").Append(pageLabels);
             if (!string.IsNullOrWhiteSpace(options.Language)) catalog.Append(" /Lang ").Append(PdfFile.TextString(options.Language));
             catalog.Append(" /ViewerPreferences << /DisplayDocTitle true >>");
+            if (structureRoot is { } root)
+                catalog.Append(CultureInfo.InvariantCulture, $" /MarkInfo << /Marked true >> /StructTreeRoot {root} 0 R");
             catalog.Append(CultureInfo.InvariantCulture, $" /Metadata {archive.Metadata(file, options, created)} 0 R");
 
             diagnostics.InsertRange(0, set.Diagnostics);

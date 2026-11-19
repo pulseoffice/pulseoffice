@@ -4233,6 +4233,7 @@
   "context.slide.order": "Order",
   "command.deck.section.add.title": "Add section",
   "command.deck.section.remove.title": "Remove section",
+  "command.deck.section.removeEmpty.title": "Remove empty sections",
   "deck.action.addSection": "Add section",
   "deck.action.renameSection": "Rename section",
   "deck.action.removeSection": "Remove section",
@@ -6468,6 +6469,7 @@
   "diagnostic.pdf012": "No installed font with outlines covers {0} character(s): {1}.",
   "diagnostic.pdf013": "Some text uses fonts that are not embedded, so the file is not PDF/A conformant.",
   "diagnostic.pdf014": "PDF/A does not allow encryption: the file is PDF/A without passwords.",
+  "diagnostic.pdf015": "Some pictures have no alternative text, so screen readers cannot describe them.",
   "diagnostic.pdf020": "JPEG compression is not available: images were written without loss.",
   "command.shell.file.exportPdf.title": "Export as PDF…",
   "command.shell.file.exportPdf.description": "Export the document to PDF with embedded fonts, bookmarks, links and comments",
@@ -8775,5 +8777,12 @@
   "settingCategory.spreadsheets": "Spreadsheets",
   "setting.ledger.links.followOnClick.title": "Open cell hyperlinks with a click",
   "setting.ledger.links.followOnClick.description": "A click on the text of a linked cell follows the link; a click beside the text, or a click held down, selects the cell. When off, use Ctrl+click or the Open Hyperlink command.",
-  "history.comment.box": "Move or resize note"
+  "history.comment.box": "Move or resize note",
+  "print.paper": "Paper",
+  "print.paper.document": "As in the document",
+  "print.paper.size": "{0} ({1} × {2} mm)",
+  "print.orientation": "Orientation",
+  "print.orientation.automatic": "Automatic",
+  "print.orientation.portrait": "Portrait",
+  "print.orientation.landscape": "Landscape"
 }

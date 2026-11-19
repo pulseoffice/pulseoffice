@@ -32,11 +32,20 @@ public sealed class CompositePrintDocument : IPrintableDocument
 
     public int PageCount { get; }
 
+    public string? Language => _parts[0].Language;
+
     public DocumentSize PageSize(int index)
     {
         for (var part = _parts.Count - 1; part >= 0; part--)
             if (index >= _offsets[part]) return _parts[part].PageSize(index - _offsets[part]);
         return _parts[0].PageSize(0);
+    }
+
+    public PrintPageLabel? PageLabel(int index)
+    {
+        for (var part = _parts.Count - 1; part >= 0; part--)
+            if (index >= _offsets[part]) return _parts[part].PageLabel(index - _offsets[part]);
+        return null;
     }
 
     public void PaintPage(int index, IPageCanvas canvas)

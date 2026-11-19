@@ -68,6 +68,8 @@ public sealed class DeckPrintable : IPrintableDocument
 
     public IReadOnlyList<string> Titles { get; init; } = [];
 
+    public string? Language { get; init; }
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);
@@ -111,18 +113,33 @@ public sealed class DeckPrintable : IPrintableDocument
         Outline(canvas, fitted);
 
         var area = Place(_notesMaster.NotesBox);
-        var lineHeight = Twip.FromPoints(_notesMaster.FontSize * 1.25).Value;
-        var font = new PrintFont("Helvetica", _notesMaster.FontSize);
         var text = slideIndex < _notes.Count ? _notes[slideIndex] : string.Empty;
-
-        var y = area.Top.Value;
-        foreach (var line in _wrapper.Wrap(text, area.Width, part => canvas.MeasureText(part, font)))
+        canvas.Tag(_slides[slideIndex].Structure is { } slideTag && text.Trim().Length > 0 ? new PrintTag(slideTag.Key + ":notes", PrintRole.Note, slideTag) : null);
+        var size = _notesMaster.FontSize;
+        var minimum = _notesMaster.FontSize * MinimumNotesScale;
+        var (font, lines, lineHeight) = NotesLines(canvas, text, area, size);
+        while (lines.Count * lineHeight > area.Height.Value && size > minimum)
         {
-            if (y > area.Bottom.Value - lineHeight) break;
-            canvas.DrawText(line, new DocumentRect(area.Left, new Twip(y), area.Width, new Twip(lineHeight)),
-                font, PrintColor.Black, PulseOffice.Printing.TextAlignment.Left, PulseOffice.Printing.TextBaseline.Top);
-            y += lineHeight;
+            size = Math.Max(minimum, size - 0.5);
+            (font, lines, lineHeight) = NotesLines(canvas, text, area, size);
         }
+        var fitting = Math.Max(0, Math.Min(lines.Count, area.Height.Value / Math.Max(1, lineHeight)));
+        for (var index = 0; index < fitting; index++)
+        {
+            var line = index == fitting - 1 && fitting < lines.Count ? lines[index].TrimEnd() + " …" : lines[index];
+            canvas.DrawText(line, new DocumentRect(area.Left, new Twip(area.Top.Value + index * lineHeight), area.Width, new Twip(lineHeight)),
+                font, PrintColor.Black, PulseOffice.Printing.TextAlignment.Left, PulseOffice.Printing.TextBaseline.Top);
+        }
+        canvas.Tag(null);
+    }
+
+    private const double MinimumNotesScale = 0.6;
+
+    private (PrintFont Font, IReadOnlyList<string> Lines, int LineHeight) NotesLines(IPageCanvas canvas, string text, DocumentRect area, double size)
+    {
+        var font = new PrintFont("Helvetica", size);
+        var lines = _wrapper.Wrap(text, area.Width, part => canvas.MeasureText(part, font)).ToList();
+        return (font, lines, Math.Max(1, Twip.FromPoints(size * 1.25).Value));
     }
 
     private void PaintHandout(IPageCanvas canvas, int pageIndex)

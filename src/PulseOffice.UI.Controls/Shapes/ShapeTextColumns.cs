@@ -21,26 +21,67 @@ public interface IShapeTextLines
 
 public sealed class FormattedShapeTextLines : IShapeTextLines
 {
-    private const int ProbeEveryCharacterUpTo = 4000;
+    private const int ProbeEveryCharacterUpTo = 256;
 
     public IReadOnlyList<ShapeTextLine> Measure(FormattedText text, string content)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(content);
-        var length = content.Length;
         var lines = new SortedDictionary<double, double>();
-        for (var index = 0; index < length; index++)
-        {
-            if (length > ProbeEveryCharacterUpTo && index > 0 && !char.IsWhiteSpace(content[index - 1])) continue;
-            if (text.BuildHighlightGeometry(default, index, 1) is not { } geometry) continue;
-            var bounds = geometry.Bounds;
-            if (bounds.Height <= 0) continue;
-            var top = Math.Round(bounds.Top, 3);
-            lines[top] = Math.Max(lines.GetValueOrDefault(top), bounds.Bottom);
-        }
+        if (content.Length > ProbeEveryCharacterUpTo) ProbeLines(text, content.Length, lines);
+        else
+            for (var index = 0; index < content.Length; index++)
+                if (Probe(text, index) is { } bounds) Add(lines, bounds);
 
         if (lines.Count == 0) return [new ShapeTextLine(0, Math.Max(1, text.Height))];
         return Merged(lines);
+    }
+
+    private void ProbeLines(FormattedText text, int length, SortedDictionary<double, double> lines)
+    {
+        var index = 0;
+        while (index < length)
+        {
+            if (Probe(text, index) is not { } first)
+            {
+                index++;
+                continue;
+            }
+            Add(lines, first);
+            var top = Math.Round(first.Top, 3);
+            var low = index;
+            var high = length - 1;
+            var step = 1;
+            while (low + step <= high)
+            {
+                if (SameLine(text, low + step, top, lines)) { low += step; step *= 2; }
+                else { high = low + step - 1; break; }
+            }
+            while (low < high)
+            {
+                var middle = (low + high + 1) / 2;
+                if (SameLine(text, middle, top, lines)) low = middle;
+                else high = middle - 1;
+            }
+            index = low + 1;
+        }
+    }
+
+    private bool SameLine(FormattedText text, int index, double top, SortedDictionary<double, double> lines)
+    {
+        if (Probe(text, index) is not { } bounds) return true;
+        if (Math.Round(bounds.Top, 3) != top) return false;
+        Add(lines, bounds);
+        return true;
+    }
+
+    private Rect? Probe(FormattedText text, int index) =>
+        text.BuildHighlightGeometry(default, index, 1) is { Bounds: { Height: > 0 } bounds } ? bounds : null;
+
+    private void Add(SortedDictionary<double, double> lines, Rect bounds)
+    {
+        var top = Math.Round(bounds.Top, 3);
+        lines[top] = Math.Max(lines.GetValueOrDefault(top), bounds.Bottom);
     }
 
     private IReadOnlyList<ShapeTextLine> Merged(SortedDictionary<double, double> lines)

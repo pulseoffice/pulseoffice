@@ -106,6 +106,10 @@ public interface IPageCanvas
     {
     }
 
+    void Tag(PrintTag? tag)
+    {
+    }
+
     void DrawGlyphs(PrintGlyphRun run)
     {
         ArgumentNullException.ThrowIfNull(run);
@@ -204,8 +208,21 @@ public sealed record PrintPath(ShapeOutline Outline, DocumentRect Bounds)
     public bool FlipVertical { get; init; }
 }
 
+public enum PageLabelStyle
+{
+    Decimal,
+    LowerRoman,
+    UpperRoman,
+    LowerLetter,
+    UpperLetter,
+}
+
+public sealed record PrintPageLabel(PageLabelStyle Style, int Number, string Prefix = "");
+
 public interface IPrintableDocument
 {
+    PrintPageLabel? PageLabel(int index) => null;
+
     PageSetup Setup { get; }
 
     int PageCount { get; }
@@ -213,4 +230,6 @@ public interface IPrintableDocument
     DocumentSize PageSize(int index) => new(Setup.PageWidth, Setup.PageHeight);
 
     void PaintPage(int index, IPageCanvas canvas);
+
+    string? Language => null;
 }

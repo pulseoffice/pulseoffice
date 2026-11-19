@@ -22,3 +22,16 @@ public sealed class Round236AnnotatedSpanMappingTests
     public void A_span_whose_characters_are_not_shown_has_no_highlight() =>
         Assert.Null(_mapping.Shown("0.25", "25%", new CommentTextSpan(0, 1)));
 }
+
+public sealed class Round241AnnotatedSpanMappingTests
+{
+    private readonly IAnnotatedSpanMapping _mapping = new AnnotatedSpanMapping();
+
+    [Fact]
+    public void A_repeated_digit_in_a_literal_prefix_does_not_shift_the_span() =>
+        Assert.Equal(new CommentTextSpan(7, 1), _mapping.Shown("1234.5", "Lot 1: 1,234.50", new CommentTextSpan(0, 1)));
+
+    [Fact]
+    public void The_whole_number_maps_after_the_prefix() =>
+        Assert.Equal(new CommentTextSpan(7, 7), _mapping.Shown("1234.5", "Lot 1: 1,234.50", new CommentTextSpan(0, 6)));
+}

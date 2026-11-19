@@ -28,6 +28,19 @@ public sealed class DeckSectionHeaders(DeckActions actions, ITextCatalog texts, 
 
     public void End() => _entries = _next;
 
+    public EmptySection? EmptyAt(Visual root, Point position) =>
+        _entries.Values
+            .Where(entry => entry.Header.Empty is not null && entry.Control.IsVisible)
+            .FirstOrDefault(entry => entry.Control.TranslatePoint(default, root) is { } origin
+                && new Rect(origin, entry.Control.Bounds.Size).Contains(position))?.Header.Empty;
+
+    public bool DropInto(Slide slide, Visual root, Point position)
+    {
+        if (EmptyAt(root, position) is not { } section) return false;
+        actions.MoveSlideIntoSection(slide, section);
+        return true;
+    }
+
     private Control Build(SlideSectionHeader section)
     {
         var label = new TextBlock

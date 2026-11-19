@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using PulseOffice.UI.Controls.Notifications;
 using System.Globalization;
 using PulseOffice.Formats.Pdf;
+using PulseOffice.Foundation.Pages;
 using PulseOffice.Localization;
 using PulseOffice.Platform;
 using PulseOffice.Printing;
@@ -29,6 +30,7 @@ public sealed class ShellPrintCommands(
     IFileDialogService files,
     IAtomicFileWriter atomic,
     IDiagnosticTexts diagnostics,
+    IPaperCatalog papers,
     ILogger<ShellPrintCommands> logger)
 {
 
@@ -208,6 +210,7 @@ public sealed class ShellPrintCommands(
             {
                 InitialCopies = preferences.Copies,
                 InitialDuplex = preferences.Duplex,
+                Papers = papers.All,
                 SupportsComments = active.Operations.SupportsPrintComments(active.Document),
                 InitialComments = active.Operations.PrintCommentsByDefault,
             }, texts, canvases),
@@ -244,7 +247,7 @@ public sealed class ShellPrintCommands(
             PrinterId = choice.PrinterId,
             Copies = capabilities.NativeCopies ? choice.Options.Copies : 1,
             Collate = choice.Options.Collate,
-            Sides = choice.Options.Duplex switch
+            Sides = choice.Options.EffectiveDuplex switch
             {
                 DuplexMode.LongEdge => PrintSides.LongEdge,
                 DuplexMode.ShortEdge => PrintSides.ShortEdge,

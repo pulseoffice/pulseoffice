@@ -4233,6 +4233,7 @@
   "context.slide.order": "Reihenfolge",
   "command.deck.section.add.title": "Abschnitt hinzufügen",
   "command.deck.section.remove.title": "Abschnitt entfernen",
+  "command.deck.section.removeEmpty.title": "Leere Abschnitte entfernen",
   "deck.action.addSection": "Abschnitt hinzufügen",
   "deck.action.renameSection": "Abschnitt umbenennen",
   "deck.action.removeSection": "Abschnitt entfernen",
@@ -6468,6 +6469,7 @@
   "diagnostic.pdf012": "Keine installierte Schrift mit Konturen deckt {0} Zeichen ab: {1}.",
   "diagnostic.pdf013": "Ein Teil des Textes verwendet nicht eingebettete Schriften, daher ist die Datei nicht PDF/A-konform.",
   "diagnostic.pdf014": "PDF/A erlaubt keine Verschlüsselung: Die Datei ist PDF/A ohne Kennwörter.",
+  "diagnostic.pdf015": "Einige Bilder haben keinen Alternativtext, daher können Bildschirmleser sie nicht beschreiben.",
   "diagnostic.pdf020": "JPEG-Komprimierung ist nicht verfügbar: Die Bilder wurden verlustfrei geschrieben.",
   "command.shell.file.exportPdf.title": "Als PDF exportieren…",
   "command.shell.file.exportPdf.description": "Dokument als PDF mit eingebetteten Schriften, Lesezeichen, Links und Kommentaren exportieren",
@@ -8775,5 +8777,12 @@
   "settingCategory.spreadsheets": "Tabellen",
   "setting.ledger.links.followOnClick.title": "Zellhyperlinks mit einem Klick öffnen",
   "setting.ledger.links.followOnClick.description": "Ein Klick auf den Text einer verknüpften Zelle folgt dem Link; ein Klick neben den Text oder ein gedrückt gehaltener Klick markiert die Zelle. Wenn deaktiviert, Strg+Klick oder den Befehl „Hyperlink öffnen“ verwenden.",
-  "history.comment.box": "Notiz verschieben oder Größe ändern"
+  "history.comment.box": "Notiz verschieben oder Größe ändern",
+  "print.paper": "Papier",
+  "print.paper.document": "Wie im Dokument",
+  "print.paper.size": "{0} ({1} × {2} mm)",
+  "print.orientation": "Ausrichtung",
+  "print.orientation.automatic": "Automatisch",
+  "print.orientation.portrait": "Hochformat",
+  "print.orientation.landscape": "Querformat"
 }

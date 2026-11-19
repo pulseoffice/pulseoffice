@@ -102,6 +102,12 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
         return composer.Compose(element.Text, BoundsOf(element), EffectiveTheme, Fields, _scale);
     }
 
+    public PulseOffice.UI.Controls.Text.Rich.ComposedTextFrame Compose(PulseOffice.UI.Controls.Text.Rich.ITextFrameComposer composer, PulseOffice.Text.Rich.RichText text, Rect bounds, PulseOffice.Text.Rich.ITextTheme theme)
+    {
+        ArgumentNullException.ThrowIfNull(composer);
+        return composer.Compose(text, bounds, theme, Fields, _scale);
+    }
+
     public Slide? Slide { get; private set; }
 
     private SlideSize _size = SlideSize.Widescreen;

@@ -105,6 +105,12 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         frame.PointerReleased += (_, e) =>
         {
             if (_sorterStrip is null) return;
+            if (_dragFrom >= 0 && _dragFrom < _deck.Slides.Count
+                && _sorterStrip.DropIntoSection(_deck.Slides[_dragFrom], e.GetPosition(_sorterStrip.Panel)))
+            {
+                _dragFrom = -1;
+                return;
+            }
             var dropIndex = _sorterStrip.DropTarget(e.GetPosition(_sorterStrip.Panel));
             if (dropIndex < 0 || dropIndex == _dragFrom) _host.Select(slide);
             else if (_dragFrom >= 0 && _dragFrom < _deck.Slides.Count) _actions.MoveSlide(_deck.Slides[_dragFrom], dropIndex);

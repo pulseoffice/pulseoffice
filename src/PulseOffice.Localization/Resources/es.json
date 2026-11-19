@@ -4233,6 +4233,7 @@
   "context.slide.order": "Orden",
   "command.deck.section.add.title": "Añadir sección",
   "command.deck.section.remove.title": "Quitar sección",
+  "command.deck.section.removeEmpty.title": "Quitar secciones vacías",
   "deck.action.addSection": "Añadir sección",
   "deck.action.renameSection": "Renombrar sección",
   "deck.action.removeSection": "Quitar sección",
@@ -6468,6 +6469,7 @@
   "diagnostic.pdf012": "Ninguna fuente instalada con contornos cubre {0} carácter(es): {1}.",
   "diagnostic.pdf013": "Parte del texto usa fuentes no incrustadas, así que el archivo no es conforme a PDF/A.",
   "diagnostic.pdf014": "PDF/A no admite cifrado: el archivo es PDF/A sin contraseñas.",
+  "diagnostic.pdf015": "Algunas imágenes no tienen texto alternativo, por lo que los lectores de pantalla no pueden describirlas.",
   "diagnostic.pdf020": "La compresión JPEG no está disponible: las imágenes se han escrito sin pérdida.",
   "command.shell.file.exportPdf.title": "Exportar como PDF…",
   "command.shell.file.exportPdf.description": "Exporta el documento a PDF con fuentes incrustadas, marcadores, vínculos y comentarios",
@@ -8775,5 +8777,12 @@
   "settingCategory.spreadsheets": "Hojas de cálculo",
   "setting.ledger.links.followOnClick.title": "Abrir los hipervínculos de celda con un clic",
   "setting.ledger.links.followOnClick.description": "Un clic en el texto de una celda vinculada sigue el vínculo; un clic junto al texto, o un clic mantenido, selecciona la celda. Si está desactivado, usa Ctrl+clic o el comando Abrir hipervínculo.",
-  "history.comment.box": "Mover o cambiar el tamaño de la nota"
+  "history.comment.box": "Mover o cambiar el tamaño de la nota",
+  "print.paper": "Papel",
+  "print.paper.document": "Como en el documento",
+  "print.paper.size": "{0} ({1} × {2} mm)",
+  "print.orientation": "Orientación",
+  "print.orientation.automatic": "Automática",
+  "print.orientation.portrait": "Vertical",
+  "print.orientation.landscape": "Horizontal"
 }

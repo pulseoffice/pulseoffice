@@ -69,6 +69,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<FolioRulerServices>();
         services.AddSingleton<IPageSurfaceFactory, PageSurfaceFactory>();
         services.AddSingleton<IFolioPrintMarks, FolioPrintMarks>();
+        services.AddSingleton<IFolioStructureIndex, FolioStructureIndex>();
         services.AddSingleton<IFolioPrintables, FolioPrintables>();
         services.AddSingleton<IPageDesk, PageDesk>();
         services.AddSingleton<ILineCells, LineCells>();

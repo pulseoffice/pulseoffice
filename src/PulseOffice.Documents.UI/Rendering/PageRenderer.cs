@@ -24,6 +24,8 @@ public sealed record PageMarks(bool FieldShadings)
 
     public Func<string, int, uint?>? RunSpotlight { get; init; }
 
+    public ILayoutVisitor? Structure { get; init; }
+
     public static readonly PageMarks None = new(false);
 }
 
@@ -162,7 +164,10 @@ public interface IPageRenderer
 public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRenderer
 {
     public void Paint(IPageSurface surface, PageBox page, Func<string, PulseOffice.Document.Embedding.EmbeddedObject?>? contents = null, PageMarks? marks = null) =>
-        page.Accept(new PagePaint(surface, contents, marks ?? PageMarks.None, bulletPictures));
+        page.Accept(Visitor(new PagePaint(surface, contents, marks ?? PageMarks.None, bulletPictures), marks?.Structure));
+
+    private ILayoutVisitor Visitor(ILayoutVisitor paint, ILayoutVisitor? structure) =>
+        structure is null ? paint : new LayoutVisitorPair(structure, paint);
 
     private sealed class PagePaint(IPageSurface surface, Func<string, PulseOffice.Document.Embedding.EmbeddedObject?>? contents, PageMarks marks, IBulletPictureObjects bulletPictures) : ILayoutVisitor
     {

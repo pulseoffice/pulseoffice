@@ -230,6 +230,45 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
             });
     }
 
+    public void MoveSlideIntoSection(Slide slide, EmptySection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        var from = deck.IndexOf(slide);
+        if (from < 0 || !deck.EmptySections.Contains(section) || IsReadOnly) return;
+        var before = section.BeforeSlideId is { } id ? deck.Slides.ToList().FindIndex(other => other.Id == id) : -1;
+        var to = before < 0 ? deck.Slides.Count - 1 : before > from ? before - 1 : before;
+
+        var markersBefore = deck.Slides.Select(s => (s, s.SectionName, s.SectionId)).ToList();
+        var markersAfter = new SlideSections().SectionsAfterMove(deck.Slides, from, to).ToList();
+        if (to == 0 && from != 0 && markersAfter.Count > 1)
+            markersAfter[1] = deck.Slides[0].SectionName is { } firstName ? new SectionMarker(firstName, deck.Slides[0].SectionId) : null;
+        markersAfter[to] = new SectionMarker(section.Name, section.Id);
+        var emptiesBefore = deck.EmptySections.ToList();
+        var following = from + 1 < deck.Slides.Count ? deck.Slides[from + 1].Id : null;
+        var emptiesAfter = emptiesBefore
+            .Where(empty => !ReferenceEquals(empty, section))
+            .Select(empty => empty.BeforeSlideId == slide.Id ? empty with { BeforeSlideId = following } : empty)
+            .ToList();
+
+        Do(texts["deck.action.moveSlide"],
+            () =>
+            {
+                deck.Move(deck.IndexOf(slide), to);
+                for (var i = 0; i < deck.Slides.Count && i < markersAfter.Count; i++) (deck.Slides[i].SectionName, deck.Slides[i].SectionId) = (markersAfter[i]?.Name, markersAfter[i]?.Id);
+                ReplaceEmptySections(emptiesAfter);
+                deck.Raise();
+                Focus(slide);
+            },
+            () =>
+            {
+                deck.Move(deck.IndexOf(slide), from);
+                foreach (var (s, name, id) in markersBefore) (s.SectionName, s.SectionId) = (name, id);
+                ReplaceEmptySections(emptiesBefore);
+                deck.Raise();
+                Focus(slide);
+            });
+    }
+
     public void SetLayout(Slide slide, SlideLayout layout)
     {
         if (slide.Layout == layout) return;
@@ -315,6 +354,15 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
     {
         ArgumentNullException.ThrowIfNull(section);
         ChangeEmptySection(section, null, "deck.action.removeSection");
+    }
+
+    public void RemoveEmptySections()
+    {
+        var before = deck.EmptySections.ToList();
+        if (before.Count == 0 || IsReadOnly) return;
+        Do(texts["deck.action.removeSection"],
+            () => { ReplaceEmptySections([]); deck.Raise(); },
+            () => { ReplaceEmptySections(before); deck.Raise(); });
     }
 
     private void ChangeEmptySection(EmptySection section, EmptySection? replacement, string labelKey)

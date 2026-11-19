@@ -16,8 +16,8 @@ the round that fixes it is joined and the join run is green.
   form (the dash and ellipsis turn with the line). (225, 230, 234)
 - Vertical, 270-degree and upright shape text is now drawn and edited on the composed frame; this has not been seen
   live, and the drawing of these flows changed from the renderer's own formatted text to the composed frame, so
-  spacing may differ slightly from earlier versions. Folio has no shape text flows. Shape text column breaks are probed
-  per character on the composed text, which costs a geometry per character for long texts. (218, 230, 234)
+  spacing may differ slightly from earlier versions. Folio has no shape text flows. Long shape text column lines are
+  probed per line assuming constant highlight tops along a horizontal line. (218, 230, 234, 240)
 - ODF has no form for upright text or text box rotation: they keep our `urn:pulseoffice:shape-text` extension; the
   270-degree flow is now written as the extension writing mode `bt-lr` beside `tb-rl`, not yet opened in another
   application. Shapes still also write `style:text-rotation-angle`, which ODF defines only for cells, beside the
@@ -26,11 +26,11 @@ the round that fixes it is joined and the join run is green.
   Excel or the reference suite here. (213, 214)
 - Deck's Connector Ends dialog (shared `ConnectorSitesDialog`) has not been seen live; it is now also in the slide
   object context menu. (225, 227, 231)
-- Slides are matched to outline lines by title, so two slides with the same title whose blocks are swapped by hand
-  may keep their old order. A title that itself contains a pilcrow is split into paragraphs at it when the outline is
-  applied. (229, 231, 234)
-- Empty sections are shown and can be renamed and removed in the filmstrip and sorter (double click, or the header's
-  own context menu, not the command registry); a slide cannot be dropped into an empty section. The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
+- Outline blocks identical in title and body cannot be told apart when swapped by hand. (240)
+- A single empty section is renamed or removed only through its header (double click or context menu); the registry
+  has Remove Empty Sections for all of them. Dropping a slide on an empty section has no drop indicator, and the
+  filmstrip has no other slide drag. (240)
+- The leading unsectioned slides are written to PPTX in a "Default Section" with a fixed identifier that reads back
   as no section. ODP empty sections are `urn:pulseoffice:presentation-section` elements inside `draw:page`. None of
   this has been opened in PowerPoint or the reference suite here. (229, 231)
 - "Number slides from" 0 is written to ODP as our extension attribute and as `text:page-adjust="-1"` on every slide
@@ -51,7 +51,7 @@ the round that fixes it is joined and the join run is green.
   paragraph that defers a page style change, and any restart when numbering restarts on every page (DOCX248). A restart
   on the first paragraph is now the first section's starting number (235). Not yet opened in Word. (204, 209, 212)
 - Folio notes: continuation notices have their own "Footnote Continuation" style and texts set in the note settings,
-  but they are still layout-only text: no caret, no selection, no copy (235). A page style run starts only at a
+  but they are still layout-only text: no caret, no selection, no copy (235; 241: still open). A page style run starts only at a
   top-level paragraph with a page style (not at a table); Word has one footnote separator per document, so a page
   style's own line is declared (DOCX273); none of this has been opened in Word or the reference suite. (232)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
@@ -60,21 +60,23 @@ the round that fixes it is joined and the join run is green.
   ODT as top/bottom; the vertical top-margin relation is written to ODT as `page` plus our own `pt:vertical-rel`, so
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
   incremental layout's page-parity stability check does not consider inside/outside objects; alignment relative to a
-  paragraph uses its unwrapped height. Not opened in Word.
+  paragraph uses its unwrapped height (241: still open). Not opened in Word.
 
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- PDF export writes no tagged structure (no `StructTreeRoot`, `MarkInfo` or role map), so exported PDFs are not
-  accessible to screen readers and cannot claim PDF/A level A or PDF/UA. (237)
-- PDF export writes no page labels, no form fields for Folio content controls and form controls, and no hyperlinks
-  for Deck text runs and shape links or Ledger object links. (237)
-- Single-line PDF text (`DrawText`: Ledger cells, Deck notes, headers and footers) is not reordered by the
-  bidirectional algorithm: right-to-left words are shaped, but digits and Latin words in a right-to-left string keep
-  logical order. (237)
-- The print dialog has no paper size or orientation override; N-up and brochure imposition scale every page by the
-  first page's size, and brochure printing does not force short-edge duplex. (237)
-- Deck notes pages cut long notes at the bottom of the notes box without saying so. (237)
+- PDF export writes no form fields for Folio content controls and form controls. (237)
+- Deck PDF: text elements with several different run links and links inside shape text have no link area; slide
+  navigation actions (go to slide, next, previous, first, last) are not internal PDF links. (238)
+- PDF page labels are written only for Folio; Deck slide numbering start and Ledger first page number are not labels. (238)
+- Tagged PDF: link and comment annotations are not linked into the structure tree (no `/StructParent`, no `OBJR`), so
+  no PDF/UA identifier is written; the output has not been run through a PDF/UA checker. (239)
+- Tagged PDF: figures carry no `BBox`, merged cells no `ColSpan`/`RowSpan`, row headers are never detected (Ledger tags
+  only print title rows as `TH`), and a sheet printed over several pages becomes one table per page. (239)
+- Tagged PDF: Folio change bars, line numbers, field shading and spotlights are painted inside the paragraph's marked
+  content instead of as artifacts; soft hyphens at line ends are read as hyphens (no `ActualText`). (239)
+- Tagged PDF: a Deck text box is one `P` element (no element per paragraph, slide lists not tagged as `L`), and Deck
+  tables are tagged as figures. (239)
 
 ## Ledger
 
@@ -83,13 +85,10 @@ the round that fixes it is joined and the join run is green.
 - The chart editor's table column picker and the missing-table placeholder and status warning have not been seen in
   the running app; the warning is checked after each history step, so a table lost outside the history (file reload)
   is not announced, only drawn as the placeholder. (220)
-- XLSX table-reference rule forms are matched first by range and flat formula when exactly one rule fits, and by
-  priority and ordinal only among equal candidates; two rules with the same range and flat formula that Excel renumbered
-  can still swap their structured forms. Not opened in Excel. (236)
+- XLSX table-reference rule forms with equal range and flat formula are matched by their rank in priority order (241);
+  a reordering that changes their relative priority can still swap them. Not opened in Excel. (236, 241)
 - Round 236 (Ledger tips and notes), open: the "edit objects and notes" permission rides on our own ODS attribute,
-  which other ODF applications ignore (they keep objects locked); Deck link tips cover text boxes and click actions but
-  not the text inside drawn shapes; Folio's exact character hit skips rotated text frames; the annotated range mapping
-  through the shown text aligns characters greedily, so a repeated digit before the span can shift it; none of this was
+  which other ODF applications ignore (they keep objects locked); Folio's exact character hit skips rotated text frames; none of this was
   built, run or opened in Excel, Word, PowerPoint or the reference suite. (236)
 
 ## Accessibility

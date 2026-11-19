@@ -105,6 +105,8 @@ public sealed class ShellAgentWorkspace(ShellAgentServices services) : IAgentWor
             var options = new PdfExportOptions(properties?.Title ?? operations.SuggestedName(document), properties?.Author ?? string.Empty, properties?.Subject ?? string.Empty)
             {
                 Bookmarks = operations.PdfExport(document).HasHeadings,
+                Keywords = string.Join(", ", properties?.Keywords ?? []),
+                Language = properties?.Language,
             };
             var written = services.Atomic.Replace(path, stream => services.Pdf.Write(printable, stream, options), result => result.Succeeded);
             return written.Succeeded

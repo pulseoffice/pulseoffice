@@ -136,7 +136,14 @@ public sealed class ShellSendCommands(
             if (module.BuildPrintable(document) is not { } printable) return null;
 
             using var pdf = File.Create(file);
-            var written = exporter.Write(printable, pdf, new PdfExportOptions(Title: module.SuggestedName(document)));
+            var properties = module.Properties(document);
+            var written = exporter.Write(printable, pdf, new PdfExportOptions(
+                properties?.Title is { } title && !string.IsNullOrWhiteSpace(title) ? title : module.SuggestedName(document),
+                properties?.Author ?? string.Empty, properties?.Subject ?? string.Empty)
+            {
+                Keywords = string.Join(", ", properties?.Keywords ?? []),
+                Language = properties?.Language,
+            });
             if (!written.Succeeded) return null;
             WarnIfUnprotected(document, file, DocumentCopyOutcome.WrittenWithoutPassword);
             return file;

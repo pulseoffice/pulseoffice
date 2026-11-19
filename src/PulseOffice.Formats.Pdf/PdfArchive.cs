@@ -23,7 +23,7 @@ public sealed class PdfArchiveParts(IColorProfile profile) : IPdfArchiveParts
         ArgumentNullException.ThrowIfNull(options);
         var date = created.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
         var archive = options.Archive
-            ? "<rdf:Description rdf:about=\"\" xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\"><pdfaid:part>2</pdfaid:part><pdfaid:conformance>B</pdfaid:conformance></rdf:Description>"
+            ? "<rdf:Description rdf:about=\"\" xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\"><pdfaid:part>2</pdfaid:part><pdfaid:conformance>" + (options.Tagged ? "A" : "B") + "</pdfaid:conformance></rdf:Description>"
             : string.Empty;
         var language = string.IsNullOrWhiteSpace(options.Language) ? "x-default" : Escape(options.Language);
         var xmp =

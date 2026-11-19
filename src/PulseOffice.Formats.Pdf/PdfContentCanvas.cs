@@ -7,8 +7,14 @@ using PulseOffice.Formats.Pdf.Fonts;
 
 namespace PulseOffice.Formats.Pdf;
 
-public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, IArcFlattener? flattener = null, ITextDecorationPainter? decorations = null) : IPageCanvas
+public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, IArcFlattener? flattener = null, ITextDecorationPainter? decorations = null, IPdfBidiText? bidi = null, PdfMarkedContent? marked = null) : IPageCanvas
 {
+    public void Tag(PrintTag? tag) => marked?.Tag(tag);
+
+    public void EndMarkedContent() => marked?.Close(_content);
+
+    private void Mark() => marked?.Enter(_content);
+
     private readonly ITextDecorationPainter _decorations = decorations ?? new TextDecorationPainter();
 
     private readonly PathReplay _replay = new();
@@ -76,6 +82,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
     {
         if (rect.IsEmpty) return;
 
+        Mark();
         Color(color, stroke: false);
 
         _content.Append(CultureInfo.InvariantCulture,
@@ -84,6 +91,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
     public void DrawLine(DocumentPoint from, DocumentPoint to, PrintColor color, Twip thickness)
     {
+        Mark();
         Color(color, stroke: true);
 
         _content.Append(CultureInfo.InvariantCulture, $"{Points(thickness)} w\n");
@@ -105,6 +113,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
 
         var outline = _flattener.Flatten(path.Outline).Scaled(width, height);
 
+        Mark();
         if (path.Shadow is { } shadow) DrawShadow(path, shadow, width, height);
 
         _content.Append("q\n");
@@ -156,6 +165,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         if (bounds.IsEmpty || image.Width <= 0 || image.Height <= 0) return;
         if (image.Rgb is null || image.Rgb.LongLength < (long)image.Width * image.Height * 3) return;
 
+        Mark();
         var name = $"Img{_images.Count + 1}";
         _images.Add((name, new PdfImagePlacement(image, bounds.Width.ToPoints(), bounds.Height.ToPoints())));
 
@@ -310,9 +320,10 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
         };
 
         var composer = new PdfTextComposer();
-        foreach (var part in fonts.Show(visible, font)) composer.Add(part);
+        foreach (var part in bidi is null ? fonts.Show(visible, font) : bidi.Show(visible, font, fonts)) composer.Add(part);
         if (composer.FirstFont is not { } first) return;
 
+        Mark();
         Color(color, stroke: false);
         var synthetic = Synthetic(first, font, color);
 
@@ -363,6 +374,7 @@ public sealed class PdfContentCanvas(DocumentSize pageSize, IPdfFontSet fonts, I
             index += length;
         }
         if (composer.FirstFont is not { } first) return;
+        Mark();
         Color(run.Color, stroke: false);
         var synthetic = Synthetic(first, run.Font, run.Color);
         var radians = double.IsFinite(run.RotationDegrees) ? run.RotationDegrees * Math.PI / 180 : 0;

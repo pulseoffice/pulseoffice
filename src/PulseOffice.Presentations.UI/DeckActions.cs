@@ -70,6 +70,9 @@ public sealed class DeckActions
     public void MoveSlide(Slide slide, int to) =>
         _slides.MoveSlide(slide, to);
 
+    public void MoveSlideIntoSection(Slide slide, EmptySection section) =>
+        _slides.MoveSlideIntoSection(slide, section);
+
     public void SetLayout(Slide slide, SlideLayout layout) =>
         _slides.SetLayout(slide, layout);
 
@@ -239,6 +242,9 @@ public sealed class DeckActions
 
     public void RenameEmptySection(EmptySection section, string name) =>
         _slides.RenameEmptySection(section, name);
+
+    public void RemoveEmptySections() =>
+        _slides.RemoveEmptySections();
 
     public void RemoveEmptySection(EmptySection section) =>
         _slides.RemoveEmptySection(section);

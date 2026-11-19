@@ -210,6 +210,8 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
         frame.PointerReleased += (_, e) =>
         {
             _filmstripHadFocus = true;
+            if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Left
+                && _headers.DropInto(slide, _filmstrip, e.GetPosition(_filmstrip))) return;
             _host.Select(slide);
             if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Right) _contextMenus.Open("slide", _host.View);
         };

@@ -11,7 +11,7 @@ public interface IFolioPrintables
 }
 
 public sealed class FolioPrintables(IPageRenderer renderer, IPageSurfaceFactory surfaces, IFolioChangeBars bars, IFolioViewMarks marks, IFolioCommentSheet comments,
-    PulseOffice.Documents.Layout.Flow.IPrintLayouts engines, IFolioPrintMarks printMarks, IFolioLineNumberMarks lines) : IFolioPrintables
+    PulseOffice.Documents.Layout.Flow.IPrintLayouts engines, IFolioPrintMarks printMarks, IFolioLineNumberMarks lines, IFolioStructureIndex structure) : IFolioPrintables
 {
     public IPrintableDocument? From(DocumentLayout layout, TextDocument document, bool? printComments = null)
     {
@@ -23,6 +23,8 @@ public sealed class FolioPrintables(IPageRenderer renderer, IPageSurfaceFactory 
             Appendix = appendix,
             Navigation = printMarks,
             Index = printMarks.Index(document),
+            StructureIndex = structure,
+            Structure = structure.Index(document),
         };
     }
 }
@@ -63,7 +65,13 @@ public sealed class FolioPrintable : IPrintableDocument
 
     public FolioMarkIndex Index { get; init; } = FolioMarkIndex.Empty;
 
+    public IFolioStructureIndex? StructureIndex { get; init; }
+
+    public FolioStructure Structure { get; init; } = FolioStructure.Empty;
+
     public int PageCount => _layout.Pages.Count + Appendix.Count;
+
+    public string? Language => _document.Language;
 
     public DocumentSize PageSize(int index)
     {
@@ -73,17 +81,34 @@ public sealed class FolioPrintable : IPrintableDocument
         return new DocumentSize(Twip.FromPoints(page.Width), Twip.FromPoints(page.Height));
     }
 
+    public PrintPageLabel? PageLabel(int index)
+    {
+        if (index < 0 || index >= _layout.Pages.Count) return null;
+        var page = _layout.Pages[index];
+        var style = _document.Styles.Page.Find(page.StyleName)?.NumberFormat switch
+        {
+            PulseOffice.Documents.Styles.NumberFormat.LowerRoman => PageLabelStyle.LowerRoman,
+            PulseOffice.Documents.Styles.NumberFormat.UpperRoman => PageLabelStyle.UpperRoman,
+            PulseOffice.Documents.Styles.NumberFormat.LowerLetter => PageLabelStyle.LowerLetter,
+            PulseOffice.Documents.Styles.NumberFormat.UpperLetter => PageLabelStyle.UpperLetter,
+            _ => PageLabelStyle.Decimal,
+        };
+        return new PrintPageLabel(style, Math.Max(1, page.Number));
+    }
+
     public void PaintPage(int index, IPageCanvas canvas)
     {
         ArgumentNullException.ThrowIfNull(canvas);
         if (index < 0 || index >= PageCount) return;
         if (index >= _layout.Pages.Count)
         {
+            if (StructureIndex is not null) canvas.Tag(new PrintTag("appendix", PrintRole.Section));
             _renderer.Paint(_surfaces.Print(canvas, _document.Language), Appendix[index - _layout.Pages.Count]);
             return;
         }
         _renderer.Paint(_surfaces.Print(canvas, _document.Language), _layout.Pages[index],
-            id => _document.Objects.Find(id)?.Content is PulseOffice.Documents.Objects.EmbeddedContent embedded ? GroupText.Painted(embedded) : null, Marks);
+            id => _document.Objects.Find(id)?.Content is PulseOffice.Documents.Objects.EmbeddedContent embedded ? GroupText.Painted(embedded) : null,
+            StructureIndex is null ? Marks : Marks with { Structure = StructureIndex.Tagger(canvas, Structure) });
         Navigation?.Mark(canvas, _layout.Pages[index], Index);
     }
 }

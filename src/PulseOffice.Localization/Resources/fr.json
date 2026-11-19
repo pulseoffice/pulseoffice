@@ -4233,6 +4233,7 @@
   "context.slide.order": "Ordre",
   "command.deck.section.add.title": "Ajouter une section",
   "command.deck.section.remove.title": "Supprimer la section",
+  "command.deck.section.removeEmpty.title": "Supprimer les sections vides",
   "deck.action.addSection": "Ajouter une section",
   "deck.action.renameSection": "Renommer la section",
   "deck.action.removeSection": "Supprimer la section",
@@ -6468,6 +6469,7 @@
   "diagnostic.pdf012": "Aucune police installée avec contours ne couvre {0} caractère(s) : {1}.",
   "diagnostic.pdf013": "Une partie du texte utilise des polices non incorporées : le fichier n'est pas conforme PDF/A.",
   "diagnostic.pdf014": "Le PDF/A n'autorise pas le chiffrement : le fichier est en PDF/A sans mot de passe.",
+  "diagnostic.pdf015": "Certaines images n'ont pas de texte de remplacement : les lecteurs d'écran ne peuvent pas les décrire.",
   "diagnostic.pdf020": "La compression JPEG n'est pas disponible : les images ont été écrites sans perte.",
   "command.shell.file.exportPdf.title": "Exporter au format PDF…",
   "command.shell.file.exportPdf.description": "Exporte le document en PDF avec polices incorporées, signets, liens et commentaires",
@@ -8775,5 +8777,12 @@
   "settingCategory.spreadsheets": "Feuilles de calcul",
   "setting.ledger.links.followOnClick.title": "Ouvrir les liens hypertexte des cellules d’un clic",
   "setting.ledger.links.followOnClick.description": "Un clic sur le texte d’une cellule liée suit le lien ; un clic à côté du texte, ou un clic maintenu, sélectionne la cellule. Désactivé, utilisez Ctrl+clic ou la commande Ouvrir le lien hypertexte.",
-  "history.comment.box": "Déplacer ou redimensionner la note"
+  "history.comment.box": "Déplacer ou redimensionner la note",
+  "print.paper": "Papier",
+  "print.paper.document": "Comme dans le document",
+  "print.paper.size": "{0} ({1} × {2} mm)",
+  "print.orientation": "Orientation",
+  "print.orientation.automatic": "Automatique",
+  "print.orientation.portrait": "Portrait",
+  "print.orientation.landscape": "Paysage"
 }

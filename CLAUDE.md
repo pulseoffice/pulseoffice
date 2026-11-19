@@ -103,6 +103,8 @@ The rules below apply to every build and test run, by hand or by agents:
   one is stopped, investigated, fixed, optimized and rerun, never waited for. `tools/run-tests.py` enforces a hard
   per-chunk timeout (10 minutes) and a per-test hang timeout (60 seconds), and flags slow tests in `summary.tsv`; a
   timeout is a failure.
+- **Keep RAM use low** (user rule, 2026-11-19): test runs by hand or by agents use `TESTS_MEMORY_TOTAL_GB=8 TESTS_JOBS=3`,
+  and a large selection is split into consecutive runs (by project fragment or `--classes`) rather than run at once.
 - **Build with few nodes and no resident servers**: `-m:2`, `-nodeReuse:false` and `MSBUILDDISABLENODEREUSE=1` (no
   MSBuild worker processes left behind), `-p:UseSharedCompilation=false` (no VBCSCompiler server holding 1–2 GB), and
   `dotnet build-server shutdown` after the build.

@@ -14,6 +14,8 @@ public interface IPrintableSlide
     double Ratio { get; }
 
     void Paint(IPageCanvas canvas, DocumentRect area);
+
+    PrintTag? Structure => null;
 }
 
 public interface ISlidePagePainter
@@ -21,8 +23,13 @@ public interface ISlidePagePainter
     IPrintableSlide For(Presentation deck, Slide slide);
 }
 
-public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture) : ISlidePagePainter
+public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture, ISlideLinkAreas links, ISlideStructureTags structure) : ISlidePagePainter
 {
+    public SlidePagePainter(ISlideRenderer renderer, IDrawingReplay replay, IObjectPathBuilder paths, IPageImageCapture capture)
+        : this(renderer, replay, paths, capture, new SlideLinkAreas(), new SlideStructureTags())
+    {
+    }
+
     private readonly SlidePalette _palette = new(Colors.Transparent, Colors.Transparent);
 
     public SlidePagePainter(ISlideRenderer renderer) : this(renderer, new DrawingReplay(), new ObjectPathBuilder(), new PageImageCapture())
@@ -48,7 +55,21 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
 
         var clipped = new ClippedPageCanvas(canvas, area);
         var scale = deck.Size.Width.Value == 0 ? 1 : target.Width / deck.Size.Width.Value;
-        foreach (var layer in layers) PaintLayer(clipped, layer, target, scale);
+        canvas.Tag(structure.SlideTag(slide));
+        foreach (var tag in structure.ReadingOrder(slide)) canvas.Tag(tag);
+        foreach (var layer in layers)
+        {
+            canvas.Tag(layer.Fill is null ? structure.For(slide, layer.Element) : null);
+            PaintLayer(clipped, layer, target, scale);
+        }
+        canvas.Tag(null);
+        foreach (var link in links.For(slide))
+        {
+            var bounds = new DocumentRect(
+                Twip.FromPoints(target.X + link.Bounds.Left.Value * scale), Twip.FromPoints(target.Y + link.Bounds.Top.Value * scale),
+                Twip.FromPoints(link.Bounds.Width.Value * scale), Twip.FromPoints(link.Bounds.Height.Value * scale));
+            canvas.MarkLink(bounds, link.Target);
+        }
     }
 
     private void PaintLayer(IPageCanvas canvas, SlideLayer layer, Rect target, double scale)
@@ -82,6 +103,8 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
 
         parts.PaintVector(canvas);
     }
+
+    private PrintTag SlideTag(Slide slide) => structure.SlideTag(slide);
 
     private DrawingGroup? Record(SlideLayer layer)
     {
@@ -122,5 +145,7 @@ public sealed class SlidePagePainter(ISlideRenderer renderer, IDrawingReplay rep
         public double Ratio => deck.Size.Width.Value == 0 ? 0.5625 : deck.Size.Height.Value / (double)deck.Size.Width.Value;
 
         public void Paint(IPageCanvas canvas, DocumentRect area) => painter.Paint(deck, slide, canvas, area);
+
+        public PrintTag? Structure => painter.SlideTag(slide);
     }
 }

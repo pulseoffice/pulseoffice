@@ -59,6 +59,8 @@ public sealed class ScaledPageCanvas(IPageCanvas inner, double scale, DocumentPo
         });
     }
 
+    public void Tag(PrintTag? tag) => _inner.Tag(tag);
+
     public void MarkHeading(int level, string title, double topPoints) => _inner.MarkHeading(level, title, Vertical(topPoints));
 
     public void MarkTarget(string name, double topPoints) => _inner.MarkTarget(name, Vertical(topPoints));

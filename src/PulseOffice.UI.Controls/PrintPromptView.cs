@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using PulseOffice.Foundation.Pages;
 using PulseOffice.Localization;
 using PulseOffice.Platform;
 using PulseOffice.Printing;
@@ -29,6 +30,8 @@ public sealed record PrintPromptRequest(
     public bool SupportsComments { get; init; }
 
     public bool InitialComments { get; init; }
+
+    public IReadOnlyList<PaperSize> Papers { get; init; } = [];
 }
 
 public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooterOwner
@@ -48,6 +51,8 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
     private readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _borders = new();
     private readonly CheckBox _brochure = new();
+    private readonly ComboBox _paper = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly ComboBox _orientation = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ComboBox _duplex = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _comments = new();
     private readonly CheckBox _graphics = new() { IsChecked = true };
@@ -86,6 +91,10 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
         _duplex.ItemsSource = new[] { texts["print.duplex.none"], texts["print.duplex.long"], texts["print.duplex.short"] };
         _duplex.SelectedIndex = request.InitialDuplex && request.Capabilities.Duplex ? 1 : 0;
         _comments.IsChecked = request.InitialComments;
+        _paper.ItemsSource = request.Papers.Select(PaperName).Prepend(texts["print.paper.document"]).ToList();
+        _paper.SelectedIndex = 0;
+        _orientation.ItemsSource = new[] { texts["print.orientation.automatic"], texts["print.orientation.portrait"], texts["print.orientation.landscape"] };
+        _orientation.SelectedIndex = 0;
 
         var form = new StackPanel { Spacing = metrics.SpacingMedium, MinWidth = 300 };
         form.Children.Add(Section(texts["print.section.printer"], metrics,
@@ -96,6 +105,7 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
             parts.Field(texts["print.subset"], _subset),
             Check(_reverse, texts["print.reverse"])));
         form.Children.Add(Section(texts["print.section.layout"], metrics,
+            Row(metrics, parts.Field(texts["print.paper"], _paper), parts.Field(texts["print.orientation"], _orientation)),
             Row(metrics, parts.Field(texts["print.perSheet"], _perSheet), parts.Field(texts["print.order"], _order)),
             Check(_borders, texts["print.borders"]),
             Check(_brochure, texts["print.brochure"]),
@@ -132,7 +142,7 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
 
         foreach (var box in new[] { _collate, _reverse, _borders, _brochure, _comments, _graphics, _black })
             box.IsCheckedChanged += (_, _) => Update();
-        foreach (var combo in new[] { _subset, _perSheet, _order, _duplex, _printer })
+        foreach (var combo in new[] { _paper, _orientation, _subset, _perSheet, _order, _duplex, _printer })
             combo.SelectionChanged += (_, _) => Update();
         _copies.ValueChanged += (_, _) => Update();
         _range.TextChanged += (_, _) => Update();
@@ -141,6 +151,8 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
 
     private PrintJobOptions Options() => new()
     {
+        Paper = _paper.SelectedIndex > 0 && _paper.SelectedIndex <= _request.Papers.Count ? _request.Papers[_paper.SelectedIndex - 1].Size : null,
+        Orientation = (SheetOrientation)Math.Max(0, _orientation.SelectedIndex),
         PageRange = string.IsNullOrWhiteSpace(_range.Text) ? null : _range.Text.Trim(),
         Subset = (PageSubset)Math.Max(0, _subset.SelectedIndex),
         Reverse = _reverse.IsChecked == true,
@@ -161,6 +173,8 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
         var options = Options();
         _perSheet.IsEnabled = !options.Brochure;
         _order.IsEnabled = !options.Brochure && options.PagesPerSheet > 1;
+        _orientation.IsEnabled = !options.Brochure;
+        _duplex.IsEnabled = !options.Brochure;
         _collate.IsEnabled = options.Copies > 1;
         if (_source is null || _commentsBuilt != options.Comments)
         {
@@ -189,6 +203,9 @@ public sealed class PrintPromptView : UserControl, IDialogContent, IDialogFooter
         var file = _printer.SelectedIndex >= _request.Targets.Count;
         Completed?.Invoke(this, new PrintChoice(file ? null : _request.Targets[_printer.SelectedIndex].Id, file, Options()));
     }
+
+    private string PaperName(PaperSize paper) =>
+        _texts.Format("print.paper.size", paper.Id.ToUpperInvariant(), (paper.Size.Width.ToCentimeters() * 10).ToString("0", System.Globalization.CultureInfo.CurrentCulture), (paper.Size.Height.ToCentimeters() * 10).ToString("0", System.Globalization.CultureInfo.CurrentCulture));
 
     private Control Section(string title, DesignTokens.Metrics metrics, params Control[] children)
     {

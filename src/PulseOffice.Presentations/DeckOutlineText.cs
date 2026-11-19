@@ -17,6 +17,7 @@ public sealed class DeckOutlineText : IDeckOutlineText
     private const string SpaceIndent = "    ";
     private const char TitleMark = '\u00B6';
     private const string TitleSeparator = " \u00B6 ";
+    private const string EscapedMark = "\u00B6\u00B6";
 
     public string Render(IReadOnlyList<Slide> slides)
     {
@@ -24,7 +25,7 @@ public sealed class DeckOutlineText : IDeckOutlineText
         var lines = new List<string>();
         foreach (var slide in slides)
         {
-            lines.Add(slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText.Replace("\n", TitleSeparator, StringComparison.Ordinal) ?? string.Empty);
+            lines.Add(TitleLine(slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText ?? string.Empty));
             if (slide.Placeholder(PlaceholderRole.Body)?.Text is not { IsEmpty: false } body) continue;
             foreach (var paragraph in body.Paragraphs)
                 lines.Add(new string('\t', Math.Clamp(paragraph.BulletLevel, 0, MaxLevel) + 1) + paragraph.Text);
@@ -59,10 +60,33 @@ public sealed class DeckOutlineText : IDeckOutlineText
         return entries;
     }
 
-    private string TitleParagraphs(string content) =>
-        content.Contains(TitleMark, StringComparison.Ordinal)
-            ? string.Join("\n", content.Split(TitleMark).Select(part => part.Trim(' ')))
-            : content;
+    private string TitleLine(string title) =>
+        title.Replace(TitleMark.ToString(), EscapedMark, StringComparison.Ordinal).Replace("\n", TitleSeparator, StringComparison.Ordinal);
+
+    private string TitleParagraphs(string content)
+    {
+        if (!content.Contains(TitleMark, StringComparison.Ordinal)) return content;
+        var paragraphs = new List<string>();
+        var current = new System.Text.StringBuilder();
+        for (var at = 0; at < content.Length; at++)
+        {
+            if (content[at] != TitleMark)
+            {
+                current.Append(content[at]);
+                continue;
+            }
+            if (at + 1 < content.Length && content[at + 1] == TitleMark)
+            {
+                current.Append(TitleMark);
+                at++;
+                continue;
+            }
+            paragraphs.Add(current.ToString().Trim(' '));
+            current.Clear();
+        }
+        paragraphs.Add(current.ToString().Trim(' '));
+        return string.Join("\n", paragraphs);
+    }
 
     private (int Depth, string Content) Indent(string line)
     {

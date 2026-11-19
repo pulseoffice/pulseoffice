@@ -14,15 +14,8 @@ public sealed class OutlineSlideMatching : IOutlineSlideMatching
 
         var matched = new int?[edited.Count];
         var taken = new bool[original.Count];
-        var previous = -1;
-        for (var i = 0; i < edited.Count; i++)
-        {
-            var found = SameTitle(original, taken, edited[i].Title, previous);
-            if (found < 0) continue;
-            matched[i] = found;
-            taken[found] = true;
-            previous = found;
-        }
+        Pair(original, edited, matched, taken, SameEntry);
+        Pair(original, edited, matched, taken, (left, right) => left.Title == right.Title);
 
         var anchor = -1;
         var gap = 0;
@@ -46,17 +39,38 @@ public sealed class OutlineSlideMatching : IOutlineSlideMatching
         return matched;
     }
 
-    private int SameTitle(IReadOnlyList<OutlineEntry> original, bool[] taken, string title, int previous)
+    private void Pair(IReadOnlyList<OutlineEntry> original, IReadOnlyList<OutlineEntry> edited, int?[] matched, bool[] taken, Func<OutlineEntry, OutlineEntry, bool> same)
+    {
+        var previous = -1;
+        for (var i = 0; i < edited.Count; i++)
+        {
+            if (matched[i] is { } kept)
+            {
+                previous = kept;
+                continue;
+            }
+            var found = Find(original, taken, edited[i], previous, same);
+            if (found < 0) continue;
+            matched[i] = found;
+            taken[found] = true;
+            previous = found;
+        }
+    }
+
+    private int Find(IReadOnlyList<OutlineEntry> original, bool[] taken, OutlineEntry entry, int previous, Func<OutlineEntry, OutlineEntry, bool> same)
     {
         var fallback = -1;
         for (var index = 0; index < original.Count; index++)
         {
-            if (taken[index] || original[index].Title != title) continue;
+            if (taken[index] || !same(original[index], entry)) continue;
             if (index > previous) return index;
             if (fallback < 0) fallback = index;
         }
         return fallback;
     }
+
+    private bool SameEntry(OutlineEntry left, OutlineEntry right) =>
+        left.Title == right.Title && left.Body.SequenceEqual(right.Body);
 }
 
 public interface IOutlineBlockMove

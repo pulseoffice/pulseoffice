@@ -24,8 +24,21 @@ public enum DuplexMode
     ShortEdge,
 }
 
+public enum SheetOrientation
+{
+    Automatic,
+    Portrait,
+    Landscape,
+}
+
 public sealed record PrintJobOptions
 {
+    public DocumentSize? Paper { get; init; }
+
+    public SheetOrientation Orientation { get; init; } = SheetOrientation.Automatic;
+
+    public DuplexMode EffectiveDuplex => Brochure ? DuplexMode.ShortEdge : Duplex;
+
     public string? PageRange { get; init; }
 
     public PageSubset Subset { get; init; } = PageSubset.All;
@@ -127,19 +140,21 @@ public sealed class PrintImposition(IPageRangeParser ranges) : IPrintImposition
         ArgumentNullException.ThrowIfNull(options);
         var source = options.Graphics && !options.BlackText ? document : new FilteredPrintDocument(document, options.Graphics, options.BlackText);
         var pages = SelectedPages(document, options).ToList();
-        var page = new DocumentSize(document.Setup.PageWidth, document.Setup.PageHeight);
+        var page = pages.Count > 0 ? document.PageSize(pages[0]) : new DocumentSize(document.Setup.PageWidth, document.Setup.PageHeight);
+        var paper = options.Paper ?? page;
         List<IReadOnlyList<SheetSlot>> sheets;
         DocumentSize sheet;
         if (options.Brochure)
         {
-            sheet = Landscape(page);
-            sheets = Brochure(pages, page, sheet);
+            sheet = Landscape(paper);
+            sheets = Brochure(pages, document, sheet);
         }
         else
         {
             var count = Grids.Contains(options.PagesPerSheet) ? options.PagesPerSheet : 1;
-            (sheet, var columns, var rows) = Layout(page, count);
-            sheets = [.. pages.Chunk(count).Select(chunk => Grid(chunk, page, sheet, columns, rows, options.Order))];
+            (sheet, var columns, var rows) = Layout(page, paper, count, options.Orientation, options.Paper is not null);
+            var fitted = count > 1 || options.Paper is not null || options.Orientation != SheetOrientation.Automatic;
+            sheets = [.. pages.Chunk(count).Select(chunk => Grid(chunk, document, sheet, columns, rows, options.Order, fitted))];
         }
         if (options.Reverse) sheets.Reverse();
         var copies = Math.Clamp(options.Copies, 1, MaximumCopies);
@@ -152,34 +167,42 @@ public sealed class PrintImposition(IPageRangeParser ranges) : IPrintImposition
         return new ImposedDocument(source, sheets, sheet, options.SheetBorders && (options.Brochure || options.PagesPerSheet > 1));
     }
 
-    private List<IReadOnlyList<SheetSlot>> Brochure(List<int> pages, DocumentSize page, DocumentSize sheet)
+    private List<IReadOnlyList<SheetSlot>> Brochure(List<int> pages, IPrintableDocument document, DocumentSize sheet)
     {
         var padded = (pages.Count + 3) / 4 * 4;
         var half = new DocumentSize(new Twip(sheet.Width.Value / 2), sheet.Height);
-        var scale = Math.Min((double)half.Width.Value / page.Width.Value, (double)half.Height.Value / page.Height.Value);
         var sides = new List<IReadOnlyList<SheetSlot>>();
         for (var side = 0; side < padded / 2; side++)
         {
             var (left, right) = side % 2 == 0 ? (padded - 1 - side, side) : (side, padded - 1 - side);
-            sides.Add([Slot(left < pages.Count ? pages[left] : -1, 0, half, page, scale), Slot(right < pages.Count ? pages[right] : -1, half.Width.Value, half, page, scale)]);
+            sides.Add([Fit(left < pages.Count ? pages[left] : -1, document, 0, 0, half.Width.Value, half.Height.Value, 1),
+                Fit(right < pages.Count ? pages[right] : -1, document, half.Width.Value, 0, half.Width.Value, half.Height.Value, 1)]);
         }
         return sides;
     }
 
-    private SheetSlot Slot(int source, int left, DocumentSize half, DocumentSize page, double scale)
+    private SheetSlot Fit(int source, IPrintableDocument document, int left, int top, int cellWidth, int cellHeight, double gap)
     {
+        var page = source >= 0 && source < document.PageCount ? document.PageSize(source) : new DocumentSize(document.Setup.PageWidth, document.Setup.PageHeight);
+        var scale = Math.Min(cellWidth / (double)Math.Max(1, page.Width.Value), cellHeight / (double)Math.Max(1, page.Height.Value)) * gap;
         var width = (int)(page.Width.Value * scale);
         var height = (int)(page.Height.Value * scale);
-        var x = left + (half.Width.Value - width) / 2;
-        var y = (half.Height.Value - height) / 2;
+        var x = left + (cellWidth - width) / 2;
+        var y = top + (cellHeight - height) / 2;
         return new SheetSlot(source, new DocumentRect(new Twip(x), new Twip(y), new Twip(width), new Twip(height)), scale, new DocumentPoint(new Twip(x), new Twip(y)));
     }
 
-    private (DocumentSize Sheet, int Columns, int Rows) Layout(DocumentSize page, int count)
+    private (DocumentSize Sheet, int Columns, int Rows) Layout(DocumentSize page, DocumentSize paper, int count, SheetOrientation orientation, bool paperChosen)
     {
-        if (count == 1) return (page, 1, 1);
-        var best = (Sheet: page, Columns: 1, Rows: count, Scale: 0.0);
-        foreach (var sheet in new[] { page, Landscape(page), Portrait(page) })
+        DocumentSize[] candidates = orientation switch
+        {
+            SheetOrientation.Portrait => [Portrait(paper)],
+            SheetOrientation.Landscape => [Landscape(paper)],
+            _ when count == 1 => [paperChosen ? (page.Width.Value > page.Height.Value ? Landscape(paper) : Portrait(paper)) : paper],
+            _ => [paper, Landscape(paper), Portrait(paper)],
+        };
+        var best = (Sheet: candidates[0], Columns: 1, Rows: count, Scale: 0.0);
+        foreach (var sheet in candidates)
             for (var columns = 1; columns <= count; columns++)
             {
                 if (count % columns != 0) continue;
@@ -190,22 +213,17 @@ public sealed class PrintImposition(IPageRangeParser ranges) : IPrintImposition
         return (best.Sheet, best.Columns, best.Rows);
     }
 
-    private IReadOnlyList<SheetSlot> Grid(int[] chunk, DocumentSize page, DocumentSize sheet, int columns, int rows, SheetOrder order)
+    private IReadOnlyList<SheetSlot> Grid(int[] chunk, IPrintableDocument document, DocumentSize sheet, int columns, int rows, SheetOrder order, bool fitted)
     {
-        if (columns * rows == 1) return [new SheetSlot(chunk[0], new DocumentRect(Twip.Zero, Twip.Zero, page.Width, page.Height), 1, new DocumentPoint(Twip.Zero, Twip.Zero))];
+        if (!fitted) return [new SheetSlot(chunk[0], new DocumentRect(Twip.Zero, Twip.Zero, sheet.Width, sheet.Height), 1, new DocumentPoint(Twip.Zero, Twip.Zero))];
         var cellWidth = sheet.Width.Value / columns;
         var cellHeight = sheet.Height.Value / rows;
-        var gap = 0.94;
-        var scale = Math.Min(cellWidth / (double)page.Width.Value, cellHeight / (double)page.Height.Value) * gap;
-        var width = (int)(page.Width.Value * scale);
-        var height = (int)(page.Height.Value * scale);
+        var gap = columns * rows == 1 ? 1 : 0.94;
         var slots = new List<SheetSlot>();
         for (var index = 0; index < chunk.Length; index++)
         {
             var (column, row) = order == SheetOrder.AcrossThenDown ? (index % columns, index / columns) : (index / rows, index % rows);
-            var x = column * cellWidth + (cellWidth - width) / 2;
-            var y = row * cellHeight + (cellHeight - height) / 2;
-            slots.Add(new SheetSlot(chunk[index], new DocumentRect(new Twip(x), new Twip(y), new Twip(width), new Twip(height)), scale, new DocumentPoint(new Twip(x), new Twip(y))));
+            slots.Add(Fit(chunk[index], document, column * cellWidth, row * cellHeight, cellWidth, cellHeight, gap));
         }
         return slots;
     }
@@ -288,6 +306,8 @@ public sealed class FilteredPrintDocument(IPrintableDocument source, bool graphi
 
     public DocumentSize PageSize(int index) => source.PageSize(index);
 
+    public PrintPageLabel? PageLabel(int index) => source.PageLabel(index);
+
     public void PaintPage(int index, IPageCanvas canvas) => source.PaintPage(index, new FilteredPageCanvas(canvas, graphics, blackText));
 }
 
@@ -321,6 +341,8 @@ public sealed class FilteredPageCanvas(IPageCanvas inner, bool graphics, bool bl
     }
 
     public IDisposable Clip(DocumentRect area) => inner.Clip(area);
+
+    public void Tag(PrintTag? tag) => inner.Tag(tag);
 
     public void MarkHeading(int level, string title, double topPoints) => inner.MarkHeading(level, title, topPoints);
 
