@@ -245,6 +245,8 @@ public sealed class FolioEditor : IDisposable
 
     public PulseOffice.Documents.Layout.Queries.LayoutText? LayoutText { get; private set; }
 
+    public IReadOnlyList<PulseOffice.Documents.Layout.Queries.LayoutText> LayoutTexts => _services.Notices.Of(this);
+
     public void SelectLayoutText(PulseOffice.Documents.Layout.Queries.LayoutText text) => Select(Caret, Caret, text);
 
     public void PlaceCaret(DocumentPosition position, bool extend) => Select(extend ? Anchor : position, position);

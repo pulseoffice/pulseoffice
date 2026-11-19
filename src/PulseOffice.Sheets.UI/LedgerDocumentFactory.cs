@@ -60,7 +60,7 @@ public sealed class LedgerDocumentFactory(
     private bool Editable => workspace.Active?.IsReadOnly != true;
 
     private Pivot.PivotLabels PivotLabelsFor() =>
-        new(texts["pivot.grandTotal"], texts["pivot.subtotal"]);
+        new(texts["pivot.grandTotal"], texts["pivot.subtotal"], texts["pivot.blank"]);
 
     public OpenDocument CreateEmpty() =>
         Build(Languaged(Workbook.CreateDefault(texts["sheet.defaultName"])), $"{ModuleIdentity.Sheets.BrandName}{++_counter}", recalculate: false);

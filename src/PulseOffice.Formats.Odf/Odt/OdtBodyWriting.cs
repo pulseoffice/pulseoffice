@@ -431,7 +431,16 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
         session.Document.Objects.Find(objectId) is { } item ? Write(item, sink, session, blocks) : null;
 
     public XElement? Write(AnchoredObject item, OdtStyleSink sink, OdtWriteSession session, IOdtBlockWriter blocks) =>
-        Linked(item, Placed(item, sink, session, blocks));
+        Linked(item, Native(item, Placed(item, sink, session, blocks), session));
+
+    private XElement? Native(AnchoredObject item, XElement? placed, OdtWriteSession session)
+    {
+        if (placed is null || frames.NativeVerticalShift(item, session.Document) is not { } shift) return placed;
+        if ((string?)placed.Attribute(Svg + "y") is not { } stored || measure.Twips(stored) is not { } offset) return placed;
+        placed.SetAttributeValue(Svg + "y", measure.Length(offset + shift));
+        placed.SetAttributeValue(Pt + "y", stored);
+        return placed;
+    }
 
     private XElement? Linked(AnchoredObject item, XElement? placed) =>
         placed is null || item.Hyperlink is not { Length: > 0 } link || item.Anchor is PageAnchor
@@ -640,7 +649,8 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
         foreach (var column in table.Columns)
         {
             var columnStyle = sink.Register("table-column", null,
-                [new XElement(Style + "table-column-properties", new XAttribute(Style + "column-width", measure.Length(column)))], "Col");
+                [new XElement(Style + "table-column-properties", new XAttribute(Style + "column-width", measure.Length(column)),
+                    new XAttribute(Style + "rel-column-width", column.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "*"))], "Col");
             element.Add(new XElement(Table + "table-column", new XAttribute(Table + "style-name", columnStyle)));
         }
 

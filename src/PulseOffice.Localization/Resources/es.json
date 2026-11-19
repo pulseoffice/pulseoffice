@@ -2842,6 +2842,7 @@
   "pivot.confirm": "Crear",
   "pivot.destination": "Hoja de destino",
   "pivot.explanation": "Arrastra los campos a las cuatro zonas, o márcalos: los números van a Valores, el resto a Filas. Hace falta al menos un campo de valor. La vista previa muestra la tabla mientras la compones.",
+  "pivot.blank": "(en blanco)",
   "pivot.grandTotal": "Total general",
   "pivot.none": "No hay tabla dinámica",
   "pivot.notUnderCursor": "Coloque el cursor dentro de la tabla dinámica que desea eliminar",

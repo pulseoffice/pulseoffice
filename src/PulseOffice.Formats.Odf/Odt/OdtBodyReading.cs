@@ -655,6 +655,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             RotationDegrees = rotation,
             Placement = placement with
             {
+                Y = measure.Twips((string?)frame.Attribute(Pt + "y")) ?? placement.Y,
                 Horizontal = frames.ReadHorizontal(graphic) ?? HorizontalRelation.Paragraph,
                 Vertical = frames.ReadVertical(graphic) ?? VerticalRelation.Paragraph,
                 HorizontalAlign = frames.HorizontalPosition((string?)graphic?.Attribute(Style + "horizontal-pos")),
@@ -790,12 +791,15 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
         var tableStyle = context.Automatic.Find("table", (string?)element.Attribute(Table + "style-name"));
         var tableWidth = measure.Twips((string?)tableStyle?.Element(Style + "table-properties")?.Attribute(Style + "width"));
         while (columns.Count < count) columns.Add(Twip.Zero);
-        if (columns.Count > 0 && columns.All(c => c.Value == 0))
+        while (relative.Count < columns.Count) relative.Add(0);
+        if (columns.Any(c => c.Value == 0))
         {
-            var available = (tableWidth ?? TextWidth(context)).Value;
-            var total = relative.Count == columns.Count ? relative.Sum() : 0;
-            for (var i = 0; i < columns.Count; i++)
-                columns[i] = new Twip(total > 0 ? (int)Math.Round(available * relative[i] / total) : available / columns.Count);
+            var missing = Enumerable.Range(0, columns.Count).Where(i => columns[i].Value == 0).ToList();
+            var available = Math.Max(0, (tableWidth ?? TextWidth(context)).Value - columns.Sum(c => c.Value));
+            if (available == 0) available = TextWidth(context).Value / columns.Count * missing.Count;
+            var total = missing.All(i => relative[i] > 0) ? missing.Sum(i => relative[i]) : 0;
+            foreach (var i in missing)
+                columns[i] = new Twip(Math.Max(1, total > 0 ? (int)Math.Round(available * relative[i] / total) : available / missing.Count));
         }
         var styleName = tableStyle is null
             ? (string?)element.Attribute(Table + "style-name") is { } named ? context.StyleNames.Resolve(named) : null

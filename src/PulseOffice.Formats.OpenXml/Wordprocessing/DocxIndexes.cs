@@ -21,7 +21,11 @@ public sealed class DocxIndexCodec(IIndexStyles styles, DocxIndexSettings settin
         switch (index.Kind)
         {
             case IndexKind.Contents:
-                builder.Append(CultureInfo.InvariantCulture, $" TOC \\o \"1-{Math.Clamp(index.Levels, 1, 9)}\"");
+                builder.Append(" TOC");
+                var last = Math.Clamp(index.Levels, 1, 9);
+                if (index.FromOutline) builder.Append(CultureInfo.InvariantCulture, $" \\o \"{Math.Clamp(index.FirstLevel, 1, last)}-{last}\"");
+                if (!index.SourceStyles.IsEmpty)
+                    builder.Append(" \\t \"").Append(string.Join(",", index.SourceStyles.Levels.Select(pair => pair.Key + "," + Math.Min(pair.Value, 9).ToString(CultureInfo.InvariantCulture)))).Append('"');
                 if (index.FromMarks) builder.Append(" \\f");
                 break;
             case IndexKind.Illustrations or IndexKind.Tables:
@@ -71,12 +75,15 @@ public sealed class DocxIndexCodec(IIndexStyles styles, DocxIndexSettings settin
                 }
                 if (switches.TryGetValue("f", out var name) && name.Length > 0 && !switches.ContainsKey("o"))
                     return new IndexDefinition(IndexKind.User) { UserName = name, Hyperlinks = common.Hyperlinks, PageNumbers = common.Pages };
-                var levels = !switches.TryGetValue("o", out var range) ? 3
-                    : range.Split('-') is [_, var last] && int.TryParse(last, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? Math.Clamp(parsed, 1, 9)
-                    : 9;
+                var outline = switches.TryGetValue("o", out var range);
+                var (first, levels) = outline ? Range(range ?? string.Empty) : switches.TryGetValue("l", out var marked) ? (1, Range(marked).Last) : (1, 3);
+                var sourceStyles = switches.TryGetValue("t", out var styled) ? SourceStyles(styled) : IndexSourceStyles.None;
                 return new IndexDefinition(IndexKind.Contents)
                 {
                     Levels = levels,
+                    FirstLevel = first,
+                    FromOutline = outline || (sourceStyles.IsEmpty && !switches.ContainsKey("f")),
+                    SourceStyles = sourceStyles,
                     FromMarks = switches.ContainsKey("f"),
                     Hyperlinks = common.Hyperlinks,
                     PageNumbers = common.Pages,
@@ -84,6 +91,32 @@ public sealed class DocxIndexCodec(IIndexStyles styles, DocxIndexSettings settin
             default:
                 return null;
         }
+    }
+
+    private (int First, int Last) Range(string range)
+    {
+        var parts = range.Split('-', StringSplitOptions.TrimEntries);
+        int Number(string text, int fallback) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? Math.Clamp(value, 1, 9) : fallback;
+        return parts switch
+        {
+            [var first, var last] => (Math.Min(Number(first, 1), Number(last, 9)), Number(last, 9)),
+            [var only] when only.Length > 0 => (Number(only, 1), Number(only, 9)),
+            _ => (1, 9),
+        };
+    }
+
+    private IndexSourceStyles SourceStyles(string value)
+    {
+        var result = IndexSourceStyles.None;
+        var parts = value.Split([',', ';'], StringSplitOptions.TrimEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (parts[i].Length == 0) continue;
+            var level = i + 1 < parts.Length && int.TryParse(parts[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 1;
+            result = result.With(parts[i], level);
+            if (i + 1 < parts.Length && int.TryParse(parts[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _)) i++;
+        }
+        return result;
     }
 
     public IndexDefinition? Parse(string instruction, string? data) =>

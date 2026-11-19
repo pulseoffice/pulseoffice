@@ -138,6 +138,7 @@ public sealed class DocxReader : ITextDocumentReader
             var referenced = _references.Targets(main).ToHashSet(StringComparer.Ordinal);
             context.ReferencedBookmarks.UnionWith(referenced);
             context.ReferencedBookmarks.UnionWith(_references.IndexRanges(main));
+            context.ReferencedBookmarks.UnionWith(_references.HyperlinkAnchors(main));
             _annotations.ReadComments(main, context);
             _annotations.ReadNotes(main, context);
             context.Part = main;

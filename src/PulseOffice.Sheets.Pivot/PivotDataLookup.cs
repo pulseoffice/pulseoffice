@@ -26,6 +26,9 @@ public sealed class PivotDataLookup : IPivotDataSource
     {
         if (sheetIndex < 0 || sheetIndex >= _workbook.Sheets.Count) return null;
 
+        if (_labels.Empty.Length > 0)
+            filters = [.. filters.Select(filter => string.Equals(filter.Item, _labels.Empty, StringComparison.OrdinalIgnoreCase) ? (filter.Field, string.Empty) : filter)];
+
         var sheetName = _workbook.Sheets[sheetIndex].Name;
 
         var definition = Containing(sheetName, target);
@@ -162,7 +165,9 @@ public sealed class PivotDataLookup : IPivotDataSource
     private bool Measure(PivotField field, string name)
     {
         var separator = name.IndexOf(" - ", StringComparison.Ordinal);
-        return separator > 0 && Names(field, name[(separator + 3)..].Trim());
+        if (separator > 0 && Names(field, name[(separator + 3)..].Trim())) return true;
+        var caption = name.IndexOf(" of ", StringComparison.OrdinalIgnoreCase);
+        return caption > 0 && Names(field, name[(caption + 4)..].Trim());
     }
 
     private IReadOnlyList<string>? Prefix(string?[] items)

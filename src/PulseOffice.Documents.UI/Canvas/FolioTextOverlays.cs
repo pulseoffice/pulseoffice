@@ -57,9 +57,10 @@ internal sealed class FolioTextOverlays(FolioEditor editor, FolioCanvasServices 
 
     public void PaintLayoutText(DrawingContext context, PageBox page, IBrush? accent)
     {
-        if (editor.LayoutText is not { } text || text.Page != page.Index) return;
+        var texts = editor.LayoutTexts.Where(text => text.Page == page.Index).ToList();
+        if (texts.Count == 0) return;
         var brush = SelectionBrush(accent);
-        foreach (var line in text.Lines) context.FillRectangle(brush, new Rect(line.X, line.Y, Math.Max(1, line.Width), line.Height));
+        foreach (var line in texts.SelectMany(text => text.Lines)) context.FillRectangle(brush, new Rect(line.X, line.Y, Math.Max(1, line.Width), line.Height));
     }
 
     private IBrush SelectionBrush(IBrush? accent) => new SolidColorBrush(accent is ISolidColorBrush solid ? solid.Color : Colors.DodgerBlue, 0.28);

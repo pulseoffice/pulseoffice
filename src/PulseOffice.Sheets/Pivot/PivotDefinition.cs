@@ -45,12 +45,17 @@ public sealed record PivotField
 
     public IReadOnlyCollection<string> ExcludedValues { get; init; } = [];
 
+    public int? SortByValue { get; init; }
+    public PivotTopFilter? TopFilter { get; init; }
+
     public string? Formula { get; init; }
 
     public bool IsCalculated => Formula is not null;
 
     public string Label => DisplayName ?? SourceName;
 }
+
+public sealed record PivotTopFilter(int Count, int ValueField, bool FromBottom = false);
 
 public enum PivotLayout { Compact, Outline, Tabular }
 

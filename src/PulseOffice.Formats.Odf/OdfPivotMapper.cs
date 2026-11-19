@@ -127,9 +127,20 @@ public sealed class OdfPivotMapper
                     new XAttribute(Namespaces.Table + "display", "false"),
                     new XAttribute(Namespaces.Table + "show-details", "true")))));
 
-        level.Add(new XElement(Namespaces.Table + "data-pilot-sort-info",
-            new XAttribute(Namespaces.Table + "sort-mode", "name"),
-            new XAttribute(Namespaces.Table + "order", field.SortDescending ? "descending" : "ascending")));
+        var values = pivot.In(PivotArea.Value).ToList();
+        if (field.TopFilter is { Count: > 0 } top && top.ValueField >= 0 && top.ValueField < values.Count)
+            level.Add(new XElement(Namespaces.Table + "data-pilot-display-info",
+                new XAttribute(Namespaces.Table + "enabled", "true"),
+                new XAttribute(Namespaces.Table + "data-field", values[top.ValueField].SourceName),
+                new XAttribute(Namespaces.Table + "member-count", top.Count.ToString(CultureInfo.InvariantCulture)),
+                new XAttribute(Namespaces.Table + "display-member-mode", top.FromBottom ? "from-bottom" : "from-top")));
+
+        var sort = new XElement(Namespaces.Table + "data-pilot-sort-info",
+            new XAttribute(Namespaces.Table + "sort-mode", field.SortByValue is { } byValue && byValue >= 0 && byValue < values.Count ? "data" : "name"),
+            new XAttribute(Namespaces.Table + "order", field.SortDescending ? "descending" : "ascending"));
+        if (field.SortByValue is { } sortIndex && sortIndex >= 0 && sortIndex < values.Count)
+            sort.Add(new XAttribute(Namespaces.Table + "data-field", values[sortIndex].SourceName));
+        level.Add(sort);
 
         var layout = new XElement(Namespaces.Table + "data-pilot-layout-info",
             new XAttribute(Namespaces.Table + "add-empty-lines", "false"),
@@ -241,6 +252,8 @@ public sealed class OdfPivotMapper
 
             if (fields.Count == 0) continue;
 
+            fields = Ranked(element, fields);
+
             var grand = element.Attribute(Namespaces.Table + "grand-total")?.Value ?? "both";
 
             workbook.Pivots.Add(new PivotDefinition
@@ -262,6 +275,46 @@ public sealed class OdfPivotMapper
             });
         }
         return new OdfPivotReadReport(passwords, filtered);
+    }
+
+    private List<PivotField> Ranked(XElement element, List<PivotField> fields)
+    {
+        var values = fields.Where(field => field.Area == PivotArea.Value).OrderBy(field => field.AreaOrder).ToList();
+        int? ValueIndex(string? name)
+        {
+            if (name is null) return null;
+            var index = values.FindIndex(field => string.Equals(field.SourceName, name, StringComparison.Ordinal));
+            return index >= 0 ? index : null;
+        }
+
+        var placed = element.Elements(Namespaces.Table + "data-pilot-field")
+            .Where(field => field.Attribute(Namespaces.Table + "is-data-layout-field")?.Value != "true")
+            .ToList();
+        var result = new List<PivotField>(fields);
+        var cursor = 0;
+        foreach (var xml in placed)
+        {
+            var name = xml.Attribute(Namespaces.Table + "source-field-name")?.Value;
+            var area = _areas.Value(xml.Attribute(Namespaces.Table + "orientation")?.Value);
+            if (name is null || area == PivotArea.Unused) continue;
+            var at = cursor++;
+            if (area is PivotArea.Value || at >= result.Count) continue;
+
+            var level = xml.Element(Namespaces.Table + "data-pilot-level");
+            var sort = level?.Element(Namespaces.Table + "data-pilot-sort-info");
+            var display = level?.Element(Namespaces.Table + "data-pilot-display-info");
+            var byValue = sort?.Attribute(Namespaces.Table + "sort-mode")?.Value == "data"
+                ? ValueIndex(sort.Attribute(Namespaces.Table + "data-field")?.Value)
+                : null;
+            PivotTopFilter? top = null;
+            if (display?.Attribute(Namespaces.Table + "enabled")?.Value == "true"
+                && ValueIndex(display.Attribute(Namespaces.Table + "data-field")?.Value) is { } topField
+                && int.TryParse(display.Attribute(Namespaces.Table + "member-count")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
+                && count > 0)
+                top = new PivotTopFilter(count, topField, display.Attribute(Namespaces.Table + "display-member-mode")?.Value == "from-bottom");
+            result[at] = result[at] with { SortByValue = byValue, TopFilter = top };
+        }
+        return result;
     }
 
     private PivotAggregation Aggregation(string? token) => token is null or "auto" ? PivotAggregation.Sum : _aggregations.Value(token);

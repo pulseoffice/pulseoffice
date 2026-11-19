@@ -14027,3 +14027,25 @@ Ledger engine: MAP broadcasts and pads mismatched arrays with #N/A as Excel does
 ### Round 257: Folio tables and tables of contents (2026-11-19)
 - DOCX floating tables keep `tblpXSpec`/`tblpYSpec` alignment; `TOC \o` without a range reads nine levels.
   Log: docs/deep-audit/round-257-folio-tables-toc.md.
+
+### Round 258: Ledger engine spills and volatility (2026-11-19)
+- Spills over merged cells or into tables give #SPILL! as in Excel (table changes recalculate spill anchors);
+  RANDARRAY is volatile; `#` computes a pending anchor first. Log: docs/deep-audit/round-258-ledger-engine-spill.md.
+
+### Round 259: Folio tables in depth and TOC sources (2026-11-19)
+- TOC first outline level and additional source styles (`\t`, `text:index-source-styles`) are model properties crossing
+  DOCX and ODT; DOCX tables without a usable grid take the cell widths; ODT columns without a width share the rest;
+  side-only DOCX cell margins keep the style's vertical padding; `_Toc` bookmarks targeted by hyperlinks are kept.
+  Log: docs/deep-audit/round-259-folio-tables-toc-sources.md.
+
+### Round 260: leftovers (2026-11-19)
+- Folio drags, Shift+click and Select All take in the continuation notices of the pages they cross.
+- Deck text boxes in tagged PDF are tagged by composed line position (`IRichTextLineBoxes`, `SlideParagraphLocator`).
+- XLSX date-group and dynamic month filters scan only the used rows; ODT writes bottom and outside margin offsets from
+  the page top with our offset in `pt:y`. Log: docs/deep-audit/round-260-leftovers.md.
+
+### Round 261: Ledger pivot tables (2026-11-19)
+- Index and difference display modes computed; sort by value and Top/Bottom N in model, engine, ODS and XLSX; outline
+  layout and repeat labels rendered, repeat labels native in XLSX; XLSX report filter selection read; GETPIVOTDATA
+  accepts "Sum of" names; numeric items as numbers, "(blank)" label, percent formats, XLSX captions per function.
+  Log: docs/deep-audit/round-261-ledger-pivots.md.

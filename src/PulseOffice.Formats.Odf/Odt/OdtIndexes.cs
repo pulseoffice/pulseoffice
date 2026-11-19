@@ -69,7 +69,8 @@ internal sealed class OdtIndexCodec(OdtStyleNames names, IIndexStyles styles) : 
                 source.Add(new XAttribute(Text + "outline-level", index.Levels.ToString(CultureInfo.InvariantCulture)),
                     new XAttribute(Text + "use-outline-level", Flag(index.FromOutline)),
                     new XAttribute(Text + "use-index-marks", Flag(index.FromMarks)),
-                    new XAttribute(Text + "use-index-source-styles", "false"));
+                    new XAttribute(Text + "use-index-source-styles", Flag(!index.SourceStyles.IsEmpty)));
+                if (index.FirstLevel > 1) source.Add(new XAttribute(Pt + "first-outline-level", index.FirstLevel.ToString(CultureInfo.InvariantCulture)));
                 break;
             case IndexKind.Alphabetical:
                 source.Add(new XAttribute(Text + "alphabetical-separators", Flag(index.LetterSeparators)),
@@ -116,6 +117,12 @@ internal sealed class OdtIndexCodec(OdtStyleNames names, IIndexStyles styles) : 
             if (index.Hyperlinks && index.Kind == IndexKind.Contents) template.Add(new XElement(Text + "index-entry-link-end"));
             source.Add(template);
         }
+        if (index.Kind == IndexKind.Contents)
+        {
+            foreach (var group in index.SourceStyles.Levels.GroupBy(pair => pair.Value).OrderBy(group => group.Key))
+                source.Add(new XElement(Text + "index-source-styles", new XAttribute(Text + "outline-level", group.Key.ToString(CultureInfo.InvariantCulture)),
+                    group.Select(pair => new XElement(Text + "index-source-style", new XAttribute(Text + "style-name", names.Encode(pair.Key))))));
+        }
         return source;
     }
 
@@ -159,6 +166,8 @@ internal sealed class OdtIndexCodec(OdtStyleNames names, IIndexStyles styles) : 
                 Levels = int.TryParse((string?)source?.Attribute(Text + "outline-level"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var levels) ? levels : 10,
                 FromOutline = (string?)source?.Attribute(Text + "use-outline-level") != "false",
                 FromMarks = (string?)source?.Attribute(Text + "use-index-marks") != "false",
+                FirstLevel = int.TryParse((string?)source?.Attribute(Pt + "first-outline-level"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var first) ? Math.Clamp(first, 1, 10) : 1,
+                SourceStyles = SourceStyles(source, resolve),
             },
             IndexKind.Alphabetical => index with
             {
@@ -180,7 +189,22 @@ internal sealed class OdtIndexCodec(OdtStyleNames names, IIndexStyles styles) : 
         };
     }
 
-    private IndexLevelStyles LevelStyles(OdtIndexShape shape, XElement? source, Func<string, string> resolve)
+    private IndexSourceStyles SourceStyles(XElement? source, Func<string, string> resolve)
+    {
+        var result = IndexSourceStyles.None;
+        if (source is null || (string?)source.Attribute(Text + "use-index-source-styles") != "true") return result;
+        foreach (var group in source.Elements(Text + "index-source-styles"))
+        {
+            if (!int.TryParse((string?)group.Attribute(Text + "outline-level"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var level)) continue;
+            foreach (var style in group.Elements(Text + "index-source-style"))
+            {
+                if ((string?)style.Attribute(Text + "style-name") is { Length: > 0 } encoded) result = result.With(resolve(encoded), level);
+            }
+        }
+        return result;
+    }
+
+        private IndexLevelStyles LevelStyles(OdtIndexShape shape, XElement? source, Func<string, string> resolve)
     {
         var result = IndexLevelStyles.Defaults;
         if (source is null || shape.Kind == IndexKind.Bibliography) return result;

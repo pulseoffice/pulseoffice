@@ -22,7 +22,7 @@ internal sealed class FormulaDependencies(CalculationEngine engine, INameExpansi
 
     private readonly HashSet<string> _volatileFunctions = new(StringComparer.OrdinalIgnoreCase)
     {
-        "NOW", "TODAY", "RAND", "RANDBETWEEN", "INDIRECT", "OFFSET", "INFO", "CELL",
+        "NOW", "TODAY", "RAND", "RANDBETWEEN", "RANDARRAY", "INDIRECT", "OFFSET", "INFO", "CELL",
     };
 
     private readonly HashSet<string> _visibilitySensitiveFunctions = new(StringComparer.OrdinalIgnoreCase)

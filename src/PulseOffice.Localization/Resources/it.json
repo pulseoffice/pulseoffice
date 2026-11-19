@@ -2842,6 +2842,7 @@
   "pivot.confirm": "Crea",
   "pivot.destination": "Foglio di destinazione",
   "pivot.explanation": "Trascina i campi nelle quattro zone, o spuntali: i numeri vanno nei Valori, il resto nelle Righe. Serve almeno un campo valore. L'anteprima mostra la tabella mentre la componi.",
+  "pivot.blank": "(vuoto)",
   "pivot.grandTotal": "Totale generale",
   "pivot.none": "Nessuna tabella pivot nel documento",
   "pivot.notUnderCursor": "Metti il cursore dentro la tabella pivot da eliminare",

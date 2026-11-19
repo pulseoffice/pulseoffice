@@ -52,8 +52,10 @@ public sealed class ContentsEntrySource(IIndexScope scope, IDocumentOutline outl
         var entries = new List<IndexEntry>();
         foreach (var paragraph in scope.Paragraphs(document))
         {
-            if (definition.FromOutline && outline.LevelOf(document, paragraph) is { } level && level <= definition.Levels && paragraph.Text.Trim() is { Length: > 0 } text)
+            if (definition.FromOutline && outline.LevelOf(document, paragraph) is { } level && level >= definition.FirstLevel && level <= definition.Levels && paragraph.Text.Trim() is { Length: > 0 } text)
                 entries.Add(new IndexEntry(text, level, [paragraph.Id]) { HeadingId = paragraph.Id });
+            else if (definition.SourceStyles.LevelOf(paragraph.StyleName) is { } styleLevel && paragraph.Text.Trim() is { Length: > 0 } styled)
+                entries.Add(new IndexEntry(styled, styleLevel, [paragraph.Id]) { HeadingId = paragraph.Id });
             if (!definition.FromMarks) continue;
             foreach (var mark in paragraph.Marks.OfType<IndexEntryMark>().Where(mark => mark.Index is "toc" && mark.Edge != MarkEdge.End && (mark.Level ?? 1) <= definition.Levels))
                 entries.Add(new IndexEntry(mark.Entry, mark.Level ?? 1, [paragraph.Id]));

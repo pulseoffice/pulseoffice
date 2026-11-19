@@ -36,6 +36,8 @@ internal sealed class SpillArea(Workbook workbook, Dictionary<SheetCell, CellVal
             .Where(blocked => touched.Any(c => c.SheetIndex == blocked.Key.SheetIndex && blocked.Value.Contains(c.Address)))
             .Select(blocked => blocked.Key)];
 
+    public IReadOnlyList<SheetCell> Anchors => [.. _ranges.Keys.Concat(_blocked.Keys).Distinct()];
+
     public void Reset()
     {
         var previous = _owners.Keys.ToList();
@@ -149,6 +151,12 @@ internal sealed class SpillArea(Workbook workbook, Dictionary<SheetCell, CellVal
 
         Release(anchor, spilled);
 
+        if (CoversMergedOrTableCells(sheet, anchor.SheetIndex, target))
+        {
+            _blocked[anchor] = target;
+            return CellValue.FromError(CellError.Spill);
+        }
+
         foreach (var address in target.Cells())
         {
             if (address == anchor.Address) continue;
@@ -206,6 +214,10 @@ internal sealed class SpillArea(Workbook workbook, Dictionary<SheetCell, CellVal
         if (sheet is not null && sheet[anchor.Address].SpillRange is not null)
             sheet[anchor.Address] = sheet[anchor.Address] with { SpillRange = null };
     }
+
+    private bool CoversMergedOrTableCells(Worksheet sheet, int sheetIndex, CellRange target) =>
+        sheet.Merges.Overlapping(target).Any()
+        || workbook.DatabaseRanges.All.Any(table => table.SheetIndex == sheetIndex && table.Range.IntersectsWith(target));
 
     private static CellValue ElementAt(ArrayValue array, int row, int column)
     {

@@ -53,8 +53,9 @@ the round that fixes it is joined and the join run is green.
   on the first paragraph is now the first section's starting number (235). Not yet opened in Word. (204, 209, 212)
 - Folio notes (232, 250): a page style run starts only at a top-level paragraph with a page style (not at a table); Word
   has one footnote separator per document, so a page style's own line is declared (DOCX273). Continuation notices are
-  now selectable read-only text by a click, but a drag or Shift+click from body text does not extend into them and
-  Select All does not include them (250, 254). None of this has been opened in Word or the reference suite.
+  selectable read-only text; a drag, Shift+click or Select All takes in the notices of the pages it crosses (260), but
+  copying a selection that holds body text copies the body only, and the notice of the page where a selection ends is
+  taken in only when the pointer is on it. None of this has been opened in Word or the reference suite. (250, 254, 260)
 - RTF has no Hiragana list numbering (the `\levelnfc` codes 12, 13, 20 and 21 are all Katakana): Hiragana lists are
   written with Katakana numbers (RTF007). (199, 209)
 - Folio object positions (235): vertical inside/outside alignment (Word only) is laid out as top/bottom and written to
@@ -62,31 +63,36 @@ the round that fixes it is joined and the join run is green.
   other applications measure a top-margin offset from the page edge correctly but align within the whole page; the
   alignment relative to a paragraph now settles on the wrapped height in up to four passes (246) and, for a paragraph
   broken across pages, on its last line on the anchor page (250). Not opened in Word.
-- Folio objects (251, 254): the bottom-margin, inside-margin and outside-margin relations go to ODT as the nearest
-  native relation plus `pt:vertical-rel`/`pt:horizontal-rel`, so other applications measure from the page top or the
-  start or end margin; a native form needs the anchor page geometry in the ODT writer. Allow-overlap goes to ODT only as
-  our attribute. Not opened in Word or the reference suite. (254)
+- Folio objects (251, 254, 260): bottom-margin and vertical outside-margin offsets are written to ODT from the page top
+  (`page` relation, offset plus page height less bottom margin, our offset kept in `pt:y`), using the initial page
+  style, so an object in a section with another page size gets an approximate native offset in other applications;
+  inside and outside relations are native only for odd pages (even pages mirror in Word but not in the ODT form);
+  aligned (not offset) objects in the bottom, inside or outside margin still align within the whole page in other
+  applications. Allow-overlap goes to ODT only as our attribute. Not opened in Word or the reference suite. (254, 260)
 
-- Folio TOC (257): the `\t` switch (additional styles with levels) and the first level of `\o "2-4"` have no model
-  property and are lost on DOCX reading (ODT `text:index-source-styles` likewise); a TOC without `\o` is still read as
-  built from the outline. (257)
-- (257) Re-audit Folio tables in depth: nested tables, cell margins and vertical alignment, merged cells, column widths
-  (auto, fixed, percent), table styles and band formatting, border conflicts, ODT table round trips, and TOC
-  hyperlinks, page numbers and update after edits; round 257 covered only floating tables, row splitting, repeated
-  headers, table look and the TOC switches.
+- Folio tables (259): percent and auto table widths (`tblW` pct/auto, ODT `style:rel-width`) have no model property;
+  tables are fixed-width after reading. (259)
+- Folio tables (259): DOCX table styles shading only `band1Horz`/`band1Vert` lose banding (the model shades only the
+  second band). (259)
+- Folio tables (259): border conflicts between adjacent cells are decided by drawing order and width, not by Word's
+  weight and colour rules. (259)
+- Folio TOC (259): update in an imported Word document does not reuse a heading's `_Toc` bookmark; the TOC dialog does
+  not expose the first level or the additional styles. (259)
+- Folio TOC (259): `\t` is written with commas; not checked in Word under a semicolon list separator. (259)
+- Folio tables (259): ODT table column widths in common (non-automatic) styles are not looked up. (259)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
-- Tagged PDF: Deck paragraphs are still matched to drawn text by text, not by layout position (the shape text layout
-  does not expose line boxes to the print path); table cells are now tagged by position. (243, 247)
+- Tagged PDF: Deck text boxes are tagged by composed line position (260); text drawn in a shape object (not a text
+  element) is still matched by text, and the line boxes come from a second composition of the frame, not from the one
+  painted. Not checked with a PDF/UA checker. (243, 247, 260)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
 - PDF form fields: a widget drawn with an embedded subset holds only the glyphs printed; a viewer that regenerates the
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
 
 ## Ledger
-- XLSX date-group and dynamic month filters scan every row of the filter range at load; clip to the used range. (255)
 - Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell
   order in Excel (declared XLSX244). Not opened in Excel or the reference suite. (253)
 - Remove duplicates now compares shown text, so the text "1" and the number 1 shown as "1" are duplicates; Excel's
@@ -102,7 +108,24 @@ the round that fixes it is joined and the join run is green.
   which other ODF applications ignore (they keep objects locked); Folio's exact character hit skips rotated text frames; none of this was
   built, run or opened in Excel, Word, PowerPoint or the reference suite. (236)
 
-- (256) Re-audit spill ranges, `@` and `#` references, iterative calculation, volatile dirty tracking, 1904 dates and the XLSX `cm` dynamic array metadata in depth; round 256 covered only the LAMBDA helpers and IFERROR/IFNA.
+- Unmerging cells does not recalculate an anchor blocked by the merge (#SPILL! stays until the next edit in its
+  range or a full recalculation); table changes now do. (258)
+- ODS `table:null-date` other than 1899-12-30 is ignored; dates stored as `office:date-value` are unaffected, but
+  numeric serials and DATEVALUE-style results follow our epoch. (258)
+- XLSX 1904 workbooks: only date-formatted constants are shifted to the 1900 system; plain numbers used as dates by
+  formulas are not. (258)
+- Not covered in depth by round 258, queued: recalculation of spills and volatile cells after row/column insertion
+  and deletion and range moves; the XLSX writer's `cm`/`metadata.xml` for blocked (#SPILL!) anchors and cached values
+  of spilled cells; ODS round trip of spill anchors and spilled values; iterative calculation with spilling cells in
+  the cycle (iteration takes the scalar). (258)
+- Round 261 (Ledger pivots), open: no interface to edit an existing pivot (show values as, number format, grouping,
+  sorting, filters, layout, totals, repeat labels); value field number formats not modelled; XLSX grouping still
+  declared (XLSX030, needs `fieldGroup`/`rangePr`/`groupItems`); manual groups, label and value filters and slicers not
+  modelled; date group labels not localized and ungrouped dates written as serials without format; boolean items keyed
+  "VERO"/"FALSO"; base field fixed to the first row field; % of parent, rank and % running total not written to either
+  format; compact layout keeps empty per-field columns, tabular parents on their own row, no blank lines; XLSX
+  `rowItems`/`colItems` not written and not opened in Excel. (261)
+
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over
   the ribbon, dialogs or panels, nor over the new polite live region of the status bar. (201, 203)

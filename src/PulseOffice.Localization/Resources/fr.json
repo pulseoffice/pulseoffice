@@ -2842,6 +2842,7 @@
   "pivot.confirm": "Créer",
   "pivot.destination": "Feuille de destination",
   "pivot.explanation": "Faites glisser les champs dans les quatre zones, ou cochez-les : les nombres vont dans Valeurs, le reste dans Lignes. Il faut au moins un champ de valeur. L'aperçu montre le tableau pendant que vous le composez.",
+  "pivot.blank": "(vide)",
   "pivot.grandTotal": "Total général",
   "pivot.none": "Aucun tableau croisé",
   "pivot.notUnderCursor": "Placez le curseur dans le tableau croisé dynamique à supprimer",

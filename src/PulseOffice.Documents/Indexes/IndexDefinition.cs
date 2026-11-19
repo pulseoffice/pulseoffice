@@ -36,6 +36,10 @@ public sealed record IndexDefinition(IndexKind Kind)
 
     public int Levels { get; init; } = 10;
 
+    public int FirstLevel { get; init; } = 1;
+
+    public IndexSourceStyles SourceStyles { get; init; } = IndexSourceStyles.None;
+
     public bool FromOutline { get; init; } = true;
 
     public bool FromMarks { get; init; } = true;

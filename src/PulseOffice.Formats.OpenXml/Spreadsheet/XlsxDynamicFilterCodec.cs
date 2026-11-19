@@ -66,7 +66,7 @@ internal sealed class XlsxDynamicFilterCodec
         var allowed = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
         var column = range.Start.Column + columnOffset;
         if (sheet is null || column > range.End.Column) return allowed;
-        for (var row = range.Start.Row + 1; row <= range.End.Row; row++)
+        for (int row = range.Start.Row + 1, last = Math.Min(range.End.Row, sheet.LastUsedRow); row <= last; row++)
         {
             var cell = sheet[new CellAddress(row, column)].Value;
             if (cell.Kind != ValueKind.Number || cell.AsNumber() is not (> FirstSerial and < LastSerial and var serial)) continue;

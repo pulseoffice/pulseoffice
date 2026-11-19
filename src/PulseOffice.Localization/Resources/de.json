@@ -2842,6 +2842,7 @@
   "pivot.confirm": "Erstellen",
   "pivot.destination": "Zieltabelle",
   "pivot.explanation": "Ziehen Sie die Felder in die vier Bereiche oder haken Sie sie an: Zahlen kommen zu den Werten, der Rest zu den Zeilen. Mindestens ein Wertfeld ist nötig. Die Vorschau zeigt die Tabelle beim Aufbau.",
+  "pivot.blank": "(Leer)",
   "pivot.grandTotal": "Gesamtergebnis",
   "pivot.none": "Keine Pivot-Tabelle im Dokument",
   "pivot.notUnderCursor": "Setzen Sie den Cursor in die zu löschende Pivot-Tabelle",

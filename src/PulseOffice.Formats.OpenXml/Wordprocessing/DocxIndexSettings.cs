@@ -12,6 +12,8 @@ public sealed class DocxIndexSettings
     private const int MaximumLevel = 10;
     private const string HeadingKey = "heading-style";
     private const string EntryKey = "entry-style.";
+    private const string SourceKey = "source-styles";
+    private const char Separator = '\u001F';
 
     public string Encode(IndexDefinition index)
     {
@@ -24,6 +26,7 @@ public sealed class DocxIndexSettings
         string Flag(bool value) => value ? "1" : "0";
         Line("kind", index.Kind.ToString());
         Line("levels", index.Levels.ToString(CultureInfo.InvariantCulture));
+        Line("first-level", index.FirstLevel.ToString(CultureInfo.InvariantCulture));
         Line("outline", Flag(index.FromOutline));
         Line("marks", Flag(index.FromMarks));
         Line("sequence", index.Sequence);
@@ -38,6 +41,8 @@ public sealed class DocxIndexSettings
         Line("objects", ((int)index.ObjectSources).ToString(CultureInfo.InvariantCulture));
         Line(HeadingKey, index.LevelStyles.Heading);
         foreach (var (level, name) in index.LevelStyles.Entries) Line(EntryKey + level.ToString(CultureInfo.InvariantCulture), name);
+        if (!index.SourceStyles.IsEmpty)
+            Line(SourceKey, string.Join(Separator, index.SourceStyles.Levels.Select(pair => pair.Value.ToString(CultureInfo.InvariantCulture) + Separator + pair.Key)));
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(lines.ToString()));
     }
 
@@ -57,10 +62,13 @@ public sealed class DocxIndexSettings
         var objects = values.TryGetValue("objects", out var objectText) && int.TryParse(objectText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var readObjects)
             ? (IndexObjectSources)readObjects & IndexObjectSources.All
             : parsed.ObjectSources;
+        var first = values.TryGetValue("first-level", out var firstText) && int.TryParse(firstText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var readFirst) ? Math.Clamp(readFirst, 1, levels) : parsed.FirstLevel;
         return new IndexDefinition(kind)
         {
             Title = parsed.Title,
             Levels = levels,
+            FirstLevel = first,
+            SourceStyles = values.TryGetValue(SourceKey, out var sourceText) ? SourceStyles(sourceText) : parsed.SourceStyles,
             FromOutline = Flag("outline", parsed.FromOutline),
             FromMarks = Flag("marks", parsed.FromMarks),
             Sequence = Value("sequence", parsed.Sequence),
@@ -85,6 +93,18 @@ public sealed class DocxIndexSettings
             if (!key.StartsWith(EntryKey, StringComparison.Ordinal) || name.Length == 0) continue;
             if (int.TryParse(key.AsSpan(EntryKey.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var level) && level is >= 0 and <= MaximumLevel)
                 result = result.WithEntry(level, name);
+        }
+        return result;
+    }
+
+    private IndexSourceStyles SourceStyles(string text)
+    {
+        var result = IndexSourceStyles.None;
+        var parts = text.Split(Separator);
+        for (var i = 0; i + 1 < parts.Length; i += 2)
+        {
+            if (parts[i + 1].Length > 0 && int.TryParse(parts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var level))
+                result = result.With(parts[i + 1], level);
         }
         return result;
     }

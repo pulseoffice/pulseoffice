@@ -16,6 +16,15 @@ public sealed partial class DocxBookmarkReferences
 
     public IEnumerable<string> IndexRanges(MainDocumentPart main) => Matches(main, IndexRange());
 
+    public IEnumerable<string> HyperlinkAnchors(MainDocumentPart main)
+    {
+        var roots = new List<DocumentFormat.OpenXml.OpenXmlElement?> { main.Document, main.FootnotesPart?.Footnotes, main.EndnotesPart?.Endnotes };
+        roots.AddRange(main.HeaderParts.Select(part => (DocumentFormat.OpenXml.OpenXmlElement?)part.Header));
+        roots.AddRange(main.FooterParts.Select(part => (DocumentFormat.OpenXml.OpenXmlElement?)part.Footer));
+        return roots.OfType<DocumentFormat.OpenXml.OpenXmlElement>().SelectMany(root => root.Descendants<W.Hyperlink>())
+            .Select(link => link.Anchor?.Value).OfType<string>().Where(anchor => anchor.Length > 0);
+    }
+
     private IEnumerable<string> Matches(MainDocumentPart main, Regex pattern)
     {
         var roots = new List<DocumentFormat.OpenXml.OpenXmlElement?> { main.Document, main.FootnotesPart?.Footnotes, main.EndnotesPart?.Endnotes };

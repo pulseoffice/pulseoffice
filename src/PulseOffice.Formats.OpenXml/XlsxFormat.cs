@@ -255,10 +255,6 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
         if (undescribed > 0)
             losses.Add(Diagnostic.Warning("XLSX030", $"{undescribed} pivot fields use a grouping, a calculation, an aggregation (median, first, last, distinct count) or a display mode XLSX cannot describe: they are saved without it.").With(undescribed));
 
-        var repeated = workbook.Pivots.Count(pivot => pivot.RepeatItemLabels);
-        if (repeated > 0)
-            losses.Add(Diagnostic.Info("XLSX063", $"{repeated} pivot tables repeat item labels: XLSX keeps the table without the repetition.").With(repeated));
-
         if (new XlsxTablePlanner().Plan(workbook).Unwritable is var untabled and > 0)
             losses.Add(Diagnostic.Info("XLSX031", $"{untabled} named data ranges cannot become Excel tables (a name Excel does not accept, header cells that are not distinct texts, an overlap with merged cells, another table or the sheet filter): they are lost in XLSX with their filters.").With(untabled));
 

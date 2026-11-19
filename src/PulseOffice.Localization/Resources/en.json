@@ -2842,6 +2842,7 @@
   "pivot.confirm": "Create",
   "pivot.destination": "Destination sheet",
   "pivot.explanation": "Drag the fields into the four areas, or tick them: numbers go to Values, the rest to Rows. At least one value field is needed. The preview shows the table as you build it.",
+  "pivot.blank": "(blank)",
   "pivot.grandTotal": "Grand total",
   "pivot.none": "No pivot table in the document",
   "pivot.notUnderCursor": "Place the cursor inside the pivot table to delete",

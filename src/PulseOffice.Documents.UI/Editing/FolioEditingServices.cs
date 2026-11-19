@@ -33,7 +33,8 @@ public sealed record FolioEditingServices(
     FolioControlServices Controls,
     ITextClusters Clusters,
     PulseOffice.Text.Rich.ITextCultures Cultures,
-    IMoveDisplayOptions Moves);
+    IMoveDisplayOptions Moves,
+    IFolioLayoutTextSelection Notices);
 
 public sealed record FolioControlServices(
     PulseOffice.Documents.Controls.IContentControlCatalog Catalog,

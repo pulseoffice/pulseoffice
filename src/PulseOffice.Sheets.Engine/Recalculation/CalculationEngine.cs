@@ -110,8 +110,9 @@ public sealed class CalculationEngine
         _columns.Reset(_workbook);
         if (_writing > 0 || !AutomaticCalculation) return;
         var readers = _tableReaders.Where(_formulas.ContainsKey).ToList();
-        if (readers.Count == 0) return;
         foreach (var reader in readers) RegisterDependencies(reader, _formulas[reader]);
+        readers.AddRange(_spills.Anchors.Where(anchor => _formulas.ContainsKey(anchor) && !readers.Contains(anchor)));
+        if (readers.Count == 0) return;
         RecalculateFrom(readers);
     }
 

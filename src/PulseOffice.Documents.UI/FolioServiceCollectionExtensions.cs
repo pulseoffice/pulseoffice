@@ -97,6 +97,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<PulseOffice.Shell.IDocumentStateWitness, Editing.FolioStateWitness>();
         services.AddSingleton<IContentControlPlaceholders, ContentControlPlaceholders>();
         services.AddSingleton<FolioControlServices>();
+        services.AddSingleton<IFolioLayoutTextSelection, FolioLayoutTextSelection>();
         services.AddSingleton<FolioEditingServices>();
         services.TryAddSingleton<PulseOffice.Text.Spelling.IWordCompletion, PulseOffice.Text.Spelling.WordCompletion>();
         services.AddSingleton<IFolioTypingAssist, FolioTypingAssist>();

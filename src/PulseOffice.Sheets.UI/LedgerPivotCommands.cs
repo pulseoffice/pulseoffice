@@ -79,7 +79,7 @@ public sealed class LedgerPivotCommands(
         return true;
     }
 
-    private PivotLabels Labels() => new(texts["pivot.grandTotal"], texts["pivot.subtotal"]);
+    private PivotLabels Labels() => new(texts["pivot.grandTotal"], texts["pivot.subtotal"], texts["pivot.blank"]);
 
     private string Describe(PulseOffice.Foundation.Diagnostics.Diagnostic diagnostic) =>
         texts.Format($"pivot.diagnostic.{diagnostic.Code}", diagnostic.Location ?? string.Empty);
@@ -101,7 +101,7 @@ public sealed class LedgerPivotCommands(
         var source = new RangePivotSource(sheet, range.Value);
 
         var choice = await dialogs.ShowAsync<PivotChoice>(
-            new PivotPromptView(source.Headers, UniqueSheetName(workbook), kit, new SourcePivotPreviewer(pivotEngine, source, new PivotLabels(kit["pivot.grandTotal"], kit["pivot.subtotal"]))),
+            new PivotPromptView(source.Headers, UniqueSheetName(workbook), kit, new SourcePivotPreviewer(pivotEngine, source, new PivotLabels(kit["pivot.grandTotal"], kit["pivot.subtotal"], kit["pivot.blank"]))),
             new DialogOptions { TitleKey = "dialog.pivot.title" }, ct)
             .ConfigureAwait(true);
 

@@ -141,7 +141,9 @@ internal sealed class WorkbookEvaluationContext(CalculationEngine engine, SheetC
         var index = ResolveSheetIndex(sheetName);
         if (index < 0) return null;
 
-        return engine.SpillRanges.TryGetValue(new SheetCell(index, anchor), out var range)
+        var cell = new SheetCell(index, anchor);
+        engine.GetValue(cell);
+        return engine.SpillRanges.TryGetValue(cell, out var range)
             ? range : null;
     }
 

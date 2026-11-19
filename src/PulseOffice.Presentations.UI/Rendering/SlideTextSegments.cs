@@ -22,15 +22,16 @@ public sealed class SlideTextSegments(TableGeometry geometry) : ISlideTextSegmen
         ArgumentNullException.ThrowIfNull(container);
         return element switch
         {
-            TextElement text when container.Role == PrintRole.Section => Paragraphs(container, text.Text),
+            TextElement text when container.Role == PrintRole.Section => Paragraphs(container, text.Text, placement),
             ObjectElement { Content: DataTableObject table } when container.Role == PrintRole.Table => Cells(container, table, placement),
             _ => null,
         };
     }
 
-    private PrintTextSegments? Paragraphs(PrintTag container, RichText text)
+    private PrintTextSegments? Paragraphs(PrintTag container, RichText text, SlideElementPlacement? placement)
     {
         var segments = new List<PrintTextSegment>();
+        var tags = new Dictionary<int, SlideParagraphTags>();
         PrintTag? list = null;
         for (var index = 0; index < text.Paragraphs.Count; index++)
         {
@@ -39,17 +40,24 @@ public sealed class SlideTextSegments(TableGeometry geometry) : ISlideTextSegmen
             if (!(paragraph.Bullet || paragraph.Numbered))
             {
                 list = null;
-                if (paragraph.Text.Trim().Length > 0) segments.Add(new PrintTextSegment(new PrintTag("p:" + key, PrintRole.Paragraph, container), paragraph.Text));
+                if (paragraph.Text.Trim().Length == 0) continue;
+                var plain = new PrintTag("p:" + key, PrintRole.Paragraph, container);
+                tags[index] = new SlideParagraphTags(plain, null);
+                segments.Add(new PrintTextSegment(plain, paragraph.Text));
                 continue;
             }
             list ??= new PrintTag("l:" + key, PrintRole.List, container);
             var item = new PrintTag("li:" + key, PrintRole.ListItem, list);
-            segments.Add(new PrintTextSegment(new PrintTag("lb:" + key, PrintRole.ListBody, item), paragraph.Text)
-            {
-                Label = new PrintTag("lbl:" + key, PrintRole.ListLabel, item),
-            });
+            var body = new PrintTag("lb:" + key, PrintRole.ListBody, item);
+            var label = new PrintTag("lbl:" + key, PrintRole.ListLabel, item);
+            tags[index] = new SlideParagraphTags(body, label);
+            segments.Add(new PrintTextSegment(body, paragraph.Text) { Label = label });
         }
-        return segments.Count == 0 ? null : new PrintTextSegments(segments, AdvanceOnMiss: false);
+        if (segments.Count == 0) return null;
+        return new PrintTextSegments(segments, AdvanceOnMiss: false)
+        {
+            Locator = placement is { Lines.Count: > 0 } placed ? new SlideParagraphLocator(placed, tags) : null,
+        };
     }
 
     private PrintTextSegments? Cells(PrintTag container, DataTableObject table, SlideElementPlacement? placement)

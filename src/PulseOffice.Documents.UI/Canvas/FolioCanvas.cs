@@ -422,7 +422,8 @@ public sealed class FolioCanvas : Control
         }
         if (ReadOnlyTextAt(point.Position) is { } notice)
         {
-            _editor.SelectLayoutText(notice);
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && PositionAt(point.Position) is { } reach) _editor.Select(_editor.Anchor, reach, notice);
+            else _editor.SelectLayoutText(notice);
             e.Handled = true;
             return;
         }
@@ -488,7 +489,7 @@ public sealed class FolioCanvas : Control
             e.Handled = true;
             return;
         }
-        if (PositionAt(e.GetPosition(this)) is { } position) _editor.PlaceCaret(position, extend: true);
+        if (PositionAt(e.GetPosition(this)) is { } position) _editor.Select(_editor.Anchor, position, ReadOnlyTextAt(e.GetPosition(this)));
         e.Handled = true;
     }
 

@@ -391,6 +391,14 @@ internal sealed class OdtFrameCodec(OdtMeasure measure) : OdtXml
         if (relation == VerticalRelation.OutsideMargin) graphic.SetAttributeValue(Pt + "vertical-rel", OutsideMargin);
     }
 
+    public PulseOffice.Foundation.Units.Twip? NativeVerticalShift(AnchoredObject item, PulseOffice.Documents.TextDocument document)
+    {
+        if (item.Anchor is AsCharacterAnchor || item.Placement.VerticalAlign != ObjectAlignment.None) return null;
+        if (item.Placement.Vertical is not (VerticalRelation.BottomMargin or VerticalRelation.OutsideMargin)) return null;
+        var page = document.Styles.Page.Find(document.InitialPageStyle) ?? new PageStyle(DefaultStyleNames.Standard);
+        return page.Size.Height - page.Margins.Bottom;
+    }
+
     public VerticalRelation? ReadVertical(XElement? graphic) =>
         (string?)graphic?.Attribute(Pt + "vertical-rel") == TopMargin ? VerticalRelation.Margin
         : (string?)graphic?.Attribute(Pt + "vertical-rel") == BottomMargin ? VerticalRelation.BottomMargin

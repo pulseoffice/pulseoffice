@@ -320,6 +320,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         var widest = columns.Count;
         var open = new List<(TableCell Origin, int Column)?>();
         var skipped = new List<TableCell>();
+        var cellWidths = new List<(int Column, int Span, W.TableCellWidth Width)>();
         foreach (var rowElement in Unwrapped<W.TableRow>(element.ChildElements))
         {
             var cells = new List<TableCell>();
@@ -370,6 +371,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
                     Formula = formulas.Read(cellElement),
                     TextDirection = geometry.Direction(properties?.TextDirection),
                 };
+                if (properties?.TableCellWidth is { } cellWidth) cellWidths.Add((column, span, cellWidth));
                 if (properties?.TableCellMargin is { HasChildren: true } cellMargins) margins.Add((cell, cellMargins));
                 if (properties?.TableCellBorders is { HasChildren: true } edges) own.Add((cell, edges));
                 cells.Add(cell);
@@ -412,7 +414,7 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
                 foreach (var cell in rows[r].Cells) cell.RowSpan = Math.Min(cell.RowSpan, rows.Count - r);
             headerRows = Math.Min(headerRows, granted);
         }
-        while (columns.Count < width) columns.Add(Twip.FromCentimeters(2));
+        Grid(columns, width, cellWidths, element.GetFirstChild<W.TableProperties>()?.TableWidth);
         foreach (var row in rows)
             while (row.Cells.Count < width) row.Cells.Add(new TableCell(new BlockContainer([new ParagraphBlock(context.Document.NextId("p"), string.Empty, DefaultStyleNames.Standard)])));
         foreach (var row in rows)
@@ -453,6 +455,31 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
             foreach (var (cell, margin) in margins) cell.Padding = geometry.Padding(margin, side, padded.VerticalCellPadding ?? side);
         }
         return table;
+    }
+
+    private void Grid(List<Twip> columns, int width, List<(int Column, int Span, W.TableCellWidth Width)> cellWidths, W.TableWidth? tableWidth)
+    {
+        while (columns.Count < width) columns.Add(new Twip(0));
+        if (columns.All(column => column.Value > 0)) return;
+        var total = tableWidth?.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(tableWidth.Width?.Value) ?? 0 : 0;
+        int Dxa(W.TableCellWidth cell) =>
+            cell.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(cell.Width?.Value) ?? 0
+            : cell.Type?.Value == W.TableWidthUnitValues.Pct && total > 0 && values.Integer(cell.Width?.Value) is { } fiftieths ? (int)((long)fiftieths * total / 5000)
+            : 0;
+        foreach (var (column, span, cell) in cellWidths.Where(entry => entry.Column < columns.Count && columns[entry.Column].Value == 0).OrderBy(entry => entry.Span))
+        {
+            var cells = Enumerable.Range(column, Math.Min(span, columns.Count - column)).ToList();
+            var unknown = cells.Where(index => columns[index].Value == 0).ToList();
+            var rest = Dxa(cell) - cells.Sum(index => columns[index].Value);
+            if (unknown.Count == 0 || rest <= 0) continue;
+            foreach (var index in unknown) columns[index] = new Twip(values.Bounded(rest / unknown.Count, 1, LargestLength));
+        }
+        var missing = columns.Count(column => column.Value == 0);
+        if (missing == 0) return;
+        var left = total - columns.Sum(column => column.Value);
+        var share = left > 0 ? values.Bounded(left / missing, 1, LargestLength) : Twip.FromCentimeters(2).Value;
+        for (var index = 0; index < columns.Count; index++)
+            if (columns[index].Value == 0) columns[index] = new Twip(share);
     }
 
     public const string TruncatedTable = "DOCX222";

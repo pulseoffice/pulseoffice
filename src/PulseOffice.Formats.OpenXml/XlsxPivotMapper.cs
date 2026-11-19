@@ -259,8 +259,8 @@ public sealed class XlsxPivotMapper
         {
             Reference = location.ToString(),
             FirstHeaderRow = 1u,
-            FirstDataRow = 1u,
-            FirstDataColumn = 1u,
+            FirstDataRow = (uint)Math.Max(pivot.In(PivotArea.Column).Count(), 1),
+            FirstDataColumn = (uint)Math.Max(pivot.In(PivotArea.Row).Count(), 1),
         });
 
         var fields = new PivotFields { Count = (uint)columns.Count };
@@ -295,6 +295,8 @@ public sealed class XlsxPivotMapper
             ShowLastColumn = true,
         });
 
+        if (TopFilters(pivot, columns) is { } topFilters) definition.AppendChild(topFilters);
+
         return definition;
     }
 
@@ -325,6 +327,7 @@ public sealed class XlsxPivotMapper
         if (axisField.SortDescending) element.SortType = FieldSortValues.Descending;
         else element.SortType = FieldSortValues.Ascending;
         if (!axisField.ShowSubtotals) element.DefaultSubtotal = false;
+        if (axisField.Area == PivotArea.Filter && axisField.ExcludedValues.Count > 0) element.MultipleItemSelectionAllowed = true;
 
         var items = new Items();
         for (var item = 0; item < column.Items.Count; item++)
@@ -336,6 +339,18 @@ public sealed class XlsxPivotMapper
         if (axisField.ShowSubtotals) items.AppendChild(new Item { ItemType = ItemValues.Default });
         items.Count = (uint)items.ChildElements.Count;
         element.AppendChild(items);
+
+        if (axisField.SortByValue is { } byValue && WrittenDataIndex(pivot, byValue) is { } dataIndex)
+            element.AppendChild(new AutoSortScope(new DocumentFormat.OpenXml.Spreadsheet.PivotArea(
+                new PivotAreaReferences(new PivotAreaReference(new FieldItem { Val = dataIndex })
+                { Field = DataReferenceField, Count = 1u, Selected = false })
+                { Count = 1u })
+            { DataOnly = false, Outline = false, FieldPosition = 0u }));
+
+        if (pivot.RepeatItemLabels && axisField.Area == PivotArea.Row)
+            element.AppendChild(new PivotFieldExtensionList(new PivotFieldExtension(
+                new DocumentFormat.OpenXml.Office2010.Excel.PivotField { FillDownLabels = true })
+            { Uri = FillDownExtension }));
 
         return element;
     }
@@ -364,8 +379,76 @@ public sealed class XlsxPivotMapper
         return data;
     }
 
-    private string DefaultCaption(PivotField field) =>
-        (field.Aggregation == PivotAggregation.Count ? "Count of " : "Sum of ") + field.SourceName;
+    private string DefaultCaption(PivotField field) => DefaultCaption(field.Aggregation, field.SourceName);
+
+    private string DefaultCaption(PivotAggregation aggregation, string name) => (aggregation switch
+    {
+        PivotAggregation.Count or PivotAggregation.CountNumbers => "Count of ",
+        PivotAggregation.Average => "Average of ",
+        PivotAggregation.Max => "Max of ",
+        PivotAggregation.Min => "Min of ",
+        PivotAggregation.Product => "Product of ",
+        PivotAggregation.StandardDeviation => "StdDev of ",
+        PivotAggregation.StandardDeviationPopulation => "StdDevp of ",
+        PivotAggregation.Variance => "Var of ",
+        PivotAggregation.VariancePopulation => "Varp of ",
+        _ => "Sum of ",
+    }) + name;
+
+    private const uint DataReferenceField = 4294967294u;
+
+    private uint? WrittenDataIndex(PivotDefinition pivot, int valueIndex)
+    {
+        var values = pivot.In(PivotArea.Value).ToList();
+        if (valueIndex < 0 || valueIndex >= values.Count || values[valueIndex].IsCalculated) return null;
+        return (uint)values.Take(valueIndex).Count(field => !field.IsCalculated);
+    }
+
+    private int? ModelValueIndex(List<PivotField> fields, uint dataIndex)
+    {
+        var values = fields.Where(field => field.Area == PivotArea.Value).OrderBy(field => field.AreaOrder).ToList();
+        return dataIndex < values.Count ? (int)dataIndex : null;
+    }
+
+    private uint? SortedByData(DocumentFormat.OpenXml.Spreadsheet.PivotField? field) =>
+        field?.GetFirstChild<AutoSortScope>()?.Descendants<PivotAreaReference>()
+            .Where(reference => reference.Field?.Value == DataReferenceField)
+            .Select(reference => reference.Elements<FieldItem>().FirstOrDefault()?.Val?.Value)
+            .FirstOrDefault();
+
+    private PivotFilters? TopFilters(PivotDefinition pivot, List<CacheColumn> columns)
+    {
+        var filters = new PivotFilters();
+        var id = 1u;
+        foreach (var field in pivot.Fields.Where(candidate => !candidate.IsCalculated && candidate.Area is PivotArea.Row or PivotArea.Column))
+        {
+            if (field.TopFilter is not { Count: > 0 } top || WrittenDataIndex(pivot, top.ValueField) is not { } measure) continue;
+            if (IndexOf(field, columns) is not (var at and >= 0)) continue;
+            filters.AppendChild(new PivotFilter(new AutoFilter(new FilterColumn(new Top10
+            {
+                Val = top.Count,
+                FilterValue = top.Count,
+                Top = top.FromBottom ? false : null,
+            }) { ColumnId = 0u }) { Reference = "A1" })
+            {
+                Field = (uint)at,
+                Type = PivotFilterValues.Count,
+                EvaluationOrder = -1,
+                Id = id++,
+                MeasureField = measure,
+            });
+        }
+        if (!filters.HasChildren) return null;
+        filters.Count = (uint)filters.ChildElements.Count;
+        return filters;
+    }
+
+    private const string FillDownExtension = "{2946ED86-A175-432a-8AC1-64E0C546D7DE}";
+
+    private bool FillsDown(DocumentFormat.OpenXml.Spreadsheet.PivotField? field) =>
+        field?.GetFirstChild<PivotFieldExtensionList>()?.Elements<PivotFieldExtension>()
+            .SelectMany(extension => extension.Elements<DocumentFormat.OpenXml.Office2010.Excel.PivotField>())
+            .Any(extended => extended.FillDownLabels?.Value == true) == true;
 
     private List<int> Axis(PivotDefinition pivot, List<CacheColumn> columns, PivotArea area) =>
         [.. pivot.In(area).Where(field => !field.IsCalculated).Select(field => IndexOf(field, columns)).Where(index => index >= 0)];
@@ -432,6 +515,14 @@ public sealed class XlsxPivotMapper
         AddAxis(fields, definition.RowFields?.Elements<Field>().Select(field => field.Index?.Value ?? -1), PivotArea.Row, cacheFields, pivotFields);
         AddAxis(fields, definition.ColumnFields?.Elements<Field>().Select(field => field.Index?.Value ?? -1), PivotArea.Column, cacheFields, pivotFields);
         AddAxis(fields, definition.PageFields?.Elements<PageField>().Select(field => field.Field?.Value ?? -1), PivotArea.Filter, cacheFields, pivotFields);
+        var selections = (definition.PageFields?.Elements<PageField>() ?? [])
+            .Where(page => page.Item?.Value is not null && page.Field?.Value is >= 0)
+            .ToDictionary(page => page.Field!.Value, page => page.Item!.Value);
+        for (var at = 0; at < fields.Count; at++)
+            if (fields[at].Area == PivotArea.Filter && selections.TryGetValue(fields[at].SourceColumnIndex, out var selected)
+                && Selected(cacheFields[fields[at].SourceColumnIndex], fields[at].SourceColumnIndex < pivotFields.Count ? pivotFields[fields[at].SourceColumnIndex] : null, selected) is { } kept)
+                fields[at] = fields[at] with { ExcludedValues = kept };
+        var repeat = fields.Any(field => field.Area == PivotArea.Row && field.SourceColumnIndex < pivotFields.Count && FillsDown(pivotFields[field.SourceColumnIndex]));
 
         var order = 0;
         foreach (var data in definition.DataFields?.Elements<DataField>() ?? [])
@@ -443,18 +534,35 @@ public sealed class XlsxPivotMapper
             var function = data.Subtotal?.Value ?? DataConsolidateFunctionValues.Sum;
             var mode = data.ShowDataAs?.Value;
             var caption = data.Name?.Value;
+            var aggregation = _aggregations.FirstOrDefault(pair => pair.Value == function, new(PivotAggregation.Sum, function)).Key;
             fields.Add(new PivotField
             {
                 SourceName = name,
                 SourceColumnIndex = index,
                 Area = PivotArea.Value,
                 AreaOrder = order++,
-                Aggregation = _aggregations.FirstOrDefault(pair => pair.Value == function, new(PivotAggregation.Sum, function)).Key,
+                Aggregation = aggregation,
                 DisplayMode = mode is { } shown ? _displayModes.FirstOrDefault(pair => pair.Value == shown, new(ValueDisplayMode.Normal, shown)).Key : ValueDisplayMode.Normal,
-                DisplayName = caption is null || caption == "Sum of " + name || caption == "Count of " + name ? null : caption,
+                DisplayName = caption is null || caption == DefaultCaption(aggregation, name) || caption == "Sum of " + name || caption == "Count of " + name ? null : caption,
             });
         }
 
+        for (var at = 0; at < fields.Count; at++)
+        {
+            if (fields[at].Area is not (PivotArea.Row or PivotArea.Column) || fields[at].SourceColumnIndex >= pivotFields.Count) continue;
+            if (SortedByData(pivotFields[fields[at].SourceColumnIndex]) is { } sortData && ModelValueIndex(fields, sortData) is { } sortIndex)
+                fields[at] = fields[at] with { SortByValue = sortIndex };
+        }
+        foreach (var filter in definition.GetFirstChild<PivotFilters>()?.Elements<PivotFilter>() ?? [])
+        {
+            if (filter.Type?.Value != PivotFilterValues.Count || filter.Field?.Value is not { } filtered) continue;
+            var top10 = filter.Descendants<Top10>().FirstOrDefault();
+            if (top10?.Val?.Value is not { } count || count <= 0) continue;
+            var measure = ModelValueIndex(fields, filter.MeasureField?.Value ?? 0u);
+            var target = fields.FindIndex(field => field.Area is PivotArea.Row or PivotArea.Column && field.SourceColumnIndex == (int)filtered);
+            if (measure is null || target < 0) continue;
+            fields[target] = fields[target] with { TopFilter = new PivotTopFilter((int)count, measure.Value, top10.Top?.Value == false) };
+        }
         if (fields.Count == 0) return null;
 
         var compact = definition.Compact?.Value != false;
@@ -476,7 +584,18 @@ public sealed class XlsxPivotMapper
             ShowGrandTotalRows = definition.ColumnGrandTotals?.Value != false,
             EmptyCellText = definition.ShowMissing?.Value != false ? definition.MissingCaption?.Value : null,
             AutoRefreshOnOpen = cache.RefreshOnLoad?.Value == true,
+            RepeatItemLabels = repeat,
         };
+    }
+
+    private HashSet<string>? Selected(CacheField cacheField, DocumentFormat.OpenXml.Spreadsheet.PivotField? pivotField, uint item)
+    {
+        var shared = cacheField.SharedItems?.ChildElements.ToList() ?? [];
+        var positions = pivotField?.Items?.Elements<Item>().Where(entry => entry.ItemType is null).Select(entry => entry.Index?.Value).ToList();
+        uint? sharedIndex = positions is { Count: > 0 } && item < positions.Count ? positions[(int)item] : item;
+        if (sharedIndex is not { } chosen || chosen >= shared.Count) return null;
+        var keep = SharedKey(shared[(int)chosen]);
+        return [.. shared.Select(SharedKey).Where(key => !string.Equals(key, keep, StringComparison.Ordinal))];
     }
 
     private PivotField Rebound(PivotField field, IReadOnlyList<string> headers)

@@ -13,7 +13,7 @@ public sealed class PivotFacade(
     IScriptReferences references,
     IScriptProtection protection) : ScriptFacade(dispatcher)
 {
-    private PivotLabels Labels => new(texts["pivot.grandTotal"], texts["pivot.subtotal"]);
+    private PivotLabels Labels => new(texts["pivot.grandTotal"], texts["pivot.subtotal"], texts["pivot.blank"]);
 
     public string[] Names => Read(() =>
         context.Workbook is { } workbook

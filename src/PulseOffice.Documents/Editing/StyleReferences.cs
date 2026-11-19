@@ -121,10 +121,10 @@ public sealed class StyleReferences(IStoryCatalog stories, IBlockTree tree) : IS
 
     private void Indexes(TextDocument document, EditRecorder recorder, string name, string? target)
     {
-        foreach (var section in stories.Stories(document).SelectMany(tree.Blocks).OfType<SectionBlock>().Where(section => section.Index?.LevelStyles.Mentions(name) == true).ToList())
+        foreach (var section in stories.Stories(document).SelectMany(tree.Blocks).OfType<SectionBlock>().Where(section => section.Index is { } index && (index.LevelStyles.Mentions(name) || index.SourceStyles.LevelOf(name) is not null)).ToList())
         {
             recorder.Touch<IndexDefinition>(section, () => [section.Index!], definitions => section.Index = definitions[0]);
-            section.Index = section.Index! with { LevelStyles = section.Index.LevelStyles.Map(style => style == name ? target : style) };
+            section.Index = section.Index! with { LevelStyles = section.Index.LevelStyles.Map(style => style == name ? target : style), SourceStyles = section.Index.SourceStyles.Map(style => style == name ? target : style) };
         }
     }
 

@@ -18,7 +18,7 @@ internal sealed class XlsxFilterDateGroups
         var column = range.Start.Column + columnOffset;
         if (column > range.End.Column) yield break;
 
-        for (var row = range.Start.Row + 1; row <= range.End.Row; row++)
+        for (int row = range.Start.Row + 1, last = Math.Min(range.End.Row, sheet.LastUsedRow); row <= last; row++)
         {
             var value = sheet[new CellAddress(row, column)].Value;
             if (value.Kind != ValueKind.Number || value.AsNumber() is not (> FirstSerial and < LastSerial and var serial)) continue;

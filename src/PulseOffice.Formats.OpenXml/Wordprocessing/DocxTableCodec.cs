@@ -72,7 +72,7 @@ public sealed class DocxTableStyleCodec(DocxValues values)
         return new TableProperties
         {
             CellPadding = left is { } horizontal ? horizontal / 20.0 : null,
-            VerticalCellPadding = top is { } vertical ? vertical / 20.0 : 0,
+            VerticalCellPadding = top is { } vertical ? vertical / 20.0 : left is null ? 0 : null,
         };
     }
 
@@ -102,8 +102,11 @@ public sealed class DocxTableStyleCodec(DocxValues values)
     public TableProperties Borders(W.TableBorders? borders)
     {
         if (borders is null) return TableProperties.None;
-        var top = borders.GetFirstChild<W.TopBorder>();
-        var lined = top?.Val?.Value is { } value && value != W.BorderValues.None && value != W.BorderValues.Nil;
+        bool Drawn(W.BorderType? border) => border?.Val?.Value is { } value && value != W.BorderValues.None && value != W.BorderValues.Nil;
+        W.BorderType? outer = borders.GetFirstChild<W.TopBorder>();
+        if (!Drawn(outer)) outer = new W.BorderType?[] { borders.GetFirstChild<W.BottomBorder>(), borders.GetFirstChild<W.LeftBorder>(), borders.GetFirstChild<W.StartBorder>(), borders.GetFirstChild<W.RightBorder>(), borders.GetFirstChild<W.EndBorder>() }.FirstOrDefault(Drawn) ?? outer;
+        var top = outer;
+        var lined = Drawn(top);
         var inside = borders.GetFirstChild<W.InsideHorizontalBorder>()?.Val?.Value;
         return new TableProperties
         {

@@ -36,8 +36,12 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
                 PathOf(source, index, rowFields), PathOf(source, index, columnFields), index));
         }
 
-        var rowNodes = Axis(rows.Select(row => row.RowPath), rowFields, definition.ShowGrandTotalRows);
-        var columnNodes = Axis(rows.Select(row => row.ColumnPath), columnFields, definition.ShowGrandTotalColumns);
+        var hiddenRows = new HashSet<IReadOnlyList<string>>(PathComparer.Instance);
+        var hiddenColumns = new HashSet<IReadOnlyList<string>>(PathComparer.Instance);
+        var rowNodes = Axis(rows, row => row.RowPath, rowFields, valueFields, source, definition.ShowGrandTotalRows, hiddenRows);
+        var columnNodes = Axis(rows, row => row.ColumnPath, columnFields, valueFields, source, definition.ShowGrandTotalColumns, hiddenColumns);
+        if (hiddenRows.Count > 0 || hiddenColumns.Count > 0)
+            rows = [.. rows.Where(row => !HiddenBy(hiddenRows, row.RowPath) && !HiddenBy(hiddenColumns, row.ColumnPath))];
 
         var columns = new List<PivotColumn>();
 
@@ -145,8 +149,16 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
     private string KeyOf(IPivotSource source, int row, PivotField field) =>
         grouping.KeyOf(source.ValueAt(row, field.SourceColumnIndex), field);
 
+    private bool HiddenBy(HashSet<IReadOnlyList<string>> hidden, IReadOnlyList<string> path)
+    {
+        for (var length = 1; length <= path.Count; length++)
+            if (hidden.Contains(new PathPrefix(path, length))) return true;
+        return false;
+    }
+
     private List<PivotNode> Axis(
-        IEnumerable<IReadOnlyList<string>> paths, IReadOnlyList<PivotField> fields, bool grandTotal)
+        IReadOnlyList<SourceRow> rows, Func<SourceRow, IReadOnlyList<string>> pathOf, IReadOnlyList<PivotField> fields,
+        IReadOnlyList<PivotField> valueFields, IPivotSource source, bool grandTotal, HashSet<IReadOnlyList<string>> hidden)
     {
         var nodes = new List<PivotNode>();
 
@@ -156,19 +168,43 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
             return nodes;
         }
 
-        void Walk(IReadOnlyList<string> prefix, int depth, IReadOnlyList<IReadOnlyList<string>> subset)
+        void Walk(IReadOnlyList<string> prefix, int depth, IReadOnlyList<SourceRow> subset)
         {
             var field = fields[depth];
 
-            var groups = new Dictionary<string, List<IReadOnlyList<string>>>(StringComparer.Ordinal);
-            foreach (var path in subset)
+            var groups = new Dictionary<string, List<SourceRow>>(StringComparer.Ordinal);
+            foreach (var row in subset)
             {
-                if (!groups.TryGetValue(path[depth], out var members)) groups[path[depth]] = members = [];
-                members.Add(path);
+                var key = pathOf(row)[depth];
+                if (!groups.TryGetValue(key, out var members)) groups[key] = members = [];
+                members.Add(row);
             }
 
             var items = groups.Keys.ToList();
             items.Sort((left, right) => Compare(left, right, field));
+
+            if (field.SortByValue is { } sortIndex && sortIndex >= 0 && sortIndex < valueFields.Count)
+            {
+                var measured = items.ToDictionary(item => item, item => Measured(source, groups[item], valueFields[sortIndex]), StringComparer.Ordinal);
+                var labelOrder = items.Select((item, position) => (item, position)).ToDictionary(pair => pair.item, pair => pair.position, StringComparer.Ordinal);
+                items.Sort((left, right) =>
+                {
+                    var byValue = measured[left].CompareTo(measured[right]);
+                    if (field.SortDescending) byValue = -byValue;
+                    return byValue != 0 ? byValue : labelOrder[left].CompareTo(labelOrder[right]);
+                });
+            }
+
+            if (field.TopFilter is { Count: > 0 } top && top.ValueField >= 0 && top.ValueField < valueFields.Count && top.Count < items.Count)
+            {
+                var ranked = items
+                    .OrderBy(item => Measured(source, groups[item], valueFields[top.ValueField]) * (top.FromBottom ? 1 : -1))
+                    .Take(top.Count)
+                    .ToHashSet(StringComparer.Ordinal);
+                foreach (var item in items.Where(item => !ranked.Contains(item)))
+                    hidden.Add(new List<string>(prefix) { item });
+                items = [.. items.Where(ranked.Contains)];
+            }
 
             foreach (var item in items)
             {
@@ -183,11 +219,18 @@ public sealed class PivotEngine(IPivotAggregator aggregator, IPivotGrouping grou
             }
         }
 
-        Walk([], 0, [.. paths]);
+        Walk([], 0, rows);
 
         if (grandTotal) nodes.Add(new PivotNode([], PivotNodeKind.GrandTotal));
 
         return nodes;
+    }
+
+    private double Measured(IPivotSource source, IReadOnlyList<SourceRow> rows, PivotField valueField)
+    {
+        if (valueField.IsCalculated) return 0;
+        var value = aggregator.Aggregate(valueField.Aggregation, [.. rows.Select(row => source.ValueAt(row.Index, valueField.SourceColumnIndex))]);
+        return value.IsNumeric ? value.AsNumber() : double.NegativeInfinity;
     }
 
     private int Compare(string left, string right, PivotField field)
@@ -269,6 +312,9 @@ internal sealed class ValueDisplays
         new PercentRunningTotal(),
         new Rank(ValueDisplayMode.RankAscending, (value, number) => value < number),
         new Rank(ValueDisplayMode.RankDescending, (value, number) => value > number),
+        new IndexDisplay(),
+        new PreviousDifference(ValueDisplayMode.DifferenceFrom, percent: false),
+        new PreviousDifference(ValueDisplayMode.PercentDifferenceFrom, percent: true),
     }.ToDictionary(display => display.Mode);
 
     public void Apply(CellValue[,] cells, IReadOnlyList<PivotNode> rows, IReadOnlyList<PivotColumn> columns)
@@ -324,6 +370,40 @@ internal sealed class DisplayPass
     public double Running { get; set; }
 
     private readonly int _leafDepth;
+
+    public CellValue? PreviousOuter(int row)
+    {
+        if (Rows.Any(node => node.Path.Count > 0))
+        {
+            var node = Rows[row];
+            if (node.Path.Count == 0) return null;
+            var target = PreviousPath(Rows, node);
+            if (target is null) return null;
+            for (var r = 0; r < Rows.Count; r++)
+                if (Rows[r].Kind == node.Kind && PathComparer.Instance.Equals(Rows[r].Path, target)) return Cells[r, Column];
+            return null;
+        }
+
+        var current = Columns[Column];
+        if (current.Node.Path.Count == 0) return null;
+        var nodes = Columns.Select(column => column.Node).ToList();
+        var previous = PreviousPath(nodes, current.Node);
+        if (previous is null) return null;
+        for (var c = 0; c < Columns.Count; c++)
+            if (Columns[c].FieldIndex == current.FieldIndex && Columns[c].Node.Kind == current.Node.Kind
+                && PathComparer.Instance.Equals(Columns[c].Node.Path, previous))
+                return Cells[row, c];
+        return null;
+    }
+
+    private static List<string>? PreviousPath(IReadOnlyList<PivotNode> nodes, PivotNode node)
+    {
+        var outer = nodes.Where(candidate => candidate.Path.Count > 0).Select(candidate => candidate.Path[0])
+            .Distinct(StringComparer.Ordinal).ToList();
+        var position = outer.IndexOf(node.Path[0]);
+        if (position <= 0) return null;
+        return [outer[position - 1], .. node.Path.Skip(1)];
+    }
 
     public bool IsItem(int row) => Rows[row].Kind == PivotNodeKind.Item && Rows[row].Path.Count == _leafDepth;
 
@@ -396,6 +476,22 @@ internal sealed class PercentRunningTotal() : ValueDisplay(ValueDisplayMode.Perc
         if (!pass.IsItem(row)) return null;
         pass.Running += number;
         return Ratio(pass.Running, pass.Total);
+    }
+}
+
+internal sealed class IndexDisplay() : ValueDisplay(ValueDisplayMode.Index)
+{
+    public override CellValue? Show(DisplayPass pass, int row, double number) =>
+        Ratio(number * pass.GrandTotal, pass.RowTotal(row) * pass.Total);
+}
+
+internal sealed class PreviousDifference(ValueDisplayMode mode, bool percent) : ValueDisplay(mode)
+{
+    public override CellValue? Show(DisplayPass pass, int row, double number)
+    {
+        if (pass.PreviousOuter(row) is not { IsNumeric: true } previous) return CellValue.Empty;
+        var difference = number - previous.AsNumber();
+        return percent ? Ratio(difference, previous.AsNumber()) : CellValue.Number(difference);
     }
 }
 
