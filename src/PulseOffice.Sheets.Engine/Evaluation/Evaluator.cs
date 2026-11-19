@@ -6,7 +6,7 @@ using PulseOffice.Sheets.Values;
 
 namespace PulseOffice.Sheets.Engine.Evaluation;
 
-public sealed class Evaluator(IFunctionRegistry functions, ISpecialFormRegistry specialForms, NumericText numbers, ArrayParameterClasses arrayParameters, INameExpansion names)
+public sealed class Evaluator(IFunctionRegistry functions, ISpecialFormRegistry specialForms, NumericText numbers, ArrayParameterClasses arrayParameters, INameExpansion names, IDateEpoch epochs)
     : IEvaluationServices
 {
     private const int MaxDepth = 64;
@@ -34,12 +34,15 @@ public sealed class Evaluator(IFunctionRegistry functions, ISpecialFormRegistry 
         var enclosingCallDepth = _callDepth.Value;
         var enclosingResult = _lastResult.Value;
         _lastResult.Value = CellValue.Number(0);
+        var epoch = context.TextRules.Settings.DateEpoch;
+        var entered = epochs.Current == epoch ? null : epochs.Enter(epoch);
         try
         {
             return EvaluateNode(node, EvaluationScope.Empty, context, 0);
         }
         finally
         {
+            entered?.Dispose();
             _callDepth.Value = enclosingCallDepth;
             if (enclosingCallDepth > 0) _lastResult.Value = enclosingResult;
         }

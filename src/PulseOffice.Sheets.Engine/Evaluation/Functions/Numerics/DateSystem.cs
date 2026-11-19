@@ -1,3 +1,5 @@
+using PulseOffice.Sheets;
+
 namespace PulseOffice.Sheets.Engine.Evaluation.Functions.Numerics;
 
 public interface IDateSystem
@@ -10,9 +12,13 @@ public interface IDateSystem
     double TimeToFraction(int hours, int minutes, double seconds);
 }
 
-public sealed class StandardDateSystem : IDateSystem
+public sealed class StandardDateSystem(IDateEpoch epochs) : IDateSystem
 {
-    public DateOnly Epoch { get; } = new(1899, 12, 30);
+    public StandardDateSystem() : this(new AmbientDateEpoch())
+    {
+    }
+
+    public DateOnly Epoch => epochs.Current;
 
     public double ToSerial(DateTime value)
     {

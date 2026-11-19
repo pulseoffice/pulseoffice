@@ -28,7 +28,8 @@ public sealed class OdfPivotMapper
         (ValueDisplayMode.PercentDifferenceFrom, "member-percentage-difference"), (ValueDisplayMode.Index, "index"));
     private readonly XNamespace _pivot = "urn:pulseoffice:pivot";
     private readonly TokenMap<ValueDisplayMode> _extendedReferences = new(ValueDisplayMode.Normal, "none",
-        (ValueDisplayMode.PercentOfParent, "parent-percentage"), (ValueDisplayMode.PercentRunningTotal, "running-total-percentage"),
+        (ValueDisplayMode.PercentOfParent, "parent-percentage"), (ValueDisplayMode.PercentOfParentColumn, "parent-column-percentage"),
+        (ValueDisplayMode.PercentRunningTotal, "running-total-percentage"),
         (ValueDisplayMode.RankAscending, "rank-ascending"), (ValueDisplayMode.RankDescending, "rank-descending"));
     private readonly TokenMap<DateGrouping> _dateParts = new(DateGrouping.None, "",
         (DateGrouping.Seconds, "seconds"), (DateGrouping.Minutes, "minutes"), (DateGrouping.Hours, "hours"),
@@ -49,6 +50,7 @@ public sealed class OdfPivotMapper
         ValueDisplayMode.PercentOfColumn, ValueDisplayMode.RunningTotal, ValueDisplayMode.DifferenceFrom,
         ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.Index, ValueDisplayMode.PercentOfParent,
         ValueDisplayMode.PercentRunningTotal, ValueDisplayMode.RankAscending, ValueDisplayMode.RankDescending,
+        ValueDisplayMode.PercentOfParentColumn,
     };
 
     public XElement? Build(Workbook workbook)
@@ -117,13 +119,33 @@ public sealed class OdfPivotMapper
                 new XAttribute(Namespaces.Table + "field-name", baseField?.SourceName ?? string.Empty),
                 new XAttribute(Namespaces.Table + "type", _references.Token(field.DisplayMode)));
             if (field.DisplayMode is ValueDisplayMode.DifferenceFrom or ValueDisplayMode.PercentDifferenceFrom)
-                reference.Add(new XAttribute(Namespaces.Table + "member-type", "previous"));
+                reference.Add(MemberOf(field.BaseItem));
             element.Add(reference);
         }
 
         if (!isValue && Grouping(field) is { } groups) element.Add(groups);
 
         return element;
+    }
+
+    private object[] MemberOf(PivotBaseItem item) => item.Kind switch
+    {
+        PivotBaseItemKind.Next => [new XAttribute(Namespaces.Table + "member-type", "next")],
+        PivotBaseItemKind.Named when item.Key is { } key =>
+            [new XAttribute(Namespaces.Table + "member-type", "named"), new XAttribute(Namespaces.Table + "member-name", PivotValues.NameOf(key))],
+        _ => [new XAttribute(Namespaces.Table + "member-type", "previous")],
+    };
+
+    private PivotBaseItem BaseItemOf(XElement? reference)
+    {
+        var type = reference?.Attribute(Namespaces.Table + "member-type")?.Value;
+        var name = reference?.Attribute(Namespaces.Table + "member-name")?.Value;
+        return type switch
+        {
+            "next" => PivotBaseItem.Next,
+            "named" when name is not null => PivotBaseItem.Named(name),
+            _ => PivotBaseItem.Previous,
+        };
     }
 
     private PivotField? BaseFieldOf(PivotDefinition pivot, PivotField field)
@@ -158,7 +180,7 @@ public sealed class OdfPivotMapper
 
         if (field.ExcludedValues.Count > 0)
             level.Add(new XElement(Namespaces.Table + "data-pilot-members",
-                field.ExcludedValues.Select(value => new XElement(Namespaces.Table + "data-pilot-member",
+                field.ExcludedValues.Select(PivotValues.NameOf).Distinct(StringComparer.Ordinal).Select(value => new XElement(Namespaces.Table + "data-pilot-member",
                     new XAttribute(Namespaces.Table + "name", value),
                     new XAttribute(Namespaces.Table + "display", "false"),
                     new XAttribute(Namespaces.Table + "show-details", "true")))));
@@ -270,6 +292,7 @@ public sealed class OdfPivotMapper
                     Aggregation = Aggregation(field.Attribute(Namespaces.Table + "function")?.Value),
                     DisplayMode = DisplayModeOf(field, reference),
                     BaseField = area == PivotArea.Value ? BaseNameOf(field, reference) : null,
+                    BaseItem = area == PivotArea.Value ? BaseItemOf(reference) : PivotBaseItem.Previous,
                     NumberFormat = area == PivotArea.Value ? field.Attribute(_pivot + "number-format")?.Value : null,
                     ShowSubtotals = level is null || Subtotals(level),
                     ShowItemsWithNoData = level?.Attribute(Namespaces.Table + "show-empty")?.Value == "true",
@@ -280,6 +303,7 @@ public sealed class OdfPivotMapper
                         .Where(member => member.Attribute(Namespaces.Table + "display")?.Value == "false")
                         .Select(member => member.Attribute(Namespaces.Table + "name")?.Value)
                         .OfType<string>()
+                        .SelectMany(name => new[] { name, PivotValues.TextKeyOf(name) })
                         .ToHashSet() ?? [],
                     DateGrouping = groups?.Attribute(Namespaces.Table + "source-field-name") is null
                         ? _dateParts.Value(groups?.Attribute(Namespaces.Table + "grouped-by")?.Value)

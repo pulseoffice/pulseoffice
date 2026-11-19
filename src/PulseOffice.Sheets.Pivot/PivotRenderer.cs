@@ -159,7 +159,7 @@ public sealed class PivotRenderer : IPivotRenderer
     private readonly IReadOnlySet<ValueDisplayMode> _percentModes = new HashSet<ValueDisplayMode>
     {
         ValueDisplayMode.PercentOfTotal, ValueDisplayMode.PercentOfRow, ValueDisplayMode.PercentOfColumn,
-        ValueDisplayMode.PercentOfParent, ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.PercentRunningTotal,
+        ValueDisplayMode.PercentOfParent, ValueDisplayMode.PercentOfParentColumn, ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.PercentRunningTotal,
     };
 
     private int FormatIdOf(PivotField field, NumberFormatCatalog? formats)
@@ -192,13 +192,24 @@ internal sealed class PivotItemCells
 {
     private readonly PivotDateLabels _dates = new();
 
-    public string Display(string key, PivotField? field, PivotLabels labels) =>
-        key.Length == 0 ? labels.Empty : _dates.Label(key, field, labels) ?? key;
+    public string Display(string key, PivotField? field, PivotLabels labels)
+    {
+        if (key.Length == 0) return labels.Empty;
+        if (_dates.Label(key, field, labels) is { } dated) return dated;
+        var culture = labels.Culture ?? System.Globalization.CultureInfo.CurrentCulture;
+        return Value(key, field, labels) switch
+        {
+            { Kind: ValueKind.Boolean } truth => new CultureBooleanNames(culture).Name(truth.AsBoolean()),
+            { Kind: ValueKind.Number } number => number.AsNumber().ToString("R", culture),
+            var other => other.ToString(),
+        };
+    }
 
     public CellValue Value(string key, PivotField? field, PivotLabels labels)
     {
         if (key.Length == 0) return CellValue.Text(labels.Empty);
         if (_dates.Label(key, field, labels) is { } dated) return CellValue.Text(dated);
+        if (PivotValues.IsMarkedText(key)) return CellValue.Text(PivotValues.NameOf(key));
         if (field is { DateGrouping: DateGrouping.None, NumericGroupInterval: null } && PivotValues.BooleanOf(key) is { } truth)
             return CellValue.Boolean(truth);
         if (field is { DateGrouping: DateGrouping.None, NumericGroupInterval: null }

@@ -82,7 +82,7 @@ public sealed class HiddenParagraphs : IHiddenParagraphs
     public bool Show { get; set; }
 }
 
-public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, IListLabeling labeling, IEnumerable<INumberFormatter> formatters, IPageFieldText fields, PageFlowOptions options, ITableAppearance appearance, IChangeMarkup markup, IHiddenParagraphs hidden, IPlaceholderMarkup placeholders, ISectionNoteCollection sectionNotes) : IFlowBuilder
+public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, IListLabeling labeling, IEnumerable<INumberFormatter> formatters, IPageFieldText fields, PageFlowOptions options, ITableAppearance appearance, IChangeMarkup markup, IHiddenParagraphs hidden, IPlaceholderMarkup placeholders, ISectionNoteCollection sectionNotes, ITableMeasure measure) : IFlowBuilder
 {
     private readonly IReadOnlyDictionary<NumberFormat, INumberFormatter> _formatters = formatters.ToDictionary(formatter => formatter.Format);
     private readonly ConditionalWeakTable<TextParagraph, TextParagraph> _styled = new();
@@ -353,7 +353,14 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         var cellContext = context with { Sections = false, Story = context.Story == StoryKind.Body ? StoryKind.Cell : context.Story };
         var looks = appearance.Cells(table, properties);
         var rows = table.Rows.Select((row, r) => new TableRowItem(row, [.. row.Cells.Select((cell, column) => Cell(looks[r][column], cell, column, cellContext))])).ToList();
-        return new TableItem(table, [.. table.Columns.Select(column => column.ToPoints())], rows, style) { Story = context.Story };
+        var item = new TableItem(table, [.. table.Columns.Select(column => column.ToPoints())], rows, style) { Story = context.Story };
+        if (!table.AutoWidth || table.Columns.Count == 0) return item;
+        return new TableItem(table, item.Columns, rows, style)
+        {
+            Story = context.Story,
+            AutoMinimum = measure.Widths(context.Document, table, TableMeasureKind.Minimal),
+            AutoMaximum = [.. measure.Widths(context.Document, table, TableMeasureKind.Optimal).Select((width, column) => Math.Max(width, item.Columns[column]))],
+        };
     }
 
     private TableCellItem Cell(CellAppearance? look, TableCell cell, int column, FlowContext context)

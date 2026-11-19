@@ -207,6 +207,10 @@ public sealed record TableProperties
 
     public uint? FirstBandBackground { get; init; }
 
+    public TableBandAxes? BandAxes { get; init; }
+
+    public TableBandAxes? FirstBandAxes { get; init; }
+
     public double? CellPadding { get; init; }
 
     public double? VerticalCellPadding { get; init; }
@@ -226,6 +230,8 @@ public sealed record TableProperties
         HeaderBold = HeaderBold ?? under.HeaderBold,
         BandBackground = BandBackground ?? under.BandBackground,
         FirstBandBackground = FirstBandBackground ?? under.FirstBandBackground,
+        BandAxes = BandBackground is null ? BandAxes ?? under.BandAxes : BandAxes,
+        FirstBandAxes = FirstBandBackground is null ? FirstBandAxes ?? under.FirstBandAxes : FirstBandAxes,
         CellPadding = CellPadding ?? under.CellPadding,
         VerticalCellPadding = VerticalCellPadding ?? under.VerticalCellPadding,
     };

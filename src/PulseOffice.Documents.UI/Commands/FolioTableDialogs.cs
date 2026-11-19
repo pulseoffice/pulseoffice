@@ -33,6 +33,8 @@ public sealed record TablePropertiesChoice(
     public PulseOffice.Foundation.Units.Twip Indent { get; init; }
 
     public CellTextDirection Direction { get; init; }
+
+    public PulseOffice.Documents.Editing.Tables.TableWidthChoice? Width { get; init; }
 }
 
 public interface IFolioTableDialogs
@@ -184,6 +186,11 @@ public sealed class FolioTableDialogs(
                     [.. _placements.Select(placement => new IconChoice(placement.ToString(), $"folio.table.place{placement}", texts[$"folio.table.properties.place.{placement.ToString().ToLowerInvariant()}"]))], icons,
                     Math.Max(0, Array.IndexOf(_placements, table.Alignment))) { ShowLabels = true, Columns = 1 },
                 new NumberField("indent", texts["folio.table.properties.indent"], Math.Round(table.Indent.ToCentimeters(), 2), -10, 50, 0.1) { Unit = "cm", ShownWhen = current => Placement(current) == TableAlignment.Left },
+                new ChoiceField("widthMode", texts["folio.table.properties.widthMode"],
+                    [texts["folio.table.properties.widthMode.fixed"], texts["folio.table.properties.widthMode.percent"], texts["folio.table.properties.widthMode.automatic"]],
+                    table.AutoWidth ? 2 : table.WidthPercent is not null ? 1 : 0),
+                new NumberField("width", texts["folio.table.properties.width"], Math.Round(PulseOffice.Foundation.Units.Twip.FromPoints(table.Columns.Sum(column => column.ToPoints())).ToCentimeters(), 2), 0.5, 100, 0.1) { Unit = "cm", ShownWhen = current => current.Choice("widthMode", 3) == 0 },
+                new NumberField("percent", texts["folio.table.properties.percent"], Math.Round(table.WidthPercent ?? 100, 1), 1, 1000, 1) { Unit = "%", ShownWhen = current => current.Choice("widthMode", 3) == 1 },
             ])
             {
                 LivePreview = feed => PlacementPreview(feed, table, textWidth),
@@ -220,6 +227,10 @@ public sealed class FolioTableDialogs(
             Placement = Placement(values),
             Indent = PulseOffice.Foundation.Units.Twip.FromCentimeters(values.Number("indent", 0)),
             Direction = _directions[values.Choice("direction", _directions.Length)],
+            Width = new PulseOffice.Documents.Editing.Tables.TableWidthChoice(
+                (PulseOffice.Documents.Editing.Tables.TableWidthMode)values.Choice("widthMode", 3),
+                PulseOffice.Foundation.Units.Twip.FromCentimeters(values.Number("width", 0)).ToPoints(),
+                values.Number("percent", 100)),
         };
     }
 

@@ -371,7 +371,7 @@ internal sealed class TableFlow(PaginationRun run, ITableComposer tables, PageSt
         var box = tables.Emit(placement, emission with { Carried = carried });
         if (run.Tables.Count > 0 && run.Tables[^1] is { } last && last.TableId == box.TableId && Math.Abs(last.Bounds.X - box.Bounds.X) < Epsilon && Math.Abs(last.Bounds.Bottom - box.Bounds.Y) < Epsilon)
         {
-            run.Tables[^1] = new TableBox(box.TableId, last.Bounds with { Height = last.Bounds.Height + box.Bounds.Height }, [.. last.Cells, .. box.Cells]);
+            run.Tables[^1] = new TableBox(box.TableId, last.Bounds with { Height = last.Bounds.Height + box.Bounds.Height }, [.. last.Cells, .. WithoutDrawnEdges(last.Cells, box.Cells)]);
         }
         else
         {
@@ -387,6 +387,18 @@ internal sealed class TableFlow(PaginationRun run, ITableComposer tables, PageSt
         _onlyHeaders = false;
         return overflow;
     }
+
+    private IEnumerable<CellBox> WithoutDrawnEdges(IReadOnlyList<CellBox> drawn, IReadOnlyList<CellBox> cells)
+    {
+        var keys = drawn.SelectMany(cell => cell.Content.OfType<DecorationBox>()).Where(box => box.Kind == DecorationKind.CellEdge).Select(EdgeKey).ToHashSet();
+        return cells.Select(cell => new CellBox(cell.TableId, cell.Row, cell.Column, cell.Bounds,
+            [.. cell.Content.Where(box => box is not DecorationBox { Kind: DecorationKind.CellEdge } edge || !keys.Contains(EdgeKey(edge)))]));
+    }
+
+    private (long, long, long, long, uint, PulseOffice.Text.Rich.BorderLineStyle) EdgeKey(DecorationBox edge) =>
+        (Snap(edge.Bounds.X), Snap(edge.Bounds.Y), Snap(edge.Bounds.Width), Snap(edge.Bounds.Height), edge.Color ?? 0, edge.LineStyle);
+
+    private long Snap(double value) => (long)Math.Round(value * 1000);
 
     private bool Overflowed(TablePlacement placement, bool overflow, int end)
     {

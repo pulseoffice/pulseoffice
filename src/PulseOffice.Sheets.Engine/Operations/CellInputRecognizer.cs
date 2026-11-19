@@ -11,8 +11,10 @@ public interface ICellInputRecognizer
     RecognizedInput Recognize(string typed);
 }
 
-public sealed class CellInputRecognizer(ISpreadsheetLocale locale, ISystemDateCode systemDates) : ICellInputRecognizer
+public sealed class CellInputRecognizer(ISpreadsheetLocale locale, ISystemDateCode systemDates, IDateEpoch epochs) : ICellInputRecognizer
 {
+    public CellInputRecognizer(ISpreadsheetLocale locale, ISystemDateCode systemDates) : this(locale, systemDates, new AmbientDateEpoch()) { }
+
     public CellInputRecognizer(ISpreadsheetLocale locale) : this(locale, new SystemDateCode()) { }
 
     private const string Euro = "€";
@@ -22,7 +24,6 @@ public sealed class CellInputRecognizer(ISpreadsheetLocale locale, ISystemDateCo
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
     private const NumberStyles GroupedStyles = PlainStyles | NumberStyles.AllowThousands;
 
-    private static readonly DateTime Epoch = new(1899, 12, 30);
     private static readonly string[] IsoDates = ["yyyy-MM-dd", "yyyy-M-d"];
     private static readonly string[] Times = [@"h\:mm", @"hh\:mm"];
     private static readonly string[] TimesWithSeconds = [@"h\:mm\:ss", @"hh\:mm\:ss"];
@@ -36,6 +37,8 @@ public sealed class CellInputRecognizer(ISpreadsheetLocale locale, ISystemDateCo
     };
 
     public CellInputRecognizer() : this(new SystemSpreadsheetLocale()) { }
+
+    private DateTime Epoch => epochs.Current.ToDateTime(TimeOnly.MinValue);
 
     public RecognizedInput Recognize(string typed)
     {

@@ -18,8 +18,11 @@ public sealed class LedgerPivotCommands(
     DataDialogs.LedgerDialogKit kit,
     IPivotEngine pivotEngine,
     IWorksheetTabPolicy tabs,
-    Queries.IPivotSourceRefresher? externalSources = null) : LedgerCommandSet(context)
+    Queries.IPivotSourceRefresher? externalSources = null,
+    IPivotSources? pivotSources = null) : LedgerCommandSet(context)
 {
+    private readonly IPivotSources _pivotSources = pivotSources ?? new PivotSources();
+
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Prototype("ledger.data.pivotCreate") with
@@ -43,7 +46,64 @@ public sealed class LedgerPivotCommands(
             RunsDocumentQueries = true,
             Execute = (_, ct) => RefreshAsync(ct),
         },
+
+        Prototype("ledger.pivot.edit") with
+        {
+            MenuPath = "data/pivot",
+            Surface = CommandSurface.Common | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.HasTarget && Context.Workbook is { } workbook && PivotUnderCursor(workbook) is not null,
+            Execute = (_, ct) => EditAsync(ct),
+        },
     ];
+
+    private PivotDefinition? PivotUnderCursor(Workbook workbook)
+    {
+        if (Context.SheetIndex < 0 || Context.SheetIndex >= workbook.Sheets.Count) return null;
+        var sheet = workbook.Sheets[Context.SheetIndex].Name;
+        var cursor = Context.Selection.Start;
+        return workbook.Pivots.FirstOrDefault(pivot => pivot.DestinationSheet == sheet && pivot.OutputRange is { } output && output.Contains(cursor));
+    }
+
+    private async Task EditAsync(CancellationToken ct)
+    {
+        if (Context.Workbook is not { } workbook) return;
+        if (PivotUnderCursor(workbook) is not { } definition)
+        {
+            status.Report(texts["pivot.edit.notUnderCursor"], NotificationSeverity.Warning);
+            return;
+        }
+
+        if (workbook.FindSheet(definition.DestinationSheet)?.Protection.IsEnabled == true)
+        {
+            status.Report(texts["status.protection.locked"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
+            return;
+        }
+
+        if (_pivotSources.Open(workbook, definition) is not { } source)
+        {
+            status.Report(texts["pivot.calculated.noSource"], NotificationSeverity.Error);
+            return;
+        }
+
+        var choice = await dialogs.ShowAsync<PivotChoice>(
+            new PivotPromptView(source.Headers, definition.DestinationSheet, kit, new SourcePivotPreviewer(pivotEngine, source, Labels()), definition),
+            new DialogOptions { TitleKey = "dialog.pivot.editTitle" }, ct)
+            .ConfigureAwait(true);
+
+        if (choice is null || !ReferenceEquals(Context.Workbook, workbook)) return;
+        if (workbook.Pivots.FirstOrDefault(pivot => pivot.Id == definition.Id) is not { } current) return;
+
+        var updated = (choice.Options ?? PivotTableOptions.Of(current)).ApplyTo(current with { Fields = choice.Fields });
+        if (updated.Fields.SequenceEqual(current.Fields) && updated with { Fields = current.Fields } == current) return;
+
+        var result = Checkpointed(checkpoints, texts["command.ledger.pivot.edit.title"], () => pivots.Apply(workbook, updated, Labels()), outcome => outcome.Succeeded);
+        status.Report(result.Succeeded
+            ? texts.Format("status.pivot.edited", current.Name)
+            : Describe(result.Diagnostics[0]), result.Succeeded ? NotificationSeverity.Success : NotificationSeverity.Error);
+        Context.RequestRefresh();
+    }
 
     private async Task RefreshAsync(CancellationToken ct)
     {
@@ -124,6 +184,7 @@ public sealed class LedgerPivotCommands(
             Destination = CellAddress.First,
             Fields = choice.Fields,
         };
+        if (choice.Options is { } options) definition = options.ApplyTo(definition);
 
         var result = Checkpointed(checkpoints, texts["command.ledger.data.pivotCreate.title"], () => pivots.Apply(workbook, definition, Labels()), outcome => outcome.Succeeded);
 

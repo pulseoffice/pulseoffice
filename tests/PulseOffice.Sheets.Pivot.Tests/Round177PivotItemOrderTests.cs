@@ -16,7 +16,7 @@ public class Round177PivotItemOrderTests
         sheet.SetValue(new CellAddress(0, 1), CellValue.Text("Amount"));
         for (var row = 0; row < keys.Length; row++)
         {
-            sheet.SetValue(new CellAddress(row + 1, 0), CellValue.Text(keys[row]));
+            sheet.SetValue(new CellAddress(row + 1, 0), double.TryParse(keys[row], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) ? CellValue.Number(number) : CellValue.Text(keys[row]));
             sheet.SetValue(new CellAddress(row + 1, 1), CellValue.Number(1));
         }
         var definition = new PivotDefinition

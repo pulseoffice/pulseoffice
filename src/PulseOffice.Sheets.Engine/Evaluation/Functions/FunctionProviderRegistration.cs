@@ -53,6 +53,8 @@ public static class SheetsEngineServiceCollectionExtensions
 
         services.TryAddSingleton<IRandomSource, SystemRandomSource>();
         services.TryAddSingleton<IGuardedRegex, GuardedRegex>();
+        services.TryAddSingleton<PulseOffice.Sheets.IDefaultDateEpoch, PulseOffice.Sheets.StandardDefaultDateEpoch>();
+        services.TryAddSingleton<PulseOffice.Sheets.IDateEpoch, PulseOffice.Sheets.AmbientDateEpoch>();
         services.TryAddSingleton<IDateSystem, StandardDateSystem>();
         services.TryAddSingleton<IEtsForecaster, EtsForecaster>();
         services.TryAddSingleton(TimeProvider.System);

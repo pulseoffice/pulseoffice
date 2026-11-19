@@ -267,6 +267,9 @@ internal sealed class TextPropertyReader : GraphicPropertyReader
                 Underline = text?.Attribute(Namespaces.Style + "text-underline-style") is not null,
                 Wrap = context.Get(Namespaces.Fo + "wrap-option") != "no-wrap",
                 Inset = measure.ParseLength(context.Get(Namespaces.Fo + "padding"), fallback.Inset),
+                Autofit = context.Get(Namespaces.Draw + "fit-to-size") == "shrink-to-fit" || context.Get(Namespaces.Style + "shrink-to-fit") == "true"
+                    ? PulseOffice.Text.Rich.TextAutofit.ShrinkText
+                    : context.Get(Namespaces.Draw + "auto-grow-height") == "true" ? PulseOffice.Text.Rich.TextAutofit.ResizeShape : PulseOffice.Text.Rich.TextAutofit.None,
                 Horizontal = context.Vocabulary.ParagraphAlignment.Value((string?)paragraph?.Attribute(Namespaces.Fo + "text-align")),
                 Vertical = context.Vocabulary.VerticalAlignment.Value(context.Get(Namespaces.Draw + "textarea-vertical-align")),
                 RotationDegrees = measure.ParseAngle(context.Get(Namespaces.Style + "text-rotation-angle"), 0),

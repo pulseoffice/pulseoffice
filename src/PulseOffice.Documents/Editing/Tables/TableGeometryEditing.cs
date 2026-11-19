@@ -11,6 +11,8 @@ public interface ITableGeometryEditing
 
     DocumentEdit ResizeColumn(TextDocument document, UndoStack history, TableBlock table, int column, double points);
 
+    DocumentEdit SetTableWidth(TextDocument document, UndoStack history, TableBlock table, TableWidthChoice width);
+
     DocumentEdit DistributeColumns(TextDocument document, UndoStack history, TableSelection selection);
 
     DocumentEdit FitColumns(TextDocument document, UndoStack history, TableSelection selection, IReadOnlyList<double> wanted, double? limit, string description);
@@ -32,8 +34,45 @@ public sealed class TableGeometryEditing(IColumnWidths widths) : ITableGeometryE
         return recorder.Commit(history);
     }
 
-    public DocumentEdit ResizeColumn(TextDocument document, UndoStack history, TableBlock table, int column, double points) =>
-        SetColumnWidths(document, history, table, widths.Resize(Points(table), column, points, MinimumColumn), "resize-table-column");
+    public DocumentEdit ResizeColumn(TextDocument document, UndoStack history, TableBlock table, int column, double points)
+    {
+        var before = Points(table).Sum();
+        var resized = widths.Resize(Points(table), column, points, MinimumColumn);
+        var recorder = new EditRecorder(document, "resize-table-column").Touch(table);
+        table.Columns.Clear();
+        table.Columns.AddRange(resized.Select(Twip.FromPoints));
+        var after = resized.Sum();
+        if (table.WidthPercent is { } percent && before > 0 && after > 0) table.WidthPercent = Math.Clamp(percent * after / before, 1, 1000);
+        return recorder.Commit(history);
+    }
+
+    public DocumentEdit SetTableWidth(TextDocument document, UndoStack history, TableBlock table, TableWidthChoice width)
+    {
+        var recorder = new EditRecorder(document, "set-table-width").Touch(table);
+        switch (width.Mode)
+        {
+            case TableWidthMode.Percent:
+                table.WidthPercent = Math.Clamp(width.Percent, 1, 1000);
+                table.AutoWidth = false;
+                break;
+            case TableWidthMode.Automatic:
+                table.WidthPercent = null;
+                table.AutoWidth = true;
+                break;
+            default:
+                var current = Points(table);
+                var total = current.Sum();
+                if (total > 0 && width.Points > 0)
+                {
+                    table.Columns.Clear();
+                    table.Columns.AddRange(current.Select(column => Twip.FromPoints(column * width.Points / total)));
+                }
+                table.WidthPercent = null;
+                table.AutoWidth = false;
+                break;
+        }
+        return recorder.Commit(history);
+    }
 
     public DocumentEdit DistributeColumns(TextDocument document, UndoStack history, TableSelection selection)
     {

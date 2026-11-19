@@ -215,6 +215,7 @@ public sealed class OdsReader
 
         public bool Row(XElement table, TableRow row)
         {
+            ReadDateEpoch(table);
             if (_scenarios.Contains(table)) return false;
             if (!_states.TryGetValue(table, out var state))
             {
@@ -236,6 +237,16 @@ public sealed class OdsReader
         }
 
         public void Finish(XDocument content) => BodyStarted(content);
+
+        private bool _epochRead;
+
+        private void ReadDateEpoch(XElement table)
+        {
+            if (_epochRead) return;
+            _epochRead = true;
+            var settings = table.Ancestors(Namespaces.Office + "spreadsheet").FirstOrDefault()?.Element(Namespaces.Table + "calculation-settings");
+            workbook.Calculation = workbook.Calculation with { DateEpoch = new OdfCalculationSettingsMapper().NullDate(settings) };
+        }
 
         public Worksheet? SheetOf(XElement table) => _states.GetValueOrDefault(table)?.Sheet;
     }

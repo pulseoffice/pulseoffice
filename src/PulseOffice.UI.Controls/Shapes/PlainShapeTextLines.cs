@@ -7,11 +7,16 @@ namespace PulseOffice.UI.Controls.Shapes;
 public interface IPlainShapeTextLines
 {
     IReadOnlyList<RichTextLineBox> Of(FormattedText text, string content, Point origin, Matrix placement);
+
+    IReadOnlyList<RichTextLineBox> Of(FormattedText text, string content, Point origin, Matrix placement, Rect clip);
 }
 
 public sealed class PlainShapeTextLines : IPlainShapeTextLines
 {
-    public IReadOnlyList<RichTextLineBox> Of(FormattedText text, string content, Point origin, Matrix placement)
+    public IReadOnlyList<RichTextLineBox> Of(FormattedText text, string content, Point origin, Matrix placement) =>
+        Of(text, content, origin, placement, new Rect(double.MinValue / 4, double.MinValue / 4, double.MaxValue / 2, double.MaxValue / 2));
+
+    public IReadOnlyList<RichTextLineBox> Of(FormattedText text, string content, Point origin, Matrix placement, Rect clip)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(content);
@@ -21,8 +26,9 @@ public sealed class PlainShapeTextLines : IPlainShapeTextLines
         for (var index = 0; index < pieces.Length; index++)
         {
             var piece = pieces[index];
-            if (piece.Trim().Length > 0 && text.BuildHighlightGeometry(origin, start, piece.Length) is { } area && area.Bounds is { Width: > 0 } bounds)
-                boxes.Add(new RichTextLineBox(index, null, bounds.TransformToAABB(placement)));
+            if (piece.Trim().Length > 0 && text.BuildHighlightGeometry(origin, start, piece.Length) is { } area
+                && area.Bounds.Intersect(clip) is { Width: > 0, Height: > 0 } bounds)
+                boxes.Add(new RichTextLineBox(index, null, bounds) { Placement = placement });
             start += piece.Length + 1;
         }
         return boxes;

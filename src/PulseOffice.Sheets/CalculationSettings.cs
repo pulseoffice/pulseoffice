@@ -8,7 +8,14 @@ public sealed record CalculationSettings
     public const double DefaultMaxChange = 0.001;
     public const int MaximumIterations = 32767;
 
+    public static readonly DateOnly StandardDateEpoch = new(1899, 12, 30);
+    public static readonly DateOnly Mac1904DateEpoch = new(1904, 1, 1);
+
     public static readonly CalculationSettings Default = new();
+
+    public DateOnly DateEpoch { get; init; } = StandardDateEpoch;
+
+    public bool UsesStandardDateEpoch => DateEpoch == StandardDateEpoch;
 
     public bool Iterative { get; init; }
 

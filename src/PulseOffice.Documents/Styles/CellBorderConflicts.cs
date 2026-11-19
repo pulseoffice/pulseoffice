@@ -32,21 +32,44 @@ public sealed class CellBorderConflicts : ICellBorderConflicts
             {
                 if (looks[row][column] is null || table.Cell(row, column).Covered) continue;
                 var cell = table.Cell(row, column);
-                var right = column + Math.Max(1, cell.ColumnSpan);
-                if (right < looks[row].Length && looks[row][right] is not null && !table.Cell(row, right).Covered)
-                {
-                    var winner = Winner(looks[row][column]!.Borders.Right, looks[row][right]!.Borders.Left);
-                    looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Right = winner } };
-                    looks[row][right] = looks[row][right]! with { Borders = looks[row][right]!.Borders with { Left = winner } };
-                }
-                var below = row + Math.Max(1, cell.RowSpan);
-                if (below < looks.Length && column < looks[below].Length && looks[below][column] is not null && !table.Cell(below, column).Covered)
-                {
-                    var winner = Winner(looks[row][column]!.Borders.Bottom, looks[below][column]!.Borders.Top);
-                    looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Bottom = winner } };
-                    looks[below][column] = looks[below][column]! with { Borders = looks[below][column]!.Borders with { Top = winner } };
-                }
+                ResolveRight(table, looks, row, column, cell);
+                ResolveBelow(table, looks, row, column, cell);
             }
+    }
+
+    private void ResolveRight(TableBlock table, CellAppearance?[][] looks, int row, int column, TableCell cell)
+    {
+        var right = column + Math.Max(1, cell.ColumnSpan);
+        var own = looks[row][column]!.Borders.Right;
+        var winners = new List<BorderLine?>();
+        for (var r = row; r < Math.Min(looks.Length, row + Math.Max(1, cell.RowSpan)); r++)
+        {
+            if (right >= looks[r].Length || looks[r][right] is not { } neighbour || table.Cell(r, right).Covered) continue;
+            var winner = Winner(own, neighbour.Borders.Left);
+            looks[r][right] = neighbour with { Borders = neighbour.Borders with { Left = winner } };
+            winners.Add(winner);
+        }
+        if (winners.Count == 0) return;
+        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : own ?? winners[0];
+        looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Right = shared } };
+    }
+
+    private void ResolveBelow(TableBlock table, CellAppearance?[][] looks, int row, int column, TableCell cell)
+    {
+        var below = row + Math.Max(1, cell.RowSpan);
+        if (below >= looks.Length) return;
+        var own = looks[row][column]!.Borders.Bottom;
+        var winners = new List<BorderLine?>();
+        for (var c = column; c < Math.Min(looks[below].Length, column + Math.Max(1, cell.ColumnSpan)); c++)
+        {
+            if (looks[below][c] is not { } neighbour || table.Cell(below, c).Covered) continue;
+            var winner = Winner(own, neighbour.Borders.Top);
+            looks[below][c] = neighbour with { Borders = neighbour.Borders with { Top = winner } };
+            winners.Add(winner);
+        }
+        if (winners.Count == 0) return;
+        var shared = winners.All(winner => Equals(winner, winners[0])) ? winners[0] : own ?? winners[0];
+        looks[row][column] = looks[row][column]! with { Borders = looks[row][column]!.Borders with { Bottom = shared } };
     }
 
     private double Weight(BorderLine line) => Math.Max(0, line.Width) * Rank(line.Style);

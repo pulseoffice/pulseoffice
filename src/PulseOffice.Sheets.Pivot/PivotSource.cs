@@ -42,6 +42,6 @@ public sealed class RangePivotSource : IPivotSource
 
         return value.IsEmpty
             ? CellAddress.ColumnName(column)
-            : PivotValues.KeyOf(value);
+            : value.Kind == ValueKind.Text ? value.AsText() : PivotValues.KeyOf(value);
     }
 }

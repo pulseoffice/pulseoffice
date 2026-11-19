@@ -70,32 +70,36 @@ the round that fixes it is joined and the join run is green.
   applications. Allow-overlap goes to ODT only as our attribute. Not opened in Word or the reference suite. (254, 260)
 
 - Folio TOC (259): `\t` is written with commas; not checked in Word under a semicolon list separator. (259)
-- Folio tables (263): a percent-width table keeps its percent when columns are resized or the table width is set in
-  the table dialog; the dialog has no percent or automatic width control, and the layout scales the stored columns
-  rather than running Word's automatic-fit algorithm for `AutoWidth` tables. (263)
-- Folio tables (263): the first-band shading has no control in the table style editor (only the second band is
-  edited); a style that shades only `band1Vert` also shades rows when row banding is on. (263)
-- Folio tables (263): border conflicts follow width times style number, style rank and colour brightness; Word's
-  special cases (a `nil` border, a cell border against a table border, conflicts at merged cells along spans other than
-  the first column or row) are not modelled, and the result has not been compared with Word. (263)
-- Folio TOC (263): the TOC dialog lists every visible paragraph style as a number field on its own tab; with many
-  styles the tab is long and the style names are shown as stored (not localized). Not seen live. (263)
-
-- Folio tables (join of 262-265): with Word's border conflict rules a shared edge between two cells is drawn by both
-  cells at identical bounds; draw it once. `TableAppearanceLayoutTests.IBordiPropriDellaCellaSiDisegnanoLatoPerLato`
-  was updated to the new rules at the join and should be reviewed with that change.
+- Folio tables (269): dragging a column edge of a percent table adds the dragged distance to the stored (unscaled)
+  width, so on a table scaled to its percent the edge lands off the pointer by the scale factor. (269)
+- Folio tables (269): Folio has no table style property editor (the style gallery picks presets); the first and second
+  band shadings and their axes can only come from files or presets. (269)
+- Folio tables (269): automatic width uses the stored columns as preferred widths and the measured longest word and
+  unwrapped text of single-column cells; spanning cells, nested tables and Word's preferred cell widths (`tcW`) do not
+  take part, and the result has not been compared with Word. (269)
+- Folio tables (269): border conflicts: a `nil` side reads as no line and loses to the neighbour's line, a cell
+  border against a table border follows the side-by-side merge on reading; a merged cell whose segments resolve to
+  different lines keeps one line for its whole side, drawn over the neighbours' segments. Not compared with Word. (269)
+- Folio TOC (269): the TOC styles tab lists the styles used in the document or already assigned; a style not yet used
+  cannot be assigned from the dialog. Not seen live. (269)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
-- Tagged PDF: Deck text boxes and shape text are tagged by the painted line boxes (265); shape text in columns falls
-  back to text matching, and a shape rotated inside its element is located by axis-aligned boxes. Not checked with a
-  PDF/UA checker. (243, 247, 260, 265)
-- Deck shapes have no autofit (shrink text, resize shape to fit); check whether PPTX `spAutoFit`/`normAutofit` and ODP
-  `draw:auto-grow-height`/`draw:fit-to-size` on shapes are lost silently and map them. (265)
-- Deck shape text lists: Tab/Shift+Tab level change and Enter on an empty item not walked in the running app. (265)
-- `src/PulseOffice.Presentations.UI/Rendering/SlideTextLines.cs` is unused since round 265; delete it at the join. (265)
+- Tagged PDF: Deck text boxes and shape text (columns and rotated shapes included since 268) are tagged by the painted
+  line boxes; not checked with a PDF/UA checker. (243, 247, 260, 265, 268)
+- Delete the emptied `src/PulseOffice.Presentations.UI/Rendering/SlideTextLines.cs` at the join (audit agents cannot
+  remove files). (265, 268)
+- Shape autofit: "resize shape to fit text" grows Deck shapes only; Ledger and Folio shapes keep their size (they shrink
+  text on overflow through the shared renderer). Shrink in shape text drawn through the rich composer (lists, vertical
+  or stacked text) is not applied; text box shrink uses its stored font scale. The resize assumes the text area is the
+  whole bounding box, not the inner text rectangle of the preset. (268)
+- Shape autofit has not been opened in PowerPoint or the reference suite; ODP writes both `draw:fit-to-size` and
+  `style:shrink-to-fit`. (268)
+- Deck shape text list keys are tested on the model service (`ShapeListKeys`); not walked through the live editor in a
+  headless key test or in the running app. Tab on a plain (non-list) paragraph still moves focus instead of inserting
+  a tab. (268)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
 - PDF form fields: a widget drawn with an embedded subset holds only the glyphs printed; a viewer that regenerates the
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
@@ -116,21 +120,29 @@ the round that fixes it is joined and the join run is green.
   which other ODF applications ignore (they keep objects locked); Folio's exact character hit skips rotated text frames; none of this was
   built, run or opened in Excel, Word, PowerPoint or the reference suite. (236)
 
-- ODS `table:null-date` other than 1899-12-30 is ignored and XLSX 1904 workbooks shift only date-formatted constants
-  (plain numbers used as dates by formulas are not): both need a workbook date epoch in `CalculationSettings`, read
-  and written by both codecs, honoured by the `IDateSystem` consumers through the evaluation context and by the format
-  renderer, replacing the 1904 load shift. (258, 262)
-- Round 261 (Ledger pivots), open: no interface to edit an existing pivot (show values as, base field, number format,
-  grouping, sorting, filters, layout, totals, repeat labels), to be built on the creation dialog (261, 264); XLSX
-  grouping still not written (XLSX030, needs `fieldGroup`/`rangePr`/`groupItems` with derived years for months across
-  years, checked in Excel; reading is done) (261, 264); manual groups, label and value filters and slicers not
-  modelled; ungrouped dates written as serials without format; compact layout keeps empty per-field columns, tabular
-  parents on their own row, no blank lines; XLSX `rowItems`/`colItems` not written and not opened in Excel. (261)
-- Round 264 (Ledger pivots), open: a text item "TRUE"/"FALSE" shares the boolean's key and renders as a boolean;
-  subtotal labels of boolean items show the invariant key; GETPIVOTDATA does not accept localized date labels; base
-  item other than "previous" not modelled; Excel percentOfParentCol reads as row parent; Excel "Months" without years
-  reads as month-and-year items; the x14 show-as extension and the `numFmtId` of data fields not yet seen in Excel.
-  (264)
+- Round 261 (Ledger pivots), open: manual groups, label and value filters and slicers not modelled; ungrouped dates
+  written as serials without format; compact layout keeps empty per-field columns, tabular parents on their own row,
+  no blank lines; XLSX `rowItems`/`colItems` not written and not opened in Excel. (261)
+- Round 266 (Ledger pivots), open: XLSX grouping (`fieldGroup`, derived years and days levels, date shared items) not
+  yet opened in Excel; hidden items of a grouped field still declared (XLSX030); the field settings panel lists items
+  and group labels by invariant key (`2024-01`, `2024-T1`, `TRUE`) instead of localized labels; calculated value fields
+  are not editable in the dialog and their position among the value fields resets to after the placed ones; the edit
+  dialog has no headless UI test of the settings panel. (266)
+- Round 264 (Ledger pivots), open: Excel "Months" without years reads as month-and-year items; the x14 show-as
+  extension and the `numFmtId` of data fields not yet seen in Excel. (264)
+- Round 267 (date epoch), open: the workbook epoch reaches evaluation, typed and edited dates, cell display, TEXT,
+  chart text, pivot grouping and Insert Current Date, but not yet the autofilter date groups and dynamic filters
+  (`FilterColumnDates`, `FilterValueText`, `XlsxFilterDateGroups`, `XlsxDynamicFilterCodec`, `RelativeDatePeriods`),
+  series fill by months (`SeriesFill`, `SeriesView`), `SheetDataTools`, query values (`QueryValueConverter`), cached
+  date items of external pivot sources (`XlsxPivotExternalSources`) or ODF relative periods; display outside
+  evaluation follows the active workbook's epoch, so a second open workbook with another epoch printed or exported in
+  the background shows its dates in the active one's system. Nothing was built, run or opened in Excel or the
+  reference suite. (267)
+- Round 267 (Ledger pivots), open: ODS hidden members and named base items carry item names, so a text item that reads
+  as a number or boolean ("5", "TRUE") cannot be told from the number or boolean there (the reference suite conflates
+  them too); hidden members named "TRUE" or "5" are read as hiding both. GETPIVOTDATA canonicalises items only for row
+  and column fields and the reduced table of filter fields; percentOfParentCol, next and named base items not opened in
+  Excel; the pivot dialog does not offer the new modes or base items yet (left to round 266's dialog work). (267)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over

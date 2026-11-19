@@ -66,9 +66,13 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
     {
         if (row < table.HeaderRows && style.HeaderBackground is { } header) return header;
         var body = row - Math.Max(0, table.HeaderRows);
-        if (style.BandBackground is { } band && (table.Banding.BandsRow(body) || body >= 0 && table.Banding.BandsColumn(column))) return band;
+        var bandAxes = style.BandAxes ?? TableBandAxes.Both;
+        if (style.BandBackground is { } band
+            && (bandAxes.HasFlag(TableBandAxes.Rows) && table.Banding.BandsRow(body) || bandAxes.HasFlag(TableBandAxes.Columns) && body >= 0 && table.Banding.BandsColumn(column))) return band;
+        var firstAxes = style.FirstBandAxes ?? TableBandAxes.Both;
         if (style.FirstBandBackground is { } first && body >= 0
-            && (table.Banding.BandedRows && !table.Banding.BandsRow(body) || table.Banding.BandedColumns && !table.Banding.BandsColumn(column))) return first;
+            && (firstAxes.HasFlag(TableBandAxes.Rows) && table.Banding.BandedRows && !table.Banding.BandsRow(body)
+                || firstAxes.HasFlag(TableBandAxes.Columns) && table.Banding.BandedColumns && !table.Banding.BandsColumn(column))) return first;
         return style.Background;
     }
 

@@ -44,6 +44,7 @@ public sealed class ShapeTextEditor : Decorator
     private readonly ICaretWord _words;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFlowFrame _flow = new();
     private readonly ShapeListText _frames = new();
+    private readonly IShapeListKeys _listKeys;
     private readonly PulseOffice.UI.Controls.Text.Rich.TextFrameComposer _composer = new(new ListLabels());
     private readonly PulseOffice.UI.Controls.Text.Editing.InlineTextEditor _inline;
     private ShapeTextPlacement? _placement;
@@ -52,8 +53,9 @@ public sealed class ShapeTextEditor : Decorator
 
     private readonly PulseOffice.UI.Controls.Text.ITextEditingFocus _focus;
 
-    public ShapeTextEditor(IShapeTextEditing editing, IShapeTextInk ink, IShapeBrushes brushes, PulseOffice.UI.Controls.Text.ITextEditingFocus focus, ICaretWord words)
+    public ShapeTextEditor(IShapeTextEditing editing, IShapeTextInk ink, IShapeBrushes brushes, PulseOffice.UI.Controls.Text.ITextEditingFocus focus, ICaretWord words, IShapeListKeys? listKeys = null)
     {
+        _listKeys = listKeys ?? new ShapeListKeys();
         _words = words;
         _focus = focus;
         _editing = editing;
@@ -358,6 +360,14 @@ public sealed class ShapeTextEditor : Decorator
 
     private void OnKey(object? sender, KeyEventArgs e)
     {
+        if (ListKey(e) is { } listKey && Live is { } live && _listKeys.Press(live, Selection.Start, Selection.End, listKey) is { } listed)
+        {
+            _base = listed;
+            Recompose();
+            LiveChanged?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+            return;
+        }
         var commit = e.Key == Key.Escape
             || e.Key == Key.Enter && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta));
         if (!commit) return;
@@ -365,6 +375,15 @@ public sealed class ShapeTextEditor : Decorator
         Exited?.Invoke(this, EventArgs.Empty);
         e.Handled = true;
     }
+
+    private ShapeListKey? ListKey(KeyEventArgs e) => (e.Key, e.KeyModifiers) switch
+    {
+        (Key.Tab, KeyModifiers.None) => ShapeListKey.Indent,
+        (Key.Tab, KeyModifiers.Shift) => ShapeListKey.Outdent,
+        (Key.Enter, KeyModifiers.None) => ShapeListKey.Return,
+        (Key.Back, KeyModifiers.None) => ShapeListKey.Backspace,
+        _ => null,
+    };
 
     private Style Transparent(string state)
     {

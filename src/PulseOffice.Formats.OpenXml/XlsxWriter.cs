@@ -119,6 +119,8 @@ public sealed class XlsxWriter
 
         var workbookPart = document.AddWorkbookPart();
         workbookPart.Workbook = new DocumentFormat.OpenXml.Spreadsheet.Workbook();
+        if (new XlsxDateEpochs().Writes1904(workbook.Calculation.DateEpoch))
+            workbookPart.Workbook.AppendChild(new WorkbookProperties { Date1904 = true });
 
         var context = new XlsxWriteContext(workbook, new XlsxStyleMapper(), new XlsxConditionalMapper(), new SharedStrings());
         context.Styles.DeclareNamedStyles(workbook.NamedStyles, workbook);

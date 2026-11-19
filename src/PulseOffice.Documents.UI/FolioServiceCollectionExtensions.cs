@@ -180,6 +180,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<IFolioPageTabs, FolioPageTabs>();
         services.AddSingleton<IFolioPageDialog, FolioPageDialog>();
         services.AddSingleton<StyleCatalog.IFolioStyleNames, StyleCatalog.FolioStyleNames>();
+        services.AddSingleton<Indexes.IFolioIndexStyleCandidates, Indexes.FolioIndexStyleCandidates>();
         services.AddSingleton<StyleCatalog.IFolioStyleDialogs, StyleCatalog.FolioStyleDialogs>();
         services.AddSingleton<StyleCatalog.IFolioStyleActions, StyleCatalog.FolioStyleActions>();
         services.AddSingleton<StyleCatalog.FolioStylesSource>();

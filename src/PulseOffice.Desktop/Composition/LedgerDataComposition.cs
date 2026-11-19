@@ -49,7 +49,7 @@ internal static class LedgerDataComposition
     public static IServiceCollection AddLedgerData(this IServiceCollection services, IUserDataPaths paths)
     {
         services.AddSingleton<IPivotAggregator, PivotAggregator>();
-        services.AddSingleton<IPivotGrouping>(_ => new PivotGrouping());
+        services.AddSingleton<IPivotGrouping>(provider => new PivotGrouping(provider.GetRequiredService<PulseOffice.Sheets.IDateEpoch>().ToDate));
         services.TryAddSingleton<PulseOffice.Sheets.Engine.Parsing.IFormulaExpressionParser, PulseOffice.Sheets.Engine.Parsing.FormulaParser>();
         services.AddSingleton<IPivotFormulas, PivotFormulas>();
         services.AddSingleton<IPivotEngine, PivotEngine>();

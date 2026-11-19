@@ -53,7 +53,7 @@ internal sealed class OdsCellWriter(OdfStyleMapper styles, IOdfParagraphText par
         switch (value.Kind)
         {
             case ValueKind.Number:
-                _numbers.Write(element, value.AsNumber(), code);
+                _numbers.Write(element, value.AsNumber(), code, workbook.Calculation.DateEpoch);
                 element.Add(Paragraph(value.ToString()));
                 break;
             case ValueKind.Boolean:
@@ -331,17 +331,16 @@ internal sealed class OdsStylesDocumentBuilder
 
 internal sealed class OdsNumberValueWriter
 {
-    private static readonly DateTime Epoch = new(1899, 12, 30);
     private readonly OdfNumberStyleWriter _styles = new();
 
-    public void Write(XElement cell, double number, string? code)
+    public void Write(XElement cell, double number, string? code, DateOnly epoch)
     {
         var type = code is null ? OdfValueType.Float : _styles.TypeOf(code);
         switch (type)
         {
             case OdfValueType.Date when number is >= -657434 and <= 2958465:
                 cell.Add(Type("date"), new XAttribute(Namespaces.Office + "date-value",
-                    DateText(number)));
+                    DateText(number, epoch.ToDateTime(TimeOnly.MinValue))));
                 break;
             case OdfValueType.Time when number >= 0 && number < 100000:
                 cell.Add(Type("time"), new XAttribute(Namespaces.Office + "time-value",
@@ -361,10 +360,10 @@ internal sealed class OdsNumberValueWriter
 
     private XAttribute Type(string type) => new(Namespaces.Office + "value-type", type);
 
-    private string DateText(double number) =>
+    private string DateText(double number, DateTime epoch) =>
         number % 1 == 0
-            ? Epoch.AddDays(number).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-            : Epoch.AddTicks((long)Math.Round(number * TimeSpan.TicksPerDay)).ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture);
+            ? epoch.AddDays(number).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : epoch.AddTicks((long)Math.Round(number * TimeSpan.TicksPerDay)).ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture);
 
     private string Duration(double totalSeconds)
     {

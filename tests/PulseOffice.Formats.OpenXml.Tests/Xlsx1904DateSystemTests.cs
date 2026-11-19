@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml.Tests;
 public sealed class Xlsx1904DateSystemTests
 {
     [Fact]
-    public void LeDateDelSistema1904SiSpostanoNelSistema1900SenzaToccareINumeri()
+    public void A_1904_workbook_keeps_its_serials_and_its_date_system()
     {
         var workbook = PulseOffice.Sheets.Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];
@@ -32,15 +32,23 @@ public sealed class Xlsx1904DateSystemTests
         stream.Position = 0;
         var read = new XlsxReader().Read(stream).Require();
 
-        Assert.Equal(43831 + 1462, read.Sheets[0].GetValue(new CellAddress(0, 0)).AsNumber());
+        Assert.Equal(43831, read.Sheets[0].GetValue(new CellAddress(0, 0)).AsNumber());
         Assert.Equal(0.5, read.Sheets[0].GetValue(new CellAddress(1, 0)).AsNumber());
         Assert.Equal(43831, read.Sheets[0].GetValue(new CellAddress(2, 0)).AsNumber());
+        Assert.Equal(PulseOffice.Sheets.CalculationSettings.Mac1904DateEpoch, read.Calculation.DateEpoch);
+
+        using var again = new MemoryStream();
+        new XlsxWriter().Write(read, again);
+        again.Position = 0;
+        using (var document = SpreadsheetDocument.Open(again, false))
+            Assert.True(document.WorkbookPart!.Workbook!.WorkbookProperties?.Date1904?.Value);
+        again.Position = 0;
+        Assert.Equal(43831, new XlsxReader().Read(again).Require().Sheets[0].GetValue(new CellAddress(0, 0)).AsNumber());
     }
 
     [Fact]
-    public void Lo_stesso_lettore_non_confonde_i_formati_di_due_libri()
+    public void Calendar_formats_of_two_workbooks_are_not_confused()
     {
-        var shift = new Xlsx1904DateShift();
         var first = PulseOffice.Sheets.Workbook.CreateDefault();
         var dated = first.Styles.Intern(first.Styles.Get(0) with { NumberFormatId = first.NumberFormats.Register("yyyy\"x\"mm") });
         first.Sheets[0][new CellAddress(0, 0)] = new PulseOffice.Sheets.Cell { Value = ModelValue.Number(10), StyleId = dated, ExplicitStyle = true };
@@ -49,9 +57,8 @@ public sealed class Xlsx1904DateSystemTests
         second.Sheets[0][new CellAddress(0, 0)] = new PulseOffice.Sheets.Cell { Value = ModelValue.Number(10), StyleId = plain, ExplicitStyle = true };
         Assert.Equal(first.Styles.Get(dated).NumberFormatId, second.Styles.Get(plain).NumberFormatId);
 
-        Assert.Equal(1, shift.ShiftToStandardSystem(first));
-        Assert.Equal(0, shift.ShiftToStandardSystem(second));
-        Assert.Equal(10, second.Sheets[0].GetValue(new CellAddress(0, 0)).AsNumber());
+        Assert.Single(new XlsxCalendarCells(first).ConstantDates());
+        Assert.Empty(new XlsxCalendarCells(second).ConstantDates());
     }
 
     [Theory]

@@ -81,6 +81,7 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
                 },
                 Insets = new TextInsets(inset, inset, inset, inset),
                 WordWrap = style.Wrap,
+                Autofit = style.Autofit,
                 Layout = style.Layout,
                 RotationDegrees = style.Layout.Upright ? style.RotationDegrees : style.RotationDegrees + shapeRotation,
             },

@@ -20,6 +20,18 @@ public enum ValueDisplayMode
     RunningTotal, PercentRunningTotal,
     RankAscending, RankDescending,
     Index,
+    PercentOfParentColumn,
+}
+
+public enum PivotBaseItemKind { Previous, Next, Named }
+
+public sealed record PivotBaseItem(PivotBaseItemKind Kind, string? Key = null)
+{
+    public static readonly PivotBaseItem Previous = new(PivotBaseItemKind.Previous);
+
+    public static readonly PivotBaseItem Next = new(PivotBaseItemKind.Next);
+
+    public static PivotBaseItem Named(string key) => new(PivotBaseItemKind.Named, key);
 }
 
 public enum DateGrouping { None, Seconds, Minutes, Hours, Days, Months, Quarters, Years }
@@ -36,6 +48,7 @@ public sealed record PivotField
     public PivotAggregation Aggregation { get; init; } = PivotAggregation.Sum;
     public ValueDisplayMode DisplayMode { get; init; } = ValueDisplayMode.Normal;
     public string? BaseField { get; init; }
+    public PivotBaseItem BaseItem { get; init; } = PivotBaseItem.Previous;
     public string? NumberFormat { get; init; }
 
     public DateGrouping DateGrouping { get; init; } = DateGrouping.None;

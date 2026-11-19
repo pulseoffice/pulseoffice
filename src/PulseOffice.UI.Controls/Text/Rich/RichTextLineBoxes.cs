@@ -3,7 +3,12 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.UI.Controls.Text.Rich;
 
-public sealed record RichTextLineBox(int Paragraph, Rect? Label, Rect Body);
+public sealed record RichTextLineBox(int Paragraph, Rect? Label, Rect Body)
+{
+    public Matrix Placement { get; init; } = Matrix.Identity;
+
+    public Point Local(Point point) => Placement.TryInvert(out var inverse) ? point.Transform(inverse) : point;
+}
 
 public interface IRichTextLineBoxes
 {
@@ -30,9 +35,9 @@ public sealed class RichTextLineBoxes : IRichTextLineBoxes
                 body = body is { } known ? known.Union(area) : area;
             }
             var label = line.Label is { } shown
-                ? new Rect(composed.Left(index) + line.LabelX, composed.Tops[index], shown.WidthIncludingTrailingWhitespace, shown.Height).TransformToAABB(composed.Placement)
+                ? new Rect(composed.Left(index) + line.LabelX, composed.Tops[index], shown.WidthIncludingTrailingWhitespace, shown.Height)
                 : (Rect?)null;
-            if (body is { } bounds) boxes.Add(new RichTextLineBox(paragraph, label, bounds.TransformToAABB(composed.Placement)));
+            if (body is { } bounds) boxes.Add(new RichTextLineBox(paragraph, label, bounds) { Placement = composed.Placement });
         }
         return boxes;
     }

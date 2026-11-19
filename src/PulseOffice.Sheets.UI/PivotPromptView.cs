@@ -14,78 +14,11 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI;
 
-public sealed record PivotChoice(IReadOnlyList<PivotField> Fields, string DestinationSheet);
-
-public sealed class PivotLayoutModel
-{
-    private readonly IReadOnlyList<string> _columns;
-    private readonly Dictionary<PivotArea, List<int>> _zones = new()
-    {
-        [PivotArea.Filter] = [],
-        [PivotArea.Column] = [],
-        [PivotArea.Row] = [],
-        [PivotArea.Value] = [],
-    };
-    private readonly Dictionary<int, PivotAggregation> _aggregations = [];
-
-    public PivotLayoutModel(IReadOnlyList<string> columns) => _columns = columns ?? throw new ArgumentNullException(nameof(columns));
-
-    public event EventHandler? Changed;
-
-    public IReadOnlyList<string> Columns => _columns;
-
-    public IReadOnlyList<PivotArea> Areas { get; } = [PivotArea.Filter, PivotArea.Column, PivotArea.Row, PivotArea.Value];
-
-    public IReadOnlyList<int> In(PivotArea area) => _zones.TryGetValue(area, out var zone) ? zone : [];
-
-    public PivotArea AreaOf(int column)
-    {
-        foreach (var (area, zone) in _zones)
-            if (zone.Contains(column)) return area;
-        return PivotArea.Unused;
-    }
-
-    public PivotAggregation AggregationOf(int column) => _aggregations.GetValueOrDefault(column, PivotAggregation.Sum);
-
-    public void Place(int column, PivotArea area, int index = int.MaxValue)
-    {
-        if (column < 0 || column >= _columns.Count) return;
-        foreach (var zone in _zones.Values) zone.Remove(column);
-        if (area != PivotArea.Unused)
-        {
-            var target = _zones[area];
-            target.Insert(Math.Clamp(index, 0, target.Count), column);
-        }
-
-        Changed?.Invoke(this, EventArgs.Empty);
-    }
-
-    public void Toggle(int column, bool used, Func<int, bool> numeric)
-    {
-        if (!used) Place(column, PivotArea.Unused);
-        else if (AreaOf(column) == PivotArea.Unused) Place(column, numeric(column) ? PivotArea.Value : PivotArea.Row);
-    }
-
-    public void Aggregate(int column, PivotAggregation aggregation)
-    {
-        _aggregations[column] = aggregation;
-        Changed?.Invoke(this, EventArgs.Empty);
-    }
-
-    public IReadOnlyList<PivotField> Fields() =>
-        [.. Areas.SelectMany(area => In(area).Select((column, order) => new PivotField
-        {
-            SourceName = _columns[column],
-            SourceColumnIndex = column,
-            Area = area,
-            AreaOrder = order,
-            Aggregation = AggregationOf(column),
-        }))];
-}
-
 public interface IPivotPreviewer
 {
     IReadOnlyList<IReadOnlyList<string>> Preview(IReadOnlyList<PivotField> fields, int rows, int columns);
+
+    IReadOnlyList<string> Items(PivotField field);
 
     bool IsNumeric(int column);
 }
@@ -109,12 +42,13 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
     private readonly TextBox _destination;
     private (int Column, Point Start)? _press;
 
-    public PivotPromptView(IReadOnlyList<string> columns, string suggestedSheet, LedgerDialogKit kit, IPivotPreviewer previewer)
+    public PivotPromptView(IReadOnlyList<string> columns, string suggestedSheet, LedgerDialogKit kit, IPivotPreviewer previewer, PivotDefinition? existing = null)
     {
         ArgumentNullException.ThrowIfNull(columns);
         _kit = kit ?? throw new ArgumentNullException(nameof(kit));
         _previewer = previewer ?? throw new ArgumentNullException(nameof(previewer));
-        Model = new PivotLayoutModel(columns);
+        Model = existing is null ? new PivotLayoutModel(columns) : new PivotLayoutModel(columns, existing);
+        IsEditing = existing is not null;
         var metrics = kit.Metrics;
 
         _destination = new TextBox { Text = suggestedSheet, MinWidth = 160 };
@@ -154,13 +88,18 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
                 zoneGrid,
                 kit.Caption("pivot.preview"),
                 new Panel { Height = PreviewHeight, ClipToBounds = true, Children = { _previewFrame, _previewNote } },
-                new StackPanel { Orientation = Orientation.Horizontal, Spacing = metrics.SpacingSmall, Children = { new TextBlock { Text = kit["pivot.destination"], VerticalAlignment = VerticalAlignment.Center }, _destination } },
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = metrics.SpacingSmall, IsVisible = !IsEditing, Children = { new TextBlock { Text = kit["pivot.destination"], VerticalAlignment = VerticalAlignment.Center }, _destination } },
             },
         };
         Grid.SetColumn(right, 1);
         body.Children.Add(right);
 
-        Content = new StackPanel { Spacing = metrics.SpacingMedium, Children = { kit.Help("pivot.explanation"), body } };
+        Settings = new PivotFieldSettingsPanel(Model, kit, previewer);
+        Content = new ScrollViewer
+        {
+            MaxHeight = 640,
+            Content = new StackPanel { Spacing = metrics.SpacingMedium, Children = { kit.Help(IsEditing ? "pivot.editExplanation" : "pivot.explanation"), body, Settings } },
+        };
 
         AddHandler(PointerMovedEvent, OnPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent, OnPointerReleased, Avalonia.Interactivity.RoutingStrategies.Tunnel);
@@ -168,9 +107,10 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
 
         Footer = new DialogFooter()
             .WithCancel(kit["pivot.cancel"], () => Completed?.Invoke(this, null))
-            .WithAction(kit["pivot.confirm"], () => Completed?.Invoke(this, new PivotChoice(
+            .WithAction(kit[IsEditing ? "pivot.apply" : "pivot.confirm"], () => Completed?.Invoke(this, new PivotChoice(
                 Model.Fields(),
-                string.IsNullOrWhiteSpace(_destination.Text) ? suggestedSheet : _destination.Text!.Trim())), out var confirm,
+                IsEditing || string.IsNullOrWhiteSpace(_destination.Text) ? suggestedSheet : _destination.Text!.Trim(),
+                Model.Options)), out var confirm,
                 primary: true);
         Confirm = confirm;
         Rebuild();
@@ -185,6 +125,10 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
     private const double PreviewHeight = 170;
 
     public PivotLayoutModel Model { get; }
+
+    public bool IsEditing { get; }
+
+    public PivotFieldSettingsPanel Settings { get; }
 
     public Button Confirm { get; }
 
@@ -442,6 +386,27 @@ public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource sourc
             result.Add((List<string>)[new string(' ', table.Rows[row].Depth * 2) + Label(table.Rows[row]),
                 .. Enumerable.Range(0, Math.Min(table.Columns.Count, columns - 1)).Select(column => table.Value(row, column).ToString())]);
         return result;
+    }
+
+    public IReadOnlyList<string> Items(PivotField field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        var probe = field with
+        {
+            Area = PivotArea.Row, AreaOrder = 0, ExcludedValues = [], TopFilter = null, SortByValue = null,
+            SortDescending = false, ShowSubtotals = false,
+        };
+        var table = engine.Build(new PivotDefinition
+        {
+            Id = "items",
+            Name = "items",
+            SourceSheet = string.Empty,
+            SourceRange = default,
+            DestinationSheet = string.Empty,
+            Destination = Addressing.CellAddress.First,
+            Fields = [probe, new PivotField { SourceName = field.SourceName, SourceColumnIndex = field.SourceColumnIndex, Area = PivotArea.Value, Aggregation = PivotAggregation.Count }],
+        }, source);
+        return [.. table.Rows.Where(row => row.Kind == PivotNodeKind.Item).Select(row => row.Label).Distinct(StringComparer.Ordinal)];
     }
 
     private string Header(PivotColumn column) =>

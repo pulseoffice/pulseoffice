@@ -3,8 +3,12 @@ using PulseOffice.Sheets.Formatting;
 
 namespace PulseOffice.Sheets.Engine.Evaluation.Functions;
 
-public sealed class NumericText(ISpreadsheetLocale locale)
+public sealed class NumericText(ISpreadsheetLocale locale, IDateEpoch epochs)
 {
+    public NumericText(ISpreadsheetLocale locale) : this(locale, new AmbientDateEpoch())
+    {
+    }
+
     private const NumberStyles Styles =
         NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite |
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
@@ -13,8 +17,6 @@ public sealed class NumericText(ISpreadsheetLocale locale)
         ["yyyy-MM-dd", "yyyy-M-d", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss"];
 
     private static readonly string[] TimeFormats = [@"h\:mm", @"h\:mm\:ss", @"hh\:mm", @"hh\:mm\:ss", @"h\:mm\:ss\.FFF"];
-
-    private static readonly DateTime StandardEpoch = new(1899, 12, 30);
 
     private readonly ISpreadsheetLocale _locale = locale ?? throw new ArgumentNullException(nameof(locale));
 
@@ -69,7 +71,7 @@ public sealed class NumericText(ISpreadsheetLocale locale)
         }
         if (LooksLikeDate(trimmed) && TryReadDate(trimmed, out var moment))
         {
-            number = (moment - StandardEpoch).TotalDays;
+            number = (moment - epochs.Current.ToDateTime(TimeOnly.MinValue)).TotalDays;
             return true;
         }
         number = 0;

@@ -293,6 +293,7 @@ internal sealed class TextPartReader : DrawingPartReader
                 AutomaticColor = run?.GetFirstChild<A.SolidFill>() is null,
                 Wrap = properties?.Wrap?.InnerText != "none",
                 Inset = new Emu(properties?.LeftInset?.Value ?? 0).ToTwips(),
+                Autofit = Autofit(properties),
                 RotationDegrees = (properties?.Rotation?.Value ?? 0) / 60000.0,
                 Layout = _layouts.Read(properties) ?? fallback.Layout,
                 Vertical = context.Vocabulary.Anchors.Value(properties?.Anchor?.InnerText),
@@ -300,6 +301,14 @@ internal sealed class TextPartReader : DrawingPartReader
             },
         };
     }
+
+    private PulseOffice.Text.Rich.TextAutofit Autofit(OpenXmlElement? properties) =>
+        properties?.ChildElements.Select(child => child.LocalName).FirstOrDefault(name => name is "normAutofit" or "spAutoFit") switch
+        {
+            "normAutofit" => PulseOffice.Text.Rich.TextAutofit.ShrinkText,
+            "spAutoFit" => PulseOffice.Text.Rich.TextAutofit.ResizeShape,
+            _ => PulseOffice.Text.Rich.TextAutofit.None,
+        };
 }
 
 internal sealed class DrawingStyleReader(DrawingVocabulary vocabulary)

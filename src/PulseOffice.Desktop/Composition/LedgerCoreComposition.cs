@@ -52,9 +52,14 @@ internal static class LedgerCoreComposition
         services.AddSingleton<FormatCodeVocabulary>();
         services.AddSingleton<PulseOffice.Sheets.Formatting.INumberFormatParser, PulseOffice.Sheets.Formatting.NumberFormatParser>();
         services.AddSingleton<PulseOffice.Sheets.Formatting.ISpreadsheetLocale, Sheets.UI.InterfaceSpreadsheetLocale>();
-        services.AddSingleton<INumberFormatter>(provider => new PulseOffice.Sheets.Formatting.LocaleNumberFormatter(
-            provider.GetRequiredService<PulseOffice.Sheets.Formatting.ISpreadsheetLocale>(),
-            serial => new DateOnly(1899, 12, 30).ToDateTime(TimeOnly.MinValue).AddDays(serial)));
+        services.AddSingleton<PulseOffice.Sheets.IDefaultDateEpoch, Sheets.UI.ActiveWorkbookDateEpoch>();
+        services.TryAddSingleton<PulseOffice.Sheets.IDateEpoch, PulseOffice.Sheets.AmbientDateEpoch>();
+        services.AddSingleton<INumberFormatter>(provider =>
+        {
+            var epochs = provider.GetRequiredService<PulseOffice.Sheets.IDateEpoch>();
+            return new PulseOffice.Sheets.Formatting.LocaleNumberFormatter(
+                provider.GetRequiredService<PulseOffice.Sheets.Formatting.ISpreadsheetLocale>(), epochs.ToDate);
+        });
         services.AddSingleton<ICellPresenter, CellPresenter>();
         services.AddSingleton<Sheets.UI.ICellTextComposer, Sheets.UI.CellTextComposer>();
         services.AddSingleton<Sheets.Formatting.ICellTextMeasure, Sheets.UI.CellTextMeasure>();

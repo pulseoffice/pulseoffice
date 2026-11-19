@@ -19,6 +19,7 @@ public sealed class XlsxPivotMapper
     private readonly OoxmlTextEscape _escape = new();
     private readonly XlsxPivotExternalSources _external = new();
     private readonly XlsxPivotGroupReader _groups = new();
+    private readonly XlsxPivotGroupWriter _groupWriter = new();
     private const int DataLayoutField = -2;
 
     private readonly IReadOnlyDictionary<PivotAggregation, DataConsolidateFunctionValues> _aggregations =
@@ -53,6 +54,7 @@ public sealed class XlsxPivotMapper
         new Dictionary<ValueDisplayMode, DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues>
         {
             [ValueDisplayMode.PercentOfParent] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParentRow,
+            [ValueDisplayMode.PercentOfParentColumn] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParentColumn,
             [ValueDisplayMode.PercentRunningTotal] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfRunningTotal,
             [ValueDisplayMode.RankAscending] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.RankAscending,
             [ValueDisplayMode.RankDescending] = DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.RankDescending,
@@ -69,6 +71,14 @@ public sealed class XlsxPivotMapper
             return _aggregations.ContainsKey(field.Aggregation)
                 && (field.DisplayMode == ValueDisplayMode.Normal || _displayModes.ContainsKey(field.DisplayMode) || _extendedModes.ContainsKey(field.DisplayMode));
         return field.DateGrouping == DateGrouping.None && field.NumericGroupInterval is null;
+    }
+
+    public bool Describes(PivotField field, IEnumerable<CellValue> sourceValues)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(sourceValues);
+        if (field.Area is PivotArea.Value || field.IsCalculated || Describes(field)) return Describes(field);
+        return _groupWriter.CanWrite(field, sourceValues);
     }
 
     public void Write(WorkbookPart workbookPart, Workbook workbook, IReadOnlyDictionary<Worksheet, WorksheetPart> parts, XlsxStyleMapper? styles = null)
@@ -88,6 +98,7 @@ public sealed class XlsxPivotMapper
             if (!parts.TryGetValue(destination, out var destinationPart)) continue;
 
             var columns = source is null ? CachedColumns(pivot) : Columns(source, pivot);
+            var groups = _groupWriter.Plan(pivot, columns.Count, field => IndexOf(field, columns), index => columns[index].Values);
             var cachePart = workbookPart.AddNewPart<PivotTableCacheDefinitionPart>();
             var saved = columns.Count > 0 && columns[0].Values.Count > 0;
             var recordsPart = saved ? cachePart.AddNewPart<PivotTableCacheRecordsPart>() : null;
@@ -105,7 +116,7 @@ public sealed class XlsxPivotMapper
                         Reference = pivot.SourceRange.ToString(),
                         Sheet = pivot.SourceSheet,
                     }) { Type = SourceValues.Worksheet },
-                new CacheFields(columns.Select(CacheField)) { Count = (uint)columns.Count })
+                new CacheFields(columns.Select((column, index) => CacheField(column, groups, index)).Concat(groups.DerivedFields())) { Count = (uint)(columns.Count + groups.DerivedCount) })
             {
                 Id = recordsPart is null ? null : cachePart.GetIdOfPart(recordsPart),
                 SaveData = recordsPart is null ? false : null,
@@ -119,7 +130,7 @@ public sealed class XlsxPivotMapper
 
             var tablePart = destinationPart.AddNewPart<PivotTablePart>();
             tablePart.AddPart(cachePart);
-            tablePart.PivotTableDefinition = Definition(pivot, columns, cacheId, new PivotFormatTarget(workbook.NumberFormats, styles));
+            tablePart.PivotTableDefinition = Definition(pivot, columns, groups, cacheId, new PivotFormatTarget(workbook.NumberFormats, styles));
             tablePart.PivotTableDefinition.Save();
 
             caches.AppendChild(new PivotCache { CacheId = cacheId, Id = workbookPart.GetIdOfPart(cachePart) });
@@ -178,7 +189,14 @@ public sealed class XlsxPivotMapper
         return columns;
     }
 
-    private CacheField CacheField(CacheColumn column)
+    private CacheField CacheField(CacheColumn column, XlsxPivotGroups groups, int index)
+    {
+        var field = CacheField(column, groups.HasDates(index));
+        if (groups.GroupOf(index) is { } group) field.AppendChild(group);
+        return field;
+    }
+
+    private CacheField CacheField(CacheColumn column, bool dates)
     {
         var numbers = column.Values.Where(value => value.Kind == ValueKind.Number).Select(value => value.AsNumber()).ToList();
         var hasText = column.Values.Any(value => value.Kind is ValueKind.Text or ValueKind.Boolean or ValueKind.Error);
@@ -195,9 +213,24 @@ public sealed class XlsxPivotMapper
             MaxValue = numbers.Count > 0 ? numbers.Max() : null,
         };
 
+        if (dates)
+        {
+            shared.ContainsSemiMixedTypes = false;
+            shared.ContainsNonDate = false;
+            shared.ContainsDate = true;
+            shared.ContainsString = false;
+            shared.ContainsNumber = null;
+            shared.ContainsInteger = null;
+            shared.MinValue = null;
+            shared.MaxValue = null;
+            shared.MinDate = DateTime.FromOADate(numbers.Min());
+            shared.MaxDate = DateTime.FromOADate(numbers.Max());
+        }
+
         if (column.IsAxis)
         {
-            foreach (var value in column.Items) shared.AppendChild(Item(value));
+            foreach (var value in column.Items)
+                shared.AppendChild(dates && value.Kind == ValueKind.Number ? new DateTimeItem { Val = DateTime.FromOADate(value.AsNumber()) } : Item(value));
             shared.Count = (uint)column.Items.Count;
         }
 
@@ -232,7 +265,7 @@ public sealed class XlsxPivotMapper
         return records;
     }
 
-    private PivotTableDefinition Definition(PivotDefinition pivot, List<CacheColumn> columns, uint cacheId, PivotFormatTarget formats)
+    private PivotTableDefinition Definition(PivotDefinition pivot, List<CacheColumn> columns, XlsxPivotGroups groups, uint cacheId, PivotFormatTarget formats)
     {
         var compact = pivot.Layout == PivotLayout.Compact;
         var outline = pivot.Layout != PivotLayout.Tabular;
@@ -272,16 +305,16 @@ public sealed class XlsxPivotMapper
             Reference = location.ToString(),
             FirstHeaderRow = 1u,
             FirstDataRow = (uint)Math.Max(pivot.In(PivotArea.Column).Count(), 1),
-            FirstDataColumn = (uint)Math.Max(pivot.In(PivotArea.Row).Count(), 1),
+            FirstDataColumn = (uint)Math.Max(Expanded(Axis(pivot, columns, PivotArea.Row), groups).Count, 1),
         });
 
-        var fields = new PivotFields { Count = (uint)columns.Count };
-        for (var index = 0; index < columns.Count; index++)
-            fields.AppendChild(PivotFieldOf(pivot, columns, index, compact, outline));
+        var fields = new PivotFields { Count = (uint)(columns.Count + groups.DerivedCount) };
+        for (var index = 0; index < columns.Count + groups.DerivedCount; index++)
+            fields.AppendChild(PivotFieldOf(pivot, columns, groups, index, compact, outline));
         definition.AppendChild(fields);
 
-        var rows = Axis(pivot, columns, PivotArea.Row);
-        var columnAxis = Axis(pivot, columns, PivotArea.Column);
+        var rows = Expanded(Axis(pivot, columns, PivotArea.Row), groups);
+        var columnAxis = Expanded(Axis(pivot, columns, PivotArea.Column), groups);
         var values = pivot.In(PivotArea.Value).Where(field => !field.IsCalculated).ToList();
         if (values.Count > 1) columnAxis.Add(DataLayoutField);
 
@@ -312,11 +345,16 @@ public sealed class XlsxPivotMapper
         return definition;
     }
 
-    private DocumentFormat.OpenXml.Spreadsheet.PivotField PivotFieldOf(PivotDefinition pivot, List<CacheColumn> columns, int index, bool compact, bool outline)
+    private List<int> Expanded(List<int> axis, XlsxPivotGroups groups) =>
+        [.. axis.SelectMany(groups.Expand)];
+
+    private DocumentFormat.OpenXml.Spreadsheet.PivotField PivotFieldOf(PivotDefinition pivot, List<CacheColumn> columns, XlsxPivotGroups groups, int index, bool compact, bool outline)
     {
+        var sourceIndex = groups.BaseOf(index);
+        var derived = groups.IsDerived(index);
         var axisField = pivot.Fields.FirstOrDefault(field => !field.IsCalculated && field.Area is PivotArea.Row or PivotArea.Column or PivotArea.Filter
-            && IndexOf(field, columns) == index);
-        var isData = pivot.Fields.Any(field => !field.IsCalculated && field.Area == PivotArea.Value && IndexOf(field, columns) == index);
+            && IndexOf(field, columns) == sourceIndex);
+        var isData = !derived && pivot.Fields.Any(field => !field.IsCalculated && field.Area == PivotArea.Value && IndexOf(field, columns) == index);
 
         var element = new DocumentFormat.OpenXml.Spreadsheet.PivotField
         {
@@ -327,7 +365,8 @@ public sealed class XlsxPivotMapper
         };
 
         if (axisField is null) return element;
-        var column = columns[index];
+        var column = columns[sourceIndex];
+        var groupItems = groups.ItemCountOf(index);
 
         element.Axis = axisField.Area switch
         {
@@ -335,24 +374,27 @@ public sealed class XlsxPivotMapper
             PivotArea.Column => PivotTableAxisValues.AxisColumn,
             _ => PivotTableAxisValues.AxisPage,
         };
-        if (axisField.DisplayName is { Length: > 0 } label) element.Name = label;
+        if (!derived && axisField.DisplayName is { Length: > 0 } label) element.Name = label;
         if (axisField.SortDescending) element.SortType = FieldSortValues.Descending;
         else element.SortType = FieldSortValues.Ascending;
         if (!axisField.ShowSubtotals) element.DefaultSubtotal = false;
         if (axisField.Area == PivotArea.Filter && axisField.ExcludedValues.Count > 0) element.MultipleItemSelectionAllowed = true;
 
         var items = new Items();
-        for (var item = 0; item < column.Items.Count; item++)
-            items.AppendChild(new Item
-            {
-                Index = (uint)item,
-                Hidden = axisField.ExcludedValues.Contains(KeyOf(column.Items[item])) ? true : null,
-            });
+        if (groupItems >= 0)
+            for (var item = 0; item < groupItems; item++) items.AppendChild(new Item { Index = (uint)item });
+        else
+            for (var item = 0; item < column.Items.Count; item++)
+                items.AppendChild(new Item
+                {
+                    Index = (uint)item,
+                    Hidden = axisField.ExcludedValues.Contains(KeyOf(column.Items[item])) ? true : null,
+                });
         if (axisField.ShowSubtotals) items.AppendChild(new Item { ItemType = ItemValues.Default });
         items.Count = (uint)items.ChildElements.Count;
         element.AppendChild(items);
 
-        if (axisField.SortByValue is { } byValue && WrittenDataIndex(pivot, byValue) is { } dataIndex)
+        if (!derived && axisField.SortByValue is { } byValue && WrittenDataIndex(pivot, byValue) is { } dataIndex)
             element.AppendChild(new AutoSortScope(new DocumentFormat.OpenXml.Spreadsheet.PivotArea(
                 new PivotAreaReferences(new PivotAreaReference(new FieldItem { Val = dataIndex })
                 { Field = DataReferenceField, Count = 1u, Selected = false })
@@ -390,7 +432,7 @@ public sealed class XlsxPivotMapper
             var baseField = BaseFieldOf(field, pivot);
             if (baseField is not null) data.BaseField = Math.Max(IndexOf(baseField, columns), 0);
             if (field.DisplayMode is ValueDisplayMode.DifferenceFrom or ValueDisplayMode.PercentDifferenceFrom)
-                data.BaseItem = 1048828u;
+                data.BaseItem = BaseItemIndex(field.BaseItem, baseField is null ? null : columns.ElementAtOrDefault(IndexOf(baseField, columns)));
             if (extended)
                 data.AppendChild(new DataFieldExtensionList(new DataFieldExtension(
                     new DocumentFormat.OpenXml.Office2010.Excel.DataField { PivotShowAs = showAs })
@@ -428,8 +470,33 @@ public sealed class XlsxPivotMapper
         foreach (var (mode, value) in _extendedModes)
             if (value == shown) return mode;
         return shown == DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParent
-            || shown == DocumentFormat.OpenXml.Office2010.Excel.PivotShowAsValues.PercentOfParentColumn
             ? ValueDisplayMode.PercentOfParent : null;
+    }
+
+    private const uint PreviousBaseItem = 1048828u;
+    private const uint NextBaseItem = 1048829u;
+
+    private uint BaseItemIndex(PivotBaseItem item, CacheColumn? column)
+    {
+        if (item.Kind == PivotBaseItemKind.Next) return NextBaseItem;
+        if (item.Kind != PivotBaseItemKind.Named || column is null) return PreviousBaseItem;
+        var position = column.Items.FindIndex(value => string.Equals(KeyOf(value), item.Key, StringComparison.Ordinal));
+        return position < 0 ? PreviousBaseItem : (uint)position;
+    }
+
+    private PivotBaseItem BaseItemOf(DataField data, List<CacheField> cacheFields, List<DocumentFormat.OpenXml.Spreadsheet.PivotField> pivotFields)
+    {
+        if (data.ShowDataAs?.Value is not { } shown || (shown != ShowDataAsValues.Difference && shown != ShowDataAsValues.PercentageDifference))
+            return PivotBaseItem.Previous;
+        var item = data.BaseItem?.Value ?? PreviousBaseItem;
+        if (item == NextBaseItem) return PivotBaseItem.Next;
+        if (item == PreviousBaseItem || data.BaseField?.Value is not { } field || field < 0 || field >= cacheFields.Count) return PivotBaseItem.Previous;
+        var shared = cacheFields[field].SharedItems?.ChildElements.ToList() ?? [];
+        var positions = field < pivotFields.Count
+            ? pivotFields[field].Items?.Elements<Item>().Where(entry => entry.ItemType is null).Select(entry => entry.Index?.Value).ToList()
+            : null;
+        uint? sharedIndex = positions is { Count: > 0 } ? (item < positions.Count ? positions[(int)item] : null) : item;
+        return sharedIndex is { } chosen && chosen < shared.Count ? PivotBaseItem.Named(SharedKey(shared[(int)chosen])) : PivotBaseItem.Previous;
     }
 
     private string? BaseNameOf(DataField data, List<CacheField> cacheFields)
@@ -611,6 +678,7 @@ public sealed class XlsxPivotMapper
                 Aggregation = aggregation,
                 DisplayMode = ExtendedModeOf(data) ?? (mode is { } shown ? _displayModes.FirstOrDefault(pair => pair.Value == shown, new(ValueDisplayMode.Normal, shown)).Key : ValueDisplayMode.Normal),
                 BaseField = BaseNameOf(data, cacheFields),
+                BaseItem = BaseItemOf(data, cacheFields, pivotFields),
                 NumberFormat = FormatCodeOf(data.NumberFormatId?.Value, formatCodes),
                 DisplayName = caption is null || caption == DefaultCaption(aggregation, name) || caption == "Sum of " + name || caption == "Count of " + name ? null : caption,
             });
@@ -713,7 +781,8 @@ public sealed class XlsxPivotMapper
     {
         NumberItem number => KeyOf(CellValue.Number(number.Val?.Value ?? 0)),
         BooleanItem boolean => KeyOf(CellValue.Boolean(boolean.Val?.Value == true)),
-        StringItem text => _escape.Decode(text.Val?.Value ?? string.Empty),
+        StringItem text => PivotValues.TextKeyOf(_escape.Decode(text.Val?.Value ?? string.Empty)),
+        DateTimeItem date => KeyOf(CellValue.Number(date.Val?.Value.ToOADate() ?? 0)),
         ErrorItem error => error.Val?.Value ?? string.Empty,
         _ => string.Empty,
     };

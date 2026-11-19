@@ -18,7 +18,7 @@ public sealed class LedgerInsertCommands(
     [
         Insert("ledger.insert.currentDate", "Ctrl+;", (workbook, sheet, address) =>
         {
-            var serial = (DateTime.Today - new DateTime(1899, 12, 30)).TotalDays;
+            var serial = (DateTime.Today - workbook.Calculation.DateEpoch.ToDateTime(TimeOnly.MinValue)).TotalDays;
 
             sheet.SetValue(address, CellValue.Number(serial));
             sheet.SetStyle(address, workbook.Styles.Derive(

@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.Odf.Tests;
 
 public sealed class Round264OdsPivotTests
 {
-    private static PivotField Through(PivotField value)
+    internal static PivotField Through(PivotField value)
     {
         var workbook = Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];

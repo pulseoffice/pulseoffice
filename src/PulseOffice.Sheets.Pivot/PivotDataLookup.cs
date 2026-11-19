@@ -39,6 +39,8 @@ public sealed class PivotDataLookup : IPivotDataSource
         var table = Built(definition, source);
         if (table.IsEmpty) return null;
 
+        filters = [.. filters.Select(filter => (filter.Field, KeyOf(table, definition, filter.Field, filter.Item)))];
+
         if (HiddenSubtotal(definition, filters)) return UniqueLeaf(table, definition, dataField, filters);
         return InLayout(table, definition, dataField, filters) ?? Aggregated(source, definition, dataField, filters);
     }
@@ -118,8 +120,26 @@ public sealed class PivotDataLookup : IPivotDataSource
         };
         var table = _engine.Build(reduced, source);
         if (table.IsEmpty || table.Columns.Count == 0) return null;
-        var row = Row(table, [.. filters.Select(filter => filter.Item)]);
+        var row = Row(table, [.. filters.Select(filter => KeyOf(table, reduced, filter.Field, filter.Item))]);
         return row < 0 ? null : table.Value(row, 0);
+    }
+
+    private readonly PivotItemCells _items = new();
+
+    private string KeyOf(PivotTable table, PivotDefinition definition, string fieldName, string item)
+    {
+        var rowFields = definition.In(PivotArea.Row).ToList();
+        var columnFields = definition.In(PivotArea.Column).ToList();
+        var rowLevel = rowFields.FindIndex(candidate => Names(candidate, fieldName));
+        var columnLevel = columnFields.FindIndex(candidate => Names(candidate, fieldName));
+        if (rowLevel < 0 && columnLevel < 0) return item;
+        var field = rowLevel >= 0 ? rowFields[rowLevel] : columnFields[columnLevel];
+        var level = rowLevel >= 0 ? rowLevel : columnLevel;
+        IEnumerable<PivotNode> nodes = rowLevel >= 0 ? table.Rows : table.Columns.Select(column => column.Node);
+        var keys = nodes.Where(node => node.Path.Count > level).Select(node => node.Path[level]).Distinct(StringComparer.Ordinal).ToList();
+        if (keys.Any(key => string.Equals(key, item, StringComparison.OrdinalIgnoreCase))) return item;
+        return keys.FirstOrDefault(key => string.Equals(PivotValues.NameOf(key), item, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(_items.Display(key, field, _labels), item, StringComparison.OrdinalIgnoreCase)) ?? item;
     }
 
     private PivotDefinition? Containing(string sheetName, CellAddress target)

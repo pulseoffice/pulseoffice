@@ -24,8 +24,15 @@ public sealed class OdfCalculationSettingsMapper
                 ? steps : CalculationSettings.DefaultMaxIterations,
             MaxChange = double.TryParse(iteration?.Attribute(Namespaces.Table + "minimum-difference")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var change) && change >= 0
                 ? change : CalculationSettings.DefaultMaxChange,
+            DateEpoch = NullDate(settings),
         };
     }
+
+    public DateOnly NullDate(XElement? settings) =>
+        settings?.Element(Namespaces.Table + "null-date")?.Attribute(Namespaces.Table + "date-value")?.Value is { Length: >= 10 } text
+        && DateOnly.TryParseExact(text[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var epoch)
+            ? epoch
+            : CalculationSettings.StandardDateEpoch;
 
     public XElement Build(CalculationSettings settings)
     {
@@ -35,6 +42,9 @@ public sealed class OdfCalculationSettingsMapper
             new XAttribute(Namespaces.Table + "automatic-find-labels", Text(settings.AutomaticFindLabels)),
             new XAttribute(Namespaces.Table + "use-regular-expressions", Text(settings.Criteria == CriteriaSyntax.RegularExpressions)),
             new XAttribute(Namespaces.Table + "use-wildcards", Text(settings.Criteria == CriteriaSyntax.Wildcards)));
+        if (!settings.UsesStandardDateEpoch)
+            element.Add(new XElement(Namespaces.Table + "null-date",
+                new XAttribute(Namespaces.Table + "date-value", settings.DateEpoch.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
         if (settings.Iterative || settings.MaxIterations != CalculationSettings.DefaultMaxIterations || settings.MaxChange != CalculationSettings.DefaultMaxChange)
             element.Add(new XElement(Namespaces.Table + "iteration",
                 new XAttribute(Namespaces.Table + "status", settings.Iterative ? "enable" : "disable"),

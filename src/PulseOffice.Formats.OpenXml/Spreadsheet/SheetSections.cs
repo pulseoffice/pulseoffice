@@ -156,12 +156,12 @@ internal sealed class XlsxWriteContext(Book workbook, XlsxStyleMapper styles, Xl
 
     public string Formula(string formula, int sheetIndex, CellAddress address) =>
         _tableReferences.Flatten(formula, workbook, new SheetCell(sheetIndex, address), Tables.Writes);
-    private readonly XlsxLeapYearSerials _leapYear = new();
+    private readonly XlsxDateEpochs _epochs = new();
     private readonly XlsxCalendarCells _calendar = new(workbook);
 
     public CellValue ExcelValue(CellValue value, bool formula, int numberFormatId) =>
         !formula && value.Kind == ValueKind.Number && _calendar.HasCalendarFormat(numberFormatId)
-            ? CellValue.Number(_leapYear.ToExcel(value.AsNumber()))
+            ? CellValue.Number(_epochs.ToExcel(value.AsNumber(), workbook.Calculation.DateEpoch))
             : value;
 }
 

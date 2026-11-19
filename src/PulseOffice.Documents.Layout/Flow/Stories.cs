@@ -463,6 +463,7 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
     {
         var table = placement.Table;
         var cells = new List<CellBox>();
+        var drawn = new HashSet<(long, long, long, long, uint, PulseOffice.Text.Rich.BorderLineStyle)>();
         var x = emission.X + placement.Offset;
         var top = emission.Y;
         foreach (var carried in emission.Carried)
@@ -471,7 +472,7 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
             var spanEnd = Math.Min(emission.RowEnd, carried.Row + cell.Cell.RowSpan);
             var height = 0.0;
             for (var r = emission.Row; r < spanEnd; r++) height += emission.RowHeight(r);
-            cells.Add(Cell(placement, cell, carried.Row, new CellSlice(carried.From, carried.To, 0), x, top, height));
+            cells.Add(Cell(placement, cell, carried.Row, new CellSlice(carried.From, carried.To, 0), x, top, height, drawn));
         }
         for (var r = emission.Row; r < emission.RowEnd; r++)
         {
@@ -484,7 +485,7 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
                 var height = 0.0;
                 for (var s = r; s < spanEnd; s++) height += emission.RowHeight(s);
                 var slice = emission.Slice(r, c) ?? new CellSlice(0, cell.Story.Atoms.Count, 0);
-                cells.Add(Cell(placement, cell, r, slice, x, top, height));
+                cells.Add(Cell(placement, cell, r, slice, x, top, height, drawn));
             }
             top += heightOfRow;
         }
@@ -500,7 +501,7 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
         return false;
     }
 
-    private CellBox Cell(TablePlacement placement, CellPlacement cell, int r, CellSlice slice, double x, double top, double height)
+    private CellBox Cell(TablePlacement placement, CellPlacement cell, int r, CellSlice slice, double x, double top, double height, HashSet<(long, long, long, long, uint, PulseOffice.Text.Rich.BorderLineStyle)> drawn)
     {
         var table = placement.Table;
         var insets = Insets(table, cell.Cell);
@@ -525,7 +526,7 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
         }
         else
         {
-            content.AddRange(Edges(look.Borders, rect, table.Table.Id));
+            content.AddRange(Edges(look.Borders, rect, table.Table.Id).Where(edge => edge.Kind != DecorationKind.CellEdge || drawn.Add(EdgeKey(edge))));
         }
         if (cell.Lying is { } lying)
         {
@@ -567,6 +568,11 @@ public sealed class BlockStacker(IParagraphDecorator decorator) : IStoryComposer
         if (borders.Left is { } left) yield return Edge(new LayoutRect(rect.X - left.Width / 2, rect.Y, left.Width, rect.Height), left, owner);
         if (borders.Right is { } right) yield return Edge(new LayoutRect(rect.Right - right.Width / 2, rect.Y, right.Width, rect.Height), right, owner);
     }
+
+    private (long, long, long, long, uint, PulseOffice.Text.Rich.BorderLineStyle) EdgeKey(DecorationBox edge) =>
+        (Snap(edge.Bounds.X), Snap(edge.Bounds.Y), Snap(edge.Bounds.Width), Snap(edge.Bounds.Height), edge.Color ?? 0, edge.LineStyle);
+
+    private long Snap(double value) => (long)Math.Round(value * 1000);
 
     private DecorationBox Edge(LayoutRect bounds, PulseOffice.Text.Rich.BorderLine line, string owner) =>
         new(DecorationKind.CellEdge, bounds, line.Color, line.Width) { Owner = owner, LineStyle = line.Style };

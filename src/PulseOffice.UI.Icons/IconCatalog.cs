@@ -172,6 +172,7 @@ public sealed class IconCatalog : IIconCatalog
         ["ledger.data.pivotRefresh"] = new("M4 4h16v16H4z M4 9h16 M9 9v11 M16 12a3 3 0 1 0 2 5 M18 12v3h-3"),
         ["ledger.pivot.calculatedField"] = new("M4 4h16v16H4z M4 9h16 M9 9v11 M12 14h6 M15 11v6"),
         ["ledger.pivot.chart"] = new("M4 20h16 M7 20V12 M12 20V8 M17 20v-5 M14 4h6v6 M14 4l6 6"),
+        ["ledger.pivot.edit"] = new("M4 4h16v16H4z M4 9h16 M9 9v11 M13 19l1-3 5-5 2 2-5 5z"),
         ["ledger.pivot.delete"] = new("M4 4h16v16H4z M4 9h16 M9 9v11 M12 12l5 5 M17 12l-5 5"),
         ["ledger.data.removeDuplicates"] = new("M4 4h9v9H4z M11 11h9v9h-9z M14 15l3 3 M17 15l-3 3"),
         ["ledger.print.pageSetup"] = new("M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h4"),

@@ -14071,3 +14071,27 @@ Ledger engine: MAP broadcasts and pads mismatched arrays with #N/A as Excel does
 - Tagged PDF takes Deck line boxes from the painted composition (`IPaintedTextLines`); shape text is a section with
   paragraphs tagged by position. The shape text editor inks and composes against the slide backdrop and language
   (`ISlideBackdrop`). Log: docs/deep-audit/round-265-notes-and-shape-text.md.
+
+### Round 266: Ledger pivot editing interface and XLSX grouping (2026-11-19)
+- `ledger.pivot.edit` (menu, ribbon, context menu) reopens the pivot dialog seeded from the pivot, with a shared field
+  settings panel (show values as, base field, number format, date and range grouping, sorting by label or value,
+  subtotals, Top N, items shown) and table options (layout, grand totals, repeat labels); one undo step per edit.
+- XLSX writes pivot grouping (`fieldGroup`/`rangePr`/`groupItems`, derived years and days levels); XLSX030 keeps only
+  groupings XLSX cannot hold. Log: docs/deep-audit/round-266-pivot-editing.md.
+
+### Round 267: workbook date epoch and pivot leftovers (2026-11-19)
+- `CalculationSettings.DateEpoch` from ODS `table:null-date` and XLSX `date1904`, written back by both (XLSX245 for an
+  epoch Excel lacks); the 1904 load shift is gone; evaluation enters the epoch through an ambient `IDateEpoch` read by
+  date functions, text coercion, typed and edited dates, display and pivot grouping. Pivots: text items named like
+  booleans or numbers keep their own key, localized subtotal labels, GETPIVOTDATA by rendered label, previous/next/named
+  base items, % of parent column. Log: docs/deep-audit/round-267-date-epoch-and-pivots.md.
+### Round 268: shape autofit, shape text lists, tagged shape text (2026-11-19)
+- Shapes carry text autofit (`ShapeTextStyle.Autofit`) across PPTX, XLSX, DOCX and ODF; shared editor choice; shrink
+  rendered, resize applied to Deck shapes. Shape text list keys (`IShapeListKeys`). Tagged PDF shape text in columns
+  and in rotated shapes uses painted line boxes with their placement. `SlideTextLines` emptied, to be deleted at the
+  join. Log: docs/deep-audit/round-268-shape-autofit-and-lists.md.
+### Round 269: Folio table and TOC leftovers (2026-11-19)
+- Shared cell edges are drawn once; border conflicts are resolved along merged spans; table style bands keep their
+  axis (`BandAxes`, `FirstBandAxes`, DOCX horizontal and vertical bands, ODT `pt:band-axes`); the table dialog sets
+  fixed, percent or automatic width; automatic tables fit their contents; the TOC styles tab is limited to used or
+  assigned styles under localized names. Log: docs/deep-audit/round-269-folio-table-leftovers.md.

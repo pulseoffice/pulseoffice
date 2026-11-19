@@ -40,6 +40,7 @@ public sealed class ShapeRenderer : IShapeRenderer
     private readonly ShapeTextColumns _columns = new();
     private readonly FormattedShapeTextLines _lines = new();
     private readonly PlainShapeTextLines _paintedLines = new();
+    private readonly IShapeTextShrink _shrink;
     private readonly IReadOnlyDictionary<ShapeShade, IBrush> _shades = new Dictionary<ShapeShade, IBrush>
     {
         [ShapeShade.Darken] = new ImmutableSolidColorBrush(Colors.Black, 0.4),
@@ -52,8 +53,9 @@ public sealed class ShapeRenderer : IShapeRenderer
         IShapeGeometry geometry, IShapeBrushes? brushes = null, IArrowGeometry? arrows = null,
         PulseOffice.UI.Controls.Text.Rich.IHyperlinkAppearance? links = null, IShapeTextInk? ink = null, IShapeEffectBounds? effects = null,
         IDimensionLineGeometry? dimensions = null, IShapeListText? listText = null,
-        PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null)
+        PulseOffice.UI.Controls.Text.ITextDecorationFactory? decorations = null, IShapeTextShrink? shrink = null)
     {
+        _shrink = shrink ?? new ShapeTextShrink();
         _decorations = decorations ?? new PulseOffice.UI.Controls.Text.TextDecorationFactory();
         _listText = listText ?? new ShapeListText();
         _dimensions = dimensions ?? new DimensionLineGeometry();
@@ -378,9 +380,30 @@ public sealed class ShapeRenderer : IShapeRenderer
         {
             if (columns > 1)
             {
+                var placedLines = new List<PulseOffice.UI.Controls.Text.Rich.RichTextLineBox>();
                 foreach (var column in _columns.Place(inner, columns, layout.ColumnSpacing, _lines.Measure(text, content)))
+                {
                     using (context.PushClip(column.Clip))
                         context.DrawText(text, column.Origin);
+                    placedLines.AddRange(_paintedLines.Of(text, content, column.Origin, turn, column.Clip));
+                }
+                backdrop.Painted?.Painted(placedLines);
+                return;
+            }
+
+            if (style.Autofit == PulseOffice.Text.Rich.TextAutofit.ShrinkText
+                && _shrink.Fit(text, inner.Width, inner.Height, style.Wrap) is var scale and < 1)
+            {
+                var top = style.Vertical switch
+                {
+                    TextVerticalPlacement.Top => inner.Y,
+                    TextVerticalPlacement.Bottom => inner.Bottom - text.Height * scale,
+                    _ => inner.Y + (inner.Height - text.Height * scale) / 2,
+                };
+                var shrunk = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(inner.X, top);
+                using (context.PushTransform(shrunk))
+                    context.DrawText(text, new Point(0, 0));
+                backdrop.Painted?.Painted(_paintedLines.Of(text, content, new Point(0, 0), shrunk * turn));
                 return;
             }
 

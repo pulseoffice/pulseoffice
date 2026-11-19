@@ -14,7 +14,7 @@ namespace PulseOffice.Formats.OpenXml.Tests;
 
 public sealed class Round264XlsxPivotTests
 {
-    private static Workbook Pivoted(PivotField value)
+    internal static Workbook Pivoted(PivotField value)
     {
         var workbook = Workbook.CreateDefault();
         var sheet = workbook.Sheets[0];
@@ -43,7 +43,7 @@ public sealed class Round264XlsxPivotTests
         return workbook;
     }
 
-    private static PivotField Through(Workbook workbook)
+    internal static PivotField Through(Workbook workbook)
     {
         using var stream = new MemoryStream();
         new XlsxWriter().Write(workbook, stream);

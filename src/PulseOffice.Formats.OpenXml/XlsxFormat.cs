@@ -121,10 +121,16 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
 
         var losses = new List<Diagnostic>();
 
-        var leapYear = new XlsxLeapYearSerials();
-        var early = new XlsxCalendarCells(workbook).ConstantDates().Count(date => leapYear.PrecedesExcelCalendar(date.Cell.Value.AsNumber()));
+        var epochs = new XlsxDateEpochs();
+        var epoch = workbook.Calculation.DateEpoch;
+        var early = new XlsxCalendarCells(workbook).ConstantDates().Count(date => epochs.PrecedesExcelCalendar(date.Cell.Value.AsNumber(), epoch));
         if (early > 0)
             losses.Add(Diagnostic.Warning("XLSX192", $"{early} dates fall before 1 January 1900: Excel's calendar starts there, so it shows them as other dates or as #####.").With(early));
+        if (!epochs.IsNative(epoch))
+        {
+            var text = epoch.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            losses.Add(Diagnostic.Warning("XLSX245", $"The workbook counts dates from {text}: Excel knows only the 1900 and 1904 date systems, so XLSX writes the dates in the 1900 system and formulas that use date serial numbers directly give other results. ODS keeps the null date.").With(text));
+        }
 
         var derived = workbook.NamedStyles.All.Count(style => !style.IsBuiltIn && style.Parent is not null
             && !string.Equals(style.Parent, "Default", StringComparison.OrdinalIgnoreCase) && workbook.NamedStyles.Find(style.Parent) is not null);
@@ -251,7 +257,12 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
             losses.Add(Diagnostic.Info("XLSX037", "Cells with two diagonals of different style: in XLSX the diagonals share one line and take the rising one."));
 
         var pivotMapper = new XlsxPivotMapper();
-        var undescribed = workbook.Pivots.Sum(pivot => pivot.Fields.Count(field => field.Area != Sheets.Pivot.PivotArea.Unused && !pivotMapper.Describes(field)));
+        var pivotSources = new Sheets.Pivot.PivotSources();
+        var undescribed = workbook.Pivots.Sum(pivot =>
+        {
+            var source = pivotSources.Open(workbook, pivot);
+            return pivot.Fields.Count(field => field.Area != Sheets.Pivot.PivotArea.Unused && !pivotMapper.Describes(field, ColumnOf(source, field)));
+        });
         if (undescribed > 0)
             losses.Add(Diagnostic.Warning("XLSX030", $"{undescribed} pivot fields use a grouping, a calculation or an aggregation (median, first, last, distinct count) XLSX cannot describe: they are saved without it.").With(undescribed));
 
@@ -401,4 +412,9 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
             return OperationResult<bool>.Fail(Diagnostic.Error("XLSX100", $"Writing the XLSX failed: {ex.Message}").With(ex.Message));
         }
     }
+
+    private IEnumerable<Sheets.Values.CellValue> ColumnOf(Sheets.Pivot.IPivotSource? source, Sheets.Pivot.PivotField field) =>
+        source is null || field.SourceColumnIndex < 0 || field.SourceColumnIndex >= source.Headers.Count
+            ? []
+            : Enumerable.Range(0, source.RowCount).Select(row => source.ValueAt(row, field.SourceColumnIndex));
 }

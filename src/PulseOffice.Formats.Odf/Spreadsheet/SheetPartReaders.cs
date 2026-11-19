@@ -382,7 +382,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
 
         var value = IsErrorResult(element, formula)
             ? Error(paragraphs.Read(element))
-            : Value(element, valueType, context.Diagnostics);
+            : Value(element, valueType, context);
         var internalFormula = formula is null ? null : _tableFormulas.Read(element) ?? new OdfFormulaSyntax().ToInternal(formula);
 
         return new Cell
@@ -398,11 +398,11 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
         };
     }
 
-    private CellValue Value(XElement element, string? valueType, List<Diagnostic> diagnostics) => valueType switch
+    private CellValue Value(XElement element, string? valueType, OdsReadContext context) => valueType switch
     {
         "float" or "percentage" or "currency" => Number(element, "value"),
         "boolean" => CellValue.Boolean(OdfBooleanValue.Parse(element.Attribute(Namespaces.Office + "boolean-value")?.Value)),
-        "date" => Date(element, diagnostics),
+        "date" => Date(element, context.Diagnostics, context.Workbook.Calculation.DateEpoch),
         "time" => Time(element),
         "string" => CellValue.Text((string?)element.Attribute(Namespaces.Office + "string-value") ?? paragraphs.Read(element)),
         _ => CellValue.Empty,
@@ -490,7 +490,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
             ? CellValue.Number(number)
             : CellValue.Empty;
 
-    private CellValue Date(XElement element, List<Diagnostic> diagnostics)
+    private CellValue Date(XElement element, List<Diagnostic> diagnostics, DateOnly epoch)
     {
         var text = element.Attribute(Namespaces.Office + "date-value")?.Value;
         if (!DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
@@ -498,7 +498,7 @@ internal sealed class OdsCellReader(OdfStyleNames styleNames, IOdfParagraphText 
             diagnostics.Add(Diagnostic.Warning("ODF012", $"Unreadable date: '{text}'.").With(text));
             return CellValue.Empty;
         }
-        return CellValue.Number((date - new DateTime(1899, 12, 30)).TotalDays);
+        return CellValue.Number((date - epoch.ToDateTime(TimeOnly.MinValue)).TotalDays);
     }
 }
 

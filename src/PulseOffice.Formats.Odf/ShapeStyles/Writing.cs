@@ -216,7 +216,12 @@ internal sealed class TextAreaPropertyWriter : GraphicPropertyWriter
         var text = style.Text;
 
         context.Set(Namespaces.Draw + "auto-grow-width", "false");
-        context.Set(Namespaces.Draw + "auto-grow-height", "false");
+        context.Set(Namespaces.Draw + "auto-grow-height", text.Autofit == PulseOffice.Text.Rich.TextAutofit.ResizeShape ? "true" : "false");
+        if (text.Autofit == PulseOffice.Text.Rich.TextAutofit.ShrinkText)
+        {
+            context.Set(Namespaces.Draw + "fit-to-size", "shrink-to-fit");
+            context.Set(Namespaces.Style + "shrink-to-fit", "true");
+        }
         context.Set(Namespaces.Fo + "wrap-option", text.Wrap ? "wrap" : "no-wrap");
         context.Set(Namespaces.Fo + "padding", context.Measure.Length(text.Inset));
         context.Set(Namespaces.Draw + "textarea-horizontal-align", context.Vocabulary.AreaAlignment.Token(text.Horizontal));

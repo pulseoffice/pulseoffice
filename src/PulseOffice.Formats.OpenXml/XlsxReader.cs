@@ -17,7 +17,7 @@ public sealed class XlsxReader
     private readonly XlsxFormControlMapper _controls = new();
     private readonly XlsxMetadataMapper _metadata = new();
     private readonly SharedStrings _strings = new();
-    private readonly Xlsx1904DateShift _dateShift = new();
+    private readonly XlsxDateEpochs _epochs = new();
     private readonly XlsxLeapYearSerials _leapYear = new();
     private readonly IReadOnlyList<IXlsxSheetPartReader> _parts;
 
@@ -213,14 +213,12 @@ public sealed class XlsxReader
                     MaxIterations = calculation.IterateCount?.Value is { } count and > 0 ? (int)count : PulseOffice.Sheets.CalculationSettings.DefaultMaxIterations,
                     MaxChange = calculation.IterateDelta?.Value is { } delta and >= 0 ? delta : PulseOffice.Sheets.CalculationSettings.DefaultMaxChange,
                 };
+            workbook.Calculation = workbook.Calculation with { DateEpoch = _epochs.Read(workbookPart.Workbook?.WorkbookProperties?.Date1904?.Value == true) };
             new XlsxFormulaMapper().Read(workbookPart, workbook);
             if (new XlsxPivotMapper().Read(workbookPart, workbook) is var external and > 0)
                 diagnostics.Add(Diagnostic.Warning("XLSX081",
                     $"{external} pivot tables draw on an OLAP cube, a consolidation of ranges, a non-database connection or a named range of another workbook: their results stay as values, the pivot table itself is not kept.").With(external));
-            if (workbookPart.Workbook?.WorkbookProperties?.Date1904?.Value == true)
-                diagnostics.Add(Diagnostic.Info("XLSX057",
-                    $"The workbook uses the 1904 date system: {_dateShift.ShiftToStandardSystem(workbook)} date values were moved to the 1900 system."));
-            if (_leapYear.ShiftToStandardSystem(workbook).Fictitious is var fictitious and > 0)
+            if (workbook.Calculation.UsesStandardDateEpoch && _leapYear.ShiftToStandardSystem(workbook).Fictitious is var fictitious and > 0)
                 diagnostics.Add(Diagnostic.Info("XLSX191",
                     $"{fictitious} dates are 29 February 1900, a day that exists only in Excel's calendar: they are read as 28 February 1900.").With(fictitious));
 

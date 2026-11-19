@@ -316,6 +316,13 @@ public sealed class ShapeStyleView : UserControl, IDialogContent, IDialogFooterO
         panel.Children.Add(Check("shape.text.wrap", _shape.Style.Text.Wrap,
             value => Style(style => style with { Text = style.Text with { Wrap = value } })));
 
+        var fits = Enum.GetValues<PulseOffice.Text.Rich.TextAutofit>();
+
+        panel.Children.Add(Choice("shape.text.autofit",
+            [.. fits.Select(value => _texts[$"shape.text.autofit.{Lower(value)}"])],
+            Array.IndexOf(fits, _shape.Style.Text.Autofit),
+            index => Style(style => style with { Text = style.Text with { Autofit = fits[index] } })));
+
         panel.Children.Add(Number("shape.text.inset", _shape.Style.Text.Inset.ToPoints(), 0, 40,
             value => Style(style => style with
             {

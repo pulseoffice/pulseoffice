@@ -25,7 +25,8 @@ public sealed class FolioBibliographyUndoTests
                 scene.Services.GetRequiredService<PulseOffice.Localization.ITextCatalog>(), null!,
                 scene.Services.GetRequiredService<PulseOffice.Documents.UI.Editing.IFolioFieldRefresh>(), null!,
                 scene.Services.GetRequiredService<BibliographyFieldNames>(), null!, null!, null!, null!,
-                scene.Services.GetRequiredService<PulseOffice.UI.Controls.Services.IStatusBarService>())
+                scene.Services.GetRequiredService<PulseOffice.UI.Controls.Services.IStatusBarService>(),
+                scene.Services.GetRequiredService<PulseOffice.Documents.UI.Indexes.IFolioIndexStyleCandidates>())
             .GetCommands().Single(command => command.Id.Value == id);
 
     private static readonly CommandContext Open = new(ModuleKind.Documents, SelectionKind.None, DocumentState.DocumentOpen);

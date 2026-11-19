@@ -147,6 +147,12 @@ public sealed class XlsxShapeStyleMapper
             Rotation = _colours.Angle(text.RotationDegrees),
         };
         _layouts.Write(body, text.Layout, 0);
+        body.Append(text.Autofit switch
+        {
+            PulseOffice.Text.Rich.TextAutofit.ShrinkText => new A.NormalAutoFit(),
+            PulseOffice.Text.Rich.TextAutofit.ResizeShape => new A.ShapeAutoFit(),
+            _ => (OpenXmlElement)new A.NoAutoFit(),
+        });
 
         return body;
     }

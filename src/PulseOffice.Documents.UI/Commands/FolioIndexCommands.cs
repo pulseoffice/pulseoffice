@@ -24,7 +24,8 @@ public sealed class FolioIndexCommands(
     PulseOffice.Documents.UI.Rendering.IFolioViewMarks marks,
     PulseOffice.Documents.UI.Indexes.IFolioIndexGallery gallery,
     PulseOffice.Documents.UI.Indexes.IFolioIndexEntries entries,
-    PulseOffice.UI.Controls.Services.IStatusBarService status) : FolioCommandSet(context)
+    PulseOffice.UI.Controls.Services.IStatusBarService status,
+    PulseOffice.Documents.UI.Indexes.IFolioIndexStyleCandidates candidates) : FolioCommandSet(context)
 {
     public const string NavigatorPage = "navigator";
 
@@ -225,7 +226,7 @@ public sealed class FolioIndexCommands(
         List<PulseOffice.Documents.Styles.ParagraphStyle> styles = current.Kind == IndexKind.Contents ? SourceStyleCandidates(editor, current) : [];
         if (styles.Count > 0)
             tabs.Add(new(texts["folio.index.tab.styles"], texts["folio.index.styles.explanation"],
-                [.. styles.Select((style, i) => (FormField)new NumberField("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), style.DisplayName ?? style.Name, current.SourceStyles.LevelOf(style.Name) ?? 0, 0, 10) { Integer = true })]));
+                [.. styles.Select((style, i) => (FormField)new NumberField("style." + i.ToString(System.Globalization.CultureInfo.InvariantCulture), candidates.Title(style), current.SourceStyles.LevelOf(style.Name) ?? 0, 0, 10) { Integer = true })]));
         if (await tabbed.AskAsync(titleKey, tabs, ct, 0, 520).ConfigureAwait(true) is not { } values) return null;
         return current with
         {
@@ -251,7 +252,7 @@ public sealed class FolioIndexCommands(
     }
 
     private List<PulseOffice.Documents.Styles.ParagraphStyle> SourceStyleCandidates(FolioEditor editor, IndexDefinition current) =>
-        [.. editor.Document.Styles.Paragraph.All.Where(style => !style.Hidden || current.SourceStyles.LevelOf(style.Name) is not null)];
+        [.. candidates.Candidates(editor.Document, current.SourceStyles)];
 
     private IndexSourceStyles SourceStyles(List<PulseOffice.Documents.Styles.ParagraphStyle> styles, IReadOnlyDictionary<string, object> values, IndexSourceStyles current)
         => current.Assign(styles.Select((style, i) => new KeyValuePair<string, int>(style.Name,

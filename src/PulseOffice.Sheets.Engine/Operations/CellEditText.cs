@@ -11,9 +11,11 @@ public interface ICellEditText
     string Value(CellValue value, string formatCode);
 }
 
-public sealed class CellEditText(ISpreadsheetLocale locale, INumberFormatParser parser) : ICellEditText
+public sealed class CellEditText(ISpreadsheetLocale locale, INumberFormatParser parser, IDateEpoch epochs) : ICellEditText
 {
-    private readonly DateTime _epoch = new(1899, 12, 30);
+    public CellEditText(ISpreadsheetLocale locale, INumberFormatParser parser) : this(locale, parser, new AmbientDateEpoch())
+    {
+    }
 
     public CellEditText() : this(new SystemSpreadsheetLocale(), new NumberFormatParser())
     {
@@ -42,7 +44,7 @@ public sealed class CellEditText(ISpreadsheetLocale locale, INumberFormatParser 
         if (!date) return time ? Clock(number) : plain;
         if (number < 0 || number > 2958465) return plain;
 
-        var day = _epoch.AddDays(Math.Floor(number));
+        var day = epochs.ToDate(Math.Floor(number));
         var text = Day(day, culture);
         var fraction = number - Math.Floor(number);
         return time || Math.Round(fraction * 86400) > 0 ? $"{text} {Clock(fraction)}" : text;

@@ -44,15 +44,17 @@ public sealed class DocxTableStyleCodec(DocxValues values)
         if (table.HeaderBold == true)
             foreach (var emphasis in new[] { W.TableStyleOverrideValues.LastRow, W.TableStyleOverrideValues.FirstColumn, W.TableStyleOverrideValues.LastColumn })
                 element.Append(new W.TableStyleProperties(new W.RunPropertiesBaseStyle(new W.Bold())) { Type = emphasis });
-        if (table.BandBackground is { } band)
-        {
-            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Vertical });
-            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Horizontal });
-        }
         if (table.FirstBandBackground is { } first)
         {
-            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Vertical });
-            element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Horizontal });
+            var axes = table.FirstBandAxes ?? TableBandAxes.Both;
+            if (axes.HasFlag(TableBandAxes.Columns)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Vertical });
+            if (axes.HasFlag(TableBandAxes.Rows)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Horizontal });
+        }
+        if (table.BandBackground is { } band)
+        {
+            var axes = table.BandAxes ?? TableBandAxes.Both;
+            if (axes.HasFlag(TableBandAxes.Columns)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Vertical });
+            if (axes.HasFlag(TableBandAxes.Rows)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Horizontal });
         }
     }
 
@@ -91,6 +93,13 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             .Select(kind => element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind))
             .Select(item => values.Color(item?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value))
             .FirstOrDefault(color => color is not null);
+        TableBandAxes? Axes(W.TableStyleOverrideValues rows, W.TableStyleOverrideValues columns)
+        {
+            bool Shaded(W.TableStyleOverrideValues kind) => element.Elements<W.TableStyleProperties>()
+                .Any(item => item.Type?.Value == kind && values.Color(item.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value) is not null);
+            var axes = (Shaded(rows) ? TableBandAxes.Rows : TableBandAxes.None) | (Shaded(columns) ? TableBandAxes.Columns : TableBandAxes.None);
+            return axes is TableBandAxes.None or TableBandAxes.Both ? null : axes;
+        }
         var run = header?.GetFirstChild<W.RunPropertiesBaseStyle>();
         return new TableProperties
         {
@@ -105,6 +114,8 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             HeaderBold = run?.GetFirstChild<W.Bold>() is { } bold ? bold.Val?.Value ?? true : null,
             BandBackground = Band(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
             FirstBandBackground = Band(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
+            BandAxes = Axes(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
+            FirstBandAxes = Axes(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
         };
     }
 

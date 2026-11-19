@@ -151,13 +151,18 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
 
     public StoryKind Story { get; init; } = StoryKind.Body;
 
+    public IReadOnlyList<double>? AutoMinimum { get; init; }
+
+    public IReadOnlyList<double>? AutoMaximum { get; init; }
+
     public override FlowKey Key => field ??= Compose();
 
     private FlowKey Compose()
     {
         var structure = string.Join(';', Columns.Select(value => value.ToString("R", CultureInfo.InvariantCulture)))
             + "|" + string.Join(';', Rows.Select(row => $"{row.Height}:{row.Exact}:{row.Row.AllowBreakAcrossPages}:" + string.Join(',', row.Cells.Select(cell => $"{cell.Column}/{cell.ColumnSpan}/{cell.RowSpan}/{cell.Cell.Background}/{cell.Cell.VerticalAlign}/{cell.Cell.TextDirection}/{cell.Cell.Padding}/{cell.Appearance}"))))
-            + "|" + Table.HeaderRows + Table.RepeatHeaderRows + "|" + Table.PageStyleName + Table.PageBreakBefore + "|" + Table.Alignment + Table.Indent.Value + "|" + Table.WidthPercent;
+            + "|" + Table.HeaderRows + Table.RepeatHeaderRows + "|" + Table.PageStyleName + Table.PageBreakBefore + "|" + Table.Alignment + Table.Indent.Value + "|" + Table.WidthPercent
+            + "|" + string.Join(';', (AutoMinimum ?? []).Concat(AutoMaximum ?? []).Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
         var parts = new List<object> { structure, Style };
         foreach (var cell in Rows.SelectMany(row => row.Cells))
         {
@@ -170,7 +175,35 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
         return new FlowKey("table:" + Table.Id, parts, string.Empty);
     }
 
-    public double Width(double available) => Columns.Count == 0 ? available : Columns.Sum() * Scale(available);
+    public double Width(double available) => Columns.Count == 0 ? available : Fitted(available).Sum();
+
+    private (double Available, IReadOnlyList<double> Widths)? _fitted;
+
+    private IReadOnlyList<double> Fitted(double available)
+    {
+        if (_fitted is { } cached && cached.Available == available) return cached.Widths;
+        var widths = Fit(available);
+        _fitted = (available, widths);
+        return widths;
+    }
+
+    private IReadOnlyList<double> Fit(double available)
+    {
+        if (AutoMinimum is { } minimum && AutoMaximum is { } maximum && minimum.Count == Columns.Count && maximum.Count == Columns.Count && available > 0)
+            return AutoFit(minimum, maximum, available);
+        var scale = Scale(available);
+        return scale == 1 ? Columns : [.. Columns.Select(column => column * scale)];
+    }
+
+    private IReadOnlyList<double> AutoFit(IReadOnlyList<double> minimum, IReadOnlyList<double> maximum, double available)
+    {
+        var low = minimum.Sum();
+        var high = maximum.Select((value, column) => Math.Max(value, minimum[column])).Sum();
+        if (high <= available) return [.. maximum.Select((value, column) => Math.Max(value, minimum[column]))];
+        if (low >= available || high <= low) return minimum;
+        var share = (available - low) / (high - low);
+        return [.. minimum.Select((value, column) => value + (Math.Max(maximum[column], value) - value) * share)];
+    }
 
     private double Scale(double available)
     {
@@ -190,12 +223,12 @@ public sealed class TableItem(TableBlock table, IReadOnlyList<double> columns, I
     }
 
     public double ColumnLeft(int column, double available) =>
-        Columns.Count == 0 ? column * available / Math.Max(1, Table.ColumnCount) : Columns.Take(column).Sum() * Scale(available);
+        Columns.Count == 0 ? column * available / Math.Max(1, Table.ColumnCount) : Fitted(available).Take(column).Sum();
 
     public double ColumnWidth(int column, int span, double available)
     {
         if (Columns.Count == 0) return span * available / Math.Max(1, Table.ColumnCount);
-        return Columns.Skip(column).Take(span).Sum() * Scale(available);
+        return Fitted(available).Skip(column).Take(span).Sum();
     }
 
     public override T Accept<T>(IFlowItemVisitor<T> visitor) => visitor.VisitTable(this);

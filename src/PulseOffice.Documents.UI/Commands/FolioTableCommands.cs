@@ -291,5 +291,13 @@ public sealed class FolioTableCommands(
         if (choice.Direction != cell.TextDirection) editing.Formatting.SetTextDirection(editor.Document, editor.History, at, choice.Direction);
         if (choice.Placement != at.Table.Alignment || choice.Indent != at.Table.Indent)
             editing.Formatting.SetPlacement(editor.Document, editor.History, at.Table, choice.Placement, choice.Indent);
+        if (choice.Width is { } width && WidthChanged(at.Table, width)) editing.Geometry.SetTableWidth(editor.Document, editor.History, at.Table, width);
     }
+
+    private bool WidthChanged(TableBlock table, PulseOffice.Documents.Editing.Tables.TableWidthChoice width) => width.Mode switch
+    {
+        PulseOffice.Documents.Editing.Tables.TableWidthMode.Percent => table.AutoWidth || table.WidthPercent is not { } percent || Math.Abs(percent - width.Percent) > 0.05,
+        PulseOffice.Documents.Editing.Tables.TableWidthMode.Automatic => !table.AutoWidth,
+        _ => table.AutoWidth || table.WidthPercent is not null || Math.Abs(table.Columns.Sum(column => column.ToPoints()) - width.Points) > 0.5,
+    };
 }

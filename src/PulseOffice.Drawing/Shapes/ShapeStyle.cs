@@ -317,6 +317,8 @@ public sealed record ShapeTextStyle
 
     public Twip Inset { get; init; } = Twip.FromPoints(4);
 
+    public PulseOffice.Text.Rich.TextAutofit Autofit { get; init; } = PulseOffice.Text.Rich.TextAutofit.None;
+
     public double RotationDegrees { get; init; }
 
     public PulseOffice.Text.Rich.TextLayout Layout { get; init; } = PulseOffice.Text.Rich.TextLayout.Default;
