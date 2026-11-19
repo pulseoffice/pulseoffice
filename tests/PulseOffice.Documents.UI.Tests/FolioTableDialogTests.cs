@@ -44,7 +44,7 @@ public sealed class FolioTableDialogTests
         {
             Wrap = PulseOffice.Documents.Objects.WrapMode.TopAndBottom,
         };
-        var dialogs = new FolioObjectDialogs(null!, new InitialAnswers(), new TextCatalog(UiLanguage.Italian), null!, null!);
+        var dialogs = new FolioObjectDialogs(null!, new InitialAnswers(), new TextCatalog(UiLanguage.Italian), null!, null!, null!, null!);
 
         var choice = await dialogs.PropertiesAsync(item, PulseOffice.Documents.UI.Editing.ObjectAnchorKind.Paragraph, ObjectDialogPage.Position, CancellationToken.None);
 

@@ -31,10 +31,10 @@ public sealed class DialogRow : Grid
         ColumnDefinitions =
         [
             new ColumnDefinition(GridLength.Auto) { SharedSizeGroup = LabelColumnGroup },
+            new ColumnDefinition(new GridLength(metrics.SpacingMedium)),
             new ColumnDefinition(GridLength.Star),
         ];
         RowDefinitions = new RowDefinitions("Auto,Auto");
-        ColumnSpacing = metrics.SpacingMedium;
 
         if (kind == DialogRowKind.Labelled && !string.IsNullOrEmpty(label))
         {
@@ -55,6 +55,8 @@ public sealed class DialogRow : Grid
         Children.Add(editor);
         Place(stacked: false);
     }
+
+    public const int EditorColumn = 2;
 
     public DialogRowKind Kind { get; }
 
@@ -96,7 +98,7 @@ public sealed class DialogRow : Grid
         {
             SetRow(Label, 0);
             SetColumn(Label, 0);
-            SetColumnSpan(Label, stacked ? 2 : 1);
+            SetColumnSpan(Label, stacked ? EditorColumn + 1 : 1);
             Label.Margin = stacked
                 ? new Thickness(0, 0, 0, _metrics.SpacingSmall / 2)
                 : AlignTop ? new Thickness(0, _metrics.SpacingSmall, 0, 0) : default;
@@ -104,7 +106,7 @@ public sealed class DialogRow : Grid
 
         var spanning = stacked || Kind == DialogRowKind.Wide;
         SetRow(Editor, stacked && Label is not null ? 1 : 0);
-        SetColumn(Editor, spanning ? 0 : 1);
-        SetColumnSpan(Editor, spanning ? 2 : 1);
+        SetColumn(Editor, spanning ? 0 : EditorColumn);
+        SetColumnSpan(Editor, spanning ? EditorColumn + 1 : 1);
     }
 }

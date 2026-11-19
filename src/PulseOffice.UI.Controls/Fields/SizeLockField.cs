@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using PulseOffice.Localization;
+using PulseOffice.UI.Controls.Dialogs;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Icons;
 using PulseOffice.UI.Theming;
@@ -49,14 +50,26 @@ public sealed class SizeLock : UserControl
         _width.ValueCommitted += (_, value) => Follow(ratio => _height.Value = value / ratio);
         _height.ValueCommitted += (_, value) => Follow(ratio => _width.Value = value * ratio);
 
-        var labels = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), RowSpacing = metrics.SpacingSmall, ColumnSpacing = metrics.SpacingSmall };
+        var labels = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnDefinitions =
+            [
+                new ColumnDefinition(GridLength.Auto) { SharedSizeGroup = DialogRow.LabelColumnGroup },
+                new ColumnDefinition(new GridLength(metrics.SpacingMedium)),
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(new GridLength(metrics.SpacingSmall)),
+                new ColumnDefinition(GridLength.Auto),
+            ],
+            RowSpacing = metrics.SpacingSmall,
+        };
         var widthLabel = new TextBlock { Text = texts["size.width"], VerticalAlignment = VerticalAlignment.Center, FontSize = metrics.FontSize };
         var heightLabel = new TextBlock { Text = texts["size.height"], VerticalAlignment = VerticalAlignment.Center, FontSize = metrics.FontSize };
-        Grid.SetColumn(_width, 1);
+        Grid.SetColumn(_width, 2);
         Grid.SetRow(heightLabel, 1);
         Grid.SetRow(_height, 1);
-        Grid.SetColumn(_height, 1);
-        Grid.SetColumn(_lock, 2);
+        Grid.SetColumn(_height, 2);
+        Grid.SetColumn(_lock, 4);
         Grid.SetRowSpan(_lock, 2);
         labels.Children.Add(widthLabel);
         labels.Children.Add(_width);
@@ -65,6 +78,7 @@ public sealed class SizeLock : UserControl
         labels.Children.Add(_lock);
         _width.AttachScrubber(widthLabel);
         _height.AttachScrubber(heightLabel);
+        ClipToBounds = false;
         Content = labels;
     }
 

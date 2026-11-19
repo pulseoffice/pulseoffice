@@ -14,7 +14,8 @@ public sealed class FolioObjectCommands(
     IFolioObjectDialogs dialogs,
     ICaptions captions,
     IFrameChains chains,
-    IFolioObjectCycle cycle) : FolioCommandSet(context)
+    IFolioObjectCycle cycle,
+    PulseOffice.UI.Controls.Shapes.IShapeStyling styling) : FolioCommandSet(context)
 {
     public const SelectionKind ObjectSelection = SelectionKind.Image | SelectionKind.Shape | SelectionKind.Frame | SelectionKind.Chart;
 
@@ -152,9 +153,12 @@ public sealed class FolioObjectCommands(
                 target.Name = choice.Name;
             });
             if (choice.Contour && item.Contour is null) objects.Contour(editor, true);
-            if (item.Content is EmbeddedContent) objects.Replace(editor, content => content with { Title = choice.Title, Description = choice.Description });
+            if (item.Content is EmbeddedContent) objects.Replace(editor, content => Restyled(content with { Title = choice.Title, Description = choice.Description }, choice.Style));
         }
     }
+
+    private EmbeddedObject Restyled(EmbeddedObject content, PulseOffice.Drawing.Shapes.ShapeStyle? style) =>
+        style is null ? content : styling.Restyle(content, _ => style) ?? content;
 
     private async Task NameAsync(FolioEditor editor, CancellationToken ct)
     {

@@ -9,7 +9,8 @@ public sealed class LedgerCommands(
     LedgerConditionalRuleCommands conditional,
     LedgerChartCommands charts,
     LedgerShapeCommands shapes,
-    LedgerShapeListCommands shapeLists)
+    LedgerShapeListCommands shapeLists,
+    LedgerShapeColourCommands shapeColours)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -20,6 +21,7 @@ public sealed class LedgerCommands(
         .. charts.GetCommands(),
         .. shapes.GetCommands(),
         .. shapeLists.GetCommands(),
+        .. shapeColours.GetCommands(),
     ];
 
     public void EditSelectedChart() => charts.EditSelectedChart();

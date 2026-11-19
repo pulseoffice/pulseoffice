@@ -51,6 +51,7 @@ public sealed class ShellComposition(IServiceProvider services)
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioNavigationCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioTextToolCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioShapeCommands>().GetCommands());
+        registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioShapeColourCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioSendCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioCellCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<PulseOffice.Documents.UI.Commands.FolioAccessibilityCommands>().GetCommands());

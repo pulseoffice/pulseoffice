@@ -24,7 +24,8 @@ public sealed class DeckRibbonCommands(
     PulseOffice.UI.Controls.Prompts.IZoomPrompt zoom,
     PulseOffice.UI.Controls.Zoom.IZoomChoice zoomChoice,
     ObjectDialogs.IDeckObjectEditing objectEditing,
-    IDeckTableCellEditing cells) : DeckCommandSet(context)
+    IDeckTableCellEditing cells,
+    IShapeColourCommands shapeColours) : DeckCommandSet(context)
 {
     private static readonly double[] FontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 72, 96];
 
@@ -34,8 +35,6 @@ public sealed class DeckRibbonCommands(
 
     private string? _textColour = memory.Recall("deck.format.color", "#C00000");
     private string? _highlight = memory.Recall("deck.format.highlight", "#FFFF00");
-    private string? _fillColour = memory.Recall("deck.object.fill", "#4472C4");
-    private string? _lineColour = memory.Recall("deck.object.lineColor", "#1F3864");
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -115,60 +114,9 @@ public sealed class DeckRibbonCommands(
                 : dialogs.ParagraphAsync(ct),
         },
 
-        Shape("deck.object.fill") with
-        {
-            RibbonControl = new ColorSplitSpec(Palette, () => _fillColour, "ribbon.colour.none")
-            {
-                MoreCommandId = "deck.object.fill",
-                Selected = () => SelectedStyle()?.Fill is { Kind: ShapeFillKind.Solid } fill ? fill.ColorHex : null,
-            },
-            Execute = async (ctx, ct) =>
-            {
-                var colour = ctx.Argument as RibbonColor
-                    ?? await colours.ChooseAsync(_fillColour, true, "command.deck.object.fill.title", ct).ConfigureAwait(true);
+        shapeColours.Fill(Shape("deck.object.fill"), ColourTarget()),
 
-                if (colour is null) return;
-
-                _fillColour = colour.Hex;
-                memory.Remember("deck.object.fill", colour.Hex);
-                Restyle("deck.object.fill", style => style with
-                {
-                    Fill = colour.Hex is { } hex
-                        ? style.Fill with { Kind = ShapeFillKind.Solid, ColorHex = hex, Opacity = 1 }
-                        : ShapeFill.None,
-                });
-            },
-        },
-
-        Shape("deck.object.lineColor") with
-        {
-            RibbonControl = new ColorSplitSpec(Palette, () => _lineColour, "ribbon.colour.none")
-            {
-                MoreCommandId = "deck.object.lineColor",
-                Selected = () => SelectedStyle()?.Line is { } line && line.Dash != ShapeStrokeStyle.None ? line.ColorHex : null,
-            },
-            Execute = async (ctx, ct) =>
-            {
-                var colour = ctx.Argument as RibbonColor
-                    ?? await colours.ChooseAsync(_lineColour, true, "command.deck.object.lineColor.title", ct).ConfigureAwait(true);
-
-                if (colour is null) return;
-
-                _lineColour = colour.Hex;
-                memory.Remember("deck.object.lineColor", colour.Hex);
-                Restyle("deck.object.lineColor", style => style with
-                {
-                    Line = colour.Hex is { } hex
-                        ? style.Line with
-                        {
-                            ColorHex = hex,
-                            Dash = style.Line.Dash == ShapeStrokeStyle.None ? ShapeStrokeStyle.Solid : style.Line.Dash,
-                            Opacity = 1,
-                        }
-                        : ShapeLine.None,
-                });
-            },
-        },
+        shapeColours.Outline(Shape("deck.object.lineColor"), ColourTarget()),
 
         Shape("deck.object.quickStyle") with
         {
@@ -257,6 +205,8 @@ public sealed class DeckRibbonCommands(
         Context.Target is { } t
             ? [.. t.SelectedMany().OfType<ObjectElement>().Where(element => styling.Editable(element.Content) is not null)]
             : [];
+
+    private ShapeColourTarget ColourTarget() => new(SelectedStyle, Restyle, Palette);
 
     private ShapeStyle? SelectedStyle() =>
         Styleable().FirstOrDefault() is { } element ? styling.Editable(element.Content)?.Style : null;

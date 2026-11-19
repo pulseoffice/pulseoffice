@@ -200,6 +200,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<FolioTextToolCommands>();
         services.AddSingleton<FolioShapeServices>();
         services.AddSingleton<FolioShapeCommands>();
+        services.AddSingleton<FolioShapeColourCommands>();
         services.AddSingleton<FolioSendServices>();
         services.AddSingleton<FolioSendCommands>();
         services.AddSingleton<IFolioNumberRecognition, FolioNumberRecognition>();

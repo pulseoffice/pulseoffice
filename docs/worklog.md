@@ -13893,3 +13893,16 @@ thread-time trace.
   4 GB while unknown), and a chunk starts only when its cap fits within `TESTS_MEMORY_TOTAL_GB` (12). Five sweep or
   engine chunks (0.3–0.5 GB) now run together; `Desktop.Tests` (3.4 GB) and `Documents.UI.Tests` (2.7 GB) still get
   room. The three sweeps run in 359 s of wall time including the build.
+
+## Shape fill and outline across modules, Folio object look, dialog row inset (2026-11-19)
+
+- `IShapeColourCommands`/`IShapeColourChanges` (UI.Controls) build the "Shape fill" and "Shape outline" colour split
+  commands over a `ShapeColourTarget` (selected style, restyle, palette). Deck now uses them; Ledger
+  (`ledger.object.fill`/`lineColor`, Page Layout › Shape style, Format › Object) and Folio (`folio.object.fill`/`lineColor`,
+  Object tab and object contextual tab › Shape style, Format › Object) gain them, with ribbon icons and five languages.
+  `folio.object.area` and `folio.object.line` are placed beside them.
+- Folio's object properties dialog has an "Area and line" tab (fill, outline, outline width) when the selected object is
+  stylable; the change joins the dialog's single undo transaction.
+- `DialogRow` used `ColumnSpacing` together with a shared-size label column: the star editor column did not account for
+  the spacing and editors overflowed the right edge by it. The gap is now a fixed column, so every form keeps a right
+  inset equal to the left one.

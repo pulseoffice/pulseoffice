@@ -27,6 +27,7 @@ public static class PulseContextLayout
             "folio.object.wrap.through", "folio.object.wrap.contour", "folio.object.wrap.firstParagraph", "folio.object.wrap.background", "folio.object.wrapDialog"),
         .. Place("folioobject/arrange", "folio.object.order.front", "folio.object.order.forward", "folio.object.order.backward", "folio.object.order.back",
             "folio.object.rotateLeft", "folio.object.rotateRight", "folio.object.flipHorizontal", "folio.object.flipVertical"),
+        .. Place("folioobject/style", "folio.object.fill", "folio.object.lineColor", "folio.object.area", "folio.object.line"),
         .. Place("folioobject/image", "folio.image.crop", "folio.image.replace", "folio.image.save", "folio.image.color", "folio.image.colorReplacer", "folio.image.imageMap", "folio.image.compress", "folio.image.externalEdit"),
         .. Place("folioobject/object", "folio.chart.edit", "folio.object.caption", "folio.object.openPackaged", "folio.object.link", "folio.object.unlink", "folio.object.hyperlink", "folio.object.hyperlink.open", "folio.object.hyperlink.remove", "folio.object.properties", "folio.object.originalSize", "folio.object.delete"),
         .. Place("object/clipboard",

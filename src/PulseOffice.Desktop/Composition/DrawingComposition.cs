@@ -88,6 +88,8 @@ internal static class DrawingComposition
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IAdjustHandleChrome>(provider => new PulseOffice.UI.Controls.Shapes.AdjustHandleChrome(
             provider.GetRequiredService<PulseOffice.Drawing.Shapes.Geometry.IShapeAdjustHandles>(), provider.GetRequiredService<IShapeGeometry>()));
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IShapeStyleEditors, PulseOffice.UI.Controls.Shapes.ShapeStyleEditors>();
+        services.AddSingleton<PulseOffice.UI.Controls.Shapes.IShapeColourChanges, PulseOffice.UI.Controls.Shapes.ShapeColourChanges>();
+        services.AddSingleton<PulseOffice.UI.Controls.Shapes.IShapeColourCommands, PulseOffice.UI.Controls.Shapes.ShapeColourCommands>();
         services.TryAddSingleton<PulseOffice.Drawing.Shapes.IGradientStopEditing, PulseOffice.Drawing.Shapes.GradientStopEditing>();
         services.TryAddSingleton<PulseOffice.Drawing.Shapes.IFillPatternCatalog, PulseOffice.Drawing.Shapes.FillPatternCatalog>();
         services.AddSingleton<PulseOffice.UI.Controls.Fills.IFillEditors>(provider => new PulseOffice.UI.Controls.Fills.FillEditors(

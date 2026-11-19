@@ -46,7 +46,7 @@ public sealed class FolioCommandTests
             .. new FolioDialogCommands(active, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioRibbonCommands(active, null!, null!, new NoMemory(), null!, null!, null!, null!, null!).GetCommands(),
             .. services.GetRequiredService<FolioZoomCommands>().GetCommands(),
-            .. new FolioObjectCommands(active, services.GetRequiredService<IFolioObjectEditing>(), services.GetRequiredService<IFolioObjectMover>(), null!, services.GetRequiredService<PulseOffice.Documents.Editing.ICaptions>(), services.GetRequiredService<PulseOffice.Documents.Objects.IFrameChains>(), services.GetRequiredService<IFolioObjectCycle>()).GetCommands(),
+            .. new FolioObjectCommands(active, services.GetRequiredService<IFolioObjectEditing>(), services.GetRequiredService<IFolioObjectMover>(), null!, services.GetRequiredService<PulseOffice.Documents.Editing.ICaptions>(), services.GetRequiredService<PulseOffice.Documents.Objects.IFrameChains>(), services.GetRequiredService<IFolioObjectCycle>(), null!).GetCommands(),
             .. new FolioListCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.IListEditing>(), null!, null!, null!).GetCommands(),
             .. new FolioStyleCommands(active, null!, null!, null!, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioSectionCommands(active, services.GetRequiredService<PulseOffice.Documents.Editing.ISectionEditing>(), null!, null!, null!, null!, null!, null!, null!, null!).GetCommands(),

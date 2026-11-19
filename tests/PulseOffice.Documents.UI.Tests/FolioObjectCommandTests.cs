@@ -24,7 +24,8 @@ public sealed class FolioObjectCommandTests
             null!,
             scene.Services.GetRequiredService<ICaptions>(),
             scene.Services.GetRequiredService<IFrameChains>(),
-            scene.Services.GetRequiredService<IFolioObjectCycle>()).GetCommands()];
+            scene.Services.GetRequiredService<IFolioObjectCycle>(),
+            null!).GetCommands()];
 
     private static void Run(FolioScene scene, string id)
     {

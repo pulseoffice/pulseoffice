@@ -2,6 +2,7 @@ using PulseOffice.Document.Embedding;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Documents.Objects;
 using PulseOffice.Documents.UI.Editing;
+using PulseOffice.Drawing.Shapes;
 using PulseOffice.Foundation.Units;
 using PulseOffice.Localization;
 using Avalonia;
@@ -12,6 +13,7 @@ using PulseOffice.UI.Controls;
 using PulseOffice.UI.Controls.Choices;
 using PulseOffice.UI.Controls.Fields;
 using PulseOffice.UI.Controls.Services;
+using PulseOffice.UI.Controls.Shapes;
 using PulseOffice.UI.Icons;
 
 namespace PulseOffice.Documents.UI.Commands;
@@ -35,7 +37,8 @@ public sealed record ObjectPropertiesChoice(
     Margins Spacing,
     string? Name,
     string? Title,
-    string? Description);
+    string? Description,
+    ShapeStyle? Style = null);
 
 public interface IFolioObjectDialogs
 {
@@ -48,7 +51,7 @@ public interface IFolioObjectDialogs
     Task<string?> LinkAsync(IReadOnlyList<AnchoredObject> targets, CancellationToken ct);
 }
 
-public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, ITextCatalog texts, ICaptions captions, IDialogService dialogs, IIconCatalog? icons = null) : IFolioObjectDialogs
+public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, ITextCatalog texts, ICaptions captions, IDialogService dialogs, IShapeStyling styling, IShapeColourChanges colours, IIconCatalog? icons = null) : IFolioObjectDialogs
 {
     private readonly ObjectAnchorKind[] _anchors = [ObjectAnchorKind.Page, ObjectAnchorKind.Paragraph, ObjectAnchorKind.Character, ObjectAnchorKind.AsCharacter];
     private readonly WrapMode[] _wraps = [WrapMode.None, WrapMode.Left, WrapMode.Right, WrapMode.Parallel, WrapMode.Through, WrapMode.Optimal];
@@ -93,12 +96,14 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
             options.Add(new TextField("title", texts["folio.object.title"], embedded.Title ?? string.Empty));
             options.Add(new TextField("description", texts["folio.object.description"], embedded.Description ?? string.Empty) { Multiline = true });
         }
-        FormTab[] tabs =
+        var style = embedded is null ? null : styling.Editable(embedded)?.Style;
+        List<FormTab> tabs =
         [
             new(texts["folio.object.tab.position"], texts["folio.object.position.explanation"], position),
             new(texts["folio.object.tab.wrap"], texts["folio.object.wrap.explanation"], wrapping),
-            new(texts["folio.object.tab.options"], texts["folio.object.options.explanation"], options),
         ];
+        if (style is not null) tabs.Add(new(texts["folio.object.tab.look"], texts["folio.object.look.explanation"], LookFields(style)));
+        tabs.Add(new(texts["folio.object.tab.options"], texts["folio.object.options.explanation"], options));
         if (await tabbed.AskAsync("command.folio.object.properties.title", tabs, ct, (int)page, 560).ConfigureAwait(true) is not { } values) return null;
         return new ObjectPropertiesChoice(
             _anchors[values.Choice("anchor", _anchors.Length)],
@@ -118,8 +123,41 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
             new Margins(Twip.FromPoints(values.Number("left", 0)), Twip.FromPoints(values.Number("top", 0)), Twip.FromPoints(values.Number("right", 0)), Twip.FromPoints(values.Number("bottom", 0))),
             Optional(values.Text("name")),
             embedded is null ? null : Optional(values.Text("title")),
-            embedded is null ? null : Optional(values.Text("description")));
+            embedded is null ? null : Optional(values.Text("description")),
+            style is null ? null : Restyled(style, values));
     }
+
+    private List<FormField> LookFields(ShapeStyle style) =>
+    [
+        new ColorField("fill", texts["folio.object.look.fill"], colours.FillOf(style) ?? string.Empty),
+        new ColorField("outline", texts["folio.object.look.outline"], colours.OutlineOf(style) ?? string.Empty),
+        new NumberField("outlineWidth", texts["folio.object.look.outlineWidth"], OutlinePoints(style), 0, 100, 0.25) { Unit = "pt" },
+    ];
+
+    private ShapeStyle? Restyled(ShapeStyle style, IReadOnlyDictionary<string, object> values)
+    {
+        var hex = new ColorFieldValue();
+        var next = style;
+        var changed = false;
+        if (hex.Normalize(values.Text("fill")) is var fill && fill != hex.Normalize(colours.FillOf(style)))
+        {
+            next = colours.WithFill(next, fill);
+            changed = true;
+        }
+        if (hex.Normalize(values.Text("outline")) is var outline && outline != hex.Normalize(colours.OutlineOf(style)))
+        {
+            next = colours.WithOutline(next, outline);
+            changed = true;
+        }
+        if (values.Number("outlineWidth", OutlinePoints(style)) is var width && Math.Abs(width - OutlinePoints(style)) > 0.001)
+        {
+            next = next with { Line = next.Line with { Width = Twip.FromPoints(width) } };
+            changed = true;
+        }
+        return changed ? next : null;
+    }
+
+    private double OutlinePoints(ShapeStyle style) => Math.Round(style.Line.Width.ToPoints(), 2);
 
     public async Task<string?> NameAsync(string? current, CancellationToken ct)
     {

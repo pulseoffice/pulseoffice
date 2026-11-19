@@ -108,6 +108,7 @@ internal static class LedgerCoreComposition
         services.AddSingleton<LedgerConditionalRuleCommands>();
         services.AddSingleton<LedgerChartCommands>();
         services.AddSingleton<LedgerShapeCommands>();
+        services.AddSingleton<LedgerShapeColourCommands>();
         services.AddSingleton<LedgerShapeListCommands>();
         services.AddSingleton<LedgerCommands>();
         services.AddSingleton<PulseOffice.Sheets.IFormControlBinding, PulseOffice.Sheets.FormControlBinding>();
