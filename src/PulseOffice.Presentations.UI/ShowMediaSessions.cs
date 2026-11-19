@@ -6,6 +6,8 @@ namespace PulseOffice.Presentations.UI;
 public interface IShowMediaSessions
 {
     Task<MediaSession?> OpenAsync(MediaElement media, string? documentPath);
+
+    Task<MediaSession?> OpenSoundAsync(EmbeddedSound sound, bool loop);
 }
 
 public sealed class ShowMediaSessions(IDeckMediaFiles mediaFiles, IMediaPlaybackFactory playback, MediaVolumeCurve curve) : IShowMediaSessions
@@ -20,6 +22,26 @@ public sealed class ShowMediaSessions(IDeckMediaFiles mediaFiles, IMediaPlayback
         try
         {
             if (await player.OpenAsync(source).ConfigureAwait(true)) return new MediaSession(player, Settings(media), curve);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.ComponentModel.Win32Exception)
+        {
+        }
+
+        player.Dispose();
+        return null;
+    }
+
+    public async Task<MediaSession?> OpenSoundAsync(EmbeddedSound sound, bool loop)
+    {
+        ArgumentNullException.ThrowIfNull(sound);
+        if (!playback.IsAvailable || sound.Data.Length == 0) return null;
+        var player = playback.Create();
+        try
+        {
+            var extension = Path.GetExtension(sound.Path) is { Length: > 1 } named ? named : _extensions.FromType(sound.MimeType);
+            if (await player.OpenAsync(new StreamMediaSource(new MemoryStream(sound.Data, writable: false), extension)).ConfigureAwait(true))
+                return new MediaSession(player, new MediaPlaybackSettings { Loop = loop }, curve);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
             or System.ComponentModel.Win32Exception)

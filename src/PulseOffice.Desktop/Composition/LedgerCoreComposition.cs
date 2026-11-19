@@ -87,6 +87,8 @@ internal static class LedgerCoreComposition
         services.AddSingleton<PulseOffice.Sheets.UI.Exchange.IExchangeCellStyles, PulseOffice.Sheets.UI.Exchange.ExchangeCellStyles>();
         services.AddSingleton<PulseOffice.Sheets.UI.Exchange.IExchangeGridSnapshots, PulseOffice.Sheets.UI.Exchange.ExchangeGridSnapshots>();
         services.AddSingleton<PulseOffice.Sheets.Styling.IStyleTransplant, PulseOffice.Sheets.Styling.StyleTransplant>();
+        services.AddSingleton<PulseOffice.Sheets.ISheetCellTransplant, PulseOffice.Sheets.SheetCellTransplant>();
+        services.AddSingleton<PulseOffice.Sheets.Formatting.ICalendarFormats, PulseOffice.Sheets.Formatting.CalendarFormats>();
         services.AddSingleton<PulseOffice.Sheets.Engine.Operations.ISheetClipboard, PulseOffice.Sheets.Engine.Operations.SheetClipboard>();
         services.AddSingleton<PulseOffice.Sheets.Engine.Operations.IChartErrorValueRefresh, PulseOffice.Sheets.Engine.Operations.ChartErrorValueRefresh>();
         services.AddSingleton<PulseOffice.Sheets.UI.Exchange.LedgerExchangeServices>();

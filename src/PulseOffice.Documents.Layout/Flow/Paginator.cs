@@ -44,6 +44,8 @@ public sealed record PaginationRequest(
 
     public Func<string, double> FrameAlignment { get; init; } = _ => 0;
 
+    public Func<string, double, double, PulseOffice.Drawing.Shapes.ShapeTextMargins> FrameMargins { get; init; } = (_, _, _) => PulseOffice.Drawing.Shapes.ShapeTextMargins.None;
+
     public Func<string, ComposedStory?> Frame { get; init; } = _ => null;
 
     public Func<string, IReadOnlyList<MemberFrame>> MemberFrames { get; init; } = _ => [];

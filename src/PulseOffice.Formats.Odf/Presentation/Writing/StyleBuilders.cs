@@ -91,6 +91,12 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
         else
         {
             properties.Add(new XAttribute(Presentation + "transition-type", "manual"));
+            if (transition.Advance == AdvanceMode.TriggerOnly)
+            {
+                if (properties.Attribute(XNamespace.Xmlns + "pulsetransition") is null)
+                    properties.Add(new XAttribute(XNamespace.Xmlns + "pulsetransition", transitions.ExtensionNamespace.NamespaceName));
+                properties.Add(new XAttribute(transitions.ExtensionNamespace + "advance-on-click", "false"));
+            }
         }
 
         if (!string.IsNullOrEmpty(transition.SoundPath))

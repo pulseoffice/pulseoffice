@@ -18,6 +18,7 @@ public sealed class PresentationWindow : Window
     private readonly bool _loop;
     private readonly bool _withoutAnimation;
     private readonly bool _manualAdvance;
+    private readonly bool _kiosk;
     private readonly IBrush _penBrush;
     private readonly int _monitorIndex;
 
@@ -95,6 +96,7 @@ public sealed class PresentationWindow : Window
         _rehearse = options.Rehearse;
         _withoutAnimation = options.WithoutAnimation;
         _manualAdvance = options.ManualAdvance;
+        _kiosk = options.Kiosk;
         _monitorIndex = options.MonitorIndex;
         _forms = options.Forms;
         _linkTips = options.LinkTips;
@@ -196,6 +198,8 @@ public sealed class PresentationWindow : Window
             _ink.Children.Clear();
             _media.Clear();
             _inkSlideIndex = _controller.SlideIndex;
+            if (_controller.Current?.Transition is { SoundPath: { Length: > 0 } sound } arriving)
+                _media.PlaySound(sound, arriving.LoopSoundUntilNext);
             _media.StartAutomatic(_controller.Current);
             _announcer.Slide(SlideNumber, SlideTotal);
         }
@@ -513,7 +517,7 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        Advance();
+        if (_rehearse || _controller.ClickAdvances(_manualAdvance, _kiosk)) Advance();
         e.Handled = true;
     }
 
@@ -568,6 +572,8 @@ public sealed class PresentationWindow : Window
             case InteractionKind.StopShow:
                 Close();
                 return true;
+            case InteractionKind.PlaySound:
+                return _media.PlaySound(action.SoundPath, loop: false);
             case InteractionKind.Hyperlink:
                 if (action.Reference is { Length: > 1 } local && local[0] == '#')
                 {
@@ -776,6 +782,7 @@ public sealed class PresentationWindow : Window
     {
         StopAnimator();
         _media.Clear();
+        _media.StopSound();
         _autoAdvance?.Stop();
 
         if (_rehearse) RehearsalFinished?.Invoke(this, _rehearsal.Finish());

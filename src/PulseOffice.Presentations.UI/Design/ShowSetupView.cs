@@ -44,6 +44,8 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
     private readonly Control _rangeRow;
     private readonly IconChoiceGroup _advance;
     private readonly CheckBox _loop = new();
+    private readonly IconChoiceGroup _kind;
+    private readonly ComboBox _customShow = new() { MinWidth = 200, HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _withoutAnimation = new();
     private readonly SwatchStrip _pen;
     private readonly ComboBox _screens = new() { MinWidth = 240 };
@@ -71,6 +73,17 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
                 new IconChoice("manual", "deck.motion.advance.onClick", Texts["deck.setup.advance.manual"]),
             ],
             services.Icons, _metrics, Texts["deck.setup.advance"], setup.Advance == ShowAdvanceMode.Manual ? 1 : 0, showLabels: true);
+        _kind = new IconChoiceGroup(
+            [
+                new IconChoice("speaker", "deck.motion.advance.onClick", Texts["deck.setup.kind.speaker"]),
+                new IconChoice("window", "deck.setup.rangeAll", Texts["deck.setup.kind.window"]),
+                new IconChoice("kiosk", "deck.motion.advance.afterTime", Texts["deck.setup.kind.kiosk"]),
+            ],
+            services.Icons, _metrics, Texts["deck.setup.kind"], (int)setup.Kind, showLabels: true);
+        _customShow.ItemsSource = new[] { Texts["deck.setup.customShow.none"] }.Concat(deck.CustomShows.Select(show => show.Name)).ToList();
+        _customShow.SelectedIndex = setup.CustomShowName is { } named ? Math.Max(0, deck.CustomShows.ToList().FindIndex(show => show.Name == named) + 1) : 0;
+        _customShow.IsEnabled = deck.CustomShows.Count > 0;
+        AutomationProperties.SetName(_customShow, Texts["deck.setup.customShow"]);
         _loop.Content = Texts["deck.setup.loop"];
         _loop.IsChecked = setup.Loop;
         _withoutAnimation.Content = Texts["deck.setup.noAnimation"];
@@ -91,6 +104,8 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
         var slides = new DialogSection(Texts["deck.setup.slides"], _metrics);
         slides.Add(null, _rangeCards, DialogRowKind.Wide);
         slides.Add(null, _rangeRow, DialogRowKind.Wide);
+        slides.Add(Texts["deck.setup.customShow"], _customShow, editorWidth: 220);
+        slides.Add(Texts["deck.setup.kind"], _kind, DialogRowKind.Wide, editorWidth: 320);
         var advance = new DialogSection(Texts["deck.setup.advance"], _metrics);
         advance.Add(null, _advance, DialogRowKind.Wide, editorWidth: 320);
         advance.Add(null, _loop, DialogRowKind.Indented);
@@ -164,6 +179,10 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
             ToSlide = _custom ? to : 0,
             Advance = _advance.SelectedIndex == 1 ? ShowAdvanceMode.Manual : ShowAdvanceMode.UseTimings,
             Loop = _loop.IsChecked == true,
+            Kind = (ShowKind)Math.Clamp(_kind.SelectedIndex, 0, (int)ShowKind.Kiosk),
+            CustomShowName = _customShow.SelectedIndex > 0 && _customShow.SelectedIndex <= _deck.CustomShows.Count
+                ? _deck.CustomShows[_customShow.SelectedIndex - 1].Name
+                : null,
             WithoutAnimation = _withoutAnimation.IsChecked == true,
             PenColor = _pen.Value ?? _deck.Setup.PenColor,
         }, Math.Max(0, _screens.SelectedIndex) - 1);

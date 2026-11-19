@@ -6,9 +6,22 @@ public enum ShowAdvanceMode
     Manual,
 }
 
+public enum ShowKind
+{
+    Speaker,
+    Window,
+    Kiosk,
+}
+
 public sealed record ShowSetup
 {
     public bool Loop { get; init; }
+
+    public ShowKind Kind { get; init; } = ShowKind.Speaker;
+
+    public string? CustomShowName { get; init; }
+
+    public bool Loops => Loop || Kind == ShowKind.Kiosk;
 
     public int FromSlide { get; init; }
 

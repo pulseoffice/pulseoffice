@@ -312,6 +312,8 @@ public sealed class AnimationPane : UserControl
         var repeat = Measure("×", effect.Repeat, 1, 100, 1, Texts["deck.animationDialog.repeat"], integer: true);
         repeat.ValueCommitted += (_, value) => Edit(effect with { Repeat = Math.Max(1, (int)Math.Round(value)) });
         Scrubbed(section.Add(Texts["deck.animationDialog.repeat"], repeat), repeat);
+        repeat.IsEnabled = !effect.RepeatsIndefinitely;
+        section.Add(Texts["deck.motion.repeatUntil"], RepeatEnds(effect));
 
         var index = Effects.ToList().FindIndex(candidate => candidate.Id == effect.Id);
         var earlier = Action("deck.motion.moveEarlier", Texts["deck.animationDialog.earlier"], () => Move(index, index - 1));
@@ -322,6 +324,25 @@ public sealed class AnimationPane : UserControl
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { earlier, later, remove } };
         section.Add(null, actions, DialogRowKind.Wide);
         return section;
+    }
+
+    private ComboBox RepeatEnds(AnimationEffect effect)
+    {
+        var ends = Enum.GetValues<AnimationRepeatEnd>();
+        var box = new ComboBox
+        {
+            ItemsSource = ends.Select(end => Texts[$"deck.motion.repeatUntil.{char.ToLowerInvariant(end.ToString()[0])}{end.ToString()[1..]}"]).ToList(),
+            SelectedIndex = Array.IndexOf(ends, effect.RepeatUntil),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 140,
+        };
+        AutomationProperties.SetName(box, Texts["deck.motion.repeatUntil"]);
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0 || box.SelectedIndex >= ends.Length) return;
+            if (ends[box.SelectedIndex] != effect.RepeatUntil) Edit(effect with { RepeatUntil = ends[box.SelectedIndex] });
+        };
+        return box;
     }
 
     private ComboBox TriggerShapes(AnimationEffect effect)

@@ -4,12 +4,18 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- PPTX `advClick="0"` without `advTm` is read as advance on click; the model has no trigger-only advance mode. (273)
-- Repeat "indefinite" / until next click or end of slide has no model value; it survives only in carried native XML and
-  is lost on edit or when crossing to ODP. (273)
-- Not audited in round 273: the ODP animation round trip (`OdfAnimationMapper`, iterate by word and letter), PPTX
-  iterate by word and letter, transition sounds in both formats, and the slide show runtime (rehearse timings, loop,
-  kiosk, hidden slides, custom shows). (273)
+- Indefinite repeats (until next click, until end of slide) are scheduled as one cycle in the show and do not keep
+  looping. (274)
+- Animation effect sounds and the sound of a non-sound action are not played in the show; "stop previous sound"
+  (`p:stSnd`) has no model value and is dropped. (274)
+- ODP `presentation:play-full="false"` is read as "loop until next sound"; check the mapping against the reference
+  suite. (274)
+- Kiosk: the keyboard still advances; the restart delay (`p:kiosk/@restart`) and the ODF pause between loops
+  (`presentation:pause`) have no model value. (274)
+- Text iterated by word or letter is revealed as a whole in the show; `p:iterate/@backwards` is not modelled. (274)
+- From current slide on a hidden slide starts from the next visible one; PowerPoint shows the hidden slide. (274)
+- Transition sounds and sound actions in the show, the trigger-only advance, the show type and custom show settings
+  have not been seen live or opened in PowerPoint or the reference suite. (274)
 - The pipe audio players on Linux (paplay, pw-cat, aplay, ffplay) report no device position: the played time is
   estimated from the bytes written less the pipe capacity and the requested player latency, not measured. (194)
 - Media "start automatically" is checked only by round trips in our own reader and writer; PowerPoint and the
@@ -76,14 +82,19 @@ the round that fixes it is joined and the join run is green.
   applications. Allow-overlap goes to ODT only as our attribute. Not opened in Word or the reference suite. (254, 260)
 
 - Folio TOC (259): `\t` is written with commas; not checked in Word under a semicolon list separator. (259)
-- Folio tables (271): a derived table style cannot clear an inherited colour to none from the style editor. (271)
-- Folio tables (271): the table style model has no total-row and first/last-column formatting (DOCX `lastRow`,
-  `firstCol`, `lastCol` conditional formats); only header row and bands are styled. (271)
-- Folio tables (271): automatic width counts nested percent tables with their stored width and ignores `tcW` in percent
-  units; not compared with Word; border conflicts between two explicit sides follow the ECMA weight rule, not compared
-  with Word. (271)
-- Folio tables (271): the DOCX explicit-empty-side pass (`ICellInheritedEdges`) is tested on the model, not through a
-  DOCX file; the TOC "Add a style" field and the table style editor have not been seen live. (271)
+- Folio tables (271): border conflicts between two explicit sides follow the ECMA weight rule, not compared with Word;
+  automatic width with nested percent tables and percent `tcW` not compared with Word. (271)
+- Folio tables (271): the TOC "Add a style" field and the table style editor have not been seen live. (271)
+- Folio tables (275): ODT table styles carry total-row, column and corner formats only as our `pt:table-region`
+  extension; no native `table:table-template` (with its region cell styles) is written or read for Folio tables, so
+  other ODF applications do not see them. (275)
+- Folio tables (275): region formats hold shading, text colour and bold only; borders, italics and fonts of Word's
+  conditional formats (and of the header and band formats) are not modelled. (275)
+- Folio tables (275): the quick table looks (`TableFormatting`) do not set total-row or column formats. (275)
+- Folio tables (275): percent `tcW` without a grid is resolved against a nominal 6.5 in text width; the layout scales
+  the result to the page, but the proportions are not compared with Word. (275)
+- Folio tables (275): the new style editor tabs (total row, columns, corners) and "no colour" in derived styles have
+  not been seen live. (275)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
@@ -93,16 +104,16 @@ the round that fixes it is joined and the join run is green.
   line boxes; not checked with a PDF/UA checker. (243, 247, 260, 265, 268)
 - Delete the emptied `src/PulseOffice.Presentations.UI/Rendering/SlideTextLines.cs` at the join (audit agents cannot
   remove files). (265, 268)
-- Shape autofit (272): Folio fits a "resize shape" shape to its story in layout only; the stored size stays as saved
-  (Word and the reference suite recompute it on opening). Folio shape stories do not use the preset inner text
-  rectangle and do not shrink text. Vertical text is not resized (PowerPoint grows the width). The preset text area
-  table covers ellipse, diamond, triangles, rounded rectangle, octagon, cylinder, document and terminator; other presets
-  use the whole box. The fallback TextBox editor (layouts not composed in place) still covers the whole box, and
-  text rotation turns about the inner area's centre rather than the shape's. (272)
+- Shape autofit (272, 276): the fallback TextBox editor (layouts not composed in place) still covers the whole box,
+  and text rotation turns about the inner area's centre rather than the shape's. (272)
+- Shape autofit (276): Folio shape stories have no vertical text layout, so vertical text in a Folio shape is not
+  resized; inline resize-shape shapes keep their stored size; the stored size settles only when an editor lays the
+  document out (a headless conversion keeps the saved size); preset text areas ignore non-default adjust values
+  except for the rounded rectangle, and stars, heart, sun, cloud and pentagon use approximate areas. (276)
 - Shape autofit has not been opened in PowerPoint or the reference suite; ODP writes both `draw:fit-to-size` and
   `style:shrink-to-fit`. (268)
 - Shape text keys (272): Tab, Shift+Tab, Enter and Backspace are walked through the live shared editor in a headless
-  test; not yet tried in the running app. Shift+Tab on a plain paragraph still moves focus. (268, 272)
+  test; not yet tried in the running app. (268, 272, 276)
 - PDF form fields: not yet opened in an external PDF viewer. (244)
 - PDF form fields: a widget drawn with an embedded subset holds only the glyphs printed; a viewer that regenerates the
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
@@ -133,16 +144,16 @@ the round that fixes it is joined and the join run is green.
 - Round 267 (date epoch), open: display and pivot grouping outside evaluation follow the active workbook's epoch, so a
   second open workbook with another epoch printed or exported in the background shows its dates in the active one's
   system. Nothing was opened in Excel or the reference suite. (267)
-- Round 270 (date epoch), open: CSV import into a workbook with another epoch keeps the 1900 system (`CsvValues`);
-  1904 date filters, dynamic filters and pivot date caches not yet opened in Excel. (270)
-- Round 270 (Ledger pivots), open: calculated field names and formulas are not validated in the settings panel; the
-  dialog still offers no next or named base items; the headless dialog test inspects the logical tree but does not
-  type into the formula box. (270)
+- Round 270 (date epoch), open: 1904 date filters, dynamic filters and pivot date caches not yet opened in Excel. (270)
+- Round 277 (Ledger editing), open: pointing to another sheet while typing a formula commits the entry; the fill
+  handle has no Ctrl copy/series toggle and no fill options button, and numbered text with a two-cell seed steps by
+  the seed length; function AutoComplete is a single inline suggestion, not a list, and argument tips show numbered
+  arguments (the registry has no argument names); the formula bar lacks AutoComplete and the argument tip. (277)
 - Round 267 (Ledger pivots), open: ODS hidden members and named base items carry item names, so a text item that reads
   as a number or boolean ("5", "TRUE") cannot be told from the number or boolean there (the reference suite conflates
   them too); hidden members named "TRUE" or "5" are read as hiding both. GETPIVOTDATA canonicalises items only for row
   and column fields and the reduced table of filter fields; percentOfParentCol, next and named base items not opened in
-  Excel; the pivot dialog does not offer the new modes or base items yet (left to round 266's dialog work). (267)
+  Excel. (267)
 
 ## Accessibility
 - Accessible names were verified by source scan only; no screen reader (VoiceOver, Narrator, Orca) has been run over

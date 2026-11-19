@@ -58,7 +58,7 @@ public sealed class PptxTransitionMapper
         }
         else
         {
-            element.AdvanceOnClick = true;
+            element.AdvanceOnClick = transition.Advance != AdvanceMode.TriggerOnly;
         }
 
         if (!transition.IsNone) element.Append(Effect(transition));
@@ -192,8 +192,13 @@ public sealed class PptxTransitionMapper
                 var s when s == P.TransitionSpeedValues.Slow => 1000,
                 _ => 500,
             },
-            Advance = transition.AdvanceAfterTime is null ? AdvanceMode.OnClick
-                : transition.AdvanceOnClick?.Value == false ? AdvanceMode.AfterTime : AdvanceMode.OnClickOrAfterTime,
+            Advance = (transition.AdvanceAfterTime is null, transition.AdvanceOnClick?.Value == false) switch
+            {
+                (true, true) => AdvanceMode.TriggerOnly,
+                (true, false) => AdvanceMode.OnClick,
+                (false, true) => AdvanceMode.AfterTime,
+                _ => AdvanceMode.OnClickOrAfterTime,
+            },
             AdvanceAfterMs = int.TryParse(transition.AdvanceAfterTime?.Value, System.Globalization.NumberStyles.Integer,
                 System.Globalization.CultureInfo.InvariantCulture, out var ms) ? Math.Clamp(ms, 0, LongestTimingMs) : 0,
         };

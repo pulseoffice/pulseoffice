@@ -9,6 +9,13 @@ public enum AnimationCategory
     Media,
 }
 
+public enum AnimationRepeatEnd
+{
+    Count,
+    NextClick,
+    EndOfSlide,
+}
+
 public enum AnimationTrigger
 {
     OnClick,
@@ -38,6 +45,10 @@ public sealed record AnimationEffect
 
     public int Repeat { get; init; } = 1;
 
+    public AnimationRepeatEnd RepeatUntil { get; init; } = AnimationRepeatEnd.Count;
+
+    public bool RepeatsIndefinitely => RepeatUntil != AnimationRepeatEnd.Count;
+
     public string? MotionPath { get; init; }
 
     public string? SoundPath { get; init; }
@@ -55,7 +66,7 @@ public sealed record AnimationEffect
     public NativeAnimation? CurrentNative => Native is { } native && native.Describes(this) ? native : null;
 }
 
-public sealed record NativeAnimation(string Format, string Xml, AnimationCategory Category, string Preset, string? Subtype, int DurationMs, int Repeat, string? MotionPath, AnimationBehaviours? Behaviours = null)
+public sealed record NativeAnimation(string Format, string Xml, AnimationCategory Category, string Preset, string? Subtype, int DurationMs, int Repeat, string? MotionPath, AnimationBehaviours? Behaviours = null, AnimationRepeatEnd RepeatUntil = AnimationRepeatEnd.Count)
 {
     public const string Odf = "odf";
 
@@ -63,7 +74,7 @@ public sealed record NativeAnimation(string Format, string Xml, AnimationCategor
 
     public bool Describes(AnimationEffect effect) =>
         effect.Category == Category && effect.Preset == Preset && effect.Subtype == Subtype
-        && effect.DurationMs == DurationMs && effect.Repeat == Repeat && effect.MotionPath == MotionPath;
+        && effect.DurationMs == DurationMs && effect.Repeat == Repeat && effect.RepeatUntil == RepeatUntil && effect.MotionPath == MotionPath;
 }
 
 public sealed record InteractiveAction

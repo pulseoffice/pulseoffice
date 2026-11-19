@@ -8,6 +8,17 @@ namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
 public sealed class DocxTableStyleCodec(DocxValues values)
 {
+    private static readonly (TableRegion Region, W.TableStyleOverrideValues Kind)[] _regions =
+    [
+        (TableRegion.TotalRow, W.TableStyleOverrideValues.LastRow),
+        (TableRegion.FirstColumn, W.TableStyleOverrideValues.FirstColumn),
+        (TableRegion.LastColumn, W.TableStyleOverrideValues.LastColumn),
+        (TableRegion.NorthWestCell, W.TableStyleOverrideValues.NorthWestCell),
+        (TableRegion.NorthEastCell, W.TableStyleOverrideValues.NorthEastCell),
+        (TableRegion.SouthWestCell, W.TableStyleOverrideValues.SouthWestCell),
+        (TableRegion.SouthEastCell, W.TableStyleOverrideValues.SouthEastCell),
+    ];
+
     public void Write(W.Style element, TableProperties table)
     {
         var properties = new W.StyleTableProperties();
@@ -36,14 +47,24 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             var header = new W.TableStyleProperties { Type = W.TableStyleOverrideValues.FirstRow };
             var run = new W.RunPropertiesBaseStyle();
             if (table.HeaderBold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
-            if (table.HeaderColor is { } ink) run.Append(new W.Color { Val = values.Color(ink) });
+            if (table.HeaderColor is { } ink) run.Append(new W.Color { Val = Ink(ink) });
             if (run.HasChildren) header.Append(run);
             if (table.HeaderBackground is { } fill) header.Append(new W.TableStyleConditionalFormattingTableCellProperties(Shading(fill)));
             element.Append(header);
         }
-        if (table.HeaderBold == true)
-            foreach (var emphasis in new[] { W.TableStyleOverrideValues.LastRow, W.TableStyleOverrideValues.FirstColumn, W.TableStyleOverrideValues.LastColumn })
-                element.Append(new W.TableStyleProperties(new W.RunPropertiesBaseStyle(new W.Bold())) { Type = emphasis });
+        foreach (var (region, kind) in _regions)
+        {
+            var format = table.Region(region);
+            if (table.HeaderBold == true && Emphasis(region)) format = (format ?? new TableRegionFormat()) with { Bold = format?.Bold ?? true };
+            if (format is null || format.IsEmpty) continue;
+            var conditional = new W.TableStyleProperties { Type = kind };
+            var run = new W.RunPropertiesBaseStyle();
+            if (format.Bold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
+            if (format.Ink is { } ink) run.Append(new W.Color { Val = Ink(ink) });
+            if (run.HasChildren) conditional.Append(run);
+            if (format.Background is { } fill) conditional.Append(new W.TableStyleConditionalFormattingTableCellProperties(Shading(fill)));
+            element.Append(conditional);
+        }
         if (table.FirstBandBackground is { } first)
         {
             var axes = table.FirstBandAxes ?? TableBandAxes.Both;
@@ -91,33 +112,57 @@ public sealed class DocxTableStyleCodec(DocxValues values)
         var header = element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == W.TableStyleOverrideValues.FirstRow);
         uint? Band(params W.TableStyleOverrideValues[] kinds) => kinds
             .Select(kind => element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind))
-            .Select(item => values.Color(item?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value))
+            .Select(item => Fill(item?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value))
             .FirstOrDefault(color => color is not null);
         TableBandAxes? Axes(W.TableStyleOverrideValues rows, W.TableStyleOverrideValues columns)
         {
             bool Shaded(W.TableStyleOverrideValues kind) => element.Elements<W.TableStyleProperties>()
-                .Any(item => item.Type?.Value == kind && values.Color(item.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value) is not null);
+                .Any(item => item.Type?.Value == kind && Fill(item.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value) is not null);
             var axes = (Shaded(rows) ? TableBandAxes.Rows : TableBandAxes.None) | (Shaded(columns) ? TableBandAxes.Columns : TableBandAxes.None);
             return axes is TableBandAxes.None or TableBandAxes.Both ? null : axes;
         }
         var run = header?.GetFirstChild<W.RunPropertiesBaseStyle>();
-        return new TableProperties
+        var headerBold = run?.GetFirstChild<W.Bold>() is { } bold ? bold.Val?.Value ?? true : (bool?)null;
+        var read = new TableProperties
         {
             BorderWidth = lines.BorderWidth,
             BorderColor = lines.BorderColor,
             InnerLines = lines.InnerLines,
             CellPadding = padding.CellPadding,
             VerticalCellPadding = padding.VerticalCellPadding,
-            Background = values.Color(element.GetFirstChild<W.StyleTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
-            HeaderBackground = values.Color(header?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
-            HeaderColor = values.Color(run?.GetFirstChild<W.Color>()?.Val?.Value),
-            HeaderBold = run?.GetFirstChild<W.Bold>() is { } bold ? bold.Val?.Value ?? true : null,
+            Background = Fill(element.GetFirstChild<W.StyleTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
+            HeaderBackground = Fill(header?.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
+            HeaderColor = Ink(run?.GetFirstChild<W.Color>()?.Val?.Value),
+            HeaderBold = headerBold,
             BandBackground = Band(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
             FirstBandBackground = Band(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
             BandAxes = Axes(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
             FirstBandAxes = Axes(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
         };
+        foreach (var (region, kind) in _regions)
+        {
+            var conditional = element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind);
+            if (conditional is null) continue;
+            var regionRun = conditional.GetFirstChild<W.RunPropertiesBaseStyle>();
+            var format = new TableRegionFormat
+            {
+                Background = Fill(conditional.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
+                Ink = Ink(regionRun?.GetFirstChild<W.Color>()?.Val?.Value),
+                Bold = regionRun?.GetFirstChild<W.Bold>() is { } regionBold ? regionBold.Val?.Value ?? true : null,
+            };
+            if (headerBold == true && Emphasis(region) && format.Bold == true) format = format with { Bold = null };
+            read = read.WithRegion(region, format);
+        }
+        return read;
     }
+
+    private bool Emphasis(TableRegion region) => region is TableRegion.TotalRow or TableRegion.FirstColumn or TableRegion.LastColumn;
+
+    private string Ink(uint argb) => argb >> 24 == 0 ? "auto" : values.Color(argb);
+
+    private uint? Ink(string? hex) => string.Equals(hex, "auto", StringComparison.OrdinalIgnoreCase) ? TableRegionFormat.NoColour : values.Color(hex);
+
+    private uint? Fill(string? hex) => string.Equals(hex, "auto", StringComparison.OrdinalIgnoreCase) ? TableRegionFormat.NoColour : values.Color(hex);
 
     public TableProperties Borders(W.TableBorders? borders)
     {
@@ -136,7 +181,7 @@ public sealed class DocxTableStyleCodec(DocxValues values)
         };
     }
 
-    private W.Shading Shading(uint color) => new() { Val = W.ShadingPatternValues.Clear, Color = "auto", Fill = values.Color(color) };
+    private W.Shading Shading(uint color) => new() { Val = W.ShadingPatternValues.Clear, Color = "auto", Fill = color >> 24 == 0 ? "auto" : values.Color(color) };
 }
 
 public sealed class DocxCellFormulas(ITableFormulaParser parser, ITableFormulaSyntax canonical)

@@ -219,8 +219,55 @@ public sealed record TableProperties
 
     public bool? InnerLines { get; init; }
 
+    public TableRegionFormat? TotalRow { get; init; }
+
+    public TableRegionFormat? FirstColumn { get; init; }
+
+    public TableRegionFormat? LastColumn { get; init; }
+
+    public TableRegionFormat? NorthWestCell { get; init; }
+
+    public TableRegionFormat? NorthEastCell { get; init; }
+
+    public TableRegionFormat? SouthWestCell { get; init; }
+
+    public TableRegionFormat? SouthEastCell { get; init; }
+
+    public TableRegionFormat? Region(TableRegion region) => region switch
+    {
+        TableRegion.TotalRow => TotalRow,
+        TableRegion.FirstColumn => FirstColumn,
+        TableRegion.LastColumn => LastColumn,
+        TableRegion.NorthWestCell => NorthWestCell,
+        TableRegion.NorthEastCell => NorthEastCell,
+        TableRegion.SouthWestCell => SouthWestCell,
+        _ => SouthEastCell,
+    };
+
+    public TableProperties WithRegion(TableRegion region, TableRegionFormat? format)
+    {
+        var kept = format is { IsEmpty: false } ? format : null;
+        return region switch
+        {
+            TableRegion.TotalRow => this with { TotalRow = kept },
+            TableRegion.FirstColumn => this with { FirstColumn = kept },
+            TableRegion.LastColumn => this with { LastColumn = kept },
+            TableRegion.NorthWestCell => this with { NorthWestCell = kept },
+            TableRegion.NorthEastCell => this with { NorthEastCell = kept },
+            TableRegion.SouthWestCell => this with { SouthWestCell = kept },
+            _ => this with { SouthEastCell = kept },
+        };
+    }
+
     public TableProperties Over(TableProperties under) => new()
     {
+        TotalRow = TableRegionFormat.Merge(TotalRow, under.TotalRow),
+        FirstColumn = TableRegionFormat.Merge(FirstColumn, under.FirstColumn),
+        LastColumn = TableRegionFormat.Merge(LastColumn, under.LastColumn),
+        NorthWestCell = TableRegionFormat.Merge(NorthWestCell, under.NorthWestCell),
+        NorthEastCell = TableRegionFormat.Merge(NorthEastCell, under.NorthEastCell),
+        SouthWestCell = TableRegionFormat.Merge(SouthWestCell, under.SouthWestCell),
+        SouthEastCell = TableRegionFormat.Merge(SouthEastCell, under.SouthEastCell),
         HeaderColor = HeaderColor ?? under.HeaderColor,
         InnerLines = InnerLines ?? under.InnerLines,
         BorderColor = BorderColor ?? under.BorderColor,
@@ -235,4 +282,33 @@ public sealed record TableProperties
         CellPadding = CellPadding ?? under.CellPadding,
         VerticalCellPadding = VerticalCellPadding ?? under.VerticalCellPadding,
     };
+}
+
+public enum TableRegion
+{
+    TotalRow,
+    FirstColumn,
+    LastColumn,
+    NorthWestCell,
+    NorthEastCell,
+    SouthWestCell,
+    SouthEastCell,
+}
+
+public sealed record TableRegionFormat
+{
+    public const uint NoColour = 0x00FFFFFF;
+
+    public uint? Background { get; init; }
+
+    public uint? Ink { get; init; }
+
+    public bool? Bold { get; init; }
+
+    public bool IsEmpty => Background is null && Ink is null && Bold is null;
+
+    public static TableRegionFormat? Merge(TableRegionFormat? over, TableRegionFormat? under) =>
+        over is null ? under
+        : under is null ? over
+        : new TableRegionFormat { Background = over.Background ?? under.Background, Ink = over.Ink ?? under.Ink, Bold = over.Bold ?? under.Bold };
 }

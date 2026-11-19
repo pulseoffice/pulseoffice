@@ -379,6 +379,12 @@ public sealed class ShapeTextEditor : Decorator
             e.Handled = true;
             return;
         }
+        if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Shift && Live is not null)
+        {
+            RemoveTabBeforeCaret();
+            e.Handled = true;
+            return;
+        }
         var commit = e.Key == Key.Escape
             || e.Key == Key.Enter && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta));
         if (!commit) return;
@@ -395,6 +401,18 @@ public sealed class ShapeTextEditor : Decorator
         _box.SelectionStart = start + 1;
         _box.SelectionEnd = start + 1;
         _box.CaretIndex = start + 1;
+    }
+
+    private void RemoveTabBeforeCaret()
+    {
+        var text = _box.Text ?? string.Empty;
+        if (_box.SelectionStart != _box.SelectionEnd) return;
+        var caret = Math.Clamp(_box.CaretIndex, 0, text.Length);
+        if (caret == 0 || text[caret - 1] != '\t') return;
+        _box.Text = text.Remove(caret - 1, 1);
+        _box.SelectionStart = caret - 1;
+        _box.SelectionEnd = caret - 1;
+        _box.CaretIndex = caret - 1;
     }
 
     private ShapeListKey? ListKey(KeyEventArgs e) => (e.Key, e.KeyModifiers) switch

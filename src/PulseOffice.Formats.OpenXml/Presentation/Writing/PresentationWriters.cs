@@ -133,12 +133,21 @@ internal sealed class ShowPropertiesWriter
             UseTimings = setup.Advance == ShowAdvanceMode.UseTimings,
         };
 
+        if (setup.Kind == ShowKind.Kiosk) show.Append(new P.KioskSlideMode());
+        else if (setup.Kind == ShowKind.Window) show.Append(new P.BrowseSlideMode());
+        else show.Append(new P.PresenterSlideMode());
+
         var count = session.Deck.Slides.Count;
+        var custom = setup.CustomShowName is { } name
+            ? session.Deck.CustomShows.Select((entry, position) => (entry.Name, position)).FirstOrDefault(entry => entry.Name == name)
+            : default;
         var start = Math.Clamp(setup.FromSlide > 0 ? setup.FromSlide : 1, 1, Math.Max(count, 1));
         var end = Math.Clamp(setup.ToSlide > 0 ? setup.ToSlide : count, start, Math.Max(count, 1));
-        show.Append(setup.HasRange && count > 0
-            ? new P.SlideRange { Start = (uint)start, End = (uint)end }
-            : new P.SlideAll());
+        show.Append(custom.Name is not null
+            ? (DocumentFormat.OpenXml.OpenXmlElement)new P.CustomShowReference { Id = (uint)custom.position }
+            : setup.HasRange && count > 0
+                ? new P.SlideRange { Start = (uint)start, End = (uint)end }
+                : new P.SlideAll());
         show.Append(new P.PenColor(new D.RgbColorModelHex { Val = Pen(setup.PenColor) }));
 
         var part = session.Part.AddNewPart<PresentationPropertiesPart>();

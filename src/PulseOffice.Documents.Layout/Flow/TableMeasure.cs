@@ -54,7 +54,7 @@ public sealed class TableMeasure(IParagraphEntries entries, IBlockTree tree, ITa
         content.Blocks.Select(block => block switch
         {
             ParagraphBlock paragraph => Natural(document, paragraph, kind),
-            TableBlock nested => nested.AutoWidth ? Widths(document, nested, kind).Sum() : nested.Columns.Sum(width => width.ToPoints()),
+            TableBlock nested => nested.AutoWidth || nested.WidthPercent is > 0 ? Widths(document, nested, kind).Sum() : nested.Columns.Sum(width => width.ToPoints()),
             _ => tree.Paragraphs(new BlockContainer([block])).Select(paragraph => Natural(document, paragraph, kind)).DefaultIfEmpty(0).Max(),
         }).DefaultIfEmpty(0).Max();
 

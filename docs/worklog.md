@@ -14120,3 +14120,28 @@ docs/deep-audit/round-272-shape-autofit-modules.md.
 - PPTX transition speeds read and written as PowerPoint plays them (fast 0.5 s by default, medium 0.75 s, slow 1 s);
   the rest of the area (ODP animations, slide show runtime, sounds) is queued. Log:
   docs/deep-audit/round-273-deck-animations-transitions.md.
+
+### Round 274: Deck slide advance, repeat, sounds and show runtime (2026-11-19)
+- Trigger-only slide advance in both formats, clicks honour "advance on click", rehearsal keeps the click choice;
+  repeat until next click or end of slide in PPTX and ODP; percent and duration iterate intervals; transition sounds
+  and sound actions play in the show; show type (speaker, window, kiosk) and custom show in the setup, both formats;
+  ODP keeps the range end and pen colour (ODP012 removed). Log: docs/deep-audit/round-274-deck-show-runtime.md.
+
+### Round 275: Folio table style regions (2026-11-19)
+- Table styles gain total-row, first/last-column and corner formats (background, text colour, bold) in the model,
+  layout, style editor, DOCX (`tblStylePr`) and ODT (our `pt:table-region`); a derived style can clear an inherited
+  colour to none; nested percent tables and percent `tcW` take part in automatic width. Log:
+  docs/deep-audit/round-275-folio-table-style-regions.md.
+
+### Round 276: Folio shape autofit and shape text keys (2026-11-19)
+- Folio resize-shape shapes store their fitted height after every layout; Folio shape stories use the preset inner
+  text rectangle and shrink text on overflow; vertical shape text grows the width in Deck and Ledger; preset text
+  areas for the remaining common presets; Shift+Tab on plain shape text stays in the editor. Log:
+  docs/deep-audit/round-276-folio-shape-autofit.md.
+
+### Round 277: Ledger leftovers and cell editing (2026-11-19)
+- Insert sheet from file keeps formats and rebases dates to the workbook epoch; the pivot settings panel validates
+  calculated fields and offers next and named base items; formula entry points at cells with the pointer and arrows,
+  completes function and range names with Tab and shows argument tips; F4 cycles whole columns and rows; paste special
+  operations count blanks as zero and keep target formulas; the fill handle advances single dates and day and month
+  names. Log: docs/deep-audit/round-277-ledger-cell-editing.md.

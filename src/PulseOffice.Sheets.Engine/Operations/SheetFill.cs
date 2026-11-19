@@ -29,10 +29,18 @@ public sealed class SheetFill : ISheetFill
     private readonly IReadOnlyDictionary<FillDirection, FillAxis> _axes;
     private readonly IReadOnlyList<FillRule> _rules;
 
-    public SheetFill()
+    private readonly PulseOffice.Sheets.Formatting.ICalendarFormats _calendars;
+
+    public SheetFill() : this(new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale(), new PulseOffice.Sheets.Formatting.CalendarFormats())
     {
+    }
+
+    public SheetFill(PulseOffice.Sheets.Formatting.ISpreadsheetLocale locale, PulseOffice.Sheets.Formatting.ICalendarFormats calendars)
+    {
+        ArgumentNullException.ThrowIfNull(locale);
+        _calendars = calendars ?? throw new ArgumentNullException(nameof(calendars));
         _axes = new FillAxis[] { new DownAxis(), new UpAxis(), new RightAxis(), new LeftAxis() }.ToDictionary(axis => axis.Direction);
-        _rules = [new FormulaFillRule(), new ProgressionFillRule(), new NumberedTextFillRule(), new RepeatFillRule()];
+        _rules = [new FormulaFillRule(), new ProgressionFillRule(), new SingleDateFillRule(), new NamedListFillRule(locale), new NumberedTextFillRule(), new RepeatFillRule()];
     }
 
     public IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(
@@ -48,6 +56,8 @@ public sealed class SheetFill : ISheetFill
         {
             var seed = axis.Seed(source, lane).Select(address => sheet[address]).ToList();
             if (seed.Count == 0) continue;
+            var singleDate = seed.Count == 1 && !seed[0].HasFormula && seed[0].Value.Kind == ValueKind.Number
+                && sheet.Owner is { } owner && _calendars.NamesDays(owner, sheet.StyleIdAt(axis.Seed(source, lane).First()));
 
             var visible = 0;
             for (var position = 1; position <= steps; position++)
@@ -56,7 +66,7 @@ public sealed class SheetFill : ISheetFill
                 if (!address.IsValid || axis.Hidden(sheet, address)) continue;
 
                 visible++;
-                var fill = new FillStep(seed, visible, address, axis.Origin(source, lane, visible), axis.Backwards);
+                var fill = new FillStep(seed, visible, address, axis.Origin(source, lane, visible), axis.Backwards) { SingleDate = singleDate };
                 result.Add((address, _rules.Select(rule => rule.Produce(fill)).First(cell => cell is not null)!));
             }
         }
@@ -126,6 +136,8 @@ public sealed class SheetFill : ISheetFill
 
 internal sealed record FillStep(IReadOnlyList<Cell> Seed, int Step, CellAddress Address, CellAddress Origin, bool Backwards)
 {
+    public bool SingleDate { get; init; }
+
     public int Cycle => (Step - 1) / Seed.Count + 1;
 
     public Cell Template => Seed[Backwards ? Seed.Count - 1 - ((Step - 1) % Seed.Count) : (Step - 1) % Seed.Count];
@@ -245,6 +257,54 @@ internal sealed class ProgressionFillRule : FillRule
 
         return (numbers[0], delta);
     }
+}
+
+internal sealed class SingleDateFillRule : FillRule
+{
+    public override Cell? Produce(FillStep step) =>
+        step.SingleDate
+            ? step.Template with { Value = CellValue.Number(step.Template.Value.AsNumber() + (step.Backwards ? -step.Step : step.Step)), Formula = null }
+            : null;
+}
+
+internal sealed class NamedListFillRule(PulseOffice.Sheets.Formatting.ISpreadsheetLocale locale) : FillRule
+{
+    public override Cell? Produce(FillStep step)
+    {
+        var template = step.Template;
+        if (template.HasFormula || template.Value.Kind != ValueKind.Text) return null;
+        var text = template.Value.AsText().Trim();
+        if (text.Length == 0) return null;
+
+        foreach (var list in Lists())
+        {
+            var index = Array.FindIndex(list, item => string.Equals(item, text, StringComparison.CurrentCultureIgnoreCase));
+            if (index < 0) continue;
+            var increment = step.Cycle * step.Seed.Count;
+            var next = list[((index + (step.Backwards ? -increment : increment)) % list.Length + list.Length) % list.Length];
+            return template with { Value = CellValue.Text(Cased(text, next)), Formula = null };
+        }
+
+        return null;
+    }
+
+    private IEnumerable<string[]> Lists()
+    {
+        foreach (var culture in new[] { locale.Culture, CultureInfo.InvariantCulture }.Distinct())
+        {
+            var format = culture.DateTimeFormat;
+            yield return format.DayNames;
+            yield return format.AbbreviatedDayNames;
+            yield return [.. format.MonthNames.Where(name => name.Length > 0)];
+            yield return [.. format.AbbreviatedMonthNames.Where(name => name.Length > 0)];
+        }
+    }
+
+    private string Cased(string typed, string next) =>
+        typed.Any(char.IsLetter) && typed.Where(char.IsLetter).All(char.IsUpper) ? next.ToUpper(locale.Culture)
+        : typed.Length > 0 && char.IsUpper(typed[0]) ? char.ToUpper(next[0], locale.Culture) + next[1..]
+        : typed.Where(char.IsLetter).All(char.IsLower) ? next.ToLower(locale.Culture)
+        : next;
 }
 
 internal sealed class NumberedTextFillRule : FillRule

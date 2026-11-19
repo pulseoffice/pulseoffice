@@ -12,6 +12,8 @@ public sealed record PresentationOptions(int StartIndex = 0, bool Loop = false, 
 
     public bool ManualAdvance { get; init; }
 
+    public bool Kiosk { get; init; }
+
     public string PenColor { get; init; } = "#E11D2E";
 
     public int MonitorIndex { get; init; } = -1;

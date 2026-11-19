@@ -19,7 +19,8 @@ public sealed class LedgerPivotCommands(
     IPivotEngine pivotEngine,
     IWorksheetTabPolicy tabs,
     Queries.IPivotSourceRefresher? externalSources = null,
-    IPivotSources? pivotSources = null) : LedgerCommandSet(context)
+    IPivotSources? pivotSources = null,
+    IPivotFormulas? pivotFormulas = null) : LedgerCommandSet(context)
 {
     private readonly IPivotSources _pivotSources = pivotSources ?? new PivotSources();
 
@@ -88,7 +89,7 @@ public sealed class LedgerPivotCommands(
         }
 
         var choice = await dialogs.ShowAsync<PivotChoice>(
-            new PivotPromptView(source.Headers, definition.DestinationSheet, kit, new SourcePivotPreviewer(pivotEngine, source, Labels()), definition),
+            new PivotPromptView(source.Headers, definition.DestinationSheet, kit, new SourcePivotPreviewer(pivotEngine, source, Labels(), pivotFormulas), definition),
             new DialogOptions { TitleKey = "dialog.pivot.editTitle" }, ct)
             .ConfigureAwait(true);
 
@@ -161,7 +162,7 @@ public sealed class LedgerPivotCommands(
         var source = new RangePivotSource(sheet, range.Value);
 
         var choice = await dialogs.ShowAsync<PivotChoice>(
-            new PivotPromptView(source.Headers, UniqueSheetName(workbook), kit, new SourcePivotPreviewer(pivotEngine, source, Labels())),
+            new PivotPromptView(source.Headers, UniqueSheetName(workbook), kit, new SourcePivotPreviewer(pivotEngine, source, Labels(), pivotFormulas)),
             new DialogOptions { TitleKey = "dialog.pivot.title" }, ct)
             .ConfigureAwait(true);
 

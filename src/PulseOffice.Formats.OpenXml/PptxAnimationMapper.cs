@@ -170,12 +170,18 @@ public sealed class PptxAnimationMapper
             new System.Xml.Linq.XAttribute("presetID", _presets.OoxmlPresetId(effect.Category, effect.Preset)),
             new System.Xml.Linq.XAttribute("presetClass", _categories.Token(effect.Category)),
             new System.Xml.Linq.XAttribute("presetSubtype", Subtype(effect)),
-            effect.Repeat > 1 ? new System.Xml.Linq.XAttribute("repeatCount", effect.Repeat * 1000) : null,
+            effect.RepeatsIndefinitely ? new System.Xml.Linq.XAttribute("repeatCount", "indefinite")
+                : effect.Repeat > 1 ? new System.Xml.Linq.XAttribute("repeatCount", effect.Repeat * 1000) : null,
             _codec.RootAttributes(behaviours),
             new System.Xml.Linq.XAttribute("fill", Fill(effect)),
             new System.Xml.Linq.XAttribute("grpId", "0"),
             new System.Xml.Linq.XAttribute("nodeType", NodeType(effect)),
             new System.Xml.Linq.XElement(p + "stCondLst", new System.Xml.Linq.XElement(p + "cond", new System.Xml.Linq.XAttribute("delay", effect.DelayMs))),
+            effect.RepeatUntil == AnimationRepeatEnd.NextClick
+                ? new System.Xml.Linq.XElement(p + "endCondLst", new System.Xml.Linq.XElement(p + "cond",
+                    new System.Xml.Linq.XAttribute("evt", "onNext"), new System.Xml.Linq.XAttribute("delay", "0"),
+                    new System.Xml.Linq.XElement(p + "tgtEl", new System.Xml.Linq.XElement(p + "sldTgt"))))
+                : null,
             _codec.Iterate(behaviours),
             new System.Xml.Linq.XElement(p + "childTnLst", _codec.Children(behaviours, spid, ids)));
         if (sounds(effect.SoundPath) is { } sound) head.Add(_sound.Build(sound, ids.Next()));
@@ -273,6 +279,7 @@ public sealed class PptxAnimationMapper
                     : durations.Count > 0 ? Math.Min(durations.Max(), MaxTimingMs) : 500,
                 MotionPath = cTn.Descendants<P.AnimateMotion>().FirstOrDefault()?.Path?.Value,
                 Repeat = RepeatCount(cTn.RepeatCount?.Value),
+                RepeatUntil = RepeatEnd(cTn),
                 DelayMs = cTn.StartConditionList?.GetFirstChild<P.Condition>()?.Delay?.Value is { } d
                     && int.TryParse(d, NumberStyles.Integer, CultureInfo.InvariantCulture, out var delay) && delay >= 0 ? Math.Min(delay, MaxTimingMs) : 0,
                 SoundPath = sounds is not null && _sound.Target(cTn) is { } target ? sounds(target) : null,
@@ -280,7 +287,7 @@ public sealed class PptxAnimationMapper
                 Rewind = cTn.Fill?.Value == P.TimeNodeFillValues.Remove,
             };
             var read = xml is not null
-                ? effect with { Native = new NativeAnimation(NativeAnimation.Ooxml, xml, effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours) }
+                ? effect with { Native = new NativeAnimation(NativeAnimation.Ooxml, xml, effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours, effect.RepeatUntil) }
                 : effect;
             effects.Add(read);
             for (var member = 1; member < targets.Count; member++)
@@ -318,6 +325,12 @@ public sealed class PptxAnimationMapper
 
     private string RepeatAttribute(int repeat) =>
         repeat > 1 ? string.Create(CultureInfo.InvariantCulture, $" repeatCount=\"{repeat * 1000}\"") : string.Empty;
+
+    private AnimationRepeatEnd RepeatEnd(P.CommonTimeNode node) =>
+        node.RepeatCount?.Value != "indefinite" ? AnimationRepeatEnd.Count
+        : node.EndConditionList?.Elements<P.Condition>().Any(condition => condition.Event?.Value == P.TriggerEventValues.OnNext) == true
+            ? AnimationRepeatEnd.NextClick
+            : AnimationRepeatEnd.EndOfSlide;
 
     private int RepeatCount(string? value) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var thousandths) && thousandths >= 1000

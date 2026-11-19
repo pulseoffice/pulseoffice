@@ -1,5 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.LogicalTree;
 using PulseOffice.Sheets.Addressing;
 using PulseOffice.Sheets.Pivot;
@@ -75,5 +76,58 @@ public sealed class Round270PivotDialogTests
         Assert.NotEmpty(items);
         Assert.DoesNotContain(items, item => item.Contains("-T", StringComparison.Ordinal));
         Assert.Contains(items, item => item.Contains("2024", StringComparison.Ordinal));
+    }
+
+    private static TextBox Box(PivotPromptView view, string key) =>
+        view.Settings.GetLogicalDescendants().OfType<TextBox>().Single(box => AutomationProperties.GetName(box) == Texts[key]);
+
+    private static ComboBox Choice(PivotPromptView view, string key) =>
+        view.Settings.GetLogicalDescendants().OfType<ComboBox>().Single(box => AutomationProperties.GetName(box) == Texts[key]);
+
+    private static void Type(TextBox box, string text)
+    {
+        box.Text = text;
+        box.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
+    }
+
+    [Fact]
+    public void Typing_into_the_formula_box_commits_valid_formulas_and_explains_invalid_ones()
+    {
+        var view = Dialog();
+        var calculated = view.Model.In(PivotArea.Value)[0];
+        view.Settings.Select(calculated);
+        var formula = Box(view, "pivot.calculated.formula");
+
+        Type(formula, "Amount*4");
+        Assert.Equal("=Amount*4", view.Model.SettingsOf(calculated).Formula);
+        Assert.False(view.Settings.CalculationProblem!.IsVisible);
+
+        Type(formula, "=Missing*(");
+        Assert.Equal("=Amount*4", view.Model.SettingsOf(calculated).Formula);
+        Assert.True(view.Settings.CalculationProblem.IsVisible);
+        Assert.Equal(Texts["pivot.calculated.badFormula"], view.Settings.CalculationProblem.Text);
+
+        Type(Box(view, "pivot.calculated.name"), "amount");
+        Assert.Equal("Double", view.Model.NameOf(calculated));
+        Assert.Equal(Texts["pivot.calculated.badName"], view.Settings.CalculationProblem.Text);
+    }
+
+    [Fact]
+    public void The_settings_panel_offers_next_and_named_base_items()
+    {
+        var view = Dialog();
+        var amount = view.Model.In(PivotArea.Value)[1];
+        view.Settings.Select(amount);
+        var mode = Choice(view, "pivot.settings.showAs");
+        mode.SelectedIndex = Array.IndexOf(Enum.GetValues<ValueDisplayMode>(), ValueDisplayMode.DifferenceFrom);
+        var baseItem = Choice(view, "pivot.settings.baseItem");
+
+        Assert.True(baseItem.IsEnabled);
+        baseItem.SelectedIndex = 1;
+        Assert.Equal(PivotBaseItem.Next, view.Model.SettingsOf(amount).BaseItem);
+
+        baseItem.SelectedIndex = 2;
+        Assert.Equal(PivotBaseItemKind.Named, view.Model.SettingsOf(amount).BaseItem.Kind);
+        Assert.False(string.IsNullOrEmpty(view.Model.SettingsOf(amount).BaseItem.Key));
     }
 }

@@ -30,8 +30,11 @@ public sealed class LedgerSheetExtraCommands(
     ICellInputRecognizer recognizer,
     ISheetValueWrites writes,
     PulseOffice.Formats.ISpreadsheetFormatRegistry formats,
-    IWorksheetTabPolicy tabs) : LedgerCommandSet(context)
+    IWorksheetTabPolicy tabs,
+    ISheetCellTransplant? cellTransplant = null) : LedgerCommandSet(context)
 {
+    private readonly ISheetCellTransplant _cells = cellTransplant ?? new SheetCellTransplant();
+
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Sheet("ledger.sheet.rightToLeft", "sheet/layout", (_, sheet, _) =>
@@ -109,12 +112,7 @@ public sealed class LedgerSheetExtraCommands(
             foreach (var sheet in source.Sheets)
             {
                 var copy = workbook.AddSheet(tabs.UniqueName(workbook, sheet.Name));
-
-                foreach (var (address, cell) in sheet.NonEmptyCells())
-                {
-                    if (cell.Formula is { } formula) copy.SetFormula(address, formula);
-                    else copy.SetValue(address, cell.Value);
-                }
+                _cells.Copy(source, sheet, workbook, copy);
             }
 
             engine.RecalculateAll();

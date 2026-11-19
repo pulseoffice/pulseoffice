@@ -74,9 +74,7 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
             IterateType = iterate is null
                 ? null
                 : _iterations.FirstOrDefault(pair => pair.Ooxml == ((string?)iterate.Attribute("type") ?? "el")).Odf ?? "by-paragraph",
-            IterateInterval = iterate is null
-                ? null
-                : Number((string?)iterate.Element(P + "tmAbs")?.Attribute("val")) / 1000.0 ?? 0,
+            IterateInterval = iterate is null ? null : Interval(iterate, effectCommonTimeNode),
             TextOnly = false,
             RootTiming = new BehaviourTiming
             {
@@ -85,6 +83,16 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
                 AutoReverse = (string?)effectCommonTimeNode.Attribute("autoRev") is "1" or "true",
             },
         };
+    }
+
+    private double Interval(XElement iterate, XElement effectCommonTimeNode)
+    {
+        if (Number((string?)iterate.Element(P + "tmAbs")?.Attribute("val")) is { } absolute) return Math.Max(0, absolute) / 1000.0;
+        if (Number((string?)iterate.Element(P + "tmPct")?.Attribute("val")) is not { } percent) return 0;
+        var element = effectCommonTimeNode.Element(P + "childTnLst")?.Descendants(P + "cTn")
+            .Select(node => Number((string?)node.Attribute("dur")) ?? 0)
+            .DefaultIfEmpty(0).Max() ?? 0;
+        return Math.Max(0, percent) / 100000.0 * element / 1000.0;
     }
 
     private IEnumerable<AnimationBehaviour> Nodes(XElement commonTimeNode) =>

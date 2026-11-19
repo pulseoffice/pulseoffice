@@ -23,6 +23,8 @@ public interface IPivotPreviewer
     string ItemLabel(PivotField field, string key);
 
     bool IsNumeric(int column);
+
+    bool IsFormulaValid(string formula);
 }
 
 public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooterOwner, IDialogSizeHint
@@ -355,9 +357,17 @@ public sealed class PivotPromptView : UserControl, IDialogContent, IDialogFooter
     private string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 }
 
-public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource source, PivotLabels labels) : IPivotPreviewer
+public sealed class SourcePivotPreviewer(IPivotEngine engine, IPivotSource source, PivotLabels labels, IPivotFormulas? formulas = null) : IPivotPreviewer
 {
     private readonly PivotItemCells _cells = new();
+    private readonly IPivotFormulas _formulas = formulas ?? new PivotFormulas(new Engine.Parsing.FormulaParser());
+
+    public bool IsFormulaValid(string formula)
+    {
+        ArgumentNullException.ThrowIfNull(formula);
+        var compiled = _formulas.Compile(formula, source.Headers);
+        return compiled.IsValid && compiled.Columns.Count > 0;
+    }
 
     public string ItemLabel(PivotField field, string key)
     {

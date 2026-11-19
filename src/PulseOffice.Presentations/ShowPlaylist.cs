@@ -6,6 +6,9 @@ public sealed class ShowPlaylist
     {
         ArgumentNullException.ThrowIfNull(deck);
         var setup = deck.Setup;
+        if (setup.CustomShowName is { } name && deck.CustomShows.FirstOrDefault(show => show.Name == name) is { } custom)
+            return [.. custom.SlideIds.Select(id => deck.Slides.FirstOrDefault(slide => slide.Id == id)).OfType<Slide>().Where(slide => !slide.Hidden)];
+
         var from = setup.FromSlide > 0 ? setup.FromSlide : 1;
         var to = setup.ToSlide > 0 ? setup.ToSlide : deck.Slides.Count;
 

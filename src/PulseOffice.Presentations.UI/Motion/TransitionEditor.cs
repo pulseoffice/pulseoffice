@@ -38,7 +38,7 @@ public sealed record TransitionEditorContext(Presentation Deck, ITransitionSampl
 
 public sealed class TransitionEditor : UserControl
 {
-    private static readonly AdvanceMode[] AdvanceModes = [AdvanceMode.OnClick, AdvanceMode.AfterTime, AdvanceMode.OnClickOrAfterTime];
+    private static readonly AdvanceMode[] AdvanceModes = [AdvanceMode.OnClick, AdvanceMode.AfterTime, AdvanceMode.OnClickOrAfterTime, AdvanceMode.TriggerOnly];
 
     private static readonly string[] SoundExtensions =["*.wav", "*.mp3", "*.ogg", "*.m4a", "*.aac", "*.flac"];
 
@@ -76,6 +76,7 @@ public sealed class TransitionEditor : UserControl
                 new IconChoice("onClick", "deck.motion.advance.onClick", Texts["deck.transitionDialog.onClick"]),
                 new IconChoice("afterTime", "deck.motion.advance.afterTime", Texts["deck.transitionDialog.afterTime"]),
                 new IconChoice("onClickOrAfterTime", "deck.motion.advance.afterTime", Texts["deck.transitionDialog.onClickOrAfterTime"]),
+                new IconChoice("triggerOnly", "deck.motion.advance.onClick", Texts["deck.transitionDialog.triggerOnly"]),
             ],
             services.Icons, _metrics, Texts["deck.transitionDialog.advance"], Array.IndexOf(AdvanceModes, _transition.Advance), showLabels: true);
         _advance.SelectionChanged += (_, index) =>

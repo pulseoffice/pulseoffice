@@ -1,6 +1,7 @@
 using PulseOffice.UI.Controls.Notifications;
 using PulseOffice.Foundation.Modules;
 using PulseOffice.Localization;
+using PulseOffice.Platform.Media;
 using PulseOffice.Presentations;
 using PulseOffice.Shell;
 using PulseOffice.UI.Commands;
@@ -273,11 +274,12 @@ public sealed class DeckCommands(
         var documentPath = workspace.Documents.FirstOrDefault(document => ReferenceEquals(document.Model, deck))?.Path;
         var renderer = new SlideRenderer(objectRenderer, texts);
         var window = new PresentationWindow(deck, scheduler, renderer,
-            new PresentationOptions(startIndex, deck.Setup.Loop, withPresenter)
+            new PresentationOptions(startIndex, deck.Setup.Loops, withPresenter)
             {
                 Playlist = playlist,
                 WithoutAnimation = deck.Setup.WithoutAnimation,
-                ManualAdvance = deck.Setup.Advance == ShowAdvanceMode.Manual,
+                ManualAdvance = deck.Setup.Advance == ShowAdvanceMode.Manual && deck.Setup.Kind != ShowKind.Kiosk,
+                Kiosk = deck.Setup.Kind == ShowKind.Kiosk,
                 PenColor = deck.Setup.PenColor,
                 MonitorIndex = _monitorIndex,
                 EndOfShowText = texts["deck.present.endOfShow"],
@@ -293,7 +295,10 @@ public sealed class DeckCommands(
                 Media = new ShowMediaOptions(
                     element => mediaSessions.OpenAsync(element, documentPath),
                     element => media.PlayAsync(element, documentPath),
-                    texts),
+                    texts,
+                    (path, loop) => deck.Sounds.Find(path) is { } sound
+                        ? mediaSessions.OpenSoundAsync(sound, loop)
+                        : Task.FromResult<MediaSession?>(null)),
             });
 
         if (withPresenter)

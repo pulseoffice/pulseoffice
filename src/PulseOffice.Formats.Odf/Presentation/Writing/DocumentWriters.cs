@@ -111,6 +111,7 @@ internal sealed class OdpSettingsWriter : OdpXml
 {
     private readonly OdpGridXml _grid = new();
     private readonly OdpShowPagesXml _pages = new();
+    private readonly OdpShowSetupXml _show = new();
 
     public XElement? Write(OdpWriteSession session)
     {
@@ -123,6 +124,7 @@ internal sealed class OdpSettingsWriter : OdpXml
         if (setup.WithoutAnimation) settings.Add(new XAttribute(Presentation + "animations", "disabled"));
         if (setup.FromSlide > 0 && setup.FromSlide <= deck.Slides.Count)
             settings.Add(new XAttribute(Presentation + "start-page", session.PageName(deck.Slides[setup.FromSlide - 1].Id)));
+        _show.Write(settings, setup, deck.Slides.Count, number => session.PageName(deck.Slides[number - 1].Id));
 
         foreach (var show in deck.CustomShows)
         {
@@ -308,8 +310,6 @@ internal sealed class OdpFidelityRules
             Diagnostic.Info("ODP015", "Image filters other than grayscale have no cross-format native representation and are shown on screen only; grayscale and crop round-trip.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(_ => true,
             Diagnostic.Info("ODP010", "Theme colour roles degrade to absolute colours and theme major/minor fonts to font names in ODP; the theme itself is not preserved.")),
-        new FidelityRule<PulseOffice.Presentations.Presentation>(deck => deck.Setup.ToSlide > 0 || deck.Setup.PenColor != new ShowSetup().PenColor,
-            Diagnostic.Info("ODP012", "The show pen colour and the end of a slide range have no ODF equivalent; loop, manual advance and start slide round-trip.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(deck => deck.Slides.Any(slide => !_transitions.ReachesOdf(slide.Transition)),
             Diagnostic.Warning("ODP023", "PowerPoint transitions without an ODF counterpart (such as the 3D and dynamic content transitions) are written as their nearest basic kind in ODP. PPTX keeps them.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(

@@ -36,7 +36,7 @@ public sealed class OdfAnimationBehaviourCodec
         {
             Nodes = [.. effect.Elements().Select(element => Node(element, 1)).OfType<AnimationBehaviour>()],
             IterateType = iterating ? (string?)effect.Attribute(Anim + "iterate-type") ?? "by-letter" : null,
-            IterateInterval = iterating ? Number((string?)effect.Attribute(Anim + "iterate-interval")) ?? 0 : null,
+            IterateInterval = iterating ? Interval((string?)effect.Attribute(Anim + "iterate-interval")) ?? 0 : null,
             TextOnly = iterating && (string?)effect.Attribute(Anim + "sub-item") == "text",
             RootTiming = ReadTiming(effect) with { Begin = null, Duration = null, Fill = null, RepeatCount = null, RepeatsIndefinitely = false },
         };
@@ -133,6 +133,24 @@ public sealed class OdfAnimationBehaviourCodec
     private string Seconds(double seconds) => Format(seconds) + "s";
 
     private string Format(double value) => Math.Round(value, 6).ToString("0.######", CultureInfo.InvariantCulture);
+
+    private double? Interval(string? value)
+    {
+        if (value is null || !value.TrimStart().StartsWith('P')) return Number(value);
+        try
+        {
+            var seconds = System.Xml.XmlConvert.ToTimeSpan(value.Trim()).TotalSeconds;
+            return double.IsFinite(seconds) && seconds >= 0 ? seconds : null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
 
     private double? Number(string? value) =>
         value is not null && double.TryParse(value.TrimEnd('s', 'S'), NumberStyles.Float, CultureInfo.InvariantCulture, out var number)

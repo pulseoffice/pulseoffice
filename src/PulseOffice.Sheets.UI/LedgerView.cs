@@ -244,6 +244,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
         _overlay.Children.Add(_editing.CellEditor);
         _overlay.Children.Add(_editing.AnnotatedRange);
+        _overlay.Children.Add(_editing.ArgumentTip);
         _overlay.Children.Add(_shapeText.Editor);
 
         _grid.ZoomChanged += (_, zoom) => ShowZoom(zoom);
@@ -253,6 +254,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
         _selection.Changed += (_, _) =>
         {
+            if (_editing.TryPoint(_selection.Range)) return;
             if (_editing.IsEditing) _editing.CommitEditor();
             _editing.CommitFormulaBar();
             OnSelectionChanged();

@@ -36,15 +36,46 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
     public CellAppearance Cell(TableBlock table, TableProperties style, int row, int column)
     {
         var cell = table.Cell(row, column);
-        var header = row < table.HeaderRows;
+        var regions = Regions(table, style, row, column);
+        uint? ink = null;
+        bool? bold = null;
+        foreach (var region in regions)
+        {
+            ink = region.Ink ?? ink;
+            bold = region.Bold ?? bold;
+        }
         return new CellAppearance(
             cell.Borders ?? StyleBorders(table, style, row, column),
-            cell.Background ?? StyleBackground(table, style, row, column),
-            header ? style.HeaderColor : null,
-            header ? style.HeaderBold == true : style.HeaderBold == true && Emphasized(table, row, column),
+            cell.Background ?? Visible(StyleBackground(table, style, row, column)),
+            Visible(ink),
+            bold ?? (style.HeaderBold == true && Emphasized(table, row, column)),
             cell.Borders is not null,
             cell.Background is not null);
     }
+
+    private IReadOnlyList<TableRegionFormat> Regions(TableBlock table, TableProperties style, int row, int column)
+    {
+        var first = table.Banding.FirstColumn && column == 0;
+        var last = table.Banding.LastColumn && column == table.ColumnCount - 1;
+        var header = row < table.HeaderRows;
+        var total = table.Banding.LastRow && row == table.Rows.Count - 1 && row >= table.HeaderRows;
+        var regions = new List<TableRegionFormat>();
+        void Add(bool applies, TableRegionFormat? format)
+        {
+            if (applies && format is not null) regions.Add(format);
+        }
+        Add(first, style.FirstColumn);
+        Add(last, style.LastColumn);
+        Add(header, new TableRegionFormat { Ink = style.HeaderColor, Bold = style.HeaderBold });
+        Add(total, style.TotalRow);
+        Add(header && first, style.NorthWestCell);
+        Add(header && last, style.NorthEastCell);
+        Add(total && first, style.SouthWestCell);
+        Add(total && last, style.SouthEastCell);
+        return regions;
+    }
+
+    private uint? Visible(uint? colour) => colour is { } value && value >> 24 == 0 ? null : colour;
 
     public BoxBorders StyleBorders(TableBlock table, TableProperties style, int row, int column)
     {
@@ -64,7 +95,29 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
 
     public uint? StyleBackground(TableBlock table, TableProperties style, int row, int column)
     {
-        if (row < table.HeaderRows && style.HeaderBackground is { } header) return header;
+        var header = row < table.HeaderRows;
+        var first = table.Banding.FirstColumn && column == 0;
+        var last = table.Banding.LastColumn && column == table.ColumnCount - 1;
+        var total = table.Banding.LastRow && row == table.Rows.Count - 1 && !header;
+        uint? fill = null;
+        if (header && style.HeaderBackground is { } headerFill) fill = headerFill;
+        if (total && style.TotalRow?.Background is { } totalFill) fill = totalFill;
+        if (fill is null && first && style.FirstColumn?.Background is { } firstFill) fill = firstFill;
+        if (fill is null && last && style.LastColumn?.Background is { } lastFill) fill = lastFill;
+        var corner = (header, total, first, last) switch
+        {
+            (true, _, true, _) => style.NorthWestCell,
+            (true, _, _, true) => style.NorthEastCell,
+            (_, true, true, _) => style.SouthWestCell,
+            (_, true, _, true) => style.SouthEastCell,
+            _ => null,
+        };
+        if (corner?.Background is { } cornerFill) fill = cornerFill;
+        return fill ?? BodyBackground(table, style, row, column);
+    }
+
+    private uint? BodyBackground(TableBlock table, TableProperties style, int row, int column)
+    {
         var body = row - Math.Max(0, table.HeaderRows);
         var bandAxes = style.BandAxes ?? TableBandAxes.Both;
         if (style.BandBackground is { } band

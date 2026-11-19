@@ -25,7 +25,8 @@ public sealed class DocumentLayoutEngine(
     IPageNumberText numbers,
     IStyleResolver resolver,
     IFrameChains chains,
-    PulseOffice.Drawing.Shapes.IShapeTextInk ink) : IDocumentLayoutEngine
+    PulseOffice.Drawing.Shapes.IShapeTextInk ink,
+    PulseOffice.Drawing.Shapes.IShapeTextArea area) : IDocumentLayoutEngine
 {
     private const int CountPasses = 4;
 
@@ -206,7 +207,7 @@ public sealed class DocumentLayoutEngine(
                     return frameStories.GetValueOrDefault(id);
                 }
                 story = found is { Content.Story: { } content } item
-                    ? stories.Compose(builder.Build(content, Inked(body with { Story = StoryKind.Frame, StoryId = id, Sections = false, Lists = builder.Lists(document, content) }, item.Content)), Math.Max(1, item.Size.Width.ToPoints() - 2 * Inset(document, item)))
+                    ? FrameStory(document, item, content, Inked(body with { Story = StoryKind.Frame, StoryId = id, Sections = false, Lists = builder.Lists(document, content) }, item.Content))
                     : null;
                 frameStories[id] = story;
                 return story;
@@ -214,6 +215,7 @@ public sealed class DocumentLayoutEngine(
             PageCount = Text(count),
             PageNumber = (style, number) => numbers.Render(numbers.FormatOf(document.Styles, style), number),
             FrameInset = id => document.Objects.Find(id) is { } item ? Inset(document, item) : 0,
+            FrameMargins = (id, width, height) => document.Objects.Find(id) is { Content: EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject shape } } ? area.Margins(shape, width, height) : PulseOffice.Drawing.Shapes.ShapeTextMargins.None,
             FrameAlignment = id => document.Objects.Find(id) is { Content: EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject shape } } ? Alignment(shape) : 0,
             MemberFrames = id =>
             {
@@ -223,6 +225,46 @@ public sealed class DocumentLayoutEngine(
                     : [];
                 memberStories[id] = members;
                 return members;
+            },
+        };
+    }
+
+    private ComposedStory FrameStory(TextDocument document, AnchoredObject item, BlockContainer content, FlowContext context)
+    {
+        var inset = Inset(document, item);
+        var (width, height) = (item.Size.Width.ToPoints(), item.Size.Height.ToPoints());
+        if (item.Content is not EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject shape })
+            return stories.Compose(builder.Build(content, context), Math.Max(1, width - 2 * inset));
+        var margins = area.Margins(shape, width, height);
+        var line = Math.Max(1, margins.Width(width) - 2 * inset);
+        var story = stories.Compose(builder.Build(content, context), line);
+        if (shape.Style.Text.Autofit != PulseOffice.Text.Rich.TextAutofit.ShrinkText) return story;
+        var available = Math.Max(1, margins.Height(height) - 2 * inset);
+        var factor = 1.0;
+        for (var attempt = 0; attempt < ShrinkAttempts && story.Height > available && factor > MinimumFontFactor; attempt++)
+        {
+            factor = Math.Max(MinimumFontFactor, factor * Math.Min(0.95, Math.Sqrt(available / story.Height)));
+            story = stories.Compose(builder.Build(content, Scaled(document, context, factor)), line);
+        }
+        return story;
+    }
+
+    private const int ShrinkAttempts = 6;
+
+    private const double MinimumFontFactor = 0.25;
+
+    private FlowContext Scaled(TextDocument document, FlowContext context, double factor)
+    {
+        var inner = context.Fields;
+        return context with
+        {
+            Fields = paragraph =>
+            {
+                var source = inner?.Invoke(paragraph) ?? paragraph;
+                var effective = resolver.EffectiveParagraph(document.Styles, source);
+                var runs = source.Runs.Count == 0 ? [new PulseOffice.Text.Rich.TextRun(source.Text)] : source.Runs;
+                double Size(int index) => (index < effective.Runs.Count ? effective.Runs[index].FontSize : null) ?? runs[index].FontSize ?? effective.FontSize;
+                return source.WithRuns([.. runs.Select((run, index) => run with { FontSize = Size(index) * factor })]);
             },
         };
     }

@@ -118,7 +118,11 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
         if (request.Frame(item.Id) is not { } frame) return rect;
         var height = frame.Height + 2 * request.FrameInset(item.Id);
         if (item.Content is EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject { Style.Text.Autofit: PulseOffice.Text.Rich.TextAutofit.ResizeShape } } && frame.Atoms.Count > 0)
-            return rect with { Height = Math.Max(1, height) };
+        {
+            var margins = request.FrameMargins(item.Id, rect.Width, rect.Height);
+            var share = rect.Height > 0 ? Math.Clamp(margins.Height(rect.Height) / rect.Height, 0.05, 1) : 1;
+            return rect with { Height = Math.Max(1, height / share) };
+        }
         return rect.Height < height ? rect with { Height = height } : rect;
     }
 
@@ -134,11 +138,14 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
 
     private IReadOnlyList<LayoutBox> FrameContent(string id, LayoutRect rect)
     {
-        if (request.Frame(id) is { } frame) return StoryIn(frame, rect, request.FrameInset(id), request.FrameAlignment(id), id);
+        if (request.Frame(id) is { } frame) return StoryIn(frame, Inner(rect, request.FrameMargins(id, rect.Width, rect.Height)), request.FrameInset(id), request.FrameAlignment(id), id);
         return [.. request.MemberFrames(id).SelectMany(member => StoryIn(member.Story,
             new LayoutRect(rect.X + member.X * rect.Width, rect.Y + member.Y * rect.Height, member.Width * rect.Width, member.Height * rect.Height),
             member.Inset, member.Alignment, id))];
     }
+
+    private LayoutRect Inner(LayoutRect rect, PulseOffice.Drawing.Shapes.ShapeTextMargins margins) =>
+        new(rect.X + margins.Left, rect.Y + margins.Top, margins.Width(rect.Width), margins.Height(rect.Height));
 
     private IReadOnlyList<LayoutBox> StoryIn(ComposedStory frame, LayoutRect rect, double inset, double alignment, string id)
     {

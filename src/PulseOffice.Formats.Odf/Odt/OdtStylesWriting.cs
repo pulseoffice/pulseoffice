@@ -24,6 +24,8 @@ internal sealed class OdtStylesWriter(
     OdtChangeWriter changes,
     OdfListPictures pictures) : OdtXml
 {
+    private readonly OdtTableRegionNames _regionNames = new();
+
     public XElement Styles(TextDocument document, OdtWriteSession session)
     {
         var sheet = document.Styles;
@@ -197,20 +199,29 @@ internal sealed class OdtStylesWriter(
     {
         var table = style.Table;
         var properties = new XElement(Style + "table-properties");
-        if (table.Background is { } background) properties.Add(new XAttribute(Fo + "background-color", measure.Hex(background)));
+        if (table.Background is { } background) properties.Add(new XAttribute(Fo + "background-color", measure.Fill(background)));
         var element = Named(style, "table", null, properties);
         if (table.BorderColor is { } borderColor) element.Add(new XAttribute(Pt + "border-color", measure.Hex(borderColor)));
         if (table.BorderWidth is { } borderWidth) element.Add(new XAttribute(Pt + "border-width", measure.Points(borderWidth)));
-        if (table.HeaderBackground is { } header) element.Add(new XAttribute(Pt + "header-background", measure.Hex(header)));
+        if (table.HeaderBackground is { } header) element.Add(new XAttribute(Pt + "header-background", measure.Fill(header)));
         if (table.HeaderBold is { } bold) element.Add(new XAttribute(Pt + "header-bold", bold ? "true" : "false"));
-        if (table.BandBackground is { } band) element.Add(new XAttribute(Pt + "band-background", measure.Hex(band)));
-        if (table.FirstBandBackground is { } first) element.Add(new XAttribute(Pt + "first-band-background", measure.Hex(first)));
+        if (table.BandBackground is { } band) element.Add(new XAttribute(Pt + "band-background", measure.Fill(band)));
+        if (table.FirstBandBackground is { } first) element.Add(new XAttribute(Pt + "first-band-background", measure.Fill(first)));
         if (table.BandAxes is { } bandAxes) element.Add(new XAttribute(Pt + "band-axes", bandAxes.ToString().ToLowerInvariant()));
         if (table.FirstBandAxes is { } firstAxes) element.Add(new XAttribute(Pt + "first-band-axes", firstAxes.ToString().ToLowerInvariant()));
         if (table.CellPadding is { } padding) element.Add(new XAttribute(Pt + "cell-padding", measure.Points(padding)));
         if (table.VerticalCellPadding is { } vertical) element.Add(new XAttribute(Pt + "cell-padding-vertical", measure.Points(vertical)));
-        if (table.HeaderColor is { } ink) element.Add(new XAttribute(Pt + "header-color", measure.Hex(ink)));
+        if (table.HeaderColor is { } ink) element.Add(new XAttribute(Pt + "header-color", measure.Fill(ink)));
         if (table.InnerLines is { } inner) element.Add(new XAttribute(Pt + "inner-lines", inner ? "true" : "false"));
+        foreach (var region in Enum.GetValues<TableRegion>())
+        {
+            if (table.Region(region) is not { IsEmpty: false } format) continue;
+            element.Add(new XElement(Pt + "table-region",
+                new XAttribute(Pt + "region", _regionNames.Token(region)),
+                format.Background is { } fill ? new XAttribute(Pt + "background", measure.Fill(fill)) : null,
+                format.Ink is { } regionInk ? new XAttribute(Pt + "color", measure.Fill(regionInk)) : null,
+                format.Bold is { } regionBold ? new XAttribute(Pt + "bold", regionBold ? "true" : "false") : null));
+        }
         return element;
     }
 

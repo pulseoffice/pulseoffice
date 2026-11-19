@@ -102,11 +102,7 @@ public sealed class DeckShowActions(Presentation deck, ITextCatalog texts, DeckA
             {
                 foreach (var slide in deck.Slides)
                     if (times.TryGetValue(slide.Id, out var ms))
-                        slide.Transition = slide.Transition with
-                        {
-                            Advance = AdvanceMode.AfterTime,
-                            AdvanceAfterMs = ms,
-                        };
+                        slide.Transition = slide.Transition.WithRehearsedTime(ms);
                 deck.Raise();
             },
             () =>

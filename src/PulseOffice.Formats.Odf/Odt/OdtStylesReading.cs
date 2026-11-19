@@ -40,6 +40,8 @@ internal sealed class OdtStylesReader(
     OdtChangeReader changes,
     OdfListPictures pictures) : OdtXml
 {
+    private readonly OdtTableRegionNames _regionNames = new();
+
     public void RegisterNames(XElement? styles, XElement? masters, XElement? contentAutomatic, XElement? stylesAutomatic, OdtReadContext context)
     {
         foreach (var style in (styles?.Elements() ?? []).Concat(contentAutomatic?.Elements(Text + "list-style") ?? []).Concat(stylesAutomatic?.Elements(Text + "list-style") ?? []))
@@ -298,23 +300,38 @@ internal sealed class OdtStylesReader(
     private TableStyle TableStyle(XElement element, string name, OdtReadContext context) =>
         Common(new TableStyle(name)
         {
-            Table = new TableProperties
+            Table = Regions(element, new TableProperties
             {
-                Background = measure.Color((string?)element.Element(Style + "table-properties")?.Attribute(Fo + "background-color")),
+                Background = measure.Fill((string?)element.Element(Style + "table-properties")?.Attribute(Fo + "background-color")),
                 BorderColor = measure.Color((string?)element.Attribute(Pt + "border-color")),
                 BorderWidth = measure.Points((string?)element.Attribute(Pt + "border-width")),
-                HeaderBackground = measure.Color((string?)element.Attribute(Pt + "header-background")),
+                HeaderBackground = measure.Fill((string?)element.Attribute(Pt + "header-background")),
                 HeaderBold = (string?)element.Attribute(Pt + "header-bold") is { } bold ? bold == "true" : null,
-                BandBackground = measure.Color((string?)element.Attribute(Pt + "band-background")),
-                FirstBandBackground = measure.Color((string?)element.Attribute(Pt + "first-band-background")),
+                BandBackground = measure.Fill((string?)element.Attribute(Pt + "band-background")),
+                FirstBandBackground = measure.Fill((string?)element.Attribute(Pt + "first-band-background")),
                 BandAxes = Enum.TryParse<TableBandAxes>((string?)element.Attribute(Pt + "band-axes"), true, out var bandAxes) ? bandAxes : null,
                 FirstBandAxes = Enum.TryParse<TableBandAxes>((string?)element.Attribute(Pt + "first-band-axes"), true, out var firstAxes) ? firstAxes : null,
                 CellPadding = measure.Points((string?)element.Attribute(Pt + "cell-padding")),
                 VerticalCellPadding = measure.Points((string?)element.Attribute(Pt + "cell-padding-vertical")),
-                HeaderColor = measure.Color((string?)element.Attribute(Pt + "header-color")),
+                HeaderColor = measure.Fill((string?)element.Attribute(Pt + "header-color")),
                 InnerLines = (string?)element.Attribute(Pt + "inner-lines") is { } inner ? inner == "true" : null,
-            },
+            }),
         }, element, context);
+
+    private TableProperties Regions(XElement element, TableProperties table)
+    {
+        foreach (var child in element.Elements(Pt + "table-region"))
+        {
+            if (_regionNames.Region((string?)child.Attribute(Pt + "region")) is not { } region) continue;
+            table = table.WithRegion(region, new TableRegionFormat
+            {
+                Background = measure.Fill((string?)child.Attribute(Pt + "background")),
+                Ink = measure.Fill((string?)child.Attribute(Pt + "color")),
+                Bold = (string?)child.Attribute(Pt + "bold") is { } bold ? bold == "true" : null,
+            });
+        }
+        return table;
+    }
 
     private ListStyle ListStyle(XElement element, string name, OdtReadContext context)
     {

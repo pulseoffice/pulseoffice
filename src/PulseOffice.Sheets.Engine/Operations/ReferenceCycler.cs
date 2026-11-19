@@ -16,11 +16,31 @@ public sealed partial class ReferenceCycler : IReferenceCycler
     [GeneratedRegex(@"(\$?)([A-Za-z]{1,3})(\$?)(\d{1,7})", RegexOptions.CultureInvariant)]
     private partial Regex Reference();
 
+    [GeneratedRegex(@"(?<![A-Za-z0-9_$.])(\$?)([A-Za-z]{1,3}):(\$?)([A-Za-z]{1,3})(?![A-Za-z0-9_($.])|(?<![A-Za-z0-9_$.:])(\$?)(\d{1,7}):(\$?)(\d{1,7})(?![A-Za-z0-9_$.:])", RegexOptions.CultureInvariant)]
+    private partial Regex WholeLines();
+
     public string Cycle(string formula, int caret) => CycleAt(formula, caret).Text;
+
+    private CycledReference? CycleWholeLine(string formula, int caret)
+    {
+        var strings = StringSpans(formula);
+        var match = WholeLines().Matches(formula)
+            .Where(found => !strings.Any(span => found.Index >= span.Start && found.Index < span.End))
+            .FirstOrDefault(found => caret >= found.Index && caret <= found.Index + found.Length);
+        if (match is null) return null;
+        var offset = match.Groups[2].Success ? 1 : 5;
+        var anchored = match.Groups[offset].Value.Length > 0 && match.Groups[offset + 2].Value.Length > 0;
+        var sign = anchored ? string.Empty : "$";
+        var replacement = sign + match.Groups[offset + 1].Value + ":" + sign + match.Groups[offset + 3].Value;
+        var text = formula[..match.Index] + replacement + formula[(match.Index + match.Length)..];
+        return new CycledReference(text, match.Index + replacement.Length);
+    }
 
     public CycledReference CycleAt(string formula, int caret)
     {
         ArgumentNullException.ThrowIfNull(formula);
+
+        if (CycleWholeLine(formula, caret) is { } line) return line;
 
         var candidates = Candidates(formula);
         if (candidates.Count == 0) return new CycledReference(formula, caret);

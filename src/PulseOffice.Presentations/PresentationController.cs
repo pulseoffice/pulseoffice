@@ -75,6 +75,9 @@ public sealed class PresentationController
     public bool AtEnd => _slides.Count == 0 || (SlideIndex >= _slides.Count - 1
         && StepIndex >= _stepCounts[SlideIndex] - 1);
 
+    public bool ClickAdvances(bool manualShow, bool kiosk = false) =>
+        !kiosk && (manualShow || StepIndex < CurrentStepCount() - 1 || Current?.Transition is not { AdvancesOnClick: false });
+
     public AdvanceResult Advance()
     {
         if (_slides.Count == 0) return AdvanceResult.None;

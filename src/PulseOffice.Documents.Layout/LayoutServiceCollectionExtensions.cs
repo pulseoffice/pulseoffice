@@ -16,6 +16,7 @@ public static class LayoutServiceCollectionExtensions
 
         services.TryAddSingleton(new LayoutOptions());
         services.TryAddSingleton<PulseOffice.Drawing.Shapes.IShapeTextInk, PulseOffice.Drawing.Shapes.ShapeTextInk>();
+        services.TryAddSingleton<PulseOffice.Drawing.Shapes.IShapeTextArea, PulseOffice.Drawing.Shapes.ShapeTextArea>();
         services.TryAddSingleton<IHyphenationPoints, NoHyphenation>();
         services.TryAddSingleton<IParagraphFlowSettings, ModelFlowSettings>();
         services.TryAddSingleton<IListLabels>(new ListLabels([new NumberMarker(), new BulletMarker()]));
@@ -83,6 +84,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<ILayoutQueries, LayoutQueries>();
         services.AddSingleton<ILineNumbers, LineNumbers>();
         services.AddTransient<IDocumentLayoutEngine, DocumentLayoutEngine>();
+        services.TryAddSingleton<IShapeStorySizes, ShapeStorySizes>();
         services.TryAddSingleton<Func<IDocumentLayoutEngine>>(provider => provider.GetRequiredService<IDocumentLayoutEngine>);
         services.AddSingleton<IPrintLayouts, PrintLayouts>();
 

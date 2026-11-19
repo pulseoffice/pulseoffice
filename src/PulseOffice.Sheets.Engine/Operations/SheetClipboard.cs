@@ -211,7 +211,7 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
 
         if (request.Operation != PasteOperation.None
             && (request.Parts.HasFlag(PasteParts.Values) || request.Parts.HasFlag(PasteParts.Formulas)))
-            next = next with { Value = arithmetic.Combine(previous.Value, source.Value), Formula = null };
+            next = Combined(previous, source, next, request, arithmetic);
 
         if (previous == next) return;
 
@@ -221,6 +221,18 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
             request.HistoryLabel,
             redo: () => sheet[destination] = next,
             undo: () => sheet[destination] = previous));
+    }
+
+    private Cell Combined(Cell previous, Cell source, Cell merged, PasteRequest request, PasteArithmetic arithmetic)
+    {
+        var value = arithmetic.Combine(previous.Value, source.Value);
+        var sourceFormula = request.Parts.HasFlag(PasteParts.Formulas) && source.HasFormula && merged.HasFormula ? merged.Formula : null;
+        if (!previous.HasFormula && sourceFormula is null) return merged with { Value = value, Formula = null };
+
+        var left = previous.HasFormula ? "(" + previous.Formula!.TrimStart('=') + ")" : arithmetic.Operand(previous.Value);
+        var right = sourceFormula is not null ? "(" + sourceFormula.TrimStart('=') + ")" : arithmetic.Operand(source.Value);
+        if (left is null || right is null) return merged with { Value = value, Formula = null };
+        return merged with { Formula = "=" + left + arithmetic.Symbol + right, Value = value };
     }
 
     private List<(int Row, int Column)> UncopiedOccupants(
@@ -406,10 +418,22 @@ internal abstract class PasteArithmetic
 {
     public abstract PasteOperation Operation { get; }
 
-    public CellValue Combine(CellValue previous, CellValue source) =>
-        Operation != PasteOperation.None && previous.Kind == ValueKind.Number && source.Kind == ValueKind.Number
-            ? Apply(previous.AsNumber(), source.AsNumber())
-            : source;
+    public virtual string Symbol => string.Empty;
+
+    public CellValue Combine(CellValue previous, CellValue source)
+    {
+        if (Operation == PasteOperation.None || (previous.IsEmpty && source.IsEmpty)) return source;
+        return Numeric(previous, out var left) && Numeric(source, out var right) ? Apply(left, right) : source;
+    }
+
+    public string? Operand(CellValue value) =>
+        Numeric(value, out var number) ? number.ToString("R", System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    private bool Numeric(CellValue value, out double number)
+    {
+        number = value.Kind == ValueKind.Number ? value.AsNumber() : 0;
+        return value.Kind == ValueKind.Number || value.IsEmpty;
+    }
 
     protected abstract CellValue Apply(double left, double right);
 }
@@ -422,24 +446,28 @@ internal sealed class KeepSource : PasteArithmetic
 
 internal sealed class AddValues : PasteArithmetic
 {
+    public override string Symbol => "+";
     public override PasteOperation Operation => PasteOperation.Add;
     protected override CellValue Apply(double left, double right) => CellValue.Number(left + right);
 }
 
 internal sealed class SubtractValues : PasteArithmetic
 {
+    public override string Symbol => "-";
     public override PasteOperation Operation => PasteOperation.Subtract;
     protected override CellValue Apply(double left, double right) => CellValue.Number(left - right);
 }
 
 internal sealed class MultiplyValues : PasteArithmetic
 {
+    public override string Symbol => "*";
     public override PasteOperation Operation => PasteOperation.Multiply;
     protected override CellValue Apply(double left, double right) => CellValue.Number(left * right);
 }
 
 internal sealed class DivideValues : PasteArithmetic
 {
+    public override string Symbol => "/";
     public override PasteOperation Operation => PasteOperation.Divide;
     protected override CellValue Apply(double left, double right) =>
         right == 0 ? CellValue.FromError(CellError.DivideByZero) : CellValue.Number(left / right);

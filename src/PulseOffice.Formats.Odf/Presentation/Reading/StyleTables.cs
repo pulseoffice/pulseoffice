@@ -130,7 +130,8 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
         var sound = properties.Element(Presentation + "sound");
         var advancing = (string?)properties.Attribute(Presentation + "transition-type") == "automatic";
         var type = (string?)properties.Attribute(Smil + "type");
-        if (type is null && !advancing && sound is null) return null;
+        if (type is null && !advancing && sound is null
+            && properties.Attribute(transitions.ExtensionNamespace + "advance-on-click") is null) return null;
 
         var native = type is null
             ? SlideTransition.None
@@ -147,8 +148,13 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
                     "fast" => 500,
                     _ => 1000,
                 }),
-            Advance = !advancing ? AdvanceMode.OnClick
-                : (string?)properties.Attribute(transitions.ExtensionNamespace + "advance-on-click") == "true" ? AdvanceMode.OnClickOrAfterTime : AdvanceMode.AfterTime,
+            Advance = ((string?)properties.Attribute(transitions.ExtensionNamespace + "advance-on-click"), advancing) switch
+            {
+                ("false", false) => AdvanceMode.TriggerOnly,
+                (_, false) => AdvanceMode.OnClick,
+                ("true", true) => AdvanceMode.OnClickOrAfterTime,
+                _ => AdvanceMode.AfterTime,
+            },
             AdvanceAfterMs = values.XmlDuration((string?)properties.Attribute(Presentation + "duration")),
             SoundPath = (string?)sound?.Attribute(OdfPackage.Namespaces.Xlink + "href"),
             LoopSoundUntilNext = (string?)sound?.Attribute(Presentation + "play-full") == "false",

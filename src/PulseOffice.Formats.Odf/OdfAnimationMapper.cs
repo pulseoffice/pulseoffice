@@ -104,7 +104,12 @@ public sealed class OdfAnimationMapper
             effectPar.Add(new XElement(Anim + "audio",
                 new XAttribute(Xlink + "href", effect.SoundPath)));
 
-        if (effect.Repeat > 1)
+        if (effect.RepeatsIndefinitely)
+        {
+            effectPar.Add(new XAttribute(Smil + "repeatCount", "indefinite"));
+            if (effect.RepeatUntil == AnimationRepeatEnd.NextClick) effectPar.Add(new XAttribute(Smil + "end", "next"));
+        }
+        else if (effect.Repeat > 1)
             effectPar.Add(new XAttribute(Smil + "repeatCount", effect.Repeat.ToString(CultureInfo.InvariantCulture)));
 
         if (!string.IsNullOrEmpty(effect.Subtype))
@@ -185,12 +190,13 @@ public sealed class OdfAnimationMapper
                 MotionPath = (string?)effectPar.Descendants(Anim + "animateMotion").FirstOrDefault()?.Attribute(Svg + "path"),
                 SoundPath = (string?)effectPar.Descendants(Anim + "audio").FirstOrDefault()?.Attribute(Xlink + "href"),
                 Repeat = RepeatCount((string?)effectPar.Attribute(Smil + "repeatCount")),
+                RepeatUntil = RepeatEnd(effectPar),
                 Subtype = (string?)effectPar.Attribute(Pres + "preset-sub-type") is { Length: > 0 } subtype ? subtype : null,
                 TriggerShapeId = TriggerShape(effectPar),
                 Rewind = (string?)effectPar.Attribute(Smil + "fill") == "remove",
             };
             effects.Add(single
-                ? effect with { Native = new NativeAnimation(NativeAnimation.Odf, effectPar.ToString(SaveOptions.DisableFormatting), effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours) }
+                ? effect with { Native = new NativeAnimation(NativeAnimation.Odf, effectPar.ToString(SaveOptions.DisableFormatting), effect.Category, effect.Preset, effect.Subtype, effect.DurationMs, effect.Repeat, effect.MotionPath, behaviours, effect.RepeatUntil) }
                 : effect);
         }
 
@@ -206,6 +212,12 @@ public sealed class OdfAnimationMapper
 
     private string Time(int milliseconds) =>
         (milliseconds / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "s";
+
+    private AnimationRepeatEnd RepeatEnd(XElement effectPar) =>
+        (string?)effectPar.Attribute(Smil + "repeatCount") != "indefinite" ? AnimationRepeatEnd.Count
+        : ((string?)effectPar.Attribute(Smil + "end"))?.Split(';').Any(token => token.Trim() == "next") == true
+            ? AnimationRepeatEnd.NextClick
+            : AnimationRepeatEnd.EndOfSlide;
 
     private int RepeatCount(string? value) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var count) && count >= 1

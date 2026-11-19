@@ -3,10 +3,13 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using PulseOffice.Sheets.Pivot;
 using PulseOffice.Sheets.UI.DataDialogs;
 using PulseOffice.UI.Controls.Panels;
+using PulseOffice.UI.Controls.Theming;
+using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI;
 
@@ -19,6 +22,10 @@ public sealed class PivotFieldSettingsPanel : UserControl
     [
         ValueDisplayMode.DifferenceFrom, ValueDisplayMode.PercentDifferenceFrom, ValueDisplayMode.RunningTotal,
         ValueDisplayMode.PercentRunningTotal, ValueDisplayMode.PercentOfParent,
+    ];
+    private static readonly HashSet<ValueDisplayMode> ItemModes =
+    [
+        ValueDisplayMode.DifferenceFrom, ValueDisplayMode.PercentDifferenceFrom,
     ];
 
     private readonly PivotLayoutModel _model;
@@ -122,24 +129,72 @@ public sealed class PivotFieldSettingsPanel : UserControl
     private void BuildValueEditor(int column, PivotField field)
     {
         var mode = Choice("pivot.settings.showAs", DisplayModes.Select(item => _kit["pivot.showAs." + Camel(item.ToString())]), Array.IndexOf(DisplayModes, field.DisplayMode));
-        var bases = _model.In(PivotArea.Row).Concat(_model.In(PivotArea.Column)).Select(index => _model.Columns[index]).ToList();
+        var baseColumns = _model.In(PivotArea.Row).Concat(_model.In(PivotArea.Column)).Where(index => !_model.IsCalculated(index)).ToList();
+        var bases = baseColumns.Select(index => _model.Columns[index]).ToList();
         var baseField = Choice("pivot.settings.baseField", bases, Math.Max(0, bases.IndexOf(field.BaseField ?? string.Empty)));
+        var baseItem = Choice("pivot.settings.baseItem", [], 0);
+        var itemKeys = new List<string>();
+
+        void FillBaseItems(PivotField current)
+        {
+            itemKeys.Clear();
+            var labels = new List<string> { _kit["pivot.baseItem.previous"], _kit["pivot.baseItem.next"] };
+            var chosenBase = baseField.Box.SelectedIndex;
+            if (chosenBase >= 0 && chosenBase < baseColumns.Count)
+            {
+                var source = _model.SettingsOf(baseColumns[chosenBase]);
+                foreach (var key in _previewer.Items(source).Take(MaximumItems))
+                {
+                    itemKeys.Add(key);
+                    labels.Add(key.Length == 0 ? _kit["pivot.blank"] : _previewer.ItemLabel(source, key));
+                }
+            }
+
+            var selected = current.BaseItem.Kind switch
+            {
+                PivotBaseItemKind.Next => 1,
+                PivotBaseItemKind.Named => itemKeys.IndexOf(current.BaseItem.Key ?? string.Empty) is var at and >= 0 ? 2 + at : 0,
+                _ => 0,
+            };
+            _filling = true;
+            baseItem.Box.ItemsSource = labels;
+            baseItem.Box.SelectedIndex = selected;
+            _filling = false;
+            baseItem.Box.IsEnabled = ItemModes.Contains(current.DisplayMode) && bases.Count > 0;
+        }
+
+        PivotBaseItem ChosenBaseItem() => baseItem.Box.SelectedIndex switch
+        {
+            1 => PivotBaseItem.Next,
+            var index and >= 2 when index - 2 < itemKeys.Count => PivotBaseItem.Named(itemKeys[index - 2]),
+            _ => PivotBaseItem.Previous,
+        };
+
         baseField.Box.IsEnabled = BasedModes.Contains(field.DisplayMode) && bases.Count > 0;
+        FillBaseItems(field);
         mode.Box.SelectionChanged += (_, _) =>
         {
             if (mode.Box.SelectedIndex < 0) return;
             var chosen = DisplayModes[mode.Box.SelectedIndex];
             baseField.Box.IsEnabled = BasedModes.Contains(chosen) && bases.Count > 0;
+            baseItem.Box.IsEnabled = ItemModes.Contains(chosen) && bases.Count > 0;
             _model.Configure(column, current => current with
             {
                 DisplayMode = chosen,
                 BaseField = BasedModes.Contains(chosen) && baseField.Box.SelectedIndex >= 0 && bases.Count > 0 ? bases[baseField.Box.SelectedIndex] : null,
+                BaseItem = ItemModes.Contains(chosen) ? ChosenBaseItem() : PivotBaseItem.Previous,
             });
         };
         baseField.Box.SelectionChanged += (_, _) =>
         {
             if (baseField.Box.SelectedIndex < 0 || bases.Count == 0) return;
-            _model.Configure(column, current => current with { BaseField = bases[baseField.Box.SelectedIndex] });
+            _model.Configure(column, current => current with { BaseField = bases[baseField.Box.SelectedIndex], BaseItem = PivotBaseItem.Previous });
+            FillBaseItems(_model.SettingsOf(column));
+        };
+        baseItem.Box.SelectionChanged += (_, _) =>
+        {
+            if (_filling || baseItem.Box.SelectedIndex < 0) return;
+            _model.Configure(column, current => current with { BaseItem = ChosenBaseItem() });
         };
 
         if (field.IsCalculated) BuildCalculation(column, field);
@@ -148,24 +203,47 @@ public sealed class PivotFieldSettingsPanel : UserControl
             _model.Configure(column, current => current with { NumberFormat = string.IsNullOrWhiteSpace(text) ? null : text.Trim() }));
         _editor.Children.Add(mode.Row);
         _editor.Children.Add(baseField.Row);
+        _editor.Children.Add(baseItem.Row);
         _editor.Children.Add(format);
     }
 
     private void BuildCalculation(int column, PivotField field)
     {
+        var problem = _kit.Note().Themed(TextBlock.ForegroundProperty, Palette.Keys.Danger);
+        problem.IsVisible = false;
+        CalculationProblem = problem;
+        void Report(string? key)
+        {
+            problem.Text = key is null ? string.Empty : _kit[key];
+            problem.IsVisible = key is not null;
+        }
+
         _editor.Children.Add(Text("pivot.calculated.name", field.SourceName, text =>
         {
             var name = text.Trim();
-            if (name.Length == 0 || _model.Columns.Contains(name, StringComparer.CurrentCultureIgnoreCase)) return;
+            if (name.Length == 0 || _model.NameTaken(name, column))
+            {
+                Report("pivot.calculated.badName");
+                return;
+            }
+            Report(null);
             _model.Configure(column, current => current with { SourceName = name });
         }));
         _editor.Children.Add(Text("pivot.calculated.formula", field.Formula, text =>
         {
             var formula = text.Trim();
-            if (formula.Length == 0) return;
+            if (formula.Length == 0 || !_previewer.IsFormulaValid(formula))
+            {
+                Report("pivot.calculated.badFormula");
+                return;
+            }
+            Report(null);
             _model.Configure(column, current => current with { Formula = formula.StartsWith('=') ? formula : "=" + formula });
         }));
+        _editor.Children.Add(problem);
     }
+
+    public TextBlock? CalculationProblem { get; private set; }
 
     private void BuildGrouping(int column, PivotField field)
     {
@@ -312,12 +390,12 @@ public sealed class PivotFieldSettingsPanel : UserControl
         }
 
         box.LostFocus += (_, _) => Commit();
-        box.KeyDown += (_, args) =>
+        box.AddHandler(InputElement.KeyDownEvent, (_, args) =>
         {
             if (args.Key != Key.Enter) return;
             Commit();
             args.Handled = true;
-        };
+        }, RoutingStrategies.Tunnel);
         return Row(labelKey, box);
     }
 

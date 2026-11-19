@@ -55,7 +55,9 @@ public sealed class TextFrameFitting(ITextFrameMeasure measure, ITextFrameResize
 
     private SlideElement FitShape(Presentation deck, Slide slide, ObjectElement placed, PulseOffice.Drawing.Shapes.ShapeObject shape)
     {
-        if (shapes.Height(shape, new DocumentSize(placed.Bounds.Width, placed.Bounds.Height), _fields.For(deck, slide)) is not { } height) return placed;
+        if (shapes.Size(shape, new DocumentSize(placed.Bounds.Width, placed.Bounds.Height), _fields.For(deck, slide)) is not { } size) return placed;
+        if (size.Width != placed.Bounds.Width) return placed with { Bounds = placed.Bounds with { Width = size.Width } };
+        var height = size.Height;
         var anchor = shape.Style.Text.Vertical switch
         {
             PulseOffice.Drawing.Shapes.TextVerticalPlacement.Top => TextAnchor.Top,

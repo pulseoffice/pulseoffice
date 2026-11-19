@@ -188,6 +188,25 @@ public sealed class Round193MediaSessionTests
     }
 
     [Fact]
+    public async Task Round274_the_show_opens_an_embedded_transition_sound_with_its_loop()
+    {
+        var playback = new FakePlayback(Ten);
+        var sessions = new ShowMediaSessions(
+            new DeckMediaFiles(new ExecutableFileTypes(), new NetworkSharePaths()), new Factory(playback), new MediaVolumeCurve());
+
+        using var session = await sessions.OpenSoundAsync(new EmbeddedSound("Media/chime.ogg", "audio/ogg", [1, 2]), loop: true);
+
+        Assert.NotNull(session);
+        Assert.Equal(".ogg", Assert.IsType<StreamMediaSource>(playback.Opened).Extension);
+        Assert.True(session.Settings.Loop);
+    }
+
+    [Fact]
+    public async Task Round274_an_empty_sound_opens_nothing() =>
+        Assert.Null(await new ShowMediaSessions(new DeckMediaFiles(new ExecutableFileTypes(), new NetworkSharePaths()),
+            new Factory(new FakePlayback(Ten)), new MediaVolumeCurve()).OpenSoundAsync(new EmbeddedSound("a.wav", "audio/wav", []), loop: false));
+
+    [Fact]
     public async Task Without_a_backend_or_a_readable_medium_the_show_falls_back_to_the_system_player()
     {
         var media = new MediaElement { Id = "m", Kind = MediaKind.Video, Data = [1], MimeType = "video/mp4" };

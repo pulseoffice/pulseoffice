@@ -76,9 +76,10 @@ public sealed class FolioEditor : IDisposable
     {
         get
         {
-            if (_layout is null) _layout = _engine.Layout(Document);
-            else if (_dirty) _layout = _engine.Relayout(Document, _layout);
+            var stale = _layout is null || _dirty;
+            _layout = _layout is null ? _engine.Layout(Document) : _dirty ? _engine.Relayout(Document, _layout) : _layout;
             _dirty = false;
+            if (stale && !ReadOnly()) _services.ShapeSizes.Settle(Document, _layout);
             return _layout;
         }
     }

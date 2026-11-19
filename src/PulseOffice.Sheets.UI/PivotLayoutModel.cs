@@ -96,6 +96,10 @@ public sealed class PivotLayoutModel
         return column >= 0 && column < _columns.Count ? _columns[column] : string.Empty;
     }
 
+    public bool NameTaken(string name, int except) =>
+        Enumerable.Range(0, _columns.Count + _calculated.Count)
+            .Any(column => column != except && string.Equals(NameOf(column), name, StringComparison.CurrentCultureIgnoreCase));
+
     public IReadOnlyList<int> In(PivotArea area) => _zones.TryGetValue(area, out var zone) ? zone : [];
 
     public PivotArea AreaOf(int column)

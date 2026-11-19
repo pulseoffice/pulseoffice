@@ -463,10 +463,10 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         while (columns.Count < width) columns.Add(new Twip(0));
         if (tableWidth?.Type?.Value == W.TableWidthUnitValues.Auto) PreferredCells(columns, cellWidths);
         if (columns.All(column => column.Value > 0)) return;
-        var total = tableWidth?.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(tableWidth.Width?.Value) ?? 0 : 0;
+        var total = GridTotal(columns, tableWidth);
         int Dxa(W.TableCellWidth cell) =>
             cell.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(cell.Width?.Value) ?? 0
-            : cell.Type?.Value == W.TableWidthUnitValues.Pct && total > 0 && values.Integer(cell.Width?.Value) is { } fiftieths ? (int)((long)fiftieths * total / 5000)
+            : cell.Type?.Value == W.TableWidthUnitValues.Pct && total > 0 && Percent(cell.Width?.Value) is { } percent ? (int)(percent * total / 100)
             : 0;
         foreach (var (column, span, cell) in cellWidths.Where(entry => entry.Column < columns.Count && columns[entry.Column].Value == 0).OrderBy(entry => entry.Span))
         {
@@ -478,17 +478,33 @@ public sealed class DocxBlockReader(IDirectFormatting formatting, DocxParagraphC
         }
         var missing = columns.Count(column => column.Value == 0);
         if (missing == 0) return;
-        var left = total - columns.Sum(column => column.Value);
+        var left = (tableWidth?.Type?.Value == W.TableWidthUnitValues.Dxa || tableWidth?.Type?.Value == W.TableWidthUnitValues.Pct ? total : 0) - columns.Sum(column => column.Value);
         var share = left > 0 ? values.Bounded(left / missing, 1, LargestLength) : Twip.FromCentimeters(2).Value;
         for (var index = 0; index < columns.Count; index++)
             if (columns[index].Value == 0) columns[index] = new Twip(share);
     }
 
+    private const int NominalTextWidth = 9360;
+
+    private int GridTotal(List<Twip> columns, W.TableWidth? tableWidth)
+    {
+        if (tableWidth?.Type?.Value == W.TableWidthUnitValues.Dxa) return values.Integer(tableWidth.Width?.Value) ?? 0;
+        if (tableWidth?.Type?.Value == W.TableWidthUnitValues.Pct) return Percent(tableWidth.Width?.Value) is { } percent and > 0 ? (int)(NominalTextWidth * Math.Clamp(percent, 1, 1000) / 100) : NominalTextWidth;
+        var known = columns.Sum(column => column.Value);
+        return known > 0 ? known : NominalTextWidth;
+    }
+
     private void PreferredCells(List<Twip> columns, List<(int Column, int Span, W.TableCellWidth Width)> cellWidths)
     {
-        foreach (var (column, _, cell) in cellWidths.Where(entry => entry.Span == 1 && entry.Column < columns.Count && entry.Width.Type?.Value == W.TableWidthUnitValues.Dxa))
-            if (columns[column].Value > 0 && values.Integer(cell.Width?.Value) is { } preferred && preferred > columns[column].Value)
-                columns[column] = new Twip(values.Bounded(preferred, 1, LargestLength));
+        var grid = GridTotal(columns, null);
+        foreach (var (column, _, cell) in cellWidths.Where(entry => entry.Span == 1 && entry.Column < columns.Count))
+        {
+            var preferred = cell.Type?.Value == W.TableWidthUnitValues.Dxa ? values.Integer(cell.Width?.Value)
+                : cell.Type?.Value == W.TableWidthUnitValues.Pct && Percent(cell.Width?.Value) is { } percent ? (int)(percent * grid / 100)
+                : null;
+            if (columns[column].Value > 0 && preferred is { } wanted && wanted > columns[column].Value)
+                columns[column] = new Twip(values.Bounded(wanted, 1, LargestLength));
+        }
     }
 
     private void PreferredWidth(TableBlock table, W.TableWidth? width)

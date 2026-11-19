@@ -276,8 +276,9 @@ internal sealed class OdpSettingsReader
             if (ids.Count > 0) deck.AddCustomShow(new CustomShow(name, ids));
         }
 
-        var start = (string?)settings.Attribute(Presentation + "start-page");
-        var from = start is null ? 0 : deck.Slides.ToList().FindIndex(s => s.Id == start);
+        var order = deck.Slides.Select((slide, position) => (slide.Id, position)).ToDictionary(entry => entry.Id, entry => entry.position + 1, StringComparer.Ordinal);
+        int Number(string? page) => page is not null && byPage.TryGetValue(page, out var id) && order.TryGetValue(id, out var number) ? number : 0;
+        var from = Number((string?)settings.Attribute(Presentation + "start-page"));
 
         deck.Setup = new ShowSetup
         {
@@ -286,8 +287,9 @@ internal sealed class OdpSettingsReader
                 ? ShowAdvanceMode.Manual
                 : ShowAdvanceMode.UseTimings,
             WithoutAnimation = (string?)settings.Attribute(Presentation + "animations") == "disabled",
-            FromSlide = from > 0 ? from + 1 : 0,
+            FromSlide = from > 1 ? from : 0,
         };
+        deck.Setup = new OdpShowSetupXml().Read(settings, deck.Setup, Number);
 
         if (new HeaderFooterXml().Parse(new HeaderFooterXml().Find(settings)) is { } headerFooter)
             deck.HeaderFooter = headerFooter;

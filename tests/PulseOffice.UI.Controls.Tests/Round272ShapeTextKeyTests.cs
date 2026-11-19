@@ -44,6 +44,21 @@ public sealed class Round272ShapeTextKeyTests
     }, CancellationToken.None);
 
     [Fact]
+    public Task Shift_tab_in_a_plain_paragraph_is_kept_by_the_editor_and_removes_a_tab_before_the_caret() => Session.Dispatch(() =>
+    {
+        var (editor, box) = Editing(Shape("U\tno"));
+        var key = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Tab, KeyModifiers = KeyModifiers.Shift, Source = box };
+        box.SelectionStart = box.SelectionEnd = box.CaretIndex = 2;
+
+        box.RaiseEvent(key);
+
+        Assert.True(key.Handled);
+        Assert.Equal("Uno", editor.Live!.Text);
+        Press(box, Key.Tab, 1, KeyModifiers.Shift);
+        Assert.Equal("Uno", editor.Live!.Text);
+    }, CancellationToken.None);
+
+    [Fact]
     public Task The_list_keys_walk_through_the_live_editor() => Session.Dispatch(() =>
     {
         var (editor, box) = Editing(Shape("Uno\n", [new ShapeListItem(), new ShapeListItem()]));

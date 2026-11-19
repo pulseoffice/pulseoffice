@@ -10,7 +10,8 @@ namespace PulseOffice.Presentations.UI;
 public sealed record ShowMediaOptions(
     Func<MediaElement, Task<MediaSession?>> Open,
     Func<MediaElement, Task> Fallback,
-    ITextCatalog Texts);
+    ITextCatalog Texts,
+    Func<string, bool, Task<MediaSession?>>? OpenSound = null);
 
 public sealed class ShowMediaStage
 {
@@ -19,6 +20,8 @@ public sealed class ShowMediaStage
     private readonly Dictionary<string, (MediaElement Element, MediaView View)> _playing = new(StringComparer.Ordinal);
     private readonly MediaAutoPlay _autoPlay = new();
     private int _generation;
+    private int _soundGeneration;
+    private MediaSession? _sound;
 
     public ShowMediaStage(ShowMediaOptions? options, Func<SlideElement, Rect> bounds)
     {
@@ -69,6 +72,35 @@ public sealed class ShowMediaStage
         _playing[media.Id] = (media, view);
         Layer.Children.Add(view);
         Place(media, view);
+        session.Start();
+    }
+
+    public bool PlaySound(string? path, bool loop)
+    {
+        if (string.IsNullOrEmpty(path) || _options?.OpenSound is not { } open) return false;
+        StopSound();
+        _ = StartSoundAsync(open, path, loop, _soundGeneration);
+        return true;
+    }
+
+    public void StopSound()
+    {
+        _soundGeneration++;
+        _sound?.Dispose();
+        _sound = null;
+    }
+
+    private async Task StartSoundAsync(Func<string, bool, Task<MediaSession?>> open, string path, bool loop, int generation)
+    {
+        var session = await open(path, loop).ConfigureAwait(true);
+        if (session is null) return;
+        if (generation != _soundGeneration)
+        {
+            session.Dispose();
+            return;
+        }
+
+        _sound = session;
         session.Start();
     }
 

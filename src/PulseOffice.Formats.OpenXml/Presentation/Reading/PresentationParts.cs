@@ -129,11 +129,19 @@ internal sealed class ShowPropertiesReader : IPptxPresentationPartReader
         if (part.PresentationPropertiesPart?.PresentationProperties?.GetFirstChild<P.ShowProperties>() is not { } show) return;
 
         var range = show.GetFirstChild<P.SlideRange>();
+        var custom = show.ChildElements.FirstOrDefault(child => child.LocalName == "custShow")?
+            .GetAttributes().FirstOrDefault(attribute => attribute.LocalName == "id").Value;
+        var customName = part.Presentation?.GetFirstChild<P.CustomShowList>()?.Elements<P.CustomShow>()
+            .FirstOrDefault(entry => entry.Id?.Value.ToString(CultureInfo.InvariantCulture) == custom)?.Name?.Value;
         var pen = show.GetFirstChild<P.PenColor>()?.GetFirstChild<DocumentFormat.OpenXml.Drawing.RgbColorModelHex>()?.Val?.Value;
 
         deck.Setup = new ShowSetup
         {
             Loop = show.Loop?.Value ?? false,
+            Kind = show.ChildElements.Any(child => child.LocalName == "kiosk") ? ShowKind.Kiosk
+                : show.ChildElements.Any(child => child.LocalName == "browse") ? ShowKind.Window
+                : ShowKind.Speaker,
+            CustomShowName = custom is null ? null : customName,
             WithoutAnimation = show.ShowAnimation?.Value == false,
             Advance = show.UseTimings?.Value == false ? ShowAdvanceMode.Manual : ShowAdvanceMode.UseTimings,
             FromSlide = range?.Start?.Value is { } start ? (int)Math.Min(start, int.MaxValue) : 0,

@@ -17,7 +17,7 @@ public sealed class LedgerShapeFitting(IShapeTextFit fit) : ILedgerShapeFitting
     public PlacedObject Fit(PlacedObject placed)
     {
         ArgumentNullException.ThrowIfNull(placed);
-        if (placed.Content is not PulseOffice.Drawing.Shapes.ShapeObject shape || fit.Height(shape, placed.Size) is not { } height) return placed;
-        return height == placed.Size.Height ? placed : placed with { Size = new DocumentSize(placed.Size.Width, height) };
+        if (placed.Content is not PulseOffice.Drawing.Shapes.ShapeObject shape || fit.Size(shape, placed.Size) is not { } size) return placed;
+        return size == placed.Size ? placed : placed with { Size = size };
     }
 }
