@@ -45,6 +45,16 @@ public sealed class Round315SectionColumnTests
     }
 
     [Fact]
+    public void Word_page_columns_are_marked_to_balance_before_a_section()
+    {
+        var read = Read("<w:p><w:pPr><w:sectPr><w:cols w:num=\"2\" w:space=\"720\"/></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:type w:val=\"continuous\"/></w:sectPr>");
+
+        var page = read.Styles.Page.Find(read.InitialPageStyle)!;
+        Assert.True(page.Columns.BalancedBeforeSection);
+        Assert.Single(read.Body.Blocks.OfType<SectionBlock>());
+    }
+
+    [Fact]
     public void A_styled_column_separator_is_declared_lost_in_docx()
     {
         var document = new TextDocumentFactory(new DefaultStyleSheetFactory()).Create();

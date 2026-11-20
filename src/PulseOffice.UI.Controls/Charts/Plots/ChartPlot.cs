@@ -24,6 +24,33 @@ public sealed record ChartDataLabel(Point Anchor, double Value)
     public int Index { get; init; } = -1;
 
     public double Across { get; init; } = double.NaN;
+
+    public ChartLabelPlacement Placement { get; init; } = ChartLabelPlacement.Above;
+
+    public Point? Middle { get; init; }
+}
+
+public enum ChartLabelPlacement
+{
+    Above,
+    Below,
+    After,
+    Before,
+    Centre,
+}
+
+public sealed class ChartLabelLayout
+{
+    private const double Gap = 2;
+
+    public Point Origin(ChartDataLabel label, Size size) => label.Placement switch
+    {
+        ChartLabelPlacement.Below => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y + Gap),
+        ChartLabelPlacement.After => new Point(label.Anchor.X + Gap, label.Anchor.Y - size.Height / 2),
+        ChartLabelPlacement.Before => new Point(label.Anchor.X - size.Width - Gap, label.Anchor.Y - size.Height / 2),
+        ChartLabelPlacement.Centre => new Point((label.Middle ?? label.Anchor).X - size.Width / 2, (label.Middle ?? label.Anchor).Y - size.Height / 2),
+        _ => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y - size.Height - Gap),
+    };
 }
 
 public interface IChartPlot
@@ -110,6 +137,11 @@ public abstract class ChartPlotBase : IChartPlot
 
     protected IBrush Brush(ChartData data, int index, double opacity = 1) =>
         new SolidColorBrush(Colour(data, index), opacity);
+
+    protected IBrush PointBrush(ChartDefinition definition, ChartData data, int series, int point) =>
+        definition.PointFormat(series, point).ColorHex is { } hex && Color.TryParse(hex, out var colour)
+            ? new SolidColorBrush(colour)
+            : Brush(data, series);
 
     protected Color Colour(ChartData data, int index) =>
         ChartColours.Resolve(index < data.Series.Count ? data.Series[index].ColorHex : null, index);

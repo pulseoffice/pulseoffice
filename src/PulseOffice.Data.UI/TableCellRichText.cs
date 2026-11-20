@@ -28,6 +28,7 @@ public sealed class TableCellRichText(ITableCellTextStyles styles) : ITableCellR
                 {
                     CellHorizontalAlign.Center => TextAlignment.Center,
                     CellHorizontalAlign.Right => TextAlignment.Right,
+                    CellHorizontalAlign.Justify => TextAlignment.Justify,
                     _ => TextAlignment.Left,
                 },
             };

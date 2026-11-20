@@ -52,6 +52,7 @@ internal sealed class OdfTableCellLooks
             {
                 "center" => CellHorizontalAlign.Center,
                 "end" or "right" => CellHorizontalAlign.Right,
+                "justify" => CellHorizontalAlign.Justify,
                 "start" or "left" => CellHorizontalAlign.Left,
                 _ => null,
             },
@@ -78,6 +79,7 @@ internal sealed class OdfTableCellLooks
             {
                 CellHorizontalAlign.Center => "center",
                 CellHorizontalAlign.Right => "end",
+                CellHorizontalAlign.Justify => "justify",
                 _ => "start",
             }));
 

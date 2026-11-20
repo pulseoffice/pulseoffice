@@ -14398,3 +14398,22 @@ not done and stays queued. Log: docs/deep-audit/round-307-shell-tear-off.md.
 - Inserted charts detect header row, category column and series orientation from the selection as Excel does, take the
   current region of a single cell, show the legend by series count (always for pie and doughnut), and keep a scatter's
   numeric first column as X. Log: docs/deep-audit/round-317-ledger-chart-creation.md.
+### Round 318 (2026-11-20): chart point formats
+- One point's colour or explosion is now in the model and crosses XLSX (`c:dPt`) and ODS (`chart:data-point`), with
+  editor and drawing support; XLSX keeps radar and marker scatter series colours, series colours beside point
+  formats, and combo line series ordering. Log: docs/deep-audit/round-318-chart-point-formats.md.
+### Round 319 (2026-11-20): Ledger chart rendering and editing
+- Stacked areas fill as separate bands, data labels follow Excel's default placement (centred in stacked segments and
+  pie slices, outside the end of negative columns and of bars), combination chart labels sit on their columns and line,
+  pie labels can show category and percent, radar rings follow the value scale with labels, 100% stacked axes read in
+  percent, objects can no longer be moved before A1, and the editor disables axis fields for types without axes.
+  Log: docs/deep-audit/round-319-ledger-chart-rendering.md.
+### Round 320 (2026-11-20): Folio columns and pages leftovers, Deck justified cells
+- Word page columns balance before a continuous section (marked from DOCX, carried in ODT); the shared column editor
+  edits the separator's style, width, colour, height and position; ODT next-column sections also write a native
+  column break on their first paragraph; Deck table cells keep justified alignment. Log:
+  docs/deep-audit/round-320-folio-columns-pages.md.
+### Round 321 (2026-11-20): Shell leftovers and shape text alignment callers
+- Activating a window lets its document view claim the shared Ledger, Folio or Deck context; a frozen status bar keeps
+  background activity progress live; a torn-off window closed maximized reopens maximized; shape text `ToRich` callers
+  checked against per-paragraph alignment. Log: docs/deep-audit/round-321-shell-shape-alignment.md.

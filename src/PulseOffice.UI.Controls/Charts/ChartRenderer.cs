@@ -83,6 +83,9 @@ public sealed class ChartRenderer
                 new Rect(bounds.X / scale, bounds.Y / scale, bounds.Width / scale, bounds.Height / scale), mode);
     }
 
+    public bool DrawsAxes(ChartType type) =>
+        (_plots.FirstOrDefault(candidate => candidate.Handles(type)) ?? _fallback).DrawsAxes;
+
     private ChartDefinition Adapt(ChartDefinition definition, ChartRenderMode mode) =>
         mode == ChartRenderMode.Thumbnail
             ? definition with { ChartTitle = null, CategoryAxisTitle = null, ValueAxisTitle = null, Legend = LegendPosition.None, ShowDataLabels = false }
@@ -125,7 +128,7 @@ public sealed class ChartRenderer
         {
             var values = painter.ValueAxis(frame) ?? _axisScaling.Apply(DefaultScale(data, plot, horizontal), definition.ValueAxis);
             categoryLine = _marks.CategoryAxisLine(values, definition.ValueAxis, horizontal ? plot.X : plot.Bottom);
-            scene.Axes.Values(context, values, plot, horizontal, definition.ShowGridLines, definition.ValueAxis.NumberFormat);
+            scene.Axes.Values(context, values, plot, horizontal, definition.ShowGridLines, ValueFormat(definition, definition.ValueAxis));
             scene.Axes.MinorTicks(context, _marks.MinorTicks(values, definition.ValueAxis), values, plot, horizontal, opposite: false);
             var across = painter.CategoryValueAxis(frame);
             if (across is not null)
@@ -135,7 +138,7 @@ public sealed class ChartRenderer
             }
             if (painter.SecondaryValueAxis(frame) is { } secondary)
             {
-                scene.Axes.Secondary(context, secondary, plot, definition.SecondaryValueAxis.NumberFormat, horizontal);
+                scene.Axes.Secondary(context, secondary, plot, ValueFormat(definition, definition.SecondaryValueAxis), horizontal);
                 scene.Axes.MinorTicks(context, _marks.MinorTicks(secondary, definition.SecondaryValueAxis), secondary, plot, horizontal, opposite: true);
             }
             if (across is null && painter.HasCategoryAxis(definition.Type))
@@ -173,6 +176,8 @@ public sealed class ChartRenderer
 
     private readonly ChartAnalysisPainter _analysis = new();
 
+    private readonly Plots.ChartLabelLayout _labelLayout = new();
+
     private bool HasAnalysis(ChartDefinition definition, ChartData data) =>
         Enumerable.Range(0, data.Series.Count).Any(series => definition.SeriesFormat(series) is { Trendline: not null } or { ErrorBars: not null } or { XErrorBars: not null });
 
@@ -197,7 +202,7 @@ public sealed class ChartRenderer
             var caption = LabelText(text, definition, data, label);
             if (caption.Length == 0) continue;
             var layout = text.Layout(caption, text.Ink.Text, 9);
-            var origin = new Point(label.Anchor.X - layout.Width / 2, label.Anchor.Y - layout.Height - 2);
+            var origin = _labelLayout.Origin(label, new Size(layout.Width, layout.Height));
             context.FillRectangle(text.Ink.Backdrop, new Rect(origin, new Size(layout.Width, layout.Height)));
             context.DrawText(layout, origin);
         }
@@ -229,6 +234,14 @@ public sealed class ChartRenderer
         var categories = Categories(data, plot, horizontal, reversed);
         return categories.Boundary(_marks.CategoryCrossing(categories.Count, definition.CategoryAxis));
     }
+
+    public const string PercentStackFormat = "0\"%\"";
+
+    public string? ValueFormat(ChartDefinition definition, ChartAxisScale axis) =>
+        axis.NumberFormat is { Length: > 0 } format ? format
+        : definition.Type is ChartType.PercentStackedColumn or ChartType.PercentStackedBar or ChartType.PercentStackedLine or ChartType.PercentStackedArea
+            ? PercentStackFormat
+            : null;
 
     private bool Has(string? text) => text is { Length: > 0 };
 

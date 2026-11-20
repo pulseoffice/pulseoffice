@@ -129,6 +129,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
     {
         CellHorizontalAlign.Center => TextHorizontalPlacement.Centre,
         CellHorizontalAlign.Right => TextHorizontalPlacement.Right,
+        CellHorizontalAlign.Justify => TextHorizontalPlacement.Justify,
         _ => TextHorizontalPlacement.Left,
     };
 
@@ -136,6 +137,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
     {
         TextHorizontalPlacement.Centre => CellHorizontalAlign.Center,
         TextHorizontalPlacement.Right => CellHorizontalAlign.Right,
+        TextHorizontalPlacement.Justify => CellHorizontalAlign.Justify,
         _ => CellHorizontalAlign.Left,
     };
 
@@ -153,12 +155,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
             Italic = false,
             Underline = false,
             ColorHex = look.Look.TextHex ?? DefaultInk,
-            Horizontal = first switch
-            {
-                CellHorizontalAlign.Center => TextHorizontalPlacement.Centre,
-                CellHorizontalAlign.Right => TextHorizontalPlacement.Right,
-                _ => TextHorizontalPlacement.Left,
-            },
+            Horizontal = Placement(first),
             Vertical = look.Vertical switch
             {
                 CellVerticalAlign.Center => TextVerticalPlacement.Middle,

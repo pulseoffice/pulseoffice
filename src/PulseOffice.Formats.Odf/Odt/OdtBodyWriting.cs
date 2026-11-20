@@ -805,11 +805,22 @@ internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec in
             section.ProtectionKey is { Length: 32 } ? new XAttribute(Text + "protection-key-digest-algorithm", "http://www.w3.org/2000/09/xmldsig#sha256") : null,
             section.Condition is { } condition ? new XAttribute(Text + "condition", condition) : null,
             section.StartsInNextColumn ? new XAttribute(Pt + "starts-in-next-column", "true") : null,
+            section.StartsInNextColumn && NeedsColumnBreak(section) ? new XAttribute(Pt + "next-column-break", "written") : null,
             section.Hidden ? new XAttribute(Text + "display", "none") : section.Condition is not null ? new XAttribute(Text + "display", "condition") : null);
         if (section.LinkedFile is { } linked)
             element.Add(new XElement(Text + "section-source", new XAttribute(Xlink + "href", new LinkedFiles().ToPackageHref(linked)), new XAttribute(Xlink + "type", "simple")));
-        blocks.Write(element, section.Content.Blocks, sink, session);
+        blocks.Write(element, section.StartsInNextColumn && NeedsColumnBreak(section) ? WithColumnBreak(section.Content.Blocks) : section.Content.Blocks, sink, session);
         return element;
+    }
+
+    private bool NeedsColumnBreak(SectionBlock section) =>
+        section.Content.Blocks.FirstOrDefault() is ParagraphBlock { Content: { ColumnBreakBefore: not true, PageBreakBefore: not true } };
+
+    private IReadOnlyList<Block> WithColumnBreak(IReadOnlyList<Block> blocks)
+    {
+        var first = (ParagraphBlock)blocks[0];
+        var broken = new ParagraphBlock(first.Id, first.Content with { ColumnBreakBefore = true }) { Marks = first.Marks };
+        return [broken, .. blocks.Skip(1)];
     }
 }
 

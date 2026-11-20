@@ -57,7 +57,7 @@ public sealed class LinePlot : ChartPlotBase
         {
             var own = ScaleOf(frame, series, scale, secondary);
             foreach (var points in Runs(data.Series[series], categories, own, type is ChartType.SteppedLine))
-                DrawRun(frame, points, series, own, data, filled, type);
+                DrawRun(frame, points, series, data, filled ? AreaFloor(frame, data, series, categories, own, points) : null, type);
         }
 
         if (frame.Definition.Type is ChartType.ControlChart) DrawControlLimits(frame, data, scale);
@@ -79,9 +79,47 @@ public sealed class LinePlot : ChartPlotBase
                     { Series = series, Index = index, Across = index + 1 };
     }
 
-    private void DrawRun(ChartFrame frame, List<Point> points, int series, PlotScale scale, ChartData data, bool filled, ChartType type)
+    public IReadOnlyList<Point> AreaOutline(ChartFrame frame, int series)
     {
-        if (filled) Fill(frame, points, series, scale, data);
+        var data = Prepared(frame);
+        var scale = PrimaryScale(frame, data, Splits(frame));
+        var own = ScaleOf(frame, series, scale, SecondaryScale(frame, data, Splits(frame)));
+        var categories = Categories(frame, data);
+        var points = Runs(data.Series[series], categories, own, false).FirstOrDefault() ?? [];
+        return points.Count == 0 ? [] : [.. points, .. AreaFloor(frame, data, series, categories, own, points)];
+    }
+
+    private List<Point> AreaFloor(ChartFrame frame, ChartData data, int series, CategoryScale categories, PlotScale scale, List<Point> points)
+    {
+        var below = Stacked(frame.Definition.Type) ? Beneath(frame, series) : -1;
+        if (below >= 0 && data.Series[below].Values.Count >= data.Series[series].Values.Count)
+        {
+            var lower = Runs(data.Series[below], categories, scale, false).FirstOrDefault();
+            if (lower is not null && lower.Count == points.Count)
+            {
+                lower.Reverse();
+                return lower;
+            }
+        }
+
+        var baseline = scale.Position(Math.Clamp(0, Math.Min(scale.Minimum, scale.Maximum), Math.Max(scale.Minimum, scale.Maximum)));
+        return [new Point(points[^1].X, baseline), new Point(points[0].X, baseline)];
+    }
+
+    private int Beneath(ChartFrame frame, int series)
+    {
+        var split = Splits(frame);
+        var side = split && frame.Definition.SeriesFormat(series).SecondaryAxis;
+        for (var candidate = series - 1; candidate >= 0; candidate--)
+            if ((split && frame.Definition.SeriesFormat(candidate).SecondaryAxis) == side) return candidate;
+        return -1;
+    }
+
+    private bool Stacked(ChartType type) => type is ChartType.StackedArea or ChartType.PercentStackedArea;
+
+    private void DrawRun(ChartFrame frame, List<Point> points, int series, ChartData data, List<Point>? floor, ChartType type)
+    {
+        if (floor is not null) Fill(frame, points, floor, series, data);
 
         var geometry = new StreamGeometry();
 
@@ -123,19 +161,15 @@ public sealed class LinePlot : ChartPlotBase
         }
     }
 
-    private void Fill(
-        ChartFrame frame, IReadOnlyList<Point> points, int series, PlotScale scale, ChartData data)
+    private void Fill(ChartFrame frame, IReadOnlyList<Point> points, IReadOnlyList<Point> floor, int series, ChartData data)
     {
         var geometry = new StreamGeometry();
-        var baseline = scale.Position(Math.Max(0, scale.Minimum));
 
         using (var sink = geometry.Open())
         {
-            sink.BeginFigure(new Point(points[0].X, baseline), true);
-
-            foreach (var point in points) sink.LineTo(point);
-
-            sink.LineTo(new Point(points[^1].X, baseline));
+            sink.BeginFigure(points[0], true);
+            foreach (var point in points.Skip(1)) sink.LineTo(point);
+            foreach (var point in floor) sink.LineTo(point);
             sink.EndFigure(true);
         }
 

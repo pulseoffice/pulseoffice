@@ -206,6 +206,7 @@ internal sealed class PptxTableStyleResolver(IDrawingColorReader colours, Drawin
         var align = paragraph?.ParagraphProperties?.Alignment?.Value;
         if (align == D.TextAlignmentTypeValues.Center) look = look with { Horizontal = CellHorizontalAlign.Center };
         else if (align == D.TextAlignmentTypeValues.Right) look = look with { Horizontal = CellHorizontalAlign.Right };
+        else if (align == D.TextAlignmentTypeValues.Justified) look = look with { Horizontal = CellHorizontalAlign.Justify };
         return look;
     }
 

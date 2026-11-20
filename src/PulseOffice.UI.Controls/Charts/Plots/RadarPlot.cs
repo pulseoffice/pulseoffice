@@ -30,19 +30,26 @@ public sealed class RadarPlot : ChartPlotBase
 
         var centre = frame.Plot.Center;
         var spokes = new RadarSpokes(centre, count, frame.Definition.CategoryAxis.Reversed);
-        var radius = Math.Min(frame.Plot.Width, frame.Plot.Height) / 2 * 0.85;
-
-        var values = frame.Data.Series.SelectMany(series => series.Values).Where(double.IsFinite).ToList();
-        if (values.Count == 0) return;
-
-        var scale = PlotScale.Nice(Math.Min(0, values.Min()), Math.Max(0, values.Max()), 0, radius);
+        var radius = Radius(frame);
+        if (RadialScale(frame) is not { } scale) return;
 
         var web = new Pen(frame.Marks.Grid);
 
-        for (var ring = 1; ring <= 4; ring++)
+        foreach (var ring in RingValues(frame))
         {
-            var geometry = Polygon(spokes, radius * ring / 4);
-            frame.Context.DrawGeometry(null, web, geometry);
+            var reach = scale.Position(ring);
+            if (reach > 0) frame.Context.DrawGeometry(null, web, Polygon(spokes, reach));
+            Label(frame, ring.ToString(Math.Abs(ring) >= 1000 ? "#,##0" : "0.##", frame.Formatting), new Point(centre.X + 3, centre.Y - reach - 11), 8);
+        }
+
+        for (var index = 0; index < count; index++)
+        {
+            var caption = index < frame.Data.Categories.Count ? frame.Data.Categories[index] : (index + 1).ToString(frame.Formatting);
+            var corner = spokes.Corner(radius + 8, index);
+            var layout = new FormattedText(caption, frame.Formatting, FlowDirection.LeftToRight, Typeface.Default, 9, frame.LabelInk);
+            var x = corner.X < centre.X - 1 ? corner.X - layout.Width : corner.X > centre.X + 1 ? corner.X : corner.X - layout.Width / 2;
+            var y = corner.Y < centre.Y - 1 ? corner.Y - layout.Height : corner.Y > centre.Y + 1 ? corner.Y : corner.Y - layout.Height / 2;
+            frame.Context.DrawText(layout, new Point(x, y));
         }
 
         for (var index = 0; index < count; index++)
@@ -75,6 +82,17 @@ public sealed class RadarPlot : ChartPlotBase
                 _strokes.Marker(frame.Context, Brush(frame.Data, order), format, spokes.Corner(scale.Position(Value(series, index)), index), 2.5);
         }
     }
+
+    private double Radius(ChartFrame frame) => Math.Min(frame.Plot.Width, frame.Plot.Height) / 2 * 0.75;
+
+    public PlotScale? RadialScale(ChartFrame frame)
+    {
+        var values = frame.Data.Series.SelectMany(series => series.Values).Where(double.IsFinite).ToList();
+        return values.Count == 0 ? null : Scaled(PlotScale.Nice(Math.Min(0, values.Min()), Math.Max(0, values.Max()), 0, Radius(frame)), frame.Definition.ValueAxis);
+    }
+
+    public IReadOnlyList<double> RingValues(ChartFrame frame) =>
+        RadialScale(frame) is { } scale ? scale.Divisions(6) : [];
 
     private void DrawParallel(ChartFrame frame)
     {

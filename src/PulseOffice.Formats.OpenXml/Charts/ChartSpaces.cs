@@ -113,6 +113,9 @@ internal sealed class ChartPalette
             : new C.ChartShapeProperties(new A.SolidFill(new A.RgbColorModelHex { Val = hex }));
     }
 
+    public bool IsAutomatic(int index, string colour) =>
+        index >= 0 && string.Equals(colour.TrimStart('#'), _colours[index % _colours.Length], StringComparison.OrdinalIgnoreCase);
+
     public IEnumerable<C.DataPoint> Points(int count) =>
         Enumerable.Range(0, count).Select(i => new C.DataPoint(
             new C.Index { Val = (uint)i }, new C.Bubble3D { Val = false }, Fill(i)));
@@ -333,7 +336,7 @@ internal sealed class ExplicitSeriesColours
 {
     public IReadOnlyList<string?>? Explicit(IReadOnlyList<OpenXmlCompositeElement?> slots)
     {
-        if (slots.Any(element => element?.Elements<C.DataPoint>().Any() == true)) return null;
+        if (slots.Any(element => element is C.PieChartSeries)) return null;
         var colours = slots.Select(Colour).ToList();
         return colours.Any(colour => colour is not null) ? colours : null;
     }
@@ -342,9 +345,11 @@ internal sealed class ExplicitSeriesColours
     {
         var properties = series?.GetFirstChild<C.ChartShapeProperties>();
         if (properties is null) return null;
-        var line = series is C.LineChartSeries or C.ScatterChartSeries;
+        var line = series is C.LineChartSeries or C.ScatterChartSeries
+            || series is C.RadarChartSeries && (series.Parent as C.RadarChart)?.GetFirstChild<C.RadarStyle>()?.Val?.Value != C.RadarStyleValues.Filled;
         var fill = line
             ? properties.GetFirstChild<A.Outline>()?.GetFirstChild<A.SolidFill>()
+                ?? series?.GetFirstChild<C.Marker>()?.GetFirstChild<C.ChartShapeProperties>()?.GetFirstChild<A.SolidFill>()
             : properties.GetFirstChild<A.SolidFill>();
         return fill?.GetFirstChild<A.RgbColorModelHex>()?.Val?.Value is { Length: 6 } hex ? "#" + hex.ToUpperInvariant() : null;
     }
@@ -465,7 +470,8 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
         if (extra.Count == 0) return series;
         var seriesKinds = series.Select(element => element.GetType()).ToHashSet();
         return [.. series.Concat(extra.SelectMany(group => group.ChildElements.OfType<OpenXmlCompositeElement>().Where(child => seriesKinds.Contains(child.GetType()))))
-            .OrderBy(element => element.GetFirstChild<C.Index>()?.Val?.Value ?? uint.MaxValue)];
+            .OrderBy(element => element is C.LineChartSeries && element.Parent is C.LineChart ? 1 : 0)
+            .ThenBy(element => element.GetFirstChild<C.Index>()?.Val?.Value ?? uint.MaxValue)];
     }
 
     private IReadOnlyList<uint> PrimaryAxes(C.PlotArea plot) =>

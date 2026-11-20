@@ -122,6 +122,8 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
 
     private readonly SeriesSourceAddresses _addresses = new();
 
+    private readonly OdfChartPointFormats _points = new();
+
     private readonly (MarkerSymbol Symbol, string Name)[] _symbols =
     [
         (MarkerSymbol.Square, "square"),
@@ -221,6 +223,7 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
         }
         if (format.ErrorBars is { } bars) yield return Indicator(seriesStyle + "-error", "y", bars, styles);
         if (format.XErrorBars is { } across) yield return Indicator(seriesStyle + "-error-x", "x", across, styles);
+        foreach (var point in _points.Write(seriesStyle, format.Points, styles)) yield return point;
     }
 
     private XElement Indicator(string name, string dimension, ChartErrorBars bars, IList<XElement> styles)
@@ -342,6 +345,7 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
             XErrorBars = series.Elements(Chart + "error-indicator").FirstOrDefault(indicator => (string?)indicator.Attribute(Chart + "dimension") == "x") is { } across
                 ? Errors(named((string?)across.Attribute(Chart + "style-name"))?.Element(Style + "chart-properties"))
                 : null,
+            Points = _points.Read(series, named),
         };
         return format.IsPlain ? ChartSeriesFormat.Plain : format;
     }
@@ -396,6 +400,59 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
         double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) ? value : null;
 
     private string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+}
+
+internal sealed class OdfChartPointFormats : OdfChartXml
+{
+    private const int MostPoints = 100_000;
+
+    public IEnumerable<XElement> Write(string seriesStyle, ChartPointFormats points, IList<XElement> styles)
+    {
+        var next = 0;
+        foreach (var point in points.Items.Where(item => item.Index >= 0 && item.Index < MostPoints))
+        {
+            if (point.Index > next) yield return Repeated(point.Index - next);
+            var name = $"{seriesStyle}-point-{point.Index + 1}";
+            var graphic = new XElement(Style + "graphic-properties");
+            if (point.ColorHex is { Length: 7 } colour && colour[0] == '#')
+                graphic.Add(new XAttribute(Draw + "fill", "solid"), new XAttribute(Draw + "fill-color", colour.ToLowerInvariant()),
+                    new XAttribute(Svg + "stroke-color", colour.ToLowerInvariant()));
+            var properties = new XElement(Style + "chart-properties");
+            if (point.ExplosionPercent > 0)
+                properties.Add(new XAttribute(Chart + "pie-offset", point.ExplosionPercent.ToString(CultureInfo.InvariantCulture)));
+            styles.Add(new XElement(Style + "style", new XAttribute(Style + "name", name), new XAttribute(Style + "family", "chart"),
+                properties.HasAttributes ? properties : null, graphic.HasAttributes ? graphic : null));
+            yield return new XElement(Chart + "data-point", new XAttribute(Chart + "style-name", name));
+            next = point.Index + 1;
+        }
+    }
+
+    public ChartPointFormats Read(XElement series, Func<string?, XElement?> named)
+    {
+        var formats = new List<ChartPointFormat>();
+        var index = 0;
+        foreach (var element in series.Elements(Chart + "data-point"))
+        {
+            if (index >= MostPoints) break;
+            var repeated = int.TryParse((string?)element.Attribute(Chart + "repeated"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
+                ? Math.Clamp(count, 1, MostPoints) : 1;
+            var style = named((string?)element.Attribute(Chart + "style-name"));
+            var graphic = style?.Element(Style + "graphic-properties");
+            var fill = (string?)graphic?.Attribute(Draw + "fill") == "none" ? null
+                : (string?)graphic?.Attribute(Draw + "fill-color") ?? (string?)graphic?.Attribute(Svg + "stroke-color");
+            var colour = fill is { Length: 7 } && fill[0] == '#' && fill.Skip(1).All(char.IsAsciiHexDigit) ? fill.ToUpperInvariant() : null;
+            var explosion = int.TryParse((string?)style?.Element(Style + "chart-properties")?.Attribute(Chart + "pie-offset"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var offset)
+                ? offset : 0;
+            if (colour is not null || explosion > 0)
+                for (var copy = 0; copy < repeated && index + copy < MostPoints; copy++)
+                    formats.Add(new ChartPointFormat(index + copy) { ColorHex = colour, ExplosionPercent = Math.Min(explosion, ChartPointFormats.MaximumExplosion) });
+            index += repeated;
+        }
+        return formats.Count == 0 ? ChartPointFormats.None : new ChartPointFormats(formats);
+    }
+
+    private XElement Repeated(int count) =>
+        count == 1 ? new XElement(Chart + "data-point") : new XElement(Chart + "data-point", new XAttribute(Chart + "repeated", count.ToString(CultureInfo.InvariantCulture)));
 }
 
 internal sealed class OdfChartExtensions

@@ -153,6 +153,8 @@ internal sealed class OoxmlSeriesFormats
 
     private readonly OoxmlRangeFormulas _formulas = new();
 
+    private readonly OoxmlPointFormats _points = new();
+
     private readonly (MarkerSymbol Symbol, C.MarkerStyleValues Value)[] _markers =
     [
         (MarkerSymbol.None, C.MarkerStyleValues.None),
@@ -184,6 +186,7 @@ internal sealed class OoxmlSeriesFormats
         if (format.IsPlain) return;
         Line(series, format);
         if (format.Marker != MarkerSymbol.Automatic && CarriesMarkers(series)) Marker(series, format);
+        _points.Apply(series, format.Points);
         if (!CarriesTrendlines(series)) return;
         if (format.Trendline is { } trendline) BeforeData(series, Trendline(trendline));
         var directed = series is C.ScatterChartSeries or C.BubbleChartSeries;
@@ -325,6 +328,7 @@ internal sealed class OoxmlSeriesFormats
             XErrorBars = series is C.ScatterChartSeries or C.BubbleChartSeries
                 && series.Elements<C.ErrorBars>().FirstOrDefault(bars => bars.GetFirstChild<C.ErrorDirection>()?.Val?.Value == C.ErrorBarDirectionValues.X) is { } across
                     ? ErrorBars(across) : null,
+            Points = _points.Read(series),
         };
         return format.IsPlain ? ChartSeriesFormat.Plain : format;
     }
@@ -374,5 +378,88 @@ internal sealed class OoxmlSeriesFormats
             Plus = kind == ErrorBarKind.Custom ? CustomValues(element.GetFirstChild<C.Plus>()) : null,
             Minus = kind == ErrorBarKind.Custom ? CustomValues(element.GetFirstChild<C.Minus>()) : null,
         };
+    }
+}
+
+internal sealed class OoxmlPointFormats
+{
+    private readonly ChartPalette _palette = new();
+
+    public void Apply(OpenXmlCompositeElement series, ChartPointFormats points)
+    {
+        foreach (var point in points.Items)
+        {
+            var element = Find(series, point.Index) ?? Insert(series, point.Index);
+            if (point.ExplosionPercent > 0)
+            {
+                element.RemoveAllChildren<C.Explosion>();
+                var explosion = new C.Explosion { Val = (uint)point.ExplosionPercent };
+                var before = (OpenXmlElement?)element.GetFirstChild<C.Bubble3D>() ?? (OpenXmlElement?)element.GetFirstChild<C.Marker>() ?? (OpenXmlElement?)element.GetFirstChild<C.InvertIfNegative>() ?? element.GetFirstChild<C.Index>();
+                if (before is not null) before.InsertAfterSelf(explosion);
+                else element.PrependChild(explosion);
+            }
+            if (point.ColorHex is { } colour && Hex(colour) is { } hex)
+            {
+                element.RemoveAllChildren<C.ChartShapeProperties>();
+                var properties = Lined(series)
+                    ? new C.ChartShapeProperties(new A.Outline(new A.SolidFill(new A.RgbColorModelHex { Val = hex })) { Width = 28575 })
+                    : new C.ChartShapeProperties(new A.SolidFill(new A.RgbColorModelHex { Val = hex }));
+                var anchor = element.ChildElements.LastOrDefault(child => child is C.Index or C.InvertIfNegative or C.Marker or C.Bubble3D or C.Explosion);
+                if (anchor is not null) anchor.InsertAfterSelf(properties);
+                else element.PrependChild(properties);
+            }
+        }
+    }
+
+    public ChartPointFormats Read(OpenXmlCompositeElement series)
+    {
+        var formats = new SortedDictionary<int, ChartPointFormat>();
+        foreach (var element in series.Elements<C.DataPoint>())
+        {
+            if (element.Index?.Val?.Value is not { } index || index > int.MaxValue) continue;
+            var properties = element.GetFirstChild<C.ChartShapeProperties>();
+            var fill = properties?.GetFirstChild<A.SolidFill>() ?? properties?.GetFirstChild<A.Outline>()?.GetFirstChild<A.SolidFill>();
+            var hex = fill?.GetFirstChild<A.RgbColorModelHex>()?.Val?.Value;
+            var colour = hex is { Length: 6 } && hex.All(char.IsAsciiHexDigit) ? "#" + hex.ToUpperInvariant() : null;
+            if (colour is not null && series is C.PieChartSeries && _palette.IsAutomatic((int)index, colour)) colour = null;
+            var explosion = element.GetFirstChild<C.Explosion>()?.Val?.Value is { } value ? (int)Math.Min(value, (uint)ChartPointFormats.MaximumExplosion) : 0;
+            var point = new ChartPointFormat((int)index) { ColorHex = colour, ExplosionPercent = explosion };
+            if (point.IsPlain) formats.Remove((int)index);
+            else formats[(int)index] = point;
+        }
+        return formats.Count == 0 ? ChartPointFormats.None : new ChartPointFormats([.. formats.Values]);
+    }
+
+    private bool Lined(OpenXmlCompositeElement series) => series is C.LineChartSeries or C.ScatterChartSeries or C.RadarChartSeries;
+
+    private string? Hex(string colour)
+    {
+        var hex = colour.TrimStart('#').ToUpperInvariant();
+        return hex.Length == 6 && hex.All(char.IsAsciiHexDigit) ? hex : null;
+    }
+
+    private C.DataPoint? Find(OpenXmlCompositeElement series, int index) =>
+        series.Elements<C.DataPoint>().FirstOrDefault(point => point.Index?.Val?.Value == (uint)index);
+
+    private C.DataPoint Insert(OpenXmlCompositeElement series, int index)
+    {
+        var point = new C.DataPoint(new C.Index { Val = (uint)index });
+        if (series is C.PieChartSeries or C.BubbleChartSeries) point.AppendChild(new C.Bubble3D { Val = false });
+        var later = series.Elements<C.DataPoint>().FirstOrDefault(existing => existing.Index?.Val?.Value > (uint)index);
+        if (later is not null)
+        {
+            later.InsertBeforeSelf(point);
+            return point;
+        }
+        if (series.Elements<C.DataPoint>().LastOrDefault() is { } last)
+        {
+            last.InsertAfterSelf(point);
+            return point;
+        }
+        var following = series.ChildElements.FirstOrDefault(child => child is C.DataLabels or C.Trendline or C.ErrorBars or C.CategoryAxisData or C.Values
+            or C.XValues or C.YValues or C.BubbleSize or C.Smooth or C.Shape or C.BarSerExtensionList);
+        if (following is not null) following.InsertBeforeSelf(point);
+        else series.AppendChild(point);
+        return point;
     }
 }

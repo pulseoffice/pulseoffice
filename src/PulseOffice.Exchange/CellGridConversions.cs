@@ -155,6 +155,7 @@ public sealed class CellGridConversions : ICellGridConversions
                 CellHorizontalAlign.Left => ExchangeHorizontalAlignment.Left,
                 CellHorizontalAlign.Center => ExchangeHorizontalAlignment.Center,
                 CellHorizontalAlign.Right => ExchangeHorizontalAlignment.Right,
+                CellHorizontalAlign.Justify => ExchangeHorizontalAlignment.Justify,
                 _ => ExchangeHorizontalAlignment.General,
             },
             Vertical = format.VerticalAlign switch
@@ -202,7 +203,8 @@ public sealed class CellGridConversions : ICellGridConversions
         FontSize = cell.FontSizePoints is { } size && double.IsFinite(size) && size > 0 ? size : null,
         Horizontal = cell.Horizontal switch
         {
-            ExchangeHorizontalAlignment.Left or ExchangeHorizontalAlignment.Justify => CellHorizontalAlign.Left,
+            ExchangeHorizontalAlignment.Left => CellHorizontalAlign.Left,
+            ExchangeHorizontalAlignment.Justify => CellHorizontalAlign.Justify,
             ExchangeHorizontalAlignment.Center => CellHorizontalAlign.Center,
             ExchangeHorizontalAlignment.Right => CellHorizontalAlign.Right,
             _ => cell.Kind == ExchangeCellKind.Number ? CellHorizontalAlign.Right : null,

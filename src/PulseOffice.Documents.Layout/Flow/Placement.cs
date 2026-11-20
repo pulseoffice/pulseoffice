@@ -204,6 +204,8 @@ public sealed class WrapSegments(PageFlowOptions options) : IWrapSegments
 public sealed record BalanceRequest(IReadOnlyList<FlowItem> Flow, int FlowIndex, int Line, int Offset, int Row, ColumnLayout Columns, double ColumnWidth, double Available)
 {
     public double TurnedLimit { get; init; } = double.PositiveInfinity;
+
+    public bool UntilSection { get; init; }
 }
 
 public interface IColumnBalancer
@@ -215,6 +217,7 @@ public sealed class ColumnBalancer(ITableComposer tables, PageFlowOptions option
 {
     public double Balance(BalanceRequest request)
     {
+        if (request.UntilSection && !SectionFollows(request)) return request.Available;
         var atoms = Atoms(request);
         if (atoms.Count == 0) return 0;
         var total = atoms.Sum();
@@ -231,6 +234,16 @@ public sealed class ColumnBalancer(ITableComposer tables, PageFlowOptions option
             else low = middle;
         }
         return high + 0.01;
+    }
+
+    private bool SectionFollows(BalanceRequest request)
+    {
+        for (var index = request.FlowIndex; index < request.Flow.Count; index++)
+        {
+            if (request.Flow[index] is SectionStartItem start) return !start.Section.StartsInNextColumn;
+            if (request.Flow[index] is ParagraphEntry { Flow: var flow } && index > request.FlowIndex && (flow.PageBreakBefore || flow.PageStyleName is not null)) return false;
+        }
+        return false;
     }
 
     private bool Fits(IReadOnlyList<double> atoms, double height, int columns)
@@ -261,7 +274,11 @@ public sealed class ColumnBalancer(ITableComposer tables, PageFlowOptions option
         for (var index = request.FlowIndex; index < request.Flow.Count && gathered <= capacity; index++)
         {
             var item = request.Flow[index];
-            if (item is SectionStartItem) depth++;
+            if (item is SectionStartItem)
+            {
+                if (request.UntilSection) break;
+                depth++;
+            }
             if (item is SectionEndItem)
             {
                 if (depth == 0) break;

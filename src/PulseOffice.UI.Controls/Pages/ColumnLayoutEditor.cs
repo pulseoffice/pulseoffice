@@ -22,6 +22,8 @@ public sealed record ColumnLayout(int Count, double Gap, bool Separator)
 
     public double TextWidth { get; init; } = 17;
 
+    public ColumnLine Line { get; init; } = ColumnLine.Default;
+
     public bool Uneven => Count > 1 && Widths.Count == Count;
 }
 
@@ -65,6 +67,7 @@ public sealed class ColumnLayoutEditor : UserControl
     private readonly DialogRow _gapRow;
     private readonly DialogRow _separatorRow;
     private readonly DialogRow _equalRow;
+    private readonly ColumnLineFields _line;
     private readonly Border _widthsHost = new();
     private readonly List<(MeasureField Width, MeasureField? Gap)> _widths = [];
     private readonly string _unit;
@@ -114,6 +117,7 @@ public sealed class ColumnLayoutEditor : UserControl
         section.Add(texts["page.columns.count"], _count, editorWidth: 120);
         _gapRow = section.Add(texts["page.columns.gap"], _gap, editorWidth: 160);
         _separatorRow = section.Add(null, _separator, DialogRowKind.Indented, editorWidth: 240);
+        _line = new ColumnLineFields(initial.Line, section, texts, metrics, Edited);
         _equalRow = section.Add(null, _equal, DialogRowKind.Indented, editorWidth: 240);
         var details = new StackPanel { Spacing = metrics.SpacingSmall };
         details.Children.Add(section);
@@ -139,6 +143,7 @@ public sealed class ColumnLayoutEditor : UserControl
             return new ColumnLayout(count, _gap.Read(), _separator.IsChecked == true)
             {
                 TextWidth = _textWidth,
+                Line = _line.Line,
                 Widths = uneven ? [.. _widths.Select(pair => new ColumnWidth(pair.Width.Read(), pair.Gap?.Read() ?? 0))] : [],
             };
         }
@@ -213,6 +218,7 @@ public sealed class ColumnLayoutEditor : UserControl
         var uneven = count > 1 && _equal.IsChecked != true;
         _gapRow.IsVisible = count > 1 && !uneven;
         _separatorRow.IsVisible = count > 1;
+        _line.IsVisible = count > 1 && _separator.IsChecked == true;
         _equalRow.IsVisible = count > 1;
         _widthsHost.IsVisible = uneven;
     }

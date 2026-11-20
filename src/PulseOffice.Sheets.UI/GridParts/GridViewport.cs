@@ -373,6 +373,8 @@ internal sealed class GridViewport
 
     public SheetGridView.ObjectChange ChangeOf(PlacedObject placed, ObjectBox box, double? rotation)
     {
+        var origin = CellRect(new CellAddress(0, 0));
+        box = box with { X = Math.Max(box.X, origin.X), Y = Math.Max(box.Y, origin.Y) };
         var address = AnchorAt(box.X, box.Y);
         var anchor = CellRect(address);
 

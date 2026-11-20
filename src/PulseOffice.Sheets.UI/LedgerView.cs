@@ -28,7 +28,7 @@ using PulseOffice.UI.Controls.Drawing;
 
 namespace PulseOffice.Sheets.UI;
 
-public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRelease, IShellViewOptions, IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions
+public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRelease, IShellViewOptions, IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions, PulseOffice.Shell.IActiveContextClaim
 {
     public void CommitPendingEdits()
     {
@@ -354,6 +354,11 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         _sheetContext.Attach(CurrentTarget());
 
         PublishSelectionContext();
+    }
+
+    public void ClaimActiveContext()
+    {
+        if (IsLoaded) _sheetContext.Attach(CurrentTarget());
     }
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)

@@ -71,7 +71,7 @@ public sealed class BarPlot : ChartPlotBase
                 if (!IsPlotted(data.Series[series], index) || Value(data.Series[series], index) == 0) continue;
                 var (start, width) = categories.Slot(index, slot, columns.Count);
                 var own = ScaleOf(frame, series, scale, secondary);
-                frame.Context.FillRectangle(Brush(data, series), Rectangle(false, start, width, Baseline(frame, series, own, secondary), own.Position(Value(data.Series[series], index))));
+                frame.Context.FillRectangle(PointBrush(frame.Definition, data, series, index), Rectangle(false, start, width, Baseline(frame, series, own, secondary), own.Position(Value(data.Series[series], index))));
             }
 
         foreach (var series in lines)
@@ -120,7 +120,7 @@ public sealed class BarPlot : ChartPlotBase
                 var position = own.Position(Value(data.Series[series], index));
 
                 frame.Context.FillRectangle(
-                    Brush(data, series),
+                    PointBrush(frame.Definition, data, series, index),
                     Rectangle(horizontal, start, width, Baseline(frame, series, own, secondary), position));
             }
     }
@@ -131,7 +131,7 @@ public sealed class BarPlot : ChartPlotBase
         {
             if (segment.From == segment.To) continue;
             frame.Context.FillRectangle(
-                Brush(data, segment.Series),
+                PointBrush(frame.Definition, data, segment.Series, segment.Index),
                 Rectangle(horizontal, segment.Start, segment.Width, segment.Scale.Position(segment.From), segment.Scale.Position(segment.To)));
         }
     }
@@ -178,11 +178,16 @@ public sealed class BarPlot : ChartPlotBase
             foreach (var segment in StackedSegments(frame, data, horizontal))
             {
                 var along = segment.Scale.Position(segment.To);
+                var middle = (segment.Scale.Position(segment.From) + along) / 2;
                 var across = segment.Start + segment.Width / 2;
                 yield return new ChartDataLabel(
                     horizontal ? new Point(along, across) : new Point(across, along),
                     Value(frame.Data.Series[segment.Series], segment.Index))
-                { Series = segment.Series, Index = segment.Index, Across = segment.Index + 1 };
+                {
+                    Series = segment.Series, Index = segment.Index, Across = segment.Index + 1,
+                    Placement = ChartLabelPlacement.Centre,
+                    Middle = horizontal ? new Point(middle, across) : new Point(across, middle),
+                };
             }
             yield break;
         }
@@ -190,18 +195,40 @@ public sealed class BarPlot : ChartPlotBase
         var scale = Primary(frame, data, horizontal);
         var secondary = Secondary(frame, data, horizontal);
         var categories = Categories(frame, data, horizontal);
+        var combination = frame.Definition.Type == ChartType.ColumnLine;
+        var columns = Enumerable.Range(0, data.Series.Count)
+            .Where(series => !combination || !frame.Definition.IsLineSeries(series, data.Series.Count)).ToList();
 
         for (var index = 0; index < categories.Count; index++)
         {
             for (var series = 0; series < data.Series.Count; series++)
             {
                 if (!IsPlotted(frame.Data.Series[series], index)) continue;
-                var (start, width) = categories.Slot(index, series, data.Series.Count);
-                var along = ScaleOf(frame, series, scale, secondary).Position(Value(data.Series[series], index));
+                var slot = columns.IndexOf(series);
+                if (slot < 0)
+                {
+                    yield return new ChartDataLabel(
+                        new Point(categories.Centre(index), ScaleOf(frame, series, scale, secondary).Position(Value(data.Series[series], index))),
+                        Value(frame.Data.Series[series], index))
+                    { Series = series, Index = index, Across = index + 1 };
+                    continue;
+                }
+
+                var (start, width) = categories.Slot(index, slot, columns.Count);
+                var own = ScaleOf(frame, series, scale, secondary);
+                var value = Value(data.Series[series], index);
+                var along = own.Position(value);
+                var below = value < _marks.ValueCrossing(own,
+                    secondary is not null && frame.Definition.SeriesFormat(series).SecondaryAxis ? frame.Definition.SecondaryValueAxis : frame.Definition.ValueAxis);
                 yield return new ChartDataLabel(
                     horizontal ? new Point(along, start + width / 2) : new Point(start + width / 2, along),
                     Value(frame.Data.Series[series], index))
-                { Series = series, Index = index, Across = index + 1 };
+                {
+                    Series = series, Index = index, Across = index + 1,
+                    Placement = horizontal
+                        ? below ? ChartLabelPlacement.Before : ChartLabelPlacement.After
+                        : below ? ChartLabelPlacement.Below : ChartLabelPlacement.Above,
+                };
             }
         }
     }

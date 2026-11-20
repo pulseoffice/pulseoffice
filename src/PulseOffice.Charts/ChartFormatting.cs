@@ -107,7 +107,45 @@ public sealed record ChartSeriesFormat
 
     public ChartErrorBars? XErrorBars { get; init; }
 
+    public ChartPointFormats Points { get; init; } = ChartPointFormats.None;
+
+    public ChartPointFormat Point(int index) => Points.At(index);
+
+    public ChartSeriesFormat WithPoint(ChartPointFormat point) => this with { Points = Points.With(point) };
+
     public bool IsPlain => this == Plain;
+}
+
+public sealed record ChartPointFormat(int Index)
+{
+    public string? ColorHex { get; init; }
+
+    public int ExplosionPercent { get; init; }
+
+    public bool IsPlain => ColorHex is null && ExplosionPercent <= 0;
+}
+
+public sealed record ChartPointFormats(IReadOnlyList<ChartPointFormat> Items)
+{
+    public const int MaximumExplosion = 400;
+
+    public static readonly ChartPointFormats None = new([]);
+
+    public bool IsEmpty => Items.Count == 0;
+
+    public ChartPointFormat At(int index) => Items.FirstOrDefault(item => item.Index == index) ?? new ChartPointFormat(index);
+
+    public ChartPointFormats With(ChartPointFormat point)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        var items = Items.Where(item => item.Index != point.Index).ToList();
+        if (!point.IsPlain && point.Index >= 0) items.Add(point with { ExplosionPercent = Math.Clamp(point.ExplosionPercent, 0, MaximumExplosion) });
+        return items.Count == 0 ? None : new ChartPointFormats([.. items.OrderBy(item => item.Index)]);
+    }
+
+    public bool Equals(ChartPointFormats? other) => other is not null && Items.SequenceEqual(other.Items);
+
+    public override int GetHashCode() => Items.Count;
 }
 
 public enum DataLabelPlacement { Automatic, Center, InsideEnd, InsideBase, OutsideEnd, Above, Below, Left, Right }

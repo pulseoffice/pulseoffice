@@ -38,7 +38,7 @@ public sealed class DeckFormatCommands(
         CellAligned(Aligned(Text("deck.paragraph.alignLeft", (t, r) => formatter.SetAlign(t, r, TextAlign.Left)), TextAlign.Left), CellHorizontalAlign.Left),
         CellAligned(Aligned(Text("deck.paragraph.alignCenter", (t, r) => formatter.SetAlign(t, r, TextAlign.Center)), TextAlign.Center), CellHorizontalAlign.Center),
         CellAligned(Aligned(Text("deck.paragraph.alignRight", (t, r) => formatter.SetAlign(t, r, TextAlign.Right)), TextAlign.Right), CellHorizontalAlign.Right),
-        Aligned(Text("deck.paragraph.alignJustify", (t, r) => formatter.SetAlign(t, r, TextAlign.Justify)), TextAlign.Justify),
+        CellAligned(Aligned(Text("deck.paragraph.alignJustify", (t, r) => formatter.SetAlign(t, r, TextAlign.Justify)), TextAlign.Justify), CellHorizontalAlign.Justify),
         Text("deck.paragraph.bullets", (t, r) => formatter.ToggleBullets(t, r)) with { CheckedWhen = _ => Paragraph()?.Bullet == true },
         Text("deck.paragraph.numbering", (t, r) => formatter.ToggleNumbering(t, r)),
         Text("deck.paragraph.spaceIncrease", (t, r) => formatter.AdjustSpacing(t, r, 3), CommandSurface.Advanced),

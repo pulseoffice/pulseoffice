@@ -118,7 +118,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
             new Twip(style.Header.Enabled ? headerDistance : Math.Abs(top)),
             new Twip(values.Bounded(margin?.Right?.Value ?? 1440, 0, LargestPage) - (fromPage ? 0 : Twips(box, PulseOffice.Text.Rich.BorderSide.Right))),
             new Twip(style.Footer.Enabled ? footerDistance : Math.Abs(bottom)));
-        style.Columns = Columns(section);
+        style.Columns = Columns(section) is { Count: > 1 } pageColumns ? pageColumns with { BalancedBeforeSection = true } : Columns(section);
         style.Gutter = new Twip(gutter);
         style.GutterAtTop = gutterAtTop;
         if (section.GetFirstChild<W.LineNumberType>() is { CountBy: not null } lineNumbers)

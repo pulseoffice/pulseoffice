@@ -364,6 +364,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         _toasts.IsVisible = true;
         _statusBar.IsFrozen = false;
         BindSurfaces();
+        if (_workspace.Active is { View: IActiveContextClaim claim } && !OnlyWindow()) claim.ClaimActiveContext();
         if (_workspace.Active is { } active) ShowDocumentName(active);
         UpdateForContext(_workspace.Context);
     }

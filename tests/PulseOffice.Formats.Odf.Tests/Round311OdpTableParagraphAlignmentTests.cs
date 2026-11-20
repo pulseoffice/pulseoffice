@@ -19,7 +19,7 @@ public sealed class Round311OdpTableParagraphAlignmentTests
         var deck = new Presentation { Theme = theme, Master = master, Size = SlideSize.Widescreen };
         var slide = _slides.Create(deck.NextId(), master, SlideLayout.Blank);
         deck.AddExisting(slide);
-        var rich = new TableCellText(0, 0, [new TableCellParagraph([new TableTextRun("plain")]), new TableCellParagraph([new TableTextRun("bold")]) { Alignment = CellHorizontalAlign.Right }]);
+        var rich = new TableCellText(0, 0, [new TableCellParagraph([new TableTextRun("plain")]), new TableCellParagraph([new TableTextRun("bold")]) { Alignment = CellHorizontalAlign.Right }, new TableCellParagraph([new TableTextRun("even")]) { Alignment = CellHorizontalAlign.Justify }]);
         var header = new TableCellText(TableCellFormat.HeaderRow, 0, [new TableCellParagraph([new TableTextRun("A")]) { Alignment = CellHorizontalAlign.Center }]);
         slide.Add(new ObjectElement
         {
@@ -29,7 +29,7 @@ public sealed class Round311OdpTableParagraphAlignmentTests
             {
                 Id = "t1",
                 Query = new DataQuerySource { ConnectionId = "", Sql = "" },
-                Snapshot = new DataSnapshot { Columns = [new DataColumn("A", DataValueKind.Text)], Rows = [["plain\nbold"]] },
+                Snapshot = new DataSnapshot { Columns = [new DataColumn("A", DataValueKind.Text)], Rows = [["plain\nbold\neven"]] },
                 CellTexts = [rich, header],
             },
         });

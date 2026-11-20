@@ -560,7 +560,7 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         _balanceLimit = double.PositiveInfinity;
         if (_region.Count > 1 && _region.Balanced)
         {
-            var height = _owner.Balancer.Balance(new BalanceRequest(_request.Flow, _flowIndex, _line, _offset, _tableFlow.Row, _region, _region.Width(_geometry.Body.Width), PageBottom - top) { TurnedLimit = _geometry.Body.Height });
+            var height = _owner.Balancer.Balance(new BalanceRequest(_request.Flow, _flowIndex, _line, _offset, _tableFlow.Row, _region, _region.Width(_geometry.Body.Width), PageBottom - top) { TurnedLimit = _geometry.Body.Height, UntilSection = _sections.Count == 0 });
             _balanceLimit = top + height;
         }
     }

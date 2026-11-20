@@ -36,7 +36,7 @@ public sealed record FolioViewServices(
     PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys Nudges,
     IFolioEditingKeys EditingKeys);
 
-public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, IDocumentFocusTarget, ITextEditingTarget, IInlineImeSurface
+public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, IDocumentFocusTarget, ITextEditingTarget, IInlineImeSurface, IActiveContextClaim
 {
     private readonly FolioEditor _editor;
     private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PointSteps = new(1, 10);
@@ -206,6 +206,11 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         _editor.Reflow();
         _editor.PlaceCaret(position, extend: false);
         FocusDocument();
+    }
+
+    public void ClaimActiveContext()
+    {
+        if (TopLevel.GetTopLevel(this) is not null) _services.Context.Attach(_target);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

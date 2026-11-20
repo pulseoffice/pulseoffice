@@ -9,10 +9,10 @@ the round that fixes it is joined and the join run is green.
 - An iterated zoom still scales each unit about the element's centre, not the unit's own centre: the reveal works on
   character ranges and the renderer has no per-unit glyph bounds to scale about (needs the composed line geometry of
   the text painters). (292, 297)
-- Deck table cell rich editing: justified cell alignment reads as left (no `CellHorizontalAlign.Justify`). Shared
-  editor, overlay, per-paragraph alignment, struck runs and turned or stacked cell editing not seen live. (311, 316)
-- Shape text `ToRich` now gives each paragraph the shape alignment instead of left; check the join for callers that
-  relied on the old default. (316)
+- Deck table cell rich editing: shared editor, overlay, per-paragraph alignment, struck runs and turned or stacked cell
+  editing not seen live. (311, 316)
+- Deck table cells: the plain-text path of the data table renderer (cells without rich text) draws a justified look as
+  left; only rich cell text justifies. (320)
 - The PPTX "PulseOffice Grid" table style and the ODP grid template have not been opened in PowerPoint or the
   reference suite; an ODP grid table from another producer keeps the default accent (only our own template names
   carry it). (302, 306)
@@ -55,11 +55,21 @@ the round that fixes it is joined and the join run is green.
 - "Number slides from" 0 is written to ODP as our extension attribute and as `text:page-adjust="-1"` on every slide
   number field (also read back alone); not opened in another application. (231, 234)
 ## Charts
-- Per-point chart formats (a single slice's colour or explosion; XLSX `c:dPt`, ODS `chart:data-point` styles) are not
-  in the model and are lost silently on read in both formats. (317)
-- Not yet audited after round 317: rendering of every chart type against Excel, stock, radar, combo with secondary axis,
-  chart styles and colours, moving and resizing charts, and per-type XLSX/ODS round trips other than pie, doughnut and
-  scatter. (317)
+- ODS combo whose line series is not the last one is read with the last series as the line (the model keeps line
+  series last). (318)
+- Chart point formats keep their index when the source rows or columns are inserted or deleted. (318)
+- Point colours are drawn only for pie, doughnut and bars; line, area, radar and scatter points round-trip but draw in
+  the series colour. (318)
+- XLSX stock series carry no colour (the writer clears their shape properties). (318)
+- Per-point formats (`c:dPt`, `chart:data-point`) have not been opened in Excel or the reference suite. (318)
+- Not yet audited: per-type XLSX/ODS round trips other than pie, doughnut and scatter (round 318's area), chart styles
+  and colour palettes against Excel's style gallery, keyboard resizing of charts, and stock, statistical, hierarchy and
+  meter plots beyond label and axis consistency. (317, 319)
+- Resizing an object past the sheet's left or top edge keeps its size, so the opposite edge moves; Excel stops the
+  dragged edge. (319)
+- Radar charts honour value axis bounds in rendering but the chart editor disables the axis page for them. (319)
+- Pie of pie and bar of pie draw as plain pies; horizontal stacked bar legends are not reversed as in Excel. (319)
+- Data labels have no position option (inside end, inside base, outside end, best fit) in the model. (319)
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
@@ -130,16 +140,14 @@ the round that fixes it is joined and the join run is green.
   "Header") is treated as built-in while keeping its own spelling. (308)
 - Folio lists (315): ODF has no native restart level for list levels (researched in ODF 1.3 list level styles and
   `text:list` attributes); our `pt:restart-after` stays, so other applications restart after any higher level. (313, 315)
-- Folio columns (315): the shared column editor still edits only the separator on/off; the separator's style, width,
-  colour, height and alignment (now in the model, ODT and layout) have no controls yet. (315)
-- Folio columns (315): ODT writes a next-column section start only as our `pt:starts-in-next-column` on `text:section`;
-  other applications start the section without a column break. (315)
-- Folio columns (315): Word balances multi-column page-level text before a continuous section break; our page-level
-  columns are never balanced, so a DOCX whose first section has columns and is followed by a continuous section fills
-  the first column to the page bottom. Needs a way to tell Word-origin page columns from ODT page columns. (315)
-- Folio pages (315): the blank page inserted before a right or left page style takes the previous page style; Word
-  shows it without headers' content of the next section, the reference suite with the previous style; not compared
-  live. (315)
+- Folio columns (320): page columns made in Folio or read from ODT are not marked to balance before a section, so a
+  DOCX written from them balances in Word before a continuous section while Folio fills the first column; the column
+  editor has no switch for the mark. (320)
+- Folio columns (320): the ODT next-column start now also writes `fo:break-before="column"` on the section's first
+  paragraph; a section starting with a table or a nested section still relies on our attribute only. Not opened in
+  other applications. (320)
+- Folio pages (320): the blank page before a right or left page style keeps the previous style (Word places it at the
+  end of the previous section, the reference suite likewise); not compared live in Word. (315, 320)
 
 - Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
   and reads back as a standard tone with the same look. (282)
@@ -152,10 +160,12 @@ the round that fixes it is joined and the join run is green.
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- Shell (314): the notification history is application-wide by decision; a frozen unfocused status bar also freezes
-  background activity progress until the window is activated. (314)
-- Shell (314): torn-off windows are not reopened at the next start and a maximized torn-off window reopens normal;
-  Deck views have no `UpdateContext` routing review. (314)
+- Shell (314): the notification history is application-wide by decision. (314)
+- Shell (321): a programmatic selection change in a Deck view of an unfocused window (macro, agent, find) still attaches
+  that view to the shared Deck context until the focused window is activated again; the same holds for Ledger and Folio
+  views that attach on load or sheet change. Needs the module contexts to be per window. (321)
+- Shell (321): activating a window re-claims the module context and keeps a torn-off window's maximized state, but the
+  multi-window context switch has not been tried in the running app. (321)
 - Shell (310): multi-window behaviour (tab drops on a scrolled strip, side panel, status, placement) not yet tried in
   the running app on the three systems, nor the native macOS menu with two windows. (310)
 - Shell (303): the keyboard tab move (Ctrl+Shift+PageUp/PageDown) takes the gesture Ledger would use to select sheet
@@ -182,7 +192,7 @@ the round that fixes it is joined and the join run is green.
   suite (299, 304).
 - XLSX validation lists on the very hidden helper sheet not yet opened in Excel or the reference suite (316).
 - Validation alert modal and input message note box not yet seen in the running app (312).
-- The shared input help note in Folio uses compact metrics, not the interface density; not seen live (316).
+- The shared input help note in Folio not yet seen live (316).
 - Grouped icon gallery of the conditional rule editor and the invalid data circles not yet seen in the running app (309).
 - Top/bottom percent count now rounds down with a minimum of one item; to confirm against real Excel (294).
 - ODS conditional format extras (stop if true, reversed icons, deviations, bar borders and direction) live in the `urn:pulseoffice:spreadsheet` extension: other applications ignore them; the ODF020/040/102/086/087 notices remain (294).

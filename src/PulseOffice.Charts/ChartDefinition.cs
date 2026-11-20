@@ -130,6 +130,13 @@ public sealed record ChartDefinition : EmbeddedObject
         return this with { SeriesFormats = formats.All(item => item is null) ? null : formats };
     }
 
+    public ChartPointFormat PointFormat(int series, int point) => SeriesFormat(series).Point(point);
+
+    public ChartDefinition WithPointFormat(int series, ChartPointFormat point) =>
+        WithSeriesFormat(series, SeriesFormat(series).WithPoint(point));
+
+    public string PointColor(int series, int point, string automatic) => PointFormat(series, point).ColorHex ?? automatic;
+
     public bool ThreeDimensional { get; init; }
 
     public int LineSeriesCount { get; init; } = 1;

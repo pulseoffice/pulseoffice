@@ -17,7 +17,7 @@ public sealed class PiePlot : ChartPlotBase
         var series = data.Series.FirstOrDefault();
         if (series is null) return [];
         return [.. Enumerable.Range(0, series.Values.Count)
-            .Select(index => new ChartLegendItem(index < data.Categories.Count ? data.Categories[index] : (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), Slice(index)))];
+            .Select(index => new ChartLegendItem(index < data.Categories.Count ? data.Categories[index] : (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), Slice(definition, index)))];
     }
 
     public override IEnumerable<ChartDataLabel> DataLabels(ChartFrame frame)
@@ -33,14 +33,19 @@ public sealed class PiePlot : ChartPlotBase
         {
             if (!double.IsFinite(series.Values[index])) continue;
             var sweep = Math.Abs(series.Values[index]) / total * Math.PI * 2;
-            if (sweep > 0) yield return new ChartDataLabel(Polar(frame.Plot.Center, radius, start + sweep / 2), series.Values[index]);
+            if (sweep > 0)
+                yield return new ChartDataLabel(Polar(frame.Plot.Center, radius, start + sweep / 2), series.Values[index])
+                { Series = 0, Index = index, Placement = ChartLabelPlacement.Centre };
             start += sweep;
         }
     }
 
-    private IBrush SliceBrush(int index) => new SolidColorBrush(Slice(index));
+    private IBrush SliceBrush(ChartDefinition definition, int index) => new SolidColorBrush(Slice(definition, index));
 
-    private Color Slice(int index) => ChartColours.Resolve(null, index);
+    private Color Slice(ChartDefinition definition, int index) => ChartColours.Resolve(definition.PointFormat(0, index).ColorHex, index);
+
+    private double Explosion(ChartDefinition definition, int index) =>
+        definition.PointFormat(0, index).ExplosionPercent / 100.0;
 
     public override void Draw(ChartFrame frame)
     {
@@ -51,7 +56,8 @@ public sealed class PiePlot : ChartPlotBase
         if (total <= 0) return;
 
         var exploded = frame.Definition.Type is ChartType.ExplodedPie;
-        var radius = Math.Min(frame.Plot.Width, frame.Plot.Height) / 2 - (exploded ? 10 : 4);
+        var furthest = Enumerable.Range(0, series.Values.Count).Select(index => Explosion(frame.Definition, index)).DefaultIfEmpty(0).Max();
+        var radius = (Math.Min(frame.Plot.Width, frame.Plot.Height) / 2 - (exploded ? 10 : 4)) / (1 + furthest);
         var centre = frame.Plot.Center;
 
         var start = -Math.PI / 2;
@@ -63,12 +69,13 @@ public sealed class PiePlot : ChartPlotBase
             var sweep = Math.Abs(series.Values[index]) / total * Math.PI * 2;
             if (sweep <= 0) continue;
 
-            var offset = exploded ? Polar(new Point(0, 0), 8, start + sweep / 2) : new Point(0, 0);
+            var distance = (exploded ? 8 : 0) + radius * Explosion(frame.Definition, index);
+            var offset = distance > 0 ? Polar(new Point(0, 0), distance, start + sweep / 2) : new Point(0, 0);
             var middle = new Point(centre.X + offset.X, centre.Y + offset.Y);
 
             if (sweep >= Math.PI * 2 - 1e-9)
             {
-                frame.Context.DrawEllipse(SliceBrush(index), new Pen(frame.Marks.Separator, 1), middle, radius, radius);
+                frame.Context.DrawEllipse(SliceBrush(frame.Definition, index), new Pen(frame.Marks.Separator, 1), middle, radius, radius);
                 start += sweep;
                 continue;
             }
@@ -88,7 +95,7 @@ public sealed class PiePlot : ChartPlotBase
             }
 
             frame.Context.DrawGeometry(
-                SliceBrush(index), new Pen(frame.Marks.Separator, 1), geometry);
+                SliceBrush(frame.Definition, index), new Pen(frame.Marks.Separator, 1), geometry);
 
             start += sweep;
         }

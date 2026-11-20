@@ -19,6 +19,7 @@ internal sealed class OdtColumnsCodec(OdtMeasure measure) : OdtXml
                 new XAttribute(Fo + "start-indent", measure.Length(index == 0 ? Twip.Zero : new Twip(columns.Spans[index - 1].Gap.Value / 2))),
                 new XAttribute(Fo + "end-indent", measure.Length(index == columns.Spans.Count - 1 ? Twip.Zero : new Twip(span.Gap.Value - span.Gap.Value / 2))))));
         if (columns.Separator) element.Add(Separator(columns.SeparatorLine));
+        if (columns.BalancedBeforeSection) element.Add(new XAttribute(Pt + "balanced-before-section", "true"));
         return element;
     }
 
@@ -37,6 +38,7 @@ internal sealed class OdtColumnsCodec(OdtMeasure measure) : OdtXml
             Separator = element.Element(Style + "column-sep") is { } sep && (string?)sep.Attribute(Style + "style") != "none",
             SeparatorLine = Separator(element.Element(Style + "column-sep")),
             Balanced = balanced,
+            BalancedBeforeSection = (string?)element.Attribute(Pt + "balanced-before-section") == "true",
         };
         return Spans(element, columns) is { } spans ? columns with { Spans = spans } : columns;
     }

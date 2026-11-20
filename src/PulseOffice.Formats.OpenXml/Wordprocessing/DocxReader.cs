@@ -285,7 +285,7 @@ public sealed class DocxReader : ITextDocumentReader
             {
                 var nextColumn = _sections.NextColumn(span.Properties);
                 var columns = _sections.Columns(span.Properties);
-                if ((nextColumn || columns != current.Columns) && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, nextColumn));
+                if ((nextColumn || columns != current.Columns with { BalancedBeforeSection = false }) && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, nextColumn));
                 if (_sections.LineNumberRestart(resolved) is { } lineStart) RestartLines(document, span.FirstBlock, end, lineStart);
                 continue;
             }
@@ -311,7 +311,7 @@ public sealed class DocxReader : ITextDocumentReader
             if (deferred)
             {
                 var columns = _sections.Columns(span.Properties);
-                if (columns != previous!.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, false));
+                if (columns != previous!.Columns with { BalancedBeforeSection = false } && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, false));
                 Defer(document, span.FirstBlock, end, name, restart, context);
                 continue;
             }

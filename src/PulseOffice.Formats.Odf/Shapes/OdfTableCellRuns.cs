@@ -34,6 +34,7 @@ internal sealed class OdfTableCellRuns(IOdfParagraphText paragraphs)
                     {
                         CellHorizontalAlign.Center => "center",
                         CellHorizontalAlign.Right => "end",
+                        CellHorizontalAlign.Justify => "justify",
                         _ => "start",
                     }))));
                 element.Add(new XAttribute(TextNs + "style-name", paragraphStyle));
@@ -96,6 +97,7 @@ internal sealed class OdfTableCellRuns(IOdfParagraphText paragraphs)
             {
                 "center" => CellHorizontalAlign.Center,
                 "end" or "right" => CellHorizontalAlign.Right,
+                "justify" => CellHorizontalAlign.Justify,
                 "start" or "left" => CellHorizontalAlign.Left,
                 _ => null,
             }

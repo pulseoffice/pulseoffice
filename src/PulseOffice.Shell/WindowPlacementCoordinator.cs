@@ -16,14 +16,16 @@ public sealed class WindowPlacementCoordinator(
 
         var scaling = source is not null ? Scaling(source) : Scaling(window);
         var area = source?.Screens?.ScreenFromWindow(source)?.WorkingArea;
+        var saved = tornOff.Load();
         var size = sizing.Choose(
-            tornOff.Load(),
+            saved,
             scaling,
             source is { Bounds.Width: > 0 } shown ? shown.Bounds.Size : new Avalonia.Size(window.Width, window.Height),
             new Avalonia.Size(window.MinWidth, window.MinHeight),
             area is { } pixels ? new Avalonia.Size(pixels.Width / scaling, pixels.Height / scaling) : null);
         window.Width = size.Width;
         window.Height = size.Height;
+        if (sizing.OpensMaximized(saved)) window.WindowState = WindowState.Maximized;
 
         WindowPlacement? normal = null;
 
@@ -37,7 +39,7 @@ public sealed class WindowPlacementCoordinator(
         window.Closing += (_, _) =>
         {
             var maximized = window.WindowState is WindowState.Maximized or WindowState.FullScreen;
-            tornOff.Save((maximized ? normal ?? Current(window) : Current(window)) with { Maximized = false });
+            tornOff.Save(sizing.Remember(normal, Current(window), maximized));
         };
     }
 

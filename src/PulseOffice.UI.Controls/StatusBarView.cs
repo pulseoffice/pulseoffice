@@ -15,6 +15,7 @@ public sealed class StatusBarView : ContentControl
     private readonly StackPanel _module;
     private readonly DockPanel _left;
     private readonly StackPanel _right;
+    private readonly StackPanel _activities = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Dictionary<string, TextBox> _inputs = new(StringComparer.Ordinal);
     private readonly ContentControl _historySlot = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl _zoomSlot = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
@@ -126,7 +127,7 @@ public sealed class StatusBarView : ContentControl
         {
             if (_frozen == value) return;
             _frozen = value;
-            if (!value) Refresh();
+            Refresh();
         }
     }
 
@@ -134,7 +135,12 @@ public sealed class StatusBarView : ContentControl
 
     public void Refresh()
     {
-        if (_frozen) return;
+        if (!_frozen) RefreshSegments();
+        RefreshActivities();
+    }
+
+    private void RefreshSegments()
+    {
         _left.Children.Clear();
         _right.Children.Clear();
 
@@ -193,6 +199,14 @@ public sealed class StatusBarView : ContentControl
             else _left.Children.Add(shown);
         }
 
+        DockPanel.SetDock(_activities, Dock.Left);
+        _left.Children.Add(_activities);
+    }
+
+    private void RefreshActivities()
+    {
+        _activities.Spacing = _metrics.SpacingMedium;
+        _activities.Children.Clear();
         foreach (var activity in _status.Activities)
         {
             var panel = new StackPanel
@@ -201,8 +215,6 @@ public sealed class StatusBarView : ContentControl
                 Spacing = _metrics.SpacingSmall,
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            DockPanel.SetDock(panel, Dock.Left);
-
             panel.Children.Add(new TextBlock
             {
                 Text = activity.Description,
@@ -222,7 +234,7 @@ public sealed class StatusBarView : ContentControl
                 VerticalAlignment = VerticalAlignment.Center,
             });
 
-            _left.Children.Add(panel);
+            _activities.Children.Add(panel);
         }
     }
 

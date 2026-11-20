@@ -24,6 +24,9 @@ public sealed class ChartSeriesFormatEditor : UserControl
     private readonly ComboBox _marker;
     private readonly TextBox _markerSize;
     private readonly CheckBox _secondary;
+    private readonly TextBox _point;
+    private readonly ColorFieldControl _pointColour;
+    private readonly TextBox _explosion;
     private int _shown;
     private bool _loading;
 
@@ -39,6 +42,12 @@ public sealed class ChartSeriesFormatEditor : UserControl
         _marker = fields.Choice("chart.series.marker", Markers.Select(marker => $"chart.marker.{fields.Lower(marker.ToString())}"), Edited);
         _markerSize = fields.Number("chart.series.markerSize", Edited);
         _secondary = fields.Check("chart.series.secondaryAxis", Edited);
+        _point = fields.Number("chart.point.number", PointChosen);
+        _point.PlaceholderText = fields.Texts["chart.point.none"];
+        _pointColour = new ColorFieldControl(string.Empty, true, fields.Texts, fields.Metrics);
+        _pointColour.Changed += (_, _) => PointEdited();
+        Avalonia.Automation.AutomationProperties.SetName(_pointColour, fields.Texts["chart.point.colour"]);
+        _explosion = fields.Number("chart.point.explosion", PointEdited);
 
         Content = new StackPanel
         {
@@ -49,6 +58,8 @@ public sealed class ChartSeriesFormatEditor : UserControl
                 fields.Pair(fields.Field("chart.series.lineWidth", _lineWidth), fields.Field("chart.series.dash", _dash)),
                 fields.Pair(fields.Field("chart.series.marker", _marker), fields.Field("chart.series.markerSize", _markerSize)),
                 _secondary,
+                fields.Field("chart.point.number", _point),
+                fields.Pair(fields.Field("chart.point.colour", _pointColour), fields.Field("chart.point.explosion", _explosion)),
             },
         };
 
@@ -97,6 +108,42 @@ public sealed class ChartSeriesFormatEditor : UserControl
         _markerSize.Text = format.MarkerSize is { } size ? size.ToString(_fields.Culture) : string.Empty;
         _secondary.IsChecked = format.SecondaryAxis;
         _loading = false;
+        LoadPoint();
+    }
+
+    public int? ChosenPoint => _fields.Parsed(_point) is { } number && number >= 1 && number <= MostPoints ? (int)Math.Round(number) - 1 : null;
+
+    private const int MostPoints = 100_000;
+
+    public void ChoosePoint(int? point) => _point.Text = point is { } index ? (index + 1).ToString(_fields.Culture) : string.Empty;
+
+    private void PointChosen()
+    {
+        if (_loading) return;
+        LoadPoint();
+    }
+
+    private void LoadPoint()
+    {
+        _loading = true;
+        var point = ChosenPoint is { } index ? Current.Point(index) : null;
+        _pointColour.IsEnabled = point is not null;
+        _explosion.IsEnabled = point is not null;
+        _pointColour.Select(point?.ColorHex);
+        _explosion.Text = point is { ExplosionPercent: > 0 } exploded ? exploded.ExplosionPercent.ToString(_fields.Culture) : string.Empty;
+        _loading = false;
+    }
+
+    private void PointEdited()
+    {
+        if (_loading || _shown >= _formats.Count || ChosenPoint is not { } index) return;
+        var explosion = _fields.Parsed(_explosion) is > 0 and var percent ? (int)Math.Round(Math.Min(percent, ChartPointFormats.MaximumExplosion)) : 0;
+        _formats[_shown] = Current.WithPoint(new ChartPointFormat(index)
+        {
+            ColorHex = _pointColour.Value.Length > 0 ? _pointColour.Value : null,
+            ExplosionPercent = explosion,
+        });
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private void Edited()

@@ -22,6 +22,10 @@ public sealed class TornOffWindowPlacementStore(IWindowPlacementStore inner) : I
 public interface ITornOffWindowSizing
 {
     Size Choose(WindowPlacement? saved, double scaling, Size source, Size minimum, Size? workingArea);
+
+    bool OpensMaximized(WindowPlacement? saved);
+
+    WindowPlacement Remember(WindowPlacement? normal, WindowPlacement current, bool maximized);
 }
 
 public sealed class TornOffWindowSizing : ITornOffWindowSizing
@@ -42,4 +46,9 @@ public sealed class TornOffWindowSizing : ITornOffWindowSizing
 
         return new Size(width, height);
     }
+
+    public bool OpensMaximized(WindowPlacement? saved) => saved is { Maximized: true };
+
+    public WindowPlacement Remember(WindowPlacement? normal, WindowPlacement current, bool maximized) =>
+        (maximized ? normal ?? current : current) with { Maximized = maximized };
 }

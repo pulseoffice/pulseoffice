@@ -44,7 +44,7 @@ public enum CellVerticalAlign { Top, Center, Bottom }
 
 public sealed record TableBorderLine(string ColorHex, double WidthPoints);
 
-public enum CellHorizontalAlign { Left, Center, Right }
+public enum CellHorizontalAlign { Left, Center, Right, Justify }
 
 public enum CellTextDirection { Horizontal, Down, Up, Stacked }
 

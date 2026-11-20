@@ -12,7 +12,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelease, PulseOffice.Shell.IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions, IDeckViewHost
+public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelease, PulseOffice.Shell.IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions, IDeckViewHost, PulseOffice.Shell.IActiveContextClaim
 {
     private readonly DeckViewState _state;
     private readonly Presentation _deck;
@@ -580,6 +580,8 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
     {
         if (_state.Target is not null) _deckContext.Attach(_state.Target);
     }
+
+    public void ClaimActiveContext() => AttachContext();
 
     private IBrush Accent() => this.FindResource("PulseAccent") as IBrush ?? Brushes.OrangeRed;
 

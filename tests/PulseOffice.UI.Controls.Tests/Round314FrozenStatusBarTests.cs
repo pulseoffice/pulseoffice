@@ -31,6 +31,28 @@ public sealed class Round314FrozenStatusBarTests
         window.Close();
     }, CancellationToken.None);
 
+    [Fact]
+    public Task A_frozen_status_bar_keeps_background_activity_progress_live() => MacroEventsViewTests.Session.Dispatch(() =>
+    {
+        var time = new ManualTime();
+        var status = new StatusBarService(time, new NotificationCenter(time), new NotificationHistory(time));
+        var bar = new StatusBarView(status);
+        var window = new Window { Width = 400, Height = 100, Content = bar };
+        window.Show();
+        bar.IsFrozen = true;
+
+        var activity = status.BeginActivity("Saving");
+        activity.Progress = 0.5;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(Texts(bar), text => text == "Saving");
+        Assert.Contains(bar.GetVisualDescendants().OfType<ProgressBar>(), progress => progress.Value == 0.5);
+
+        status.EndActivity(activity);
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(Texts(bar), text => text == "Saving");
+        window.Close();
+    }, CancellationToken.None);
+
     private static List<string?> Texts(StatusBarView bar) =>
         [.. bar.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text)];
 }

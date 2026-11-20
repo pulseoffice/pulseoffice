@@ -131,6 +131,7 @@ public sealed class PptxDeckTableMapper
                     {
                         CellHorizontalAlign.Center => D.TextAlignmentTypeValues.Center,
                         CellHorizontalAlign.Right => D.TextAlignmentTypeValues.Right,
+                        CellHorizontalAlign.Justify => D.TextAlignmentTypeValues.Justified,
                         _ => D.TextAlignmentTypeValues.Left,
                     },
                 });
@@ -385,6 +386,7 @@ public sealed class PptxDeckTableMapper
     private CellHorizontalAlign? AlignmentOf(D.TextAlignmentTypeValues? value) =>
         value == D.TextAlignmentTypeValues.Center ? CellHorizontalAlign.Center
         : value == D.TextAlignmentTypeValues.Right ? CellHorizontalAlign.Right
+        : value == D.TextAlignmentTypeValues.Justified ? CellHorizontalAlign.Justify
         : null;
 
     private TableCellText? BeyondLook(TableCellText text, IReadOnlyList<TableCellFormat> formats)

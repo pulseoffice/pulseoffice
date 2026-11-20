@@ -1044,6 +1044,8 @@ internal sealed class OdtSectionReader(OdtColumnsCodec columns, OdtIndexCodec in
         var properties = context.Automatic.Find("section", (string?)element.Attribute(Text + "style-name"))?.Element(Style + "section-properties");
         var display = (string?)element.Attribute(Text + "display");
         var content = new BlockContainer(blocks.Read(element, context));
+        if ((string?)element.Attribute(Pt + "next-column-break") == "written" && content.Blocks.FirstOrDefault() is ParagraphBlock { Content.ColumnBreakBefore: true } first)
+            first.Content = first.Content with { ColumnBreakBefore = null };
         return new SectionBlock(id, (string?)element.Attribute(Text + "name") ?? id, content)
         {
             Columns = columns.Read(properties),

@@ -586,6 +586,11 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             _title.Text = TypeName(_type);
 
         _typeName.Text = TypeName(_type);
+        var axes = _services.Renderer.DrawsAxes(_type);
+        _categoryAxis.IsEnabled = axes;
+        _valueAxis.IsEnabled = axes;
+        _grid.IsEnabled = axes;
+        _axes.IsEnabled = axes;
         _preview.Show(Definition(), _data);
     }
 

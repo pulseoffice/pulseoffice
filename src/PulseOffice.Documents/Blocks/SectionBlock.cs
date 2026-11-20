@@ -14,12 +14,14 @@ public sealed record SectionColumns(int Count, Twip Gap)
 
     public bool Balanced { get; init; } = true;
 
+    public bool BalancedBeforeSection { get; init; }
+
     public IReadOnlyList<ColumnSpan> Spans { get; init; } = [];
 
     public bool Uneven => Count > 1 && Spans.Count == Count;
 
     public bool Equals(SectionColumns? other) =>
-        other is not null && Count == other.Count && Gap == other.Gap && Separator == other.Separator && SeparatorLine == other.SeparatorLine && Balanced == other.Balanced
+        other is not null && Count == other.Count && Gap == other.Gap && Separator == other.Separator && SeparatorLine == other.SeparatorLine && Balanced == other.Balanced && BalancedBeforeSection == other.BalancedBeforeSection
         && Spans.SequenceEqual(other.Spans);
 
     public override int GetHashCode() => HashCode.Combine(Count, Gap, Separator, Balanced, Spans.Count);
