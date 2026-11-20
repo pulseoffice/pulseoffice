@@ -50,6 +50,7 @@ internal static class ObjectsAndScriptingComposition
     {
         services.AddSingleton<PulseOffice.UI.Controls.Objects.IChosenFileReader, PulseOffice.UI.Controls.Objects.ChosenFileReader>();
         services.AddSingleton<PulseOffice.UI.Controls.Objects.IRasterImageFiles, PulseOffice.UI.Controls.Objects.RasterImageFiles>();
+        services.AddSingleton<PulseOffice.UI.Controls.Objects.IPictureCompression, PulseOffice.UI.Controls.Objects.PictureCompression>();
         services.AddSingleton<PulseOffice.UI.Controls.Objects.IBitmapPixels, PulseOffice.UI.Controls.Objects.BitmapPixels>();
         services.TryAddSingleton<PulseOffice.Drawing.Assets.IImageExtents, PulseOffice.Drawing.Assets.ImageExtents>();
         services.AddSingleton<PulseOffice.UI.Controls.Objects.IRasterRecolor, PulseOffice.UI.Controls.Objects.RasterRecolor>();

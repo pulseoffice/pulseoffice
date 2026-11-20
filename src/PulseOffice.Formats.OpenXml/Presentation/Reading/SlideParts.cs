@@ -272,6 +272,7 @@ internal sealed class BackgroundImageReader(PptxBackgroundFillReader fills) : IP
             Data = buffer.ToArray(),
             MediaType = part.ContentType,
             Duotone = fills.Duotone(source.Slide.Slide?.CommonSlideData?.Background?.BackgroundProperties?.GetFirstChild<D.BlipFill>()?.Blip),
+            Tone = fills.Tone(source.Slide.Slide?.CommonSlideData?.Background?.BackgroundProperties?.GetFirstChild<D.BlipFill>()?.Blip),
         };
     }
 }

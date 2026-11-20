@@ -42,6 +42,10 @@ internal sealed class OdtWriteSession(TextDocument document)
 
     public Dictionary<PulseOffice.Documents.Blocks.CellNumberFormat, string> DataStyles { get; } = [];
 
+    public Dictionary<(string Picture, bool Time), string?> FieldDataStyles { get; } = [];
+
+    public List<XElement> FieldDataStyleElements { get; } = [];
+
     private HashSet<string>? _sequenceReferences;
 
     public bool IsSequenceReference(string name, Func<TextDocument, IEnumerable<string>> scan)

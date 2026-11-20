@@ -77,6 +77,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
 {
     private readonly DrawingML.DrawingDuotone _duotones = new();
     private readonly DrawingML.DrawingImageTone _tones = new();
+    private readonly DrawingML.DrawingAspectLock _aspect = new();
     private readonly DrawingML.OoxmlSvgBlip _svgBlips = new();
 
     public DocxPictureCodec(OoxmlImageTypes types, ImageHeader header) : this(types, header, new VectorFallback())
@@ -102,7 +103,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
         return new PIC.Picture(
             new PIC.NonVisualPictureProperties(
                 new PIC.NonVisualDrawingProperties { Id = 0U, Name = item.Name ?? string.Empty },
-                new PIC.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = true })),
+                new PIC.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = image.LocksAspectRatio })),
             fill,
             new PIC.ShapeProperties(Transform(item), new A.PresetGeometry(new A.AdjustValueList()) { Preset = A.ShapeTypeValues.Rectangle }));
     }
@@ -143,7 +144,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
         return new PIC.Picture(
             new PIC.NonVisualPictureProperties(
                 new PIC.NonVisualDrawingProperties { Id = 0U, Name = item.Name ?? string.Empty },
-                new PIC.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = true })),
+                new PIC.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = vector.LocksAspectRatio })),
             new PIC.BlipFill(_svgBlips.Blip(context.Part, svg, vectors.Png(svg, item.Size)), new A.Stretch(new A.FillRectangle())),
             new PIC.ShapeProperties(transform, new A.PresetGeometry(new A.AdjustValueList()) { Preset = A.ShapeTypeValues.Rectangle }));
     }
@@ -157,7 +158,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
         if (blip is not null && _svgBlips.Svg(blip, context.Part) is { } svg)
         {
             var transform = picture.ShapeProperties?.Transform2D;
-            return new DocxGraphic(new EmbeddedContent(vectors.Read(id, svg, false, false)),
+            return new DocxGraphic(new EmbeddedContent(_aspect.Apply(vectors.Read(id, svg, false, false), picture)),
                 picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } vectorName ? vectorName : null, null, Rotation(transform))
             {
                 FlipHorizontal = transform?.HorizontalFlip?.Value ?? false,
@@ -169,7 +170,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
             : default;
         if (blip?.Embed?.Value is not { } embed || !context.Part.TryGetPartById(embed, out var found) || found is not ImagePart part)
             return Linked(blip, context, id) is { } linkedImage
-                ? new DocxGraphic(new EmbeddedContent(linkedImage with { Crop = crop }), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } linkedName ? linkedName : null, null,
+                ? new DocxGraphic(new EmbeddedContent(_aspect.Apply(linkedImage with { Crop = crop }, picture)), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } linkedName ? linkedName : null, null,
                     Rotation(picture.ShapeProperties?.Transform2D))
                 {
                     FlipHorizontal = picture.ShapeProperties?.Transform2D?.HorizontalFlip?.Value ?? false,
@@ -193,7 +194,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
             Tone = _tones.Read(blip),
             Crop = crop,
         };
-        return new DocxGraphic(new EmbeddedContent(image), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } pictureName ? pictureName : null, null,
+        return new DocxGraphic(new EmbeddedContent(_aspect.Apply(image, picture)), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } pictureName ? pictureName : null, null,
             Rotation(picture.ShapeProperties?.Transform2D))
         {
             FlipHorizontal = picture.ShapeProperties?.Transform2D?.HorizontalFlip?.Value ?? false,
@@ -627,6 +628,12 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
     private readonly IReadOnlyList<DocxGraphicCodec> _codecs = [.. codecs];
 
     private readonly DocxObjectAlignments _alignments = new();
+    private readonly DrawingML.DrawingAspectLock _aspect = new();
+
+    private DW.NonVisualGraphicFrameDrawingProperties FrameProperties(AnchoredObject item) =>
+        _aspect.FrameLocks((item.Content as EmbeddedContent)?.Value) is { } locks
+            ? new DW.NonVisualGraphicFrameDrawingProperties(locks)
+            : new DW.NonVisualGraphicFrameDrawingProperties();
 
     private readonly IReadOnlyList<(HorizontalRelation Relation, DW.HorizontalRelativePositionValues Word)> _horizontal =
     [
@@ -681,7 +688,7 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         var spacing = item.WrapSpacing;
         if (item.Anchor is AsCharacterAnchor)
             return new W.Run(new W.Drawing(new DW.Inline(extent, new DW.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 }, properties,
-                new DW.NonVisualGraphicFrameDrawingProperties(), graphic)
+                FrameProperties(item), graphic)
             {
                 DistanceFromTop = (uint)Emu(spacing.Top), DistanceFromBottom = (uint)Emu(spacing.Bottom),
                 DistanceFromLeft = (uint)Emu(spacing.Left), DistanceFromRight = (uint)Emu(spacing.Right),
@@ -697,7 +704,7 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
             new DW.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 },
             Wrap(item),
             properties,
-            new DW.NonVisualGraphicFrameDrawingProperties(),
+            FrameProperties(item),
             graphic)
         {
             DistanceFromTop = (uint)Emu(spacing.Top), DistanceFromBottom = (uint)Emu(spacing.Bottom),
@@ -746,6 +753,7 @@ public sealed class DocxDrawingCodec(IEnumerable<DocxGraphicCodec> codecs, IEnum
         if (content is EmbeddedContent embedded)
             content = embedded.With(embedded.Value with { Description = properties?.Description?.Value, Title = properties?.Title?.Value is { Length: > 0 } title ? title : embedded.Value.Title, NaturalSize = size });
         var source = (OpenXmlElement?)inline ?? anchor!;
+        if (content is EmbeddedContent framed && _aspect.FrameLocked(source)) content = framed.With(framed.Value.WithAspectLock(true));
         var turned = graphic.FlipHorizontal && Math.Abs(graphic.Rotation - 180) < 0.01;
         var item = new AnchoredObject(id, objectAnchor, content, size)
         {

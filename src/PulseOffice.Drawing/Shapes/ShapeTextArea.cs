@@ -37,15 +37,15 @@ public sealed class ShapeTextArea(IPresetGeometryEngine presets, IShapePresets n
         ArgumentNullException.ThrowIfNull(shape);
         if (shape.Dimension is not null || width <= 0 || height <= 0) return ShapeTextMargins.None;
         if (shape.Computed is PresetGeometry preset) return Preset(preset, width, height);
-        if (shape.Computed is FormulaGeometry formula) return Formula(formula, width, height);
+        if (shape.Computed is FormulaGeometry formula) return Formula(formula, shape.Style.Text.Layout.IsVertical, width, height);
         if (shape.Computed is not null) return ShapeTextMargins.None;
         if (shape.Shape == ShapeKind.RoundedRectangle)
             return Rounded(width, height, Math.Clamp(double.IsFinite(shape.CornerRatio) ? shape.CornerRatio : 0.18, 0, 0.5));
         return Preset(new PresetGeometry(names.OoxmlName(shape.Shape)), width, height);
     }
 
-    private ShapeTextMargins Formula(FormulaGeometry geometry, double width, double height) =>
-        formulas.TextArea(geometry) is { } area
+    private ShapeTextMargins Formula(FormulaGeometry geometry, bool vertical, double width, double height) =>
+        formulas.TextArea(geometry, vertical) is { } area
             ? new ShapeTextMargins(width * area.Left, height * area.Top, width * (1 - area.Right), height * (1 - area.Bottom))
             : ShapeTextMargins.None;
 

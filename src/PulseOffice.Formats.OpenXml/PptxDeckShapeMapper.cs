@@ -20,6 +20,7 @@ public sealed class PptxDeckShapeMapper
     private readonly DeckConnectionShapeReader _connections;
     private readonly DeckVectorPictureCodec _vectors;
     private readonly DeckSceneCodec _scenes;
+    private readonly DrawingML.DrawingAspectLock _aspect = new();
 
     public PptxDeckShapeMapper() : this(new PulseOffice.Formats.VectorFallback())
     {
@@ -43,28 +44,31 @@ public sealed class PptxDeckShapeMapper
     }
 
     public OpenXmlElement? Build(ObjectElement element, uint id, SlidePart part) =>
-        _builders.FirstOrDefault(builder => builder.Builds(element.Content))?.Build(element, id, part);
+        _builders.FirstOrDefault(builder => builder.Builds(element.Content))?.Build(element, id, part) is { } built ? _aspect.Mark(built, element.Content) : null;
 
     public bool IsDecoration(ObjectElement element) => element.Content is ShapeObject;
 
-    public OpenXmlElement BuildDecoration(ObjectElement element, uint id) => _shapes.Build(element, id);
+    public OpenXmlElement BuildDecoration(ObjectElement element, uint id) => _aspect.Mark(_shapes.Build(element, id), element.Content);
 
-    public ObjectElement? ReadGeometry(P.Shape shape, string id) => _freeforms.Read(shape, id);
+    public ObjectElement? ReadGeometry(P.Shape shape, string id) => Locked(_freeforms.Read(shape, id), shape);
 
-    public ObjectElement? ReadShape(P.Shape shape, string id) => _shapes.Read(shape, id);
+    public ObjectElement? ReadShape(P.Shape shape, string id) => Locked(_shapes.Read(shape, id), shape);
 
-    public ObjectElement? ReadScene(P.Shape shape, string id) => _scenes.Read(shape, id) ?? _shapes.Read(shape, id);
+    public ObjectElement? ReadScene(P.Shape shape, string id) => Locked(_scenes.Read(shape, id) ?? _shapes.Read(shape, id), shape);
 
-    public ObjectElement? ReadConnection(P.ConnectionShape connection, string id) => _connections.Read(connection, id);
+    public ObjectElement? ReadConnection(P.ConnectionShape connection, string id) => Locked(_connections.Read(connection, id), connection);
 
     public bool IsFontwork(P.Shape shape) => _fontwork.Reads(shape);
 
-    public ObjectElement ReadFontwork(P.Shape shape, string id) => _fontwork.Read(shape, id);
+    public ObjectElement ReadFontwork(P.Shape shape, string id) => Locked(_fontwork.Read(shape, id), shape)!;
 
-    public ObjectElement? ReadFormula(P.Shape shape, string id) => _formulas.Read(shape, id);
+    public ObjectElement? ReadFormula(P.Shape shape, string id) => Locked(_formulas.Read(shape, id), shape);
 
     public ObjectElement? ReadImage(P.Picture picture, SlidePart part, string id) =>
-        _vectors.Read(picture, part, id) ?? _pictures.Read(picture, part, id);
+        Locked(_vectors.Read(picture, part, id) ?? _pictures.Read(picture, part, id), picture);
+
+    private ObjectElement? Locked(ObjectElement? element, OpenXmlElement source) =>
+        element is null ? null : element with { Content = _aspect.Apply(element.Content, source) };
 
     public P.GraphicFrame BuildOle(ObjectElement element, PackagedObject package, uint id, SlidePart part) => _ole.Build(element, package, id, part);
 

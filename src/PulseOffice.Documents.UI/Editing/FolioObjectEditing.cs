@@ -20,6 +20,8 @@ public interface IFolioObjectEditing
 
     bool Replace(FolioEditor editor, Func<EmbeddedObject, EmbeddedObject> change);
 
+    bool ReplaceContents(FolioEditor editor, IReadOnlyDictionary<string, EmbeddedObject> contents);
+
     bool Wrap(FolioEditor editor, WrapMode mode);
 
     bool Contour(FolioEditor editor, bool on);
@@ -74,6 +76,25 @@ public sealed class FolioObjectEditing(
         if (Equals(next, embedded.Value)) return false;
         Swap(editor, item, item.CopyAs(item.Id, item.Anchor, embedded.With(next)), "replace-object");
         return Settle(editor, item.Id);
+    }
+
+    public bool ReplaceContents(FolioEditor editor, IReadOnlyDictionary<string, EmbeddedObject> contents)
+    {
+        if (editor.ReadOnly()) return false;
+        var all = editor.Document.Objects.All;
+        var replaced = all.Select(item => item.Content is EmbeddedContent embedded && !editor.Objects.Locked(item)
+                && contents.TryGetValue(item.Id, out var next) && !Equals(next, embedded.Value)
+                ? item.CopyAs(item.Id, item.Anchor, embedded.With(next))
+                : item).ToList();
+        if (replaced.SequenceEqual(all, ReferenceEqualityComparer.Instance)) return false;
+        var selected = editor.SelectedObjectId;
+        var recorder = new EditRecorder(editor.Document, "replace-object").Touch(editor.Document.Objects, () => editor.Document.Objects.All, editor.Document.Objects.Replace);
+        editor.Document.Objects.Replace(replaced);
+        recorder.Commit(editor.History);
+        editor.Normalize();
+        if (selected is not null) editor.SelectObject(selected);
+        editor.Refresh();
+        return true;
     }
 
     public bool Wrap(FolioEditor editor, WrapMode mode) => Change(editor, item => item.Wrap = mode);

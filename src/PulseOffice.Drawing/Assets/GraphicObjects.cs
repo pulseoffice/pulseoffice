@@ -10,6 +10,8 @@ public sealed record VectorGraphicObject : EmbeddedObject, IDrawingObject
 
     public required VectorAsset Asset { get; init; }
 
+    protected override bool LocksAspectByDefault => true;
+
     public override EmbeddedObjectKind Kind => EmbeddedObjectKind.Shape;
 
     public string? RecolorHex { get; init; }
@@ -68,6 +70,8 @@ public sealed record RasterImageObject : EmbeddedObject, IDrawingObject
     public Document.Embedding.ImageMap Map { get; init; } = new();
 
     public string? LinkPath { get; init; }
+
+    protected override bool LocksAspectByDefault => true;
 
     public override EmbeddedObjectKind Kind => EmbeddedObjectKind.Image;
 

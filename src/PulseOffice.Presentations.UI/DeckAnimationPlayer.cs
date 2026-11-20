@@ -31,7 +31,7 @@ internal sealed class DeckAnimationPlayer(DeckViewState state, IAnimationSchedul
         if (_state.Current is not { } slide || slide.Animations.Count == 0) return;
 
         _playSlide = slide;
-        _playSchedule = _scheduler.Schedule(slide.Animations);
+        _playSchedule = _scheduler.Schedule(slide);
         var total = _scheduler.Duration(_playSchedule) + 400;
 
         _playClock = System.Diagnostics.Stopwatch.StartNew();

@@ -65,7 +65,7 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
 
     private void PaintPicture(RichTextScene scene, TypesetBulletPicture picture, Rect box, TypesetLine line)
     {
-        if (box.Width <= 0 || box.Height <= 0) return;
+        if (box.Width <= 0 || box.Height <= 0 || line.Paragraph.BulletSymbol is { Transparent: true }) return;
         if (pictures.For(picture.Picture.Data) is { } bitmap)
         {
             scene.Context.DrawImage(bitmap, new Rect(bitmap.Size), box);

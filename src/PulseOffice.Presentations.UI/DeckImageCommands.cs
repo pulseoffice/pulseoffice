@@ -16,6 +16,7 @@ public sealed class DeckImageCommands(
     IDialogService dialogs,
     IRasterImageFiles images,
     IRasterImageOperations operations,
+    IPictureCompression compression,
     PulseOffice.UI.Controls.Objects.IEmbeddedFileLauncher launcher,
     IStatusBarService status,
     ITextCatalog texts,
@@ -110,8 +111,25 @@ public sealed class DeckImageCommands(
     private Task ReplaceAsync(CancellationToken ct) =>
         Edit(image => operations.ReplaceAsync(image, ct), "command.deck.image.replace.title");
 
-    private Task CompressAsync(CancellationToken ct) =>
-        Edit(image => operations.CompressAsync(image, ct), "command.deck.image.compress.title");
+    private async Task CompressAsync(CancellationToken ct)
+    {
+        if (Selected() is not { Slide: { } slide, Element: { } element, Image: { } image } || Context.Target is not { } target) return;
+        var pictures = target.Deck.Slides
+            .SelectMany(each => each.Elements.OfType<ObjectElement>()
+                .Where(candidate => candidate.Content is RasterImageObject)
+                .Select(candidate => new CompressiblePicture(Key(each, candidate), (RasterImageObject)candidate.Content, new DocumentSize(candidate.Bounds.Width, candidate.Bounds.Height))))
+            .ToList();
+        var selected = new CompressiblePicture(Key(slide, element), image, new DocumentSize(element.Bounds.Width, element.Bounds.Height));
+        if (await compression.CompressAsync(selected, pictures, ct).ConfigureAwait(true) is not { } changed) return;
+        var changes = target.Deck.Slides
+            .SelectMany(each => each.Elements.OfType<ObjectElement>()
+                .Where(candidate => changed.ContainsKey(Key(each, candidate)))
+                .Select(candidate => (each, candidate.Id, changed[Key(each, candidate)])))
+            .ToList();
+        target.Actions.EditImages(changes, "command.deck.image.compress.title");
+    }
+
+    private static string Key(Slide slide, SlideElement element) => slide.Id + "/" + element.Id;
 
     private async Task SaveAsync(CancellationToken ct)
     {

@@ -403,6 +403,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
 {
     private readonly OdfImageClip _clip = new(measure);
     private readonly OdfImageTone _tones = new();
+    private readonly OdfAspectLockMapper _aspectLocks = new();
 
     private XElement? SignatureFallback(AnchoredObject item, OdtWriteSession session)
     {
@@ -541,6 +542,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
             if (embedded.Title is { } title) frame.Add(new XElement(Svg + "title", title));
             if (embedded.Description is { } description) frame.Add(new XElement(Svg + "desc", description));
             if (embedded is PulseOffice.Document.Forms.SignatureLineObject signatureLine) frame.Add(signatures.Element(signatureLine));
+            _aspectLocks.Write(frame, embedded);
         }
         if (contours.Write(item) is { } polygon) frame.Add(polygon);
         return frame;

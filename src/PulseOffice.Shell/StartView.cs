@@ -436,14 +436,27 @@ public sealed class StartView : UserControl
         };
         button.Classes.Add("startRecent");
 
-        Avalonia.Automation.AutomationProperties.SetName(button, document.Name);
+        Avalonia.Automation.AutomationProperties.SetName(button,
+            document.Pinned ? $"{document.Name} ({_texts["start.pinnedRecent"]})" : document.Name);
         button.Click += (_, _) => OpenRecent(document);
+        button.ContextMenu = RecentMenu(document);
 
         if (!divided) return button;
 
         var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false }
             .Themed(Border.BackgroundProperty, Palette.Keys.Border);
         return new Panel { Children = { button, divider } };
+    }
+
+    private ContextMenu RecentMenu(RecentDocument document)
+    {
+        var pin = new MenuItem { Header = _texts[document.Pinned ? "start.unpinRecent" : "start.pinRecent"] };
+        pin.Click += (_, _) => _recent.SetPinned(document.Path, !document.Pinned);
+
+        var remove = new MenuItem { Header = _texts["start.removeRecent"] };
+        remove.Click += (_, _) => _recent.Forget(document.Path);
+
+        return new ContextMenu { ItemsSource = new[] { pin, remove } };
     }
 
     private void OpenRecent(RecentDocument document)

@@ -38,7 +38,8 @@ public sealed record ObjectPropertiesChoice(
     string? Name,
     string? Title,
     string? Description,
-    ShapeStyle? Style = null);
+    ShapeStyle? Style = null,
+    bool? AspectLock = null);
 
 public interface IFolioObjectDialogs
 {
@@ -67,7 +68,7 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
         var wrap = item.Wrap == WrapMode.TopAndBottom ? WrapMode.None : item.Wrap;
         var position = new List<FormField>
         {
-            new SizeLockField("size", texts["size.title"], new LockedSize(Centimetres(item.Size.Width), Centimetres(item.Size.Height), embedded is not null), "cm", 0.05, 500, 0.1, icons),
+            new SizeLockField("size", texts["size.title"], new LockedSize(Centimetres(item.Size.Width), Centimetres(item.Size.Height), embedded?.LocksAspectRatio == true), "cm", 0.05, 500, 0.1, icons),
             new IconChoiceField("anchor", texts["folio.object.anchor"],
                 [.. _anchors.Select(kind => new IconChoice(Key(kind), $"folio.object.anchor.{Key(kind)}", texts[$"command.folio.object.anchor.{Key(kind)}.title"]))], icons, Math.Max(0, Array.IndexOf(_anchors, anchor))),
             Aligns("horizontalAlign", "folio.object.align.horizontal", _horizontalAligns, item.Placement.HorizontalAlign),
@@ -124,7 +125,8 @@ public sealed class FolioObjectDialogs(IFolioForms forms, ITabbedForms tabbed, I
             Optional(values.Text("name")),
             embedded is null ? null : Optional(values.Text("title")),
             embedded is null ? null : Optional(values.Text("description")),
-            style is null ? null : Restyled(style, values));
+            style is null ? null : Restyled(style, values),
+            embedded is not null && values.TryGetValue("size", out var locking) && locking is LockedSize lockChoice ? lockChoice.Locked : null);
     }
 
     private List<FormField> LookFields(ShapeStyle style) =>

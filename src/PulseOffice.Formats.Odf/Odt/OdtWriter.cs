@@ -52,7 +52,7 @@ public sealed class OdtWriter : ITextDocumentWriter
         var tree = new PulseOffice.Documents.Blocks.BlockTree();
         var catalog = new PulseOffice.Documents.Controls.ContentControlCatalog(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree);
         _fidelity = new OdtFidelityRules(catalog);
-        var inline = new OdtInlineWriter(characters, new OdtFieldTable(new OdtPreservedFields(new PreservedFieldTable(), new OdfParagraphText()), new OdfParagraphText()), direct, names, new OdfParagraphText(), marks,
+        var inline = new OdtInlineWriter(characters, new OdtFieldTable(new OdtPreservedFields(new PreservedFieldTable(), new OdfParagraphText()), new OdfParagraphText(), new OdtDatePictures()), direct, names, new OdfParagraphText(), marks,
             new OdtContentControls(new PulseOffice.Documents.Controls.ContentControlLockTokens()),
             catalog,
             new PulseOffice.Documents.Marks.MarkOrder());
@@ -239,6 +239,7 @@ internal sealed class OdtDocumentWriter(
 
         var officeStyles = styles.Styles(document, session);
         officeStyles.Add(session.Drawing.Deck.ShapeStyles.Definitions, session.Drawing.Deck.FillImages());
+        officeStyles.AddFirst(session.FieldDataStyleElements);
         var (fonts, fontFiles) = new OdfFontFaceWriter().Build(session.Fonts.OrderBy(font => font, StringComparer.OrdinalIgnoreCase), document.Fonts);
 
         package.WriteXml("content.xml", new XDocument(new XElement(Office + "document-content",

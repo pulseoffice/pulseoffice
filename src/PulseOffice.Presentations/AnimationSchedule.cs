@@ -1,6 +1,6 @@
 namespace PulseOffice.Presentations;
 
-public readonly record struct ScheduledEffect(AnimationEffect Effect, int StartMs, int EndMs, int TriggerMs, int LoopUntilMs = 0)
+public readonly record struct ScheduledEffect(AnimationEffect Effect, int StartMs, int EndMs, int TriggerMs, int LoopUntilMs = 0, int SpanMs = 0)
 {
     public bool LoopsAt(int timeMs) => Effect.RepeatsIndefinitely && timeMs >= StartMs && timeMs < LoopUntilMs;
 }
@@ -17,6 +17,10 @@ public interface IAnimationScheduler
     IReadOnlyList<ScheduledEffect> Schedule(IReadOnlyList<AnimationEffect> effects);
 
     IReadOnlyList<ScheduledEffect> ScheduleTriggered(IReadOnlyList<AnimationEffect> effects, string triggerShapeId);
+
+    IReadOnlyList<ScheduledEffect> Schedule(Slide slide);
+
+    IReadOnlyList<ScheduledEffect> ScheduleTriggered(Slide slide, string triggerShapeId);
 
     IReadOnlyList<(int StartMs, int EndMs)> TriggerGroups(IReadOnlyList<ScheduledEffect> schedule);
 
@@ -64,9 +68,36 @@ public sealed class AnimationScheduler : IAnimationScheduler
         return Plan([.. effects.Where(effect => effect.IsTriggered && string.Equals(effect.TriggerShapeId, triggerShapeId, StringComparison.Ordinal))]);
     }
 
+    public IReadOnlyList<ScheduledEffect> Schedule(Slide slide)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        return Plan([.. slide.Animations.Where(effect => !effect.IsTriggered)], slide);
+    }
+
+    public IReadOnlyList<ScheduledEffect> ScheduleTriggered(Slide slide, string triggerShapeId)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        return Plan([.. slide.Animations.Where(effect => effect.IsTriggered && string.Equals(effect.TriggerShapeId, triggerShapeId, StringComparison.Ordinal))], slide);
+    }
+
     public IReadOnlyList<(int StartMs, int EndMs)> TriggerGroups(IReadOnlyList<ScheduledEffect> schedule) => Groups(schedule);
 
-    private List<ScheduledEffect> Plan(IReadOnlyList<AnimationEffect> effects)
+    private int SpanOf(AnimationEffect effect, Slide? slide)
+    {
+        var duration = Math.Max(1, effect.DurationMs);
+        if (slide is null || effect.Category is not (AnimationCategory.Entrance or AnimationCategory.Exit)) return duration;
+        var unit = _iteration.UnitOf(effect);
+        if (unit == TextIterationUnit.None) return duration;
+        var target = slide.Elements.FirstOrDefault(element => element.Id == effect.TargetId);
+        if (target is null) return duration;
+        var units = _iteration.UnitCount(target, unit);
+        return Saturated(duration + (long)Interval(effect) * Math.Max(0, units - 1));
+    }
+
+    private int Interval(AnimationEffect effect) =>
+        (int)Math.Round(Math.Clamp(effect.Native?.Behaviours?.IterateInterval ?? 0, 0, 3600) * 1000);
+
+    private List<ScheduledEffect> Plan(IReadOnlyList<AnimationEffect> effects, Slide? slide = null)
     {
 
         var scheduled = new List<ScheduledEffect>(effects.Count);
@@ -85,9 +116,10 @@ public sealed class AnimationScheduler : IAnimationScheduler
             };
 
             var start = Saturated((long)baseline + Math.Max(0, effect.DelayMs));
-            var end = Saturated(start + (long)Math.Max(1, effect.DurationMs) * Math.Max(1, effect.Repeat));
+            var span = SpanOf(effect, slide);
+            var end = Saturated(start + (long)span * Math.Max(1, effect.Repeat));
 
-            scheduled.Add(new ScheduledEffect(effect, start, end, baseline));
+            scheduled.Add(new ScheduledEffect(effect, start, end, baseline, 0, span));
 
             previousStart = start;
             previousEnd = end;
@@ -177,7 +209,7 @@ public sealed class AnimationScheduler : IAnimationScheduler
             var progress = scheduled.LoopsAt(timeMs) ? Cycle(scheduled, timeMs + Math.Max(0, loopElapsedMs)) : Progress(scheduled, timeMs);
             if (Iterated(scheduled, timeMs) is { } reveal)
             {
-                visual = visual with { Reveal = reveal with { Progress = progress } };
+                visual = visual with { Opacity = 1, OffsetX = 0, OffsetY = 0, Scale = 1, Reveal = reveal };
                 continue;
             }
 
@@ -194,8 +226,11 @@ public sealed class AnimationScheduler : IAnimationScheduler
         var unit = _iteration.UnitOf(effect);
         if (unit == TextIterationUnit.None) return null;
         var behaviours = effect.Native!.Behaviours!;
-        var interval = (int)Math.Round(Math.Max(0, behaviours.IterateInterval ?? 0) * 1000);
-        return new TextReveal(unit, behaviours.IterateBackwards, effect.Category == AnimationCategory.Exit, timeMs - scheduled.StartMs, interval, 0);
+        var span = Math.Max(1, scheduled.SpanMs > 0 ? scheduled.SpanMs : effect.DurationMs);
+        var elapsed = Math.Max(0, timeMs - scheduled.StartMs) % span;
+        var motion = _motions.For(effect);
+        Func<double, double>? opacity = motion is StillMotion ? null : progress => motion.Visual(progress, ElementVisual.Shown).Opacity;
+        return new TextReveal(unit, behaviours.IterateBackwards, effect.Category == AnimationCategory.Exit, elapsed, Interval(effect), Math.Max(1, effect.DurationMs), opacity);
     }
 
     private double Progress(ScheduledEffect scheduled, int timeMs)
@@ -203,7 +238,7 @@ public sealed class AnimationScheduler : IAnimationScheduler
         if (timeMs <= scheduled.StartMs) return 0;
         if (timeMs >= scheduled.EndMs) return 1;
 
-        var iteration = Math.Max(1, scheduled.Effect.DurationMs);
+        var iteration = Math.Max(1, scheduled.SpanMs > 0 ? scheduled.SpanMs : scheduled.Effect.DurationMs);
         return (double)((timeMs - scheduled.StartMs) % iteration) / iteration;
     }
 

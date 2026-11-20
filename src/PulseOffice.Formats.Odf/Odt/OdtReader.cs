@@ -36,7 +36,7 @@ public sealed class OdtReader : ITextDocumentReader
         var columns = new OdtColumnsCodec(measure);
         var lookup = new OdtStyleLookup(characters, paragraphCodec);
         var objects = new OdtObjectReader(measure, frames, new OdfImageTypes(), new OdfImageMapCodec(), new OdtDrawingReader(new PulseOffice.Documents.Objects.GroupStories()), new OdtContours(measure), new OdfSignatureLineCodec(new SignatureLineImage()));
-        var inline = new OdtInlineReader(lookup, new OdtFieldTable(new OdtPreservedFields(new PreservedFieldTable(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()), direct, new OdtCommentReader(), new OdtNoteReader(vocabulary), objects,
+        var inline = new OdtInlineReader(lookup, new OdtFieldTable(new OdtPreservedFields(new PreservedFieldTable(), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText()), new PulseOffice.Formats.Odf.TextCodecs.OdfParagraphText(), new OdtDatePictures()), direct, new OdtCommentReader(), new OdtNoteReader(vocabulary), objects,
             new OdtContentControls(new PulseOffice.Documents.Controls.ContentControlLockTokens()),
             new OdtLegacyFormFields(new PulseOffice.Documents.Controls.LegacyFormFieldConverter()));
         var tree = new PulseOffice.Documents.Blocks.BlockTree();

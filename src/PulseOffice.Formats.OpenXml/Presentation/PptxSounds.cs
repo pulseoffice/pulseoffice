@@ -50,6 +50,19 @@ internal sealed class PptxSounds(SoundTypes types)
     public P.SoundAction Transition(PptxSoundReference sound, bool loop) =>
         new(new P.StartSoundAction(new P.Sound { Embed = sound.RelationshipId, Name = sound.Name }) { Loop = loop ? true : null });
 
+    public const string SoundCutNamespace = "urn:pulseoffice:presentation-sound";
+
+    public const string SoundCutUri = "{3B1F7C2E-8D4A-4E61-A5C9-7F0D2B6E9A14}";
+
+    public DocumentFormat.OpenXml.OpenXmlElement SoundCut() =>
+        new DocumentFormat.OpenXml.OpenXmlUnknownElement("p", "extLst", "http://schemas.openxmlformats.org/presentationml/2006/main")
+        {
+            InnerXml = $"<p:ext xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" uri=\"{SoundCutUri}\"><pulsesound:soundCut xmlns:pulsesound=\"{SoundCutNamespace}\"/></p:ext>",
+        };
+
+    public bool CutsSound(DocumentFormat.OpenXml.OpenXmlElement? transition) =>
+        transition?.Descendants().Any(element => element.LocalName == "soundCut" && element.NamespaceUri == SoundCutNamespace) == true;
+
     public D.HyperlinkSound Click(PptxSoundReference sound) => new() { Embed = sound.RelationshipId, Name = sound.Name };
 
     public bool Plays(string? path, PulseOffice.Presentations.Presentation deck) => deck.Sounds.Find(path) is not null;
@@ -70,7 +83,12 @@ internal sealed class PptxSoundReader(PptxSounds sounds, PptxTransitionMapper tr
         var library = source.Sounds;
         if (transitions.Find(source.Slide.Slide)?.Descendants<P.StartSoundAction>().FirstOrDefault() is { } start
             && sounds.Read(start.GetFirstChild<P.Sound>(), source.Slide, library) is { } transitionSound)
-            slide.Transition = slide.Transition with { SoundPath = transitionSound, LoopSoundUntilNext = start.Loop?.Value == true };
+            slide.Transition = slide.Transition with
+            {
+                SoundPath = transitionSound,
+                LoopSoundUntilNext = start.Loop?.Value == true,
+                SoundPlaysToEnd = start.Loop?.Value == true || !sounds.CutsSound(transitions.Find(source.Slide.Slide)),
+            };
         else if (transitions.Find(source.Slide.Slide)?.Descendants<P.EndSoundAction>().Any() == true)
             slide.Transition = slide.Transition with { StopPreviousSound = true };
 

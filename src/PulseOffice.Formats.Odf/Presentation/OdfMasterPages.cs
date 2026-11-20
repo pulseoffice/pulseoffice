@@ -85,6 +85,7 @@ internal sealed class OdfMasterPages
                 }));
                 if (master.BackgroundLayout.Width.Value > 0) pageProperties.Add(new XAttribute(Draw + "fill-image-width", _units.Cm(master.BackgroundLayout.Width)));
                 if (master.BackgroundLayout.Height.Value > 0) pageProperties.Add(new XAttribute(Draw + "fill-image-height", _units.Cm(master.BackgroundLayout.Height)));
+                _tones.WriteBackground(pageProperties, backgroundImage.Tone);
             }
             masterPages.Add(pageProperties);
             automaticStyles.Add(new XElement(Style + "style",
@@ -309,6 +310,8 @@ internal sealed class OdfMasterPages
             .Element(Style + "drawing-page-properties"), definitions);
     }
 
+    private readonly OdfImageTone _tones = new();
+
     private PulseOffice.Drawing.Assets.RasterImageObject? BackgroundImage(XElement page, XElement? automatic, IReadOnlyDictionary<string, XElement> definitions, string id)
     {
         var styleName = (string?)page.Attribute(Draw + "style-name");
@@ -331,6 +334,7 @@ internal sealed class OdfMasterPages
             Id = $"{id}.bg",
             Data = data,
             MediaType = _header.MediaType(data) ?? "image/png",
+            Tone = _tones.ReadBackground(properties),
             NaturalSize = new PulseOffice.Foundation.Units.DocumentSize(PulseOffice.Foundation.Units.Twip.Zero, PulseOffice.Foundation.Units.Twip.Zero),
         };
     }

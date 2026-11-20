@@ -60,6 +60,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         foreach (var (kind, keyword) in _simple)
         {
             if (kind != run.Field) continue;
+            if (kind == TextFieldKind.PageNumber && detail?.Value is { Length: > 0 } shape) return $" {keyword} \\* {WordShape(shape)} ";
             return detail?.Format is { Length: > 0 } format && kind is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate
                 ? $" {keyword} \\@ {Quote(pictures.ToWord(format))} "
                 : $" {keyword} ";
@@ -76,13 +77,15 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
                 _ => $" REF {argument} \\h ",
             },
             TextFieldKind.NoteReference => $" NOTEREF {DocxNoteBookmarks.Prefix}{argument} \\h ",
-            TextFieldKind.Sequence => $" SEQ {argument} \\* ARABIC ",
+            TextFieldKind.Sequence => $" SEQ {argument} \\* {WordShape(detail?.Value)} ",
             TextFieldKind.Variable => userVariables.ContainsKey(argument!) ? $" DOCVARIABLE {argument} " : $" REF {argument} \\h ",
             TextFieldKind.VariableSet => $" SET {argument} {Quote(detail?.Format ?? run.Text)} ",
             TextFieldKind.HiddenParagraph => $" IF {WordCondition(argument!)} \"\" \"\" ",
             TextFieldKind.ConditionalText => $" IF {WordCondition(argument!)} {Quote(detail?.WhenTrue ?? string.Empty)} {Quote(detail?.WhenFalse ?? string.Empty)} ",
             TextFieldKind.CustomProperty => $" DOCPROPERTY {Quote(argument!)} ",
-            TextFieldKind.Database => argument!.Contains(' ', StringComparison.Ordinal) ? $" MERGEFIELD {Quote(argument)} " : $" MERGEFIELD {argument} ",
+            TextFieldKind.Database => (argument!.Contains(' ', StringComparison.Ordinal) ? $" MERGEFIELD {Quote(argument)} " : $" MERGEFIELD {argument} ")
+                + (detail?.WhenTrue is { Length: > 0 } before ? $"\\b {Quote(before)} " : string.Empty)
+                + (detail?.WhenFalse is { Length: > 0 } after ? $"\\f {Quote(after)} " : string.Empty),
             TextFieldKind.Citation => $" CITATION {argument} ",
             TextFieldKind.Chapter => argument == "number" ? $" STYLEREF {Quote(ChapterStyle)} \\n " : $" STYLEREF {Quote(ChapterStyle)} ",
             _ => null,
@@ -100,6 +103,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         foreach (var (kind, simple) in _simple)
         {
             if (simple != keyword) continue;
+            if (kind == TextFieldKind.PageNumber) return new DocxField(kind, null, SequenceShape(words));
             var format = Switch(words, "\\@");
             return new DocxField(kind, null, format is null ? null : new FieldDetail { Format = pictures.FromWord(format) });
         }
@@ -109,12 +113,12 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             "REF" when argument is not null => new DocxField(TextFieldKind.Bookmark, argument, Reference(switches)),
             "PAGEREF" when argument is not null => new DocxField(TextFieldKind.Bookmark, argument, new FieldDetail { Format = "page" }),
             "NOTEREF" when argument is not null => new DocxField(TextFieldKind.NoteReference, argument),
-            "SEQ" when argument is not null && PlainSequence(words, switches) => new DocxField(TextFieldKind.Sequence, argument),
+            "SEQ" when argument is not null && PlainSequence(words, switches) => new DocxField(TextFieldKind.Sequence, argument, SequenceShape(words)),
             "DOCVARIABLE" when argument is not null => new DocxField(TextFieldKind.Variable, argument),
             "SET" when argument is not null => new DocxField(TextFieldKind.VariableSet, argument, new FieldDetail { Format = words.Count > 2 ? words[2].Text : string.Empty }),
             "IF" when words.Count >= 4 => Conditional(words),
             "DOCPROPERTY" when argument is not null => new DocxField(TextFieldKind.CustomProperty, argument),
-            "MERGEFIELD" when argument is not null => new DocxField(TextFieldKind.Database, argument),
+            "MERGEFIELD" when argument is not null => new DocxField(TextFieldKind.Database, argument, Affixes(words)),
             "CITATION" when argument is not null => new DocxField(TextFieldKind.Citation, argument),
             "STYLEREF" => new DocxField(TextFieldKind.Chapter, switches.Contains("\\n") ? "number" : null),
             _ when _structural.Contains(keyword) => null,
@@ -122,12 +126,38 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         };
     }
 
+    private readonly IReadOnlyList<(string Word, string Ours)> _sequenceShapes =
+    [
+        ("ROMAN", PulseOffice.Documents.Fields.SequenceFormats.UpperRoman),
+        ("roman", PulseOffice.Documents.Fields.SequenceFormats.LowerRoman),
+        ("ALPHABETIC", PulseOffice.Documents.Fields.SequenceFormats.UpperLetter),
+        ("alphabetic", PulseOffice.Documents.Fields.SequenceFormats.LowerLetter),
+    ];
+
+    private string WordShape(string? ours) => _sequenceShapes.FirstOrDefault(shape => shape.Ours == ours).Word ?? "ARABIC";
+
+    private IEnumerable<string> Shapes(IReadOnlyList<(string Text, bool Quoted)> words) =>
+        words.Select((word, i) => (word, i)).Where(pair => !pair.word.Quoted && pair.word.Text.StartsWith("\\*", StringComparison.Ordinal))
+            .Select(pair => pair.word.Text.Length > 2 ? pair.word.Text[2..] : pair.i + 1 < words.Count ? words[pair.i + 1].Text : string.Empty);
+
+    private FieldDetail? SequenceShape(IReadOnlyList<(string Text, bool Quoted)> words) =>
+        Shapes(words).Select(shape => _sequenceShapes.FirstOrDefault(known => known.Word == shape).Ours).FirstOrDefault(ours => ours is not null) is { } value
+            ? new FieldDetail { Value = value }
+            : null;
+
+    private FieldDetail? Affixes(IReadOnlyList<(string Text, bool Quoted)> words)
+    {
+        var before = Switch(words, "\\b");
+        var after = Switch(words, "\\f");
+        return string.IsNullOrEmpty(before) && string.IsNullOrEmpty(after) ? null : new FieldDetail { WhenTrue = before, WhenFalse = after };
+    }
+
     private bool PlainSequence(IReadOnlyList<(string Text, bool Quoted)> words, IReadOnlyList<string> switches) =>
         !switches.Any(item => item is "\\c" or "\\h" or "\\n" or "\\r" or "\\s" || item.StartsWith("\\#", StringComparison.Ordinal))
         && Switch(words, "\\@") is null
-        && words.Select((word, i) => (word, i)).Where(pair => !pair.word.Quoted && pair.word.Text.StartsWith("\\*", StringComparison.Ordinal))
-            .Select(pair => pair.word.Text.Length > 2 ? pair.word.Text[2..] : pair.i + 1 < words.Count ? words[pair.i + 1].Text : string.Empty)
-            .All(shape => shape.Equals("ARABIC", StringComparison.OrdinalIgnoreCase) || shape.Equals("MERGEFORMAT", StringComparison.OrdinalIgnoreCase));
+        && Shapes(words).Count(shape => !shape.Equals("MERGEFORMAT", StringComparison.OrdinalIgnoreCase)) <= 1
+        && Shapes(words).All(shape => shape.Equals("ARABIC", StringComparison.OrdinalIgnoreCase) || shape.Equals("MERGEFORMAT", StringComparison.OrdinalIgnoreCase)
+            || _sequenceShapes.Any(known => known.Word == shape));
 
     private readonly IReadOnlySet<string> _structural = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {

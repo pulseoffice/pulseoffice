@@ -53,7 +53,7 @@ internal abstract class OdpObjectReader(OdfAltTextMapper altText) : OdpPageReade
             if (ReadOne(node, assembly.NextId(Kind), context) is { } element)
             {
                 assembly.Remember((string?)node.Attribute(XmlId) ?? (string?)node.Attribute(Draw + "id"), element.Id);
-                assembly.Add(_rotation.Read(node, element) with { ZOrder = Position(node), Content = new OdfObjectNameMapper().Read(altText.Read(element.Content, node), node) });
+                assembly.Add(_rotation.Read(node, element) with { ZOrder = Position(node), Content = new OdfAspectLockMapper().Read(new OdfObjectNameMapper().Read(altText.Read(element.Content, node), node), node) });
             }
     }
 

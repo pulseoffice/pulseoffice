@@ -32,6 +32,7 @@ public sealed class PresentationWindow : Window
 
     private readonly Canvas _ink = new() { IsHitTestVisible = false };
     private readonly ShowKeypad _keypad = new();
+    private readonly ShowCurtainCaption _caption;
     private readonly TextBlock _endMessage = new()
     {
         Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
@@ -107,7 +108,7 @@ public sealed class PresentationWindow : Window
         _controlChanged = options.ControlChanged;
         _penBrush = new SolidColorBrush(ParseColor(options.PenColor));
         _laser.Fill = _penBrush;
-        _endMessage.Text = options.EndOfShowText;
+        _caption = new ShowCurtainCaption(_endMessage, options.EndOfShowText, options.Texts?["deck.present.pauseCountdown"]);
         _curtain.Child = _endMessage;
         _announcer = new ShowAnnouncer(options.Texts, options.EndOfShowText);
         _controller = new PresentationController([.. options.Playlist is { Count: > 0 } list ? list : deck.Slides], scheduler, options.StartIndex, ignoreSteps: _withoutAnimation);
@@ -237,7 +238,7 @@ public sealed class PresentationWindow : Window
     {
         _curtain.IsVisible = _keypad.Screen != ShowCurtain.Slide;
         _curtain.Background = _keypad.Screen == ShowCurtain.White ? Brushes.White : Brushes.Black;
-        _endMessage.IsVisible = _keypad.Screen == ShowCurtain.End && _endMessage.Text is { Length: > 0 };
+        _caption.Refresh(_keypad.Screen);
         _announcer.Screen(_keypad.Screen, SlideNumber, SlideTotal);
     }
 
@@ -396,7 +397,7 @@ public sealed class PresentationWindow : Window
                 PlayTransition(slideBefore, _controller.SlideIndex);
                 break;
             case AdvanceResult.Finished:
-                if (_loop && Playlist.Count > 0) _loopClock.Loop(() => { _keypad.Pause(); RefreshScreen(); }, () => { _keypad.Resume(); Restart(_controller.SlideIndex); RefreshScreen(); });
+                if (_loop && Playlist.Count > 0) _loopClock.Loop(() => { _keypad.Pause(); RefreshScreen(); }, () => { _keypad.Resume(); Restart(_controller.SlideIndex); RefreshScreen(); }, seconds => _caption.Countdown(_keypad.Screen, seconds));
                 else if (_rehearse) Close();
                 else
                 {

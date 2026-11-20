@@ -52,6 +52,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<PageGeometries>();
         services.AddSingleton<IContinuousLayout, ContinuousLayout>();
         services.AddSingleton<IPageGeometries, ViewPageGeometries>();
+        services.TryAddSingleton<PulseOffice.Documents.Fields.ISequenceNumerals, PulseOffice.Documents.Fields.SequenceNumerals>();
         services.AddSingleton<IPageFieldText, PageFieldText>();
         services.AddSingleton<IPageNumberText, PageNumberText>();
         services.AddSingleton<IPageCountFields, PageCountFields>();

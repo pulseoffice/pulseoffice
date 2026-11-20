@@ -153,7 +153,7 @@ public sealed class FolioObjectCommands(
                 target.Name = choice.Name;
             });
             if (choice.Contour && item.Contour is null) objects.Contour(editor, true);
-            if (item.Content is EmbeddedContent) objects.Replace(editor, content => Restyled(content with { Title = choice.Title, Description = choice.Description }, choice.Style));
+            if (item.Content is EmbeddedContent) objects.Replace(editor, content => Restyled((choice.AspectLock is { } locked ? content.WithAspectLock(locked) : content) with { Title = choice.Title, Description = choice.Description }, choice.Style));
         }
     }
 

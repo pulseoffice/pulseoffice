@@ -14200,3 +14200,27 @@ docs/deep-audit/round-272-shape-autofit-modules.md.
   shape's text area is the evaluated DrawingML text rectangle and enhanced geometries use `draw:text-areas`; pictures
   keep their proportions on corner drags in the three modules (Shift frees them); Compress Pictures can delete cropped
   areas. Log: docs/deep-audit/round-285-table-regions-text-areas-images.md.
+
+### Round 286: Deck iterated effects and show leftovers (2026-11-20)
+- Iterated effects follow PowerPoint: one unit starts every iteration delay and each unit plays the whole effect (fade
+  per unit), so the step lasts duration plus delay times units less one; drawn shapes reveal their text by unit too,
+  picture bullets of unrevealed paragraphs are hidden, the pause between loops shows a countdown, and the sound cut of
+  the last slide crosses PPTX through a slide transition extension. Log: docs/deep-audit/round-286-iterated-effects.md.
+
+### Round 287: image and shape leftovers (2026-11-20)
+- Pictures and shapes carry an aspect ratio lock (pictures on, shapes off by default) followed by corner drags and set
+  from the shared Size dialog checkbox in the three modules; OOXML reads and writes `picLocks`, `spLocks` and
+  `graphicFrameLocks`, ODF a `pulsedraw:lock-aspect-ratio` extension; Compress Pictures targets a resolution at the
+  displayed size and can apply to every picture; background image tone crosses PPTX and ODP; vertical text uses the
+  second `draw:text-areas` rectangle. Log: docs/deep-audit/round-287-image-shape-leftovers.md.
+
+## Round 288 — shell audit, recent documents (2026-11-20)
+Recent documents can be pinned (persisted, kept first, beyond the shown count, through Clear and missing files);
+welcome page context menu to pin, unpin and remove. Most of the shell area was not covered and is queued. Log:
+docs/deep-audit/round-288-shell-recent-pinning.md.
+
+### Round 289: Folio fields, cross-references and mail merge (2026-11-20)
+- Merge conditions on record columns are evaluated per record in the output and the preview; each merged record gets
+  its own page styles when headers or footers hold merge fields; sequence and page number fields keep their numerals
+  through DOCX and ODT; date and time field formats cross ODF as native data styles; `MERGEFIELD \b`/`\f` text is kept
+  and applied. Log: docs/deep-audit/round-289-folio-fields-merge.md.

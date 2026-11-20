@@ -38,6 +38,8 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
         return name;
     }
 
+    private readonly OdfImageTone _tones = new();
+
     private XElement ImageFill(PulseOffice.Drawing.Assets.RasterImageObject image, BackgroundImageLayout layout, int number, OdpWriteSession session)
     {
         var path = $"Pictures/bg_{number}.{units.Images.Extension(image.MediaType)}";
@@ -55,6 +57,7 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
         if (layout.Width.Value > 0) properties.Add(new XAttribute(Draw + "fill-image-width", $"{Math.Round(layout.Width.ToCentimeters(), 3).ToString(CultureInfo.InvariantCulture)}cm"));
         if (layout.Height.Value > 0) properties.Add(new XAttribute(Draw + "fill-image-height", $"{Math.Round(layout.Height.ToCentimeters(), 3).ToString(CultureInfo.InvariantCulture)}cm"));
         if (layout.Opacity < 1) properties.Add(new XAttribute(Draw + "opacity", $"{Math.Round(layout.Opacity * 100, 1).ToString(CultureInfo.InvariantCulture)}%"));
+        _tones.WriteBackground(properties, image.Tone);
         return properties;
     }
 

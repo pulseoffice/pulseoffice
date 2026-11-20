@@ -195,7 +195,13 @@ public sealed class SlideRenderer : ISlideRenderer
         using var animation = visual.IsIdentity ? default : context.PushTransform(placement.Animated(visual));
         using var rotation = element.RotationDegrees == 0 ? default : context.PushTransform(placement.Rotated(element.RotationDegrees));
 
-        if (!visual.Reveal.IsWhole && element is TextElement iterated) element = iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal) };
+        if (!visual.Reveal.IsWhole)
+            element = element switch
+            {
+                TextElement iterated => iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal, theme) },
+                ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject shape } drawn => drawn with { Content = _iteration.Reveal(shape, visual.Reveal) },
+                _ => element,
+            };
         element.Accept(new ElementPaintVisitor(
             new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language, Painted = palette.Painted } }, _text, _media, _content));
     }

@@ -22,7 +22,10 @@ public sealed class FolioFieldRefresh(IFieldUpdater fields, IIndexEditing indexe
 {
     private const int Passes = 3;
 
-    private readonly IReadOnlySet<TextFieldKind> _mergeKinds = new HashSet<TextFieldKind> { TextFieldKind.Database };
+    private readonly IReadOnlySet<TextFieldKind> _mergeKinds = new HashSet<TextFieldKind>
+    {
+        TextFieldKind.Database, TextFieldKind.ConditionalText, TextFieldKind.HiddenText, TextFieldKind.HiddenParagraph,
+    };
 
     public IFieldLayoutFacts Facts(FolioEditor editor) => facts.Create(editor.Document, editor.Layout);
 

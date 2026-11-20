@@ -87,7 +87,7 @@ public sealed class ObjectManipulator : IObjectManipulator
         new(this, handle, start, startRotation) { KeepsAspect = keepsAspect };
 
     public bool KeepsAspect(PulseOffice.Document.Embedding.EmbeddedObject? content) =>
-        content is PulseOffice.Drawing.Assets.RasterImageObject or PulseOffice.Drawing.Assets.VectorGraphicObject;
+        content?.LocksAspectRatio == true;
 
     public ObjectHandle HandleAt(ObjectBox box, double rotationDegrees, double x, double y, double unit = 1)
     {

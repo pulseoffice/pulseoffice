@@ -36,6 +36,7 @@ internal sealed class PageStyleApplier
                 Data = data,
                 MediaType = context.Values.MediaType(href),
                 NaturalSize = new DocumentSize(Twip.Zero, Twip.Zero),
+                Tone = styles.PageImageTones.TryGetValue(name, out var tone) ? tone : PulseOffice.Drawing.Assets.ImageTone.Neutral,
             };
     }
 }

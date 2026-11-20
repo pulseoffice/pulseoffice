@@ -180,6 +180,8 @@ public sealed record BulletSymbol(string Character)
     public bool SymbolCharset { get; init; }
 
     public ListBulletPicture? Picture { get; init; }
+
+    public bool Transparent => Color is { } colour && colour >> 24 == 0;
 }
 
 public sealed record ListBulletPicture(ReadOnlyMemory<byte> Data, string MediaType, double Width, double Height)

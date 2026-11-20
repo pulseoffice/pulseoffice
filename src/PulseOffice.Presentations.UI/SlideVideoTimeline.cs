@@ -20,7 +20,7 @@ public sealed class SlideVideoTimeline(IAnimationScheduler scheduler) : ISlideVi
     public int AnimatedMs(Slide slide)
     {
         ArgumentNullException.ThrowIfNull(slide);
-        return slide.Animations.Count == 0 ? 0 : Math.Max(0, scheduler.Duration(scheduler.Schedule(slide.Animations)));
+        return slide.Animations.Count == 0 ? 0 : Math.Max(0, scheduler.Duration(scheduler.Schedule(slide)));
     }
 
     public IReadOnlyList<SlideVideoShot> Shots(IReadOnlyList<Slide> slides, Func<Slide, int> durationOf)

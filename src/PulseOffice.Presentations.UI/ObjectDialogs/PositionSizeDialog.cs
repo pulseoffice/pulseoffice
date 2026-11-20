@@ -28,7 +28,7 @@ public sealed class PositionSizeDialog(IActiveDeckContext context, IDialogServic
                 [
                     new NumberField("x", Texts["deck.position.x"], Round(bounds.Left), -limit, limit, 0.1),
                     new NumberField("y", Texts["deck.position.y"], Round(bounds.Top), -limit, limit, 0.1),
-                    new SizeLockField("size", Texts["size.title"], new LockedSize(Round(bounds.Width), Round(bounds.Height), element is ObjectElement { Content: PulseOffice.Drawing.Assets.RasterImageObject } or MediaElement), "cm", 0.1, limit, 0.1, icons),
+                    new SizeLockField("size", Texts["size.title"], new LockedSize(Round(bounds.Width), Round(bounds.Height), element is ObjectElement { Content.LocksAspectRatio: true } or MediaElement), "cm", 0.1, limit, 0.1, icons),
                     new NumberField("rotation", Texts["deck.position.rotation"], Math.Round(element.RotationDegrees, 1), -360, 360, 1),
                 ],
                 Texts),
@@ -37,7 +37,10 @@ public sealed class PositionSizeDialog(IActiveDeckContext context, IDialogServic
 
         if (values is null) return null;
 
-        return element with
+        var resized = element is ObjectElement placed && values["size"] is LockedSize chosen
+            ? placed with { Content = placed.Content.WithAspectLock(chosen.Locked) }
+            : element;
+        return resized with
         {
             Bounds = values["size"] is LockedSize size
                 ? new DocumentRect(Cm(values["x"]), Cm(values["y"]), Twip.FromCentimeters(size.Width), Twip.FromCentimeters(size.Height))

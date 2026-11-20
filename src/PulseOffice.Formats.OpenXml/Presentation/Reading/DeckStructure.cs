@@ -161,6 +161,7 @@ internal sealed class PptxMasterReader(
             Data = buffer.ToArray(),
             MediaType = part.ContentType,
             Duotone = backgrounds.Duotone(blip.Blip),
+            Tone = backgrounds.Tone(blip.Blip),
         };
     }
 

@@ -66,10 +66,12 @@ internal sealed class PptxMasterWriter(
 {
     private readonly OoxmlPendingImages _pending = new();
     private readonly DrawingML.DrawingDuotone _duotones = new();
+    private readonly DrawingML.DrawingImageTone _tones = new();
 
     private D.Blip Duotoned(D.Blip blip, PulseOffice.Drawing.Assets.RasterImageObject image)
     {
         _duotones.Write(blip, image.Duotone);
+        _tones.Write(blip, image.Tone with { Transparency = 0 });
         return blip;
     }
 

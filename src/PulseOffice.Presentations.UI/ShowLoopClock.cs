@@ -10,6 +10,7 @@ public sealed class ShowLoopClock
     private readonly int _restartMs;
     private DispatcherTimer? _pause;
     private DispatcherTimer? _idle;
+    private DispatcherTimer? _countdown;
     private Action? _restartAfterPause;
 
     public ShowLoopClock(bool kiosk, int pauseMs, int restartMs)
@@ -25,7 +26,9 @@ public sealed class ShowLoopClock
 
     public bool Restarts => _kiosk && _restartMs > 0;
 
-    public void Loop(Action paused, Action restart)
+    public int SecondsLeft(int elapsedMs) => (int)Math.Ceiling(Math.Max(0, _pauseMs - Math.Max(0, elapsedMs)) / 1000.0);
+
+    public void Loop(Action paused, Action restart, Action<int>? remaining = null)
     {
         ArgumentNullException.ThrowIfNull(paused);
         ArgumentNullException.ThrowIfNull(restart);
@@ -41,6 +44,12 @@ public sealed class ShowLoopClock
         _pause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(_pauseMs) };
         _pause.Tick += (_, _) => SkipPause();
         _pause.Start();
+        if (remaining is null) return;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        remaining(SecondsLeft(0));
+        _countdown = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _countdown.Tick += (_, _) => remaining(SecondsLeft((int)clock.ElapsedMilliseconds));
+        _countdown.Start();
     }
 
     public bool SkipPause()
@@ -48,6 +57,7 @@ public sealed class ShowLoopClock
         if (_restartAfterPause is not { } restart) return false;
         _restartAfterPause = null;
         Stop(ref _pause);
+        Stop(ref _countdown);
         restart();
         return true;
     }
@@ -70,6 +80,7 @@ public sealed class ShowLoopClock
     {
         _restartAfterPause = null;
         Stop(ref _pause);
+        Stop(ref _countdown);
         Stop(ref _idle);
     }
 

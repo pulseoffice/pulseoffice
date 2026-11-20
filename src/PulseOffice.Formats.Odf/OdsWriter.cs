@@ -88,6 +88,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
         private OdfShapeMapper? _shapeMapper;
         private OdfShapeMapper Shapes => _shapeMapper ??= new OdfShapeMapper(_images);
         private readonly OdsObjectLinks _objectLinks = new();
+        private readonly OdfAspectLockMapper _aspectLocks = new();
         private readonly OdsFrameAnchoring _frameAnchoring = new();
         private readonly OdfFormControlMapper _forms = new();
         private readonly OdfFormulaMapper _formulas = new();
@@ -348,6 +349,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
                 if (_placedObjects is { } pagePlaced)
                 {
                     altText.WriteByName(shapes, pagePlaced.Content);
+                    _aspectLocks.WriteByName(shapes, pagePlaced.Content);
                     _objectLinks.Wrap(shapes, pagePlaced.Links, pagePlaced.Tips);
                 }
                 table.Add(shapes);
@@ -637,6 +639,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             if (_placedObjects is { } placed)
             {
                 altText.WriteByName(row, placed.Content);
+                _aspectLocks.WriteByName(row, placed.Content);
                 _objectLinks.Wrap(row, placed.Links, placed.Tips);
             }
             return row;

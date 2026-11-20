@@ -4,12 +4,12 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- Iterated text in shapes drawn as objects (`ShapeObject` text) is still revealed as a whole. (283)
-- Iterated effects show each unit at once (no per-unit fade or fly), and a reveal longer than the effect is compressed
-  into the effect's duration. (283)
-- Picture bullets of a paragraph not yet revealed by an iterated effect stay visible. (283)
-- The pause screen between loops is plain black, with no countdown. (283)
-- A transition sound cut at the next slide on the last slide has no PPTX carrier. (283)
+- Each unit of an iterated fly or zoom fades in place; the per-unit offset and scale are not drawn. (286)
+- The editor's animation timeline shows an iterated effect with its single-unit duration. (286)
+- Number labels of unrevealed numbered list paragraphs in drawn shapes stay visible during an iterated reveal. (286)
+- A fading unit of shape text without its own colour uses the shape's text colour, not the automatic contrast ink. (286)
+- The iterated reveal, the pause countdown and the last-slide sound cut extension have not been seen live or opened in
+  PowerPoint. (286)
 - Iterated text, the sound cut, the pause screen and the new dialog fields have not been seen live. (283)
 - Looping repeats, effect sounds, kiosk keys and timings and the hidden start slide have not been seen live. (278)
 - Transition sounds and sound actions in the show, the trigger-only advance, the show type and custom show settings
@@ -95,18 +95,32 @@ the round that fixes it is joined and the join run is green.
 - Folio tables (275): the new style editor tabs (total row, columns, corners) and "no colour" in derived styles have
   not been seen live. (275)
 
+- Folio mail merge (289): the wizard offers a record range only, no recipient list with excluded records or a filter;
+  body paragraphs of a merged record that switch to a page style with merge fields keep the template style; the merge
+  source is still declared lost in DOCX (DOCX028), `w:mailMerge` with `w:query` not attempted; `MERGEFIELD` case
+  switches and `\#` pictures are dropped. (289)
+- Folio fields (289): a page field's own numerals apply only on pages numbered in Arabic; `REF \n`/`\w` and ODF
+  `number-no-context`/`number-all-superior` collapse to one number format; chapter fields keep level 1 only; date
+  pictures write `/` and `:` as literal ODF text and do not read era, quarter or week parts; no dialog control to
+  choose sequence or page field numerals; none of the round 289 changes opened in Word or the reference suite. (289)
+
 - Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
   and reads back as a standard tone with the same look. (282)
-- Deck images (282): slide background images do not carry `ImageTone`. (282)
 - Images (282): the picture corrections panel has not been seen live; Word and PowerPoint have not opened our
   `a:biLevel` and washout pictures. (282)
-- Images (285): no per-object "lock aspect ratio" flag: pictures always keep proportions on corner drags, shapes never;
-  `a:picLocks/@noChangeAspect` is always written as true and never read; no Size dialog checkbox in any module. (285)
-- Images (285): Compress Pictures offers a maximum edge rather than a resolution relative to the displayed size, and
-  works on one picture only (no "all pictures"). (285)
+- Images (287): the aspect ratio lock flags (`picLocks`, `spLocks`, `graphicFrameLocks`) have not been opened in Word,
+  PowerPoint or Excel. (287)
+- Images (287): compressing all pictures and the Size dialog lock checkbox are tested at service and format level, not
+  through a headless walk of the three modules' commands. (287)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
+- Shell (288): unpinned recent entries with a missing file are dropped silently at startup; opening a missing recent
+  entry forgets it without a message. (288)
+- Shell (288): no pin glyph on welcome page rows; File › Recent has no pin action. (288)
+- Shell (288), not audited yet: settings dialog (search, reset, every setting applied, persistence across restarts and
+  instances), open/save dialogs and format choice, unsaved-changes prompts on close and quit, read-only and locked
+  files, live switching of the five languages, document tabs and windows, recovery dialog in depth. (288)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
 - Tagged PDF: Deck text boxes and shape text (columns and rotated shapes included since 268) are tagged by the painted
@@ -115,8 +129,9 @@ the round that fixes it is joined and the join run is green.
 - Shape autofit (276): Folio shape stories have no vertical text layout, so vertical text in a Folio shape is not
   resized; the stored size settles only when an editor lays the document out (a headless conversion keeps the saved
   size). (276)
-- Shape text areas (285): the rounded rectangle's text area follows the model's corner ratio, not `roundRect`'s `adj`;
-  only the first of several `draw:text-areas` is used. (285)
+- Shape text areas (287): a model rounded rectangle without preset adjust values draws elliptic corners at
+  `CornerRatio` of each side, and its text area follows them, while `roundRect` and the ODF round rectangle use
+  circular corners on the short side; `IShapeGeometry.Outline` would need the box's aspect. (285, 287)
 - Shape autofit has not been opened in PowerPoint or the reference suite; ODP writes both `draw:fit-to-size` and
   `style:shrink-to-fit`. (268)
 - Shape text keys (272): Tab, Shift+Tab, Enter and Backspace are walked through the live shared editor in a headless

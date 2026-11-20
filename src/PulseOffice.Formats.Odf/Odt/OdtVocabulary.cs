@@ -10,7 +10,7 @@ internal sealed record OdtFieldEntry(TextFieldKind Kind, XName Element, XName? A
 
 internal sealed record OdtFieldRead(TextFieldKind Kind, string? Argument, FieldDetail? Detail);
 
-internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText text) : OdtXml
+internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Formats.Odf.TextCodecs.IOdfParagraphText text, OdtDatePictures dates) : OdtXml
 {
     private readonly IReadOnlyList<OdtFieldEntry> _entries =
     [
@@ -79,7 +79,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
         if (kind == TextFieldKind.Bookmark && argument is not null && session.IsSequenceReference(argument, SequenceReferences) && !HasBookmark(document, argument))
             element.Name = Text + "sequence-ref";
         if (kind == TextFieldKind.Database) Database(element, document.MergeSource);
-        Detail(element, run, shown, document);
+        Detail(element, run, shown, session);
         if (kind != TextFieldKind.HiddenParagraph) AddShown(element, shown);
         return element;
     }
@@ -125,8 +125,9 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
             .Concat(document.Objects.All.SelectMany(item => item.Content.Stories).SelectMany(story => Walk(story)));
     }
 
-    private void Detail(XElement element, TextRun run, string shown, TextDocument document)
+    private void Detail(XElement element, TextRun run, string shown, OdtWriteSession session)
     {
+        var document = session.Document;
         var detail = run.FieldDetail;
         switch (run.Field)
         {
@@ -145,9 +146,14 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                 element.SetAttributeValue(Text + "current-value", shown == (detail?.WhenTrue ?? string.Empty) ? "true" : "false");
                 break;
             case TextFieldKind.Sequence:
+                if (detail?.Value is { Length: > 0 } numbering) element.SetAttributeValue(Style + "num-format", numbering);
                 break;
             case TextFieldKind.HiddenParagraph:
                 element.SetAttributeValue(Text + "is-hidden", run.Hidden == true ? "true" : "false");
+                break;
+            case TextFieldKind.Database:
+                if (detail?.WhenTrue is { Length: > 0 } before) element.SetAttributeValue(Pt + "text-before", before);
+                if (detail?.WhenFalse is { Length: > 0 } after) element.SetAttributeValue(Pt + "text-after", after);
                 break;
             case TextFieldKind.HiddenText:
                 element.SetAttributeValue(Text + "string-value", detail?.WhenTrue ?? shown);
@@ -155,11 +161,27 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                 break;
             default:
                 if (detail?.Fixed == true) element.SetAttributeValue(Text + "fixed", "true");
+                if (run.Field == TextFieldKind.PageNumber && detail?.Value is { Length: > 0 } pageShape) element.SetAttributeValue(Style + "num-format", pageShape);
                 if (detail?.Value is { Length: > 0 } stored && run.Field is TextFieldKind.Date or TextFieldKind.Time)
                     element.SetAttributeValue(Text + (run.Field == TextFieldKind.Date ? "date-value" : "time-value"), stored);
-                if (detail?.Format is { Length: > 0 } format) element.SetAttributeValue(Pt + "format", format);
+                if (detail?.Format is { Length: > 0 } format)
+                {
+                    element.SetAttributeValue(Pt + "format", format);
+                    if (run.Field is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate
+                        && DataStyle(session, format, run.Field == TextFieldKind.Time) is { } data)
+                        element.SetAttributeValue(Style + "data-style-name", data);
+                }
                 break;
         }
+    }
+
+    private string? DataStyle(OdtWriteSession session, string picture, bool time)
+    {
+        if (session.FieldDataStyles.TryGetValue((picture, time), out var known)) return known;
+        var name = "PtF" + (session.FieldDataStyleElements.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var style = dates.DataStyle(picture, name, time);
+        if (style is not null) session.FieldDataStyleElements.Add(style);
+        return session.FieldDataStyles[(picture, time)] = style is null ? null : name;
     }
 
     private XElement Citation(TextRun run, string shown, TextDocument document)
@@ -196,7 +218,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
 
     private void AddShown(XElement element, string shown) => element.Add(text.Paragraph(shown).Nodes());
 
-    public OdtFieldRead? Read(XElement element, TextDocument document)
+    public OdtFieldRead? Read(XElement element, TextDocument document, OdtAutomaticStyles? data = null)
     {
         if (preserved.Read(element) is { } kept) return kept;
         if (element.Name == Text + "bibliography-mark") return ReadCitation(element, document);
@@ -213,8 +235,11 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
         if (kind == TextFieldKind.Chapter && (string?)element.Attribute(Pt + "argument") is null && argument == "name") argument = null;
         if (kind is TextFieldKind.ConditionalText or TextFieldKind.HiddenText or TextFieldKind.HiddenParagraph && argument is not null) argument = Unprefixed(argument);
         if (kind == TextFieldKind.Database) ReadDatabase(element, document);
-        return new OdtFieldRead(kind.Value, argument, ReadDetail(element, kind.Value));
+        return new OdtFieldRead(kind.Value, argument, ReadDetail(element, kind.Value, data));
     }
+
+    private string? Shape(string? format) =>
+        format is not null && format != PulseOffice.Documents.Fields.SequenceFormats.Arabic && PulseOffice.Documents.Fields.SequenceFormats.All.Contains(format) ? format : null;
 
     private string Unprefixed(string condition)
     {
@@ -223,7 +248,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
         return condition;
     }
 
-    private FieldDetail? ReadDetail(XElement element, TextFieldKind kind)
+    private FieldDetail? ReadDetail(XElement element, TextFieldKind kind, OdtAutomaticStyles? data)
     {
         switch (kind)
         {
@@ -244,15 +269,25 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                     WhenTrue = (string?)element.Attribute(Text + "string-value-if-true") ?? string.Empty,
                     WhenFalse = (string?)element.Attribute(Text + "string-value-if-false") ?? string.Empty,
                 };
+            case TextFieldKind.Database:
+                var before = (string?)element.Attribute(Pt + "text-before");
+                var after = (string?)element.Attribute(Pt + "text-after");
+                return before is null && after is null ? null : new FieldDetail { WhenTrue = before, WhenFalse = after };
             case TextFieldKind.HiddenText:
                 return new FieldDetail { WhenTrue = (string?)element.Attribute(Text + "string-value") ?? Shown(element) };
             case TextFieldKind.Sequence:
-                return (string?)element.Attribute(Text + "ref-name") is { Length: > 0 } reference ? new FieldDetail { Format = reference } : null;
+                var named = (string?)element.Attribute(Text + "ref-name") is { Length: > 0 } reference ? reference : null;
+                var numbering = Shape((string?)element.Attribute(Style + "num-format"));
+                return named is null && numbering is null ? null : new FieldDetail { Format = named, Value = numbering };
             default:
                 var fixedValue = (string?)element.Attribute(Text + "fixed") == "true";
-                var own = (string?)element.Attribute(Pt + "format");
+                var own = (string?)element.Attribute(Pt + "format")
+                    ?? (kind is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate
+                        ? dates.Picture(data?.Find(OdtAutomaticStyles.DataFamily, (string?)element.Attribute(Style + "data-style-name")))
+                        : null);
                 var stored = fixedValue ? (string?)element.Attribute(Text + "date-value") ?? (string?)element.Attribute(Text + "time-value") : null;
-                return fixedValue || own is not null ? new FieldDetail { Fixed = fixedValue, Format = own, Value = stored } : null;
+                if (kind == TextFieldKind.PageNumber) stored = Shape((string?)element.Attribute(Style + "num-format"));
+                return fixedValue || own is not null || stored is not null ? new FieldDetail { Fixed = fixedValue, Format = own, Value = stored } : null;
         }
     }
 

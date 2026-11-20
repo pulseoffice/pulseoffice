@@ -47,12 +47,15 @@ public static class DocumentsServiceCollectionExtensions
         services.AddSingleton<Fields.IFieldValueSource, Fields.StatisticFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.VariableFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.ConditionalFieldSource>();
+        services.TryAddSingleton<Fields.ISequenceNumerals, Fields.SequenceNumerals>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.SequenceFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.ChapterFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.ReferenceFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.NoteReferenceFieldSource>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.CitationFieldSource>();
         services.AddSingleton<Fields.IMergeRecords, Fields.MergeRecords>();
+        services.AddSingleton<Fields.IMergeVariables, Fields.MergeVariables>();
+        services.AddSingleton<Fields.IMergePageStyles, Fields.MergePageStyles>();
         services.AddSingleton<Fields.IMergePlaceholder, Fields.GuillemetPlaceholder>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.MergeFieldSource>();
         services.AddSingleton<Fields.IMailMergeEngine, Fields.MailMergeEngine>();

@@ -94,6 +94,17 @@ internal sealed class AltTextPartReader(OdfAltTextMapper altText) : IOdsSheetPar
     }
 }
 
+internal sealed class AspectLockPartReader(OdfAspectLockMapper locks) : IOdsSheetPartReader
+{
+    public void Read(XElement table, Worksheet sheet, OdsReadContext context)
+    {
+        var locked = locks.ReadByName(table);
+        for (var i = 0; i < sheet.Objects.Count; i++)
+            if (locked.TryGetValue(sheet.Objects[i].Id, out var value))
+                sheet.Objects[i] = sheet.Objects[i] with { Content = sheet.Objects[i].Content.WithAspectLock(value) };
+    }
+}
+
 internal sealed class ArrayFormulaPartReader(TableCells cells, TableRows rows) : IOdsSheetPartReader
 {
     private readonly OdfDynamicArrays _dynamicArrays = new();

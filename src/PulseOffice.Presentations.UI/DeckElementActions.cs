@@ -185,6 +185,21 @@ public sealed class DeckElementActions(Presentation deck, ITextCatalog texts, De
             () => { slide.Replace(before); deck.Raise(); });
     }
 
+    public void EditImages(IReadOnlyList<(Slide Slide, string ElementId, PulseOffice.Drawing.Assets.RasterImageObject Image)> changes, string labelKey)
+    {
+        var edits = changes
+            .Where(change => deck.IndexOf(change.Slide) >= 0 && change.Slide.Find(change.ElementId) is ObjectElement { Content: PulseOffice.Drawing.Assets.RasterImageObject })
+            .Select(change => (change.Slide, Before: (ObjectElement)change.Slide.Find(change.ElementId)!, change.Image))
+            .Select(change => (change.Slide, change.Before, After: change.Before with { Content = change.Image }))
+            .Where(change => change.After != change.Before)
+            .ToList();
+        if (edits.Count == 0) return;
+
+        Do(texts[labelKey],
+            () => { foreach (var edit in edits) edit.Slide.Replace(edit.After); deck.Raise(); },
+            () => { foreach (var edit in edits) edit.Slide.Replace(edit.Before); deck.Raise(); });
+    }
+
     public void FlipElement(Slide slide, string elementId, bool horizontal)
     {
         if (slide.Find(elementId) is not ObjectElement element) return;

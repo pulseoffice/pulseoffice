@@ -143,9 +143,12 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
     private uint? Argb(string? hex)
     {
         var digits = (hex ?? string.Empty).TrimStart('#');
-        if (digits.Length == 8) digits = digits[2..];
-        return digits.Length == 6 && uint.TryParse(digits, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb)
-            ? 0xFF000000 | rgb
-            : null;
+        if (!uint.TryParse(digits, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value)) return null;
+        return digits.Length switch
+        {
+            6 => 0xFF000000 | value,
+            8 => value,
+            _ => null,
+        };
     }
 }

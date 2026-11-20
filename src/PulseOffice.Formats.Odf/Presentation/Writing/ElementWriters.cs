@@ -118,7 +118,7 @@ internal abstract class OdpObjectWriter<TContent>(OdfAltTextMapper altText) : Od
     public bool CanWrite(EmbeddedObject content) => content is TContent;
 
     public XElement Write(ObjectElement element, OdpWriteSession session) =>
-        new OdfObjectNameMapper().Write(altText.Write(Build(element, (TContent)element.Content, session), element.Content), element.Content);
+        new OdfAspectLockMapper().Write(new OdfObjectNameMapper().Write(altText.Write(Build(element, (TContent)element.Content, session), element.Content), element.Content), element.Content);
 
     protected abstract XElement Build(ObjectElement element, TContent content, OdpWriteSession session);
 }

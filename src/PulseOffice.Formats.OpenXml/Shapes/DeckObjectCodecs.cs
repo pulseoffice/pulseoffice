@@ -315,7 +315,7 @@ internal sealed class DeckVectorPictureCodec(PulseOffice.Formats.VectorFallback 
         return new P.Picture(
             new P.NonVisualPictureProperties(
                 new P.NonVisualDrawingProperties { Id = id, Name = "Picture" },
-                new P.NonVisualPictureDrawingProperties(new D.PictureLocks { NoChangeAspect = true }),
+                new P.NonVisualPictureDrawingProperties(new D.PictureLocks { NoChangeAspect = vector.LocksAspectRatio }),
                 new P.ApplicationNonVisualDrawingProperties()),
             new P.BlipFill(blip, new D.Stretch(new D.FillRectangle())),
             new P.ShapeProperties(transform, new D.PresetGeometry { Preset = D.ShapeTypeValues.Rectangle }));
@@ -372,7 +372,7 @@ internal sealed class DeckPictureCodec(OoxmlImageTypes types, DrawingML.DrawingD
         return new P.Picture(
             new P.NonVisualPictureProperties(
                 new P.NonVisualDrawingProperties { Id = id, Name = "Picture" },
-                new P.NonVisualPictureDrawingProperties(new D.PictureLocks { NoChangeAspect = true }),
+                new P.NonVisualPictureDrawingProperties(new D.PictureLocks { NoChangeAspect = image.LocksAspectRatio }),
                 new P.ApplicationNonVisualDrawingProperties()),
             fill,
             new P.ShapeProperties(Transform(element), new D.PresetGeometry { Preset = D.ShapeTypeValues.Rectangle }));

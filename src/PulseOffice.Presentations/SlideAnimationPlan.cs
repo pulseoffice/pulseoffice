@@ -12,9 +12,9 @@ public sealed class SlideAnimationPlan
         _scheduler = scheduler;
         Slide = slide;
         Count = slide.Animations.Count;
-        Main = scheduler.Schedule(slide.Animations);
+        Main = scheduler.Schedule(slide);
         foreach (var trigger in slide.Animations.Where(effect => effect.IsTriggered).Select(effect => effect.TriggerShapeId!).Distinct(StringComparer.Ordinal))
-            _triggered[trigger] = scheduler.ScheduleTriggered(slide.Animations, trigger);
+            _triggered[trigger] = scheduler.ScheduleTriggered(slide, trigger);
     }
 
     public Slide Slide { get; }

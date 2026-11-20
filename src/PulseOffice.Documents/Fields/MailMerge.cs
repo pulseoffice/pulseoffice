@@ -112,9 +112,53 @@ public sealed class MergeFieldSource(IMergeRecords records, IMergePlaceholder pl
         if (run.FieldArgument is not { Length: > 0 } column) return null;
         var document = context.Document;
         if (records.Previewing(document) && records.Data(document) is { } data && data.Value(records.Current(document), column) is { } value)
-            return new FieldValue(value);
+            return new FieldValue(Around(value, run.FieldDetail));
         return new FieldValue(placeholder.For(column));
     }
+
+    private string Around(string? value, FieldDetail? detail) =>
+        string.IsNullOrEmpty(value) ? string.Empty : (detail?.WhenTrue ?? string.Empty) + value + (detail?.WhenFalse ?? string.Empty);
+}
+
+public interface IMergeVariables
+{
+    IReadOnlyDictionary<string, string> With(TextDocument document, IReadOnlyDictionary<string, string> variables, MergeData data, int row);
+
+    bool Mentions(string? condition, TextDocument document, MergeData data);
+}
+
+public sealed partial class MergeVariables : IMergeVariables
+{
+    public IReadOnlyDictionary<string, string> With(TextDocument document, IReadOnlyDictionary<string, string> variables, MergeData data, int row)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(variables);
+        ArgumentNullException.ThrowIfNull(data);
+        var merged = new Dictionary<string, string>(variables, StringComparer.Ordinal);
+        foreach (var name in Names(document, data))
+            merged[name.Key] = data.Value(row, name.Value) ?? string.Empty;
+        return merged;
+    }
+
+    public bool Mentions(string? condition, TextDocument document, MergeData data)
+    {
+        if (string.IsNullOrWhiteSpace(condition) || data.Columns.Count == 0) return false;
+        var names = new HashSet<string>(Names(document, data).Select(name => name.Key), StringComparer.Ordinal);
+        return Words().Matches(condition).Any(match => names.Contains(match.Value));
+    }
+
+    private IEnumerable<KeyValuePair<string, string>> Names(TextDocument document, MergeData data)
+    {
+        var source = document.MergeSource;
+        foreach (var column in data.Columns)
+        {
+            yield return new(column, column);
+            if (source is { Database.Length: > 0, Command.Length: > 0 }) yield return new(source.Database + "." + source.Command + "." + column, column);
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"[\p{L}_][\p{L}\p{Nd}_.]*")]
+    private static partial System.Text.RegularExpressions.Regex Words();
 }
 
 public interface IMailMergeEngine
@@ -126,7 +170,14 @@ public interface IMailMergeEngine
     TextDocument Combine(TextDocument template, MergeData data, IReadOnlyList<int> rows);
 }
 
-public sealed class MailMergeEngine(IStoryCatalog stories, IFieldRunRewriter rewriter, IFragmentExtractor extractor, IFragmentPaster paster) : IMailMergeEngine
+public sealed class MailMergeEngine(
+    IStoryCatalog stories,
+    IFieldRunRewriter rewriter,
+    IFragmentExtractor extractor,
+    IFragmentPaster paster,
+    IFieldCondition conditions,
+    IMergeVariables merged,
+    IMergePageStyles pages) : IMailMergeEngine
 {
     public IReadOnlyList<string> Fields(TextDocument template)
     {
@@ -143,18 +194,40 @@ public sealed class MailMergeEngine(IStoryCatalog stories, IFieldRunRewriter rew
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(data);
         var copy = template.Clone();
-        copy.MergeSource = null;
+        var variables = merged.With(template, template.Variables, data, row);
         foreach (var paragraph in stories.Paragraphs(copy).ToList())
         {
             var runs = paragraph.Content.Runs;
-            if (!runs.Any(run => run.Field == TextFieldKind.Database)) continue;
-            var replaced = runs.Select(run => run.Field == TextFieldKind.Database
-                ? run with { Text = data.Value(row, run.FieldArgument ?? string.Empty) ?? string.Empty, Field = TextFieldKind.None, FieldArgument = null, FieldDetail = null }
-                : run).ToList();
+            if (!runs.Any(run => run.Field == TextFieldKind.Database || Conditional(run, template, data))) continue;
+            var replaced = runs.Select(run => Resolved(run, template, data, row, variables)).ToList();
             paragraph.State = rewriter.Rewrite(paragraph.State, replaced);
         }
+        copy.MergeSource = null;
         return copy;
     }
+
+    private bool Conditional(TextRun run, TextDocument template, MergeData data) =>
+        run.Field is TextFieldKind.ConditionalText or TextFieldKind.HiddenText or TextFieldKind.HiddenParagraph
+        && merged.Mentions(run.FieldArgument, template, data);
+
+    private TextRun Resolved(TextRun run, TextDocument template, MergeData data, int row, IReadOnlyDictionary<string, string> variables)
+    {
+        if (run.Field == TextFieldKind.Database)
+            return Plain(run, Around(data.Value(row, run.FieldArgument ?? string.Empty), run.FieldDetail));
+        if (!Conditional(run, template, data)) return run;
+        var holds = conditions.Holds(run.FieldArgument, variables);
+        return run.Field switch
+        {
+            TextFieldKind.ConditionalText => Plain(run, holds ? run.FieldDetail?.WhenTrue ?? string.Empty : run.FieldDetail?.WhenFalse ?? string.Empty) with { Hidden = null },
+            TextFieldKind.HiddenText => Plain(run, holds ? string.Empty : run.FieldDetail?.WhenTrue ?? run.Text) with { Hidden = null },
+            _ => run with { FieldArgument = holds ? "1" : "0", Hidden = holds },
+        };
+    }
+
+    private string Around(string? value, FieldDetail? detail) =>
+        string.IsNullOrEmpty(value) ? string.Empty : (detail?.WhenTrue ?? string.Empty) + value + (detail?.WhenFalse ?? string.Empty);
+
+    private TextRun Plain(TextRun run, string text) => run with { Text = text, Field = TextFieldKind.None, FieldArgument = null, FieldDetail = null };
 
     public TextDocument Combine(TextDocument template, MergeData data, IReadOnlyList<int> rows)
     {
@@ -173,7 +246,9 @@ public sealed class MailMergeEngine(IStoryCatalog stories, IFieldRunRewriter rew
             var first = (ParagraphBlock)record.Body.Blocks[0];
             var last = (ParagraphBlock)record.Body.Blocks[^1];
             var fragment = extractor.Copy(record, new DocumentRange(new DocumentPosition(first.Id, 0), new DocumentPosition(last.Id, last.Length)));
-            var opener = new ParagraphBlock(combined.NextId("p"), Emptied(first.Content) with { PageBreakBefore = true });
+            var ordinal = row + 1;
+            var style = pages.Adopt(combined, template, record, data, first.Content.PageStyleName, ordinal);
+            var opener = new ParagraphBlock(combined.NextId("p"), Emptied(first.Content) with { PageBreakBefore = true, PageStyleName = style ?? first.Content.PageStyleName });
             combined.Body.Replace([.. combined.Body.Blocks, opener]);
             paster.Paste(combined, history, new DocumentPosition(opener.Id, 0), fragment);
         }

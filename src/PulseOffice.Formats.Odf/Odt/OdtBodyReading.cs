@@ -361,7 +361,7 @@ internal sealed class OdtInlineReader(
             else if (name == Text + "tab") Append(builder, format, "\t", collapse: false);
             else if (name == Text + "line-break") Append(builder, format, "\n", collapse: false);
             else if (name == Text + "soft-page-break" || name.Namespace == Office && name.LocalName != "annotation" && name.LocalName != "annotation-end") { }
-            else if (fields.Read(child, context.Document) is { } field)
+            else if (fields.Read(child, context.Document, context.Automatic) is { } field)
             {
                 bool? hidden = field.Kind is TextFieldKind.HiddenText or TextFieldKind.HiddenParagraph ? (string?)child.Attribute(Text + "is-hidden") == "true" : null;
                 var content = fields.Shown(child);
@@ -564,6 +564,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
 {
     private readonly OdfImageClip _clip = new(measure);
     private readonly OdfImageTone _tones = new();
+    private readonly OdfAspectLockMapper _aspectLocks = new();
 
     public bool Handles(XElement element) => element.Name == Draw + "frame" || element.Name == Draw + "a" || drawings.Handles(element);
 
@@ -647,6 +648,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
                 Map = imageMaps.Read(frame, size),
             });
         if (content is null) return null;
+        if (content is EmbeddedContent locking) content = locking.With(_aspectLocks.Read(locking.Value, frame));
         if (content is TextBoxContent box) box.Look = frames.ReadLook(graphic);
 
         var id = context.Id((string?)frame.Attribute(Xml + "id") ?? (string?)frame.Attribute(Pt + "item-id"), "obj");

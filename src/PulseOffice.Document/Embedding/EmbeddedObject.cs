@@ -40,6 +40,15 @@ public abstract record EmbeddedObject
 
     public ObjectSource? Source { get; init; }
 
+    public bool? AspectLock { get; init; }
+
+    public bool LocksAspectRatio => AspectLock ?? LocksAspectByDefault;
+
+    protected virtual bool LocksAspectByDefault => false;
+
+    public EmbeddedObject WithAspectLock(bool locked) =>
+        locked == LocksAspectRatio ? this : this with { AspectLock = locked };
+
     public abstract IReadOnlyCollection<ModuleKind> EditableIn { get; }
 }
 

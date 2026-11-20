@@ -24,6 +24,7 @@ internal sealed class PptxSlideWriter(
 
     private readonly OoxmlImageTypes _imageTypes = new();
     private readonly DrawingML.DrawingDuotone _duotones = new();
+    private readonly DrawingML.DrawingImageTone _tones = new();
 
     private readonly PptxHeaderFooter _headerFooter = new();
 
@@ -144,8 +145,11 @@ internal sealed class PptxSlideWriter(
             : slide.Transition;
         transitions.Append(part.Slide, cueTransition);
         if (_sounds.Write(cueTransition.SoundPath, part, session) is { } transitionSound)
-            foreach (var transition in part.Slide.Descendants<P.Transition>())
+            foreach (var transition in part.Slide.Descendants<P.Transition>().ToList())
+            {
                 transition.Append(_sounds.Transition(transitionSound, cueTransition.LoopSoundUntilNext));
+                if (CutsOwnSoundAtTheEnd(session.Deck, slide)) transition.Append(_sounds.SoundCut());
+            }
         else if (cueTransition.StopPreviousSound)
             foreach (var transition in part.Slide.Descendants<P.Transition>())
                 transition.Append(new P.SoundAction(new P.EndSoundAction()));
@@ -155,6 +159,9 @@ internal sealed class PptxSlideWriter(
         comments.Write(part, session.Part, slide);
         return part;
     }
+
+    private bool CutsOwnSoundAtTheEnd(PulseOffice.Presentations.Presentation deck, Slide slide) =>
+        slide.Transition is { SoundPlaysToEnd: false, LoopSoundUntilNext: false } && deck.IndexOf(slide) == deck.Slides.Count - 1;
 
     private bool CutsSoundOfPrevious(PulseOffice.Presentations.Presentation deck, Slide slide)
     {
@@ -179,6 +186,7 @@ internal sealed class PptxSlideWriter(
 
         var blip = new D.Blip { Embed = part.GetIdOfPart(imagePart) };
         _duotones.Write(blip, image.Duotone);
+        _tones.Write(blip, image.Tone with { Transparency = 0 });
         if (slide.BackgroundLayout.Opacity < 1) blip.Append(new D.AlphaModulationFixed { Amount = (int)Math.Round(Math.Max(slide.BackgroundLayout.Opacity, 0) * 100000) });
         return new P.Background(new P.BackgroundProperties(
             slide.BackgroundLayout.Mode is BackgroundImageMode.Tile

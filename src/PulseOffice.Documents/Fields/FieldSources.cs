@@ -135,7 +135,7 @@ public static class FieldVisibility
     public const string Invisible = "invisible";
 }
 
-public sealed class ConditionalFieldSource(IFieldCondition conditions) : IFieldValueSource
+public sealed class ConditionalFieldSource(IFieldCondition conditions, IMergeRecords records, IMergeVariables merged) : IFieldValueSource
 {
     public const string HiddenParagraphMark = "\u200B";
 
@@ -143,15 +143,23 @@ public sealed class ConditionalFieldSource(IFieldCondition conditions) : IFieldV
 
     public FieldValue Evaluate(TextRun run, FieldContext context)
     {
-        var holds = conditions.Holds(run.FieldArgument, context.Variables);
+        var holds = conditions.Holds(run.FieldArgument, Variables(run, context));
         if (run.Field == TextFieldKind.HiddenParagraph) return new FieldValue(HiddenParagraphMark, holds);
         return run.Field == TextFieldKind.HiddenText
             ? new FieldValue(run.FieldDetail?.WhenTrue ?? run.Text, holds)
             : new FieldValue(holds ? run.FieldDetail?.WhenTrue ?? string.Empty : run.FieldDetail?.WhenFalse ?? string.Empty);
     }
+
+    private IReadOnlyDictionary<string, string> Variables(TextRun run, FieldContext context)
+    {
+        var document = context.Document;
+        return records.Previewing(document) && records.Data(document) is { } data && merged.Mentions(run.FieldArgument, document, data)
+            ? merged.With(document, context.Variables, data, records.Current(document))
+            : context.Variables;
+    }
 }
 
-public sealed class SequenceFieldSource : IFieldValueSource
+public sealed class SequenceFieldSource(ISequenceNumerals numerals) : IFieldValueSource
 {
     public IReadOnlyCollection<TextFieldKind> Kinds { get; } = [TextFieldKind.Sequence];
 
@@ -160,7 +168,7 @@ public sealed class SequenceFieldSource : IFieldValueSource
         var name = run.FieldArgument ?? string.Empty;
         var value = context.Sequences.GetValueOrDefault(name) + 1;
         context.Sequences[name] = value;
-        return new FieldValue(value.ToString(CultureInfo.InvariantCulture));
+        return new FieldValue(numerals.Format(value, run.FieldDetail?.Value));
     }
 }
 

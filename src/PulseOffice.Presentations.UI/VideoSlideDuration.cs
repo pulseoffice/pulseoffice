@@ -18,7 +18,7 @@ public sealed class VideoSlideDuration(IAnimationScheduler scheduler) : IVideoSl
             ? transition.AdvanceAfterMs
             : DefaultSlideMs;
         var entering = slide.Transition.IsNone ? 0 : Math.Max(0, slide.Transition.DurationMs);
-        var animated = scheduler.Duration(scheduler.Schedule(slide.Animations));
+        var animated = scheduler.Duration(scheduler.Schedule(slide));
         return (int)Math.Min((long)Math.Max(shown, (long)entering + animated), LongestSlideMs);
     }
 }

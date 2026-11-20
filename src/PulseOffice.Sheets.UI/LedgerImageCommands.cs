@@ -21,7 +21,8 @@ public sealed class LedgerImageCommands(
     IStatusBarService status,
     PulseOffice.UI.Controls.Objects.IAltTextPrompt altText,
     ITextCatalog texts,
-    PulseOffice.UI.Icons.IIconCatalog icons) : LedgerCommandSet(context)
+    PulseOffice.UI.Icons.IIconCatalog icons,
+    IPictureCompression compression) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -192,7 +193,7 @@ public sealed class LedgerImageCommands(
         var view = new FormPromptView(texts["ledger.object.positionSize.explanation"],
         [
             new PulseOffice.UI.Controls.Fields.SizeLockField("size", texts["size.title"],
-                new PulseOffice.UI.Controls.Fields.LockedSize(Math.Round(placed.Size.Width.ToCentimeters(), 2), Math.Round(placed.Size.Height.ToCentimeters(), 2), placed.Content is RasterImageObject),
+                new PulseOffice.UI.Controls.Fields.LockedSize(Math.Round(placed.Size.Width.ToCentimeters(), 2), Math.Round(placed.Size.Height.ToCentimeters(), 2), placed.Content.LocksAspectRatio),
                 "cm", 0.05, 500, 0.1, icons),
             new NumberField("x", texts["ledger.object.offsetX"], Math.Round(placed.OffsetX.ToCentimeters(), 2), 0, 500, 0.1) { Unit = "cm" },
             new NumberField("y", texts["ledger.object.offsetY"], Math.Round(placed.OffsetY.ToCentimeters(), 2), 0, 500, 0.1) { Unit = "cm" },
@@ -206,6 +207,7 @@ public sealed class LedgerImageCommands(
             : placed.Size;
         var updated = placed with
         {
+            Content = values["size"] is PulseOffice.UI.Controls.Fields.LockedSize chosenLock ? placed.Content.WithAspectLock(chosenLock.Locked) : placed.Content,
             Size = size,
             OffsetX = Twip.FromCentimeters(Convert.ToDouble(values["x"], System.Globalization.CultureInfo.InvariantCulture)),
             OffsetY = Twip.FromCentimeters(Convert.ToDouble(values["y"], System.Globalization.CultureInfo.InvariantCulture)),
@@ -266,18 +268,32 @@ public sealed class LedgerImageCommands(
 
     private async Task CompressAsync(CancellationToken ct)
     {
-        if (Context.SelectedObject is not { Content: RasterImageObject raster }) return;
-        if (await images.CompressAsync(raster, ct).ConfigureAwait(true) is not { } result) return;
+        if (Context.Workbook is not { } workbook || Context.SelectedObject is not { Content: RasterImageObject raster } selected) return;
+        var pictures = workbook.Sheets
+            .SelectMany((sheet, sheetIndex) => sheet.Objects
+                .Where(placed => placed.Content is RasterImageObject)
+                .Select(placed => new CompressiblePicture(Key(sheetIndex, placed), (RasterImageObject)placed.Content, placed.Size)))
+            .ToList();
+        var chosen = new CompressiblePicture(Key(Context.SheetIndex, selected), raster, selected.Size);
+        if (await compression.CompressAsync(chosen, pictures, ct).ConfigureAwait(true) is not { } changed) return;
 
-        if (!result.Changed)
-        {
-            status.Report(texts["status.image.notCompressed"], NotificationSeverity.Warning);
-            return;
-        }
-
-        ApplyRaster("command.ledger.image.compress.title", _ => result.Image);
-        status.Report(texts.Format("status.image.compressed", result.BytesBefore / 1024, result.BytesAfter / 1024), NotificationSeverity.Success);
+        var edits = workbook.Sheets
+            .SelectMany((sheet, sheetIndex) => sheet.Objects
+                .Select((placed, index) => (Sheet: sheet, Index: index, Before: placed, Key: Key(sheetIndex, placed))))
+            .Where(edit => changed.ContainsKey(edit.Key))
+            .Select(edit => (edit.Sheet, edit.Index, edit.Before, After: edit.Before with { Content = changed[edit.Key] }))
+            .ToList();
+        if (edits.Count == 0) return;
+        foreach (var edit in edits) edit.Sheet.Objects[edit.Index] = edit.After;
+        Context.History?.Push(new DelegateAction(
+            texts["command.ledger.image.compress.title"],
+            redo: () => { foreach (var edit in edits) edit.Sheet.Objects[edit.Index] = edit.After; },
+            undo: () => { foreach (var edit in edits) edit.Sheet.Objects[edit.Index] = edit.Before; }));
+        if (edits.FirstOrDefault(edit => ReferenceEquals(edit.Before, selected)) is { After: { } after }) Context.SelectObject(after);
+        Context.RequestRefresh();
     }
+
+    private static string Key(int sheetIndex, PulseOffice.Sheets.PlacedObject placed) => sheetIndex + "/" + placed.Id;
 
     private void ApplyRaster(string titleKey, Func<RasterImageObject, RasterImageObject> change)
     {

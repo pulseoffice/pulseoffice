@@ -221,7 +221,7 @@ internal sealed class OdtDrawingReader(IGroupStories groupStories) : OdtXml
 
         if (element is null) return null;
         element = _rotation.Read(node, element);
-        var content = new OdfObjectNameMapper().Read(_altText.Read(element.Content, node), node);
+        var content = new OdfAspectLockMapper().Read(new OdfObjectNameMapper().Read(_altText.Read(element.Content, node), node), node);
         var own = content switch
         {
             ShapeObject shape => shape.RotationDegrees,

@@ -11,6 +11,8 @@ public sealed class XlsxDrawingMapper
 
     private readonly XlsxObjectLinks _links = new();
 
+    private readonly DrawingML.DrawingAspectLock _aspect = new();
+
     private readonly XlsxChartMapper _charts;
     private readonly XlsxShapeMapper _shapes;
     private readonly XlsxVectorMapper _vectors;
@@ -63,7 +65,9 @@ public sealed class XlsxDrawingMapper
             return;
         }
 
-        _altText.WriteByName(drawingsPart.WorksheetDrawing, new PlacedObjectIndex(sheet.Objects).Content);
+        var index = new PlacedObjectIndex(sheet.Objects);
+        _altText.WriteByName(drawingsPart.WorksheetDrawing, index.Content);
+        _aspect.MarkByName(drawingsPart.WorksheetDrawing, index.Content);
         _links.Write(drawingsPart, sheet.Objects);
         drawingsPart.WorksheetDrawing.Save();
 
@@ -88,6 +92,7 @@ public sealed class XlsxDrawingMapper
         var described = _altText.ReadByName(drawing);
         var links = _links.Read(drawings);
         var tips = _links.ReadTips(drawings);
+        var locked = _aspect.LockedNames(drawing);
 
         return
         [
@@ -99,7 +104,7 @@ public sealed class XlsxDrawingMapper
                 _images.ReadImages(drawings, layout),
             }.SelectMany(objects => objects).Select(placed => described.TryGetValue(placed.Id, out var text)
                 ? placed with { Content = text.ApplyTo(placed.Content) }
-                : placed).Select(placed => links.TryGetValue(placed.Id, out var link) ? placed with { Hyperlink = link, HyperlinkTip = tips.GetValueOrDefault(placed.Id) } : placed),
+                : placed).Select(placed => locked.Contains(placed.Id) || placed.Content is PulseOffice.Drawing.Assets.VectorGraphicObject ? placed with { Content = placed.Content.WithAspectLock(locked.Contains(placed.Id)) } : placed).Select(placed => links.TryGetValue(placed.Id, out var link) ? placed with { Hyperlink = link, HyperlinkTip = tips.GetValueOrDefault(placed.Id) } : placed),
         ];
     }
 }

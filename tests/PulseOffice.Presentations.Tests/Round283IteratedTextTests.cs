@@ -17,7 +17,7 @@ public sealed class Round283IteratedTextTests
     [Fact]
     public void ByWordRevealsOneWordPerInterval()
     {
-        var reveal = new TextReveal(TextIterationUnit.Word, false, false, 150, 100, 0);
+        var reveal = new TextReveal(TextIterationUnit.Word, false, false, 150, 100);
 
         Assert.Equal("one_two______", Shown("one two three", reveal));
     }
@@ -25,7 +25,7 @@ public sealed class Round283IteratedTextTests
     [Fact]
     public void ByLetterBackwardsStartsFromTheEnd()
     {
-        var reveal = new TextReveal(TextIterationUnit.Letter, true, false, 0, 100, 0);
+        var reveal = new TextReveal(TextIterationUnit.Letter, true, false, 0, 100);
 
         Assert.Equal("___d", Shown("abcd", reveal));
     }
@@ -33,8 +33,8 @@ public sealed class Round283IteratedTextTests
     [Fact]
     public void AnExitHidesUnitsInOrderAndTheEndShowsEverything()
     {
-        Assert.Equal("___ b", Shown("aaa b", new TextReveal(TextIterationUnit.Word, false, true, 0, 1000, 0)));
-        Assert.Equal("aaa_b", Shown("aaa b", new TextReveal(TextIterationUnit.Word, false, false, 0, 1000, 1)));
+        Assert.Equal("___ b", Shown("aaa b", new TextReveal(TextIterationUnit.Word, false, true, 0, 1000)));
+        Assert.Equal("aaa_b", Shown("aaa b", new TextReveal(TextIterationUnit.Word, false, false, 1000, 1000)));
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public sealed class Round283IteratedTextTests
     {
         var text = new RichText(PlaceholderRole.Body, [new TextParagraph("ab cd") { Runs = [new TextRun("ab cd") { Color = 0xFF112233u }] }]);
 
-        var revealed = _reveal.Reveal(text, new TextReveal(TextIterationUnit.Word, false, false, 0, 100, 0));
+        var revealed = _reveal.Reveal(text, new TextReveal(TextIterationUnit.Word, false, false, 0, 100), new Theme { Name = "t" });
 
         var runs = revealed.Paragraphs[0].Runs;
         Assert.Equal("ab cd", string.Concat(runs.Select(run => run.Text)));

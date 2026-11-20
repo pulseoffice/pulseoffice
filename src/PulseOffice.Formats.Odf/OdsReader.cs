@@ -52,6 +52,7 @@ public sealed class OdsReader
             new ObjectPartReader((table, context) => formulas.Read(table, context.Package)),
             new ObjectPartReader((table, _) => new OdfFormControlMapper().ReadControls(table, table.Element(Namespaces.Office + "forms"))),
             new AltTextPartReader(new OdfAltTextMapper()),
+            new AspectLockPartReader(new OdfAspectLockMapper()),
             new ObjectLinkPartReader(_objectLinks),
             new CommentPartReader(cells, paragraphs),
             new MergePartReader(cells, rows),

@@ -164,7 +164,7 @@ internal sealed class SheetDrawingVisitor(
         groupPictures?.Blip(raster) is not { } blip ? null : new Xdr.Picture(
             new Xdr.NonVisualPictureProperties(
                 new Xdr.NonVisualDrawingProperties { Id = id, Name = name },
-                new Xdr.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = true })),
+                new Xdr.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = raster.LocksAspectRatio })),
             new Xdr.BlipFill(blip, new A.Stretch(new A.FillRectangle())),
             new Xdr.ShapeProperties(
                 new A.Transform2D(box.Offset, box.Extents) { Rotation = Rotation(extraRotation) },

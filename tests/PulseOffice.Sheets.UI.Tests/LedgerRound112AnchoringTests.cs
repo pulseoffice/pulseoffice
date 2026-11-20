@@ -105,7 +105,7 @@ public class LedgerRound112AnchoringTests
             ["anchoring"] = 2,
         });
         var commands = new LedgerImageCommands(context, Fake<IRasterImageFiles>(), Fake<IRasterRecolor>(), Fake<IRasterColorAdjust>(),
-            dialogs, Fake<IStatusBarService>(), Fake<PulseOffice.UI.Controls.Objects.IAltTextPrompt>(), _texts, new IconCatalog());
+            dialogs, Fake<IStatusBarService>(), Fake<PulseOffice.UI.Controls.Objects.IAltTextPrompt>(), _texts, new IconCatalog(), Fake<IPictureCompression>());
 
         await commands.GetCommands().Single(command => command.Id == "ledger.object.positionSize").Execute(null!, CancellationToken.None);
 

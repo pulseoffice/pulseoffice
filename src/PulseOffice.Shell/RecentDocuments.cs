@@ -5,7 +5,7 @@ using PulseOffice.Settings;
 
 namespace PulseOffice.Shell;
 
-public sealed record RecentDocument(string Path, string Name, DateTimeOffset LastOpened);
+public sealed record RecentDocument(string Path, string Name, DateTimeOffset LastOpened, bool Pinned = false);
 
 public interface IRecentDocuments
 {
@@ -16,6 +16,10 @@ public interface IRecentDocuments
     void Forget(string path);
 
     void Clear();
+
+    void SetPinned(string path, bool pinned)
+    {
+    }
 
     event EventHandler? Changed;
 }
@@ -51,7 +55,11 @@ public sealed class RecentDocuments : IRecentDocuments
 
     public IReadOnlyList<RecentDocument> Items
     {
-        get { lock (_gate) return [.. _items.Take(Capacity)]; }
+        get
+        {
+            lock (_gate)
+                return [.. _items.Where(item => item.Pinned), .. _items.Where(item => !item.Pinned).Take(Capacity)];
+        }
     }
 
     public event EventHandler? Changed;
@@ -63,11 +71,12 @@ public sealed class RecentDocuments : IRecentDocuments
 
         lock (_gate)
         {
+            var pinned = _items.Any(item => item.Pinned && string.Equals(item.Path, path, _pathComparison));
             _items.RemoveAll(item => string.Equals(item.Path, path, _pathComparison));
-            if (Capacity == 0) _items.Clear();
-            else _items.Insert(0, new RecentDocument(path, name, DateTimeOffset.Now));
+            if (Capacity == 0) _items.RemoveAll(item => !item.Pinned);
+            if (pinned || Capacity > 0) _items.Insert(0, new RecentDocument(path, name, DateTimeOffset.Now, pinned));
 
-            if (_items.Count > MaximumKept) _items.RemoveRange(MaximumKept, _items.Count - MaximumKept);
+            TrimUnpinned();
         }
 
         Save();
@@ -87,12 +96,30 @@ public sealed class RecentDocuments : IRecentDocuments
     public void Clear()
     {
         lock (_gate)
+            if (_items.RemoveAll(item => !item.Pinned) == 0)
+                return;
+
+        Save();
+    }
+
+    public void SetPinned(string path, bool pinned)
+    {
+        path = Canonical(path);
+        lock (_gate)
         {
-            if (_items.Count == 0) return;
-            _items.Clear();
+            var index = _items.FindIndex(item => string.Equals(item.Path, path, _pathComparison));
+            if (index < 0 || _items[index].Pinned == pinned) return;
+            _items[index] = _items[index] with { Pinned = pinned };
+            TrimUnpinned();
         }
 
         Save();
+    }
+
+    private void TrimUnpinned()
+    {
+        var unpinned = 0;
+        _items.RemoveAll(item => !item.Pinned && ++unpinned > MaximumKept);
     }
 
     private void Load()
@@ -109,9 +136,9 @@ public sealed class RecentDocuments : IRecentDocuments
                 _items.AddRange(stored
                     .Where(item => item is not null && !string.IsNullOrEmpty(item.Path))
                     .Select(item => item with { Path = Canonical(item.Path) })
-                    .Where(item => seen.Add(item.Path) && File.Exists(item.Path))
-                    .Select(item => item with { Name = item.Name ?? Path.GetFileName(item.Path) })
-                    .Take(MaximumKept));
+                    .Where(item => seen.Add(item.Path) && (item.Pinned || File.Exists(item.Path)))
+                    .Select(item => item with { Name = item.Name ?? Path.GetFileName(item.Path) }));
+            lock (_gate) TrimUnpinned();
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {

@@ -14,6 +14,7 @@ public sealed class FolioImageCommands(
     IActiveFolioContext context,
     IFolioObjectEditing objects,
     IRasterImageOperations operations,
+    IPictureCompression compression,
     IRasterImageFiles images,
     IEmbeddedFileLauncher launcher,
     IDialogService dialogs,
@@ -29,7 +30,13 @@ public sealed class FolioImageCommands(
             Image($"folio.image.filter{filter}", (image, _) => Task.FromResult(operations.Baked(image, filter == ImageFilter.Grayscale && image.Filter == ImageFilter.Grayscale ? ImageFilter.None : filter)))),
         Image("folio.image.crop", operations.CropAsync),
         Image("folio.image.replace", operations.ReplaceAsync),
-        Image("folio.image.compress", operations.CompressAsync),
+        Editing("folio.image.compress") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredSelection = FolioObjectCommands.ObjectSelection,
+            EnabledWhen = _ => Editor is { } editor && !editor.ReadOnly() && Picture() is not null,
+            Execute = (_, ct) => CompressAsync(ct),
+        },
         Image("folio.image.color", (image, ct) => operations.ColorAsync(image, "command.folio.image.color.title", ct)),
         Image("folio.image.tone", (image, ct) => operations.ToneAsync(image, "command.folio.image.tone.title", ct)),
         Image("folio.image.colorReplacer", (image, ct) => operations.RecolorAsync(image, "command.folio.image.colorReplacer.title", ct)),
@@ -97,6 +104,17 @@ public sealed class FolioImageCommands(
                 objects.Replace(editor, _ => changed);
             },
         };
+
+    private async Task CompressAsync(CancellationToken ct)
+    {
+        if (Editor is not { SelectedObjectId: { } id } editor || objects.Selected(editor) is not { Content: EmbeddedContent { Value: RasterImageObject image } } item) return;
+        var pictures = editor.Document.Objects.All
+            .Where(each => each.Content is EmbeddedContent { Value: RasterImageObject })
+            .Select(each => new CompressiblePicture(each.Id, (RasterImageObject)((EmbeddedContent)each.Content).Value, each.Size))
+            .ToList();
+        if (await compression.CompressAsync(new CompressiblePicture(id, image, item.Size), pictures, ct).ConfigureAwait(true) is not { } changed) return;
+        objects.ReplaceContents(editor, changed.ToDictionary(pair => pair.Key, pair => (EmbeddedObject)pair.Value, StringComparer.Ordinal));
+    }
 
     private async Task SizeCheckAsync(CancellationToken ct)
     {

@@ -177,6 +177,9 @@ public sealed class DeckActions
         Func<PulseOffice.Drawing.Assets.RasterImageObject, PulseOffice.Drawing.Assets.RasterImageObject> change, string labelKey) =>
         _elements.EditImage(slide, elementId, change, labelKey);
 
+    public void EditImages(IReadOnlyList<(Slide Slide, string ElementId, PulseOffice.Drawing.Assets.RasterImageObject Image)> changes, string labelKey) =>
+        _elements.EditImages(changes, labelKey);
+
     public void FlipElement(Slide slide, string elementId, bool horizontal) =>
         _elements.FlipElement(slide, elementId, horizontal);
 

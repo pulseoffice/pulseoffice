@@ -83,6 +83,11 @@ internal sealed class PptxBackgroundFillReader(IDrawingColorReader colours, Draw
 {
     public PulseOffice.Drawing.Assets.ImageDuotone? Duotone(D.Blip? blip) => duotones.Read(blip);
 
+    public PulseOffice.Drawing.Assets.ImageTone Tone(D.Blip? blip) =>
+        (_tones.Read(blip) with { Transparency = 0 }) is { IsNeutral: false } tone ? tone : PulseOffice.Drawing.Assets.ImageTone.Neutral;
+
+    private readonly DrawingImageTone _tones = new();
+
     private const uint FirstBackgroundStyle = 1001;
 
     public ShapeFill? Read(P.Background? background, ThemePart? theme)

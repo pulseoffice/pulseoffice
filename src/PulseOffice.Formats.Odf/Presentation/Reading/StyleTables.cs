@@ -104,6 +104,14 @@ internal sealed class PageImageTable(XElement? styles) : AutomaticStyleTable<str
     }
 }
 
+internal sealed class PageImageToneTable() : AutomaticStyleTable<PulseOffice.Drawing.Assets.ImageTone>("drawing-page")
+{
+    private readonly OdfImageTone _tones = new();
+
+    protected override PulseOffice.Drawing.Assets.ImageTone? Describe(XElement style, XElement automatic) =>
+        _tones.ReadBackground(style.Element(Style + "drawing-page-properties")) is { IsNeutral: false } tone ? tone : null;
+}
+
 internal sealed class PageVisibilityTable() : AutomaticStyleTable<string>("drawing-page")
 {
     protected override string? Describe(XElement style, XElement automatic)
@@ -224,7 +232,8 @@ internal sealed record OdpStyleSheet(
     IReadOnlyDictionary<string, XElement> Lists,
     OdfTextFrameStyles Frames,
     OdfPresentationTextStyles Presentation,
-    IReadOnlyDictionary<string, string> DataStyles)
+    IReadOnlyDictionary<string, string> DataStyles,
+    IReadOnlyDictionary<string, PulseOffice.Drawing.Assets.ImageTone> PageImageTones)
 {
     public OdfTextStyles Text { get; } = new(Paragraphs, Spans, Lists, DataStyles);
 }
@@ -311,7 +320,8 @@ internal sealed class OdpStyleSheetBuilder(OdfValues values, SmilTransitionMappe
             Presentational(content.Element(OdfPackage.Namespaces.Office + "automatic-styles")),
             Presentational(styles?.Element(OdfPackage.Namespaces.Office + "styles")),
             new OdfParagraphPropertiesReader(values, _frames)),
-        DataStyles(content, styles));
+        DataStyles(content, styles),
+        new PageImageToneTable().Read(content));
 
     private Dictionary<string, string> DataStyles(XElement content, XElement? styles)
     {

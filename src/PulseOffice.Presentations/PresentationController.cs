@@ -173,21 +173,21 @@ public sealed class PresentationController
     {
         if (Current is not { } slide || StepIndex < 0) return null;
 
-        var groups = _scheduler.ClickGroups(_scheduler.Schedule(slide.Animations));
+        var groups = _scheduler.ClickGroups(_scheduler.Schedule(slide));
         return StepIndex < groups.Count ? groups[StepIndex] : null;
     }
 
     public (int StartMs, int EndMs)? EntryWindow()
     {
         if (Current is not { } slide || StepIndex >= 0) return null;
-        return _scheduler.EntryGroup(_scheduler.Schedule(slide.Animations));
+        return _scheduler.EntryGroup(_scheduler.Schedule(slide));
     }
 
     public int FrozenTimeMs()
     {
         if (Current is not { } slide) return -1;
 
-        var schedule = _scheduler.Schedule(slide.Animations);
+        var schedule = _scheduler.Schedule(slide);
         if (StepIndex < 0) return _scheduler.EntryGroup(schedule)?.EndMs ?? -1;
 
         var groups = _scheduler.ClickGroups(schedule);
@@ -196,7 +196,7 @@ public sealed class PresentationController
 
     private int StepsOf(Slide slide)
     {
-        var groups = _scheduler.ClickGroups(_scheduler.Schedule(slide.Animations));
+        var groups = _scheduler.ClickGroups(_scheduler.Schedule(slide));
         return groups.Count;
     }
 }

@@ -23,7 +23,7 @@ public sealed class Fixture
         Fields.IFieldValueSource[] sources =
         [
             new Fields.PropertyFieldSource(Cultures), new Fields.ClockFieldSource(Cultures), new Fields.StatisticFieldSource(new DocumentStatisticsCounter(), Tree, Cultures),
-            new Fields.VariableFieldSource(conditions), new Fields.ConditionalFieldSource(conditions), new Fields.SequenceFieldSource(),
+            new Fields.VariableFieldSource(conditions), new Fields.ConditionalFieldSource(conditions, new Fields.MergeRecords(), new Fields.MergeVariables()), new Fields.SequenceFieldSource(new Fields.SequenceNumerals()),
             new Fields.ChapterFieldSource(), new Fields.ReferenceFieldSource(Bookmarks, Stories, Outline, words),
             new Fields.NoteReferenceFieldSource(words), new Fields.CitationFieldSource(),
         ];

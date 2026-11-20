@@ -20,6 +20,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
     private readonly OoxmlImageTypes _types = new();
     private readonly DrawingML.DrawingDuotone _duotones = new();
     private readonly DrawingML.DrawingImageTone _tones = new();
+    private readonly DrawingML.DrawingAspectLock _aspect = new();
 
     public IEnumerable<OpenXmlCompositeElement> BuildAnchors(DrawingsPart drawings, Worksheet sheet)
     {
@@ -81,7 +82,10 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
     public EmbeddedObject? PictureContent(DrawingsPart drawings, Xdr.Picture picture, string name) =>
         picture.BlipFill?.Blip is { } blip ? Content(drawings, blip, picture, name) : null;
 
-    private EmbeddedObject? Content(DrawingsPart drawings, A.Blip blip, Xdr.Picture picture, string name)
+    private EmbeddedObject? Content(DrawingsPart drawings, A.Blip blip, Xdr.Picture picture, string name) =>
+        Raw(drawings, blip, picture, name) is { } content ? _aspect.Apply(content, picture) : null;
+
+    private EmbeddedObject? Raw(DrawingsPart drawings, A.Blip blip, Xdr.Picture picture, string name)
     {
         var transform = picture.ShapeProperties?.Transform2D;
 
@@ -172,7 +176,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
         anchor.AppendChild(new Xdr.Picture(
             new Xdr.NonVisualPictureProperties(
                 new Xdr.NonVisualDrawingProperties { Id = id, Name = placed.Id },
-                new Xdr.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = true })),
+                new Xdr.NonVisualPictureDrawingProperties(new A.PictureLocks { NoChangeAspect = placed.Content.LocksAspectRatio })),
             new Xdr.BlipFill(
                 blip,
                 new A.Stretch(new A.FillRectangle())),

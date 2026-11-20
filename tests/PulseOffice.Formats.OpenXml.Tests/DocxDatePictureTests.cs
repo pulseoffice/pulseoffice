@@ -45,7 +45,7 @@ public sealed class DocxDatePictureTests
     [Theory]
     [InlineData(" SEQ Figure \\* ARABIC ", TextFieldKind.Sequence)]
     [InlineData(" SEQ Figure \\* ARABIC \\* MERGEFORMAT ", TextFieldKind.Sequence)]
-    [InlineData(" SEQ Figure \\* ROMAN ", TextFieldKind.Preserved)]
+    [InlineData(" SEQ Figure \\* ROMAN ", TextFieldKind.Sequence)]
     [InlineData(" SEQ Figure \\c ", TextFieldKind.Preserved)]
     [InlineData(" SEQ Figure \\h ", TextFieldKind.Preserved)]
     [InlineData(" SEQ Figure \\s 1 ", TextFieldKind.Preserved)]
