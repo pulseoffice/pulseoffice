@@ -28,9 +28,23 @@ public class ConditionalRuleRemovalTests
         var count = new ConditionalRuleRemoval().Remove(sheet, R("C2"), "x", history);
 
         Assert.Equal(1, count);
-        Assert.Equal([second], sheet.ConditionalRules);
+        Assert.Equal([R("A1:A5"), R("C1:C1"), R("C3:C5")], sheet.ConditionalRules[0].Ranges);
+        Assert.Same(second, sheet.ConditionalRules[1]);
 
         history.Undo();
         Assert.Equal([first, second], sheet.ConditionalRules);
+    }
+
+    [Fact]
+    public void Clearing_the_first_cells_of_a_formula_rule_keeps_the_rest_with_its_formula_reanchored()
+    {
+        var sheet = new Workbook().AddSheet("Dati");
+        sheet.ConditionalRules.Add(new ConditionalRule { Range = R("A1:A4"), Formula = "=A1>B1" });
+
+        new ConditionalRuleRemoval().Remove(sheet, R("A1:A2"), "x");
+
+        var rule = Assert.Single(sheet.ConditionalRules);
+        Assert.Equal(R("A3:A4"), rule.Range);
+        Assert.Equal("=A3>B3", rule.Formula);
     }
 }

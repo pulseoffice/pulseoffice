@@ -150,7 +150,9 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<Func<FolioViewServices>>(provider => provider.GetRequiredService<FolioViewServices>);
         services.TryAddSingleton<PulseOffice.Localization.IInterfaceCulture>(provider =>
             new PulseOffice.Localization.InterfaceCulture(provider.GetRequiredService<PulseOffice.Localization.ITextCatalog>()));
-        services.AddSingleton<IFolioDocumentFactory, FolioDocumentFactory>();
+        services.AddSingleton<FolioDocumentFactory>();
+        services.AddSingleton<IFolioDocumentFactory>(provider => provider.GetRequiredService<FolioDocumentFactory>());
+        services.AddSingleton<PulseOffice.Shell.IDocumentViewSource>(provider => provider.GetRequiredService<FolioDocumentFactory>());
         services.AddSingleton<IDocumentOperations, FolioDocumentOperations>();
         services.AddSingleton<FolioModuleFormats>();
         services.AddSingleton<IFolioDocumentService, FolioDocumentService>();

@@ -125,6 +125,7 @@ internal static class DrawingComposition
         services.TryAddSingleton<PulseOffice.Drawing.Shapes.Geometry.IComputedGeometryEngine, PulseOffice.Drawing.Shapes.Geometry.ComputedGeometryEngine>();
         services.TryAddSingleton<IArcFlattener, ArcFlattener>();
         services.TryAddSingleton<PulseOffice.Sheets.Engine.Operations.IConditionalRuleRemoval, PulseOffice.Sheets.Engine.Operations.ConditionalRuleRemoval>();
+        services.TryAddSingleton<PulseOffice.Sheets.Engine.Operations.IConditionalRuleInsertion, PulseOffice.Sheets.Engine.Operations.ConditionalRuleInsertion>();
         services.TryAddSingleton<PulseOffice.Sheets.Engine.Operations.ISheetRangeReferences, PulseOffice.Sheets.Engine.Operations.SheetRangeReferences>();
         services.AddSingleton<ISvgPathParser, SvgPathParser>();
         services.AddSingleton<PulseOffice.UI.Controls.StylePanels.IStyleRecents, PulseOffice.UI.Controls.StylePanels.StyleRecents>();

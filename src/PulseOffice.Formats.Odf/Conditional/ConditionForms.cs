@@ -3,7 +3,10 @@ using PulseOffice.Sheets.Formatting;
 
 namespace PulseOffice.Formats.Odf;
 
-internal sealed record ParsedCondition(ConditionOperator Operator, IReadOnlyList<string> Operands, string? Formula);
+internal sealed record ParsedCondition(ConditionOperator Operator, IReadOnlyList<string> Operands, string? Formula)
+{
+    public IReadOnlyList<string>? Expressions { get; init; }
+}
 
 internal sealed class OdfConditionLiterals
 {
@@ -14,6 +17,41 @@ internal sealed class OdfConditionLiterals
             ? trimmed[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal)
             : trimmed;
     }
+
+    public bool IsLiteral(string raw)
+    {
+        var trimmed = raw.Trim();
+        return double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+            || (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"');
+    }
+
+    public IReadOnlyList<string> RawArguments(string text)
+    {
+        var arguments = new List<string>();
+        var start = 0;
+        var quoted = false;
+        var depth = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            if (character == '"') quoted = !quoted;
+            else if (quoted) continue;
+            else if (character is '(' or '[') depth++;
+            else if (character is ')' or ']') depth--;
+            else if (character is ',' or ';' && depth == 0)
+            {
+                arguments.Add(text[start..index].Trim());
+                start = index + 1;
+            }
+        }
+        arguments.Add(text[start..].Trim());
+        return arguments;
+    }
+
+    public ParsedCondition Parsed(ConditionOperator op, IReadOnlyList<string> raw) =>
+        raw.All(IsLiteral)
+            ? new ParsedCondition(op, [.. raw.Select(Unquote)], null)
+            : new ParsedCondition(op, [], null) { Expressions = raw };
 
     public IReadOnlyList<string> Arguments(string text)
     {
@@ -79,9 +117,9 @@ internal sealed class FunctionConditionForm(ConditionOperator op, string name, i
         $"{name}({string.Join(",", Literals(rule).Take(arity))})";
 
     public override ParsedCondition? Read(string value) =>
-        value.StartsWith(name + "(", StringComparison.Ordinal) && value.EndsWith(')')
-            ? new ParsedCondition(op, Text.Arguments(value[(name.Length + 1)..^1]), null)
-            : null;
+        !value.StartsWith(name + "(", StringComparison.Ordinal) || !value.EndsWith(')') ? null
+        : op is ConditionOperator.Between or ConditionOperator.NotBetween ? Text.Parsed(op, Text.RawArguments(value[(name.Length + 1)..^1]))
+        : new ParsedCondition(op, Text.Arguments(value[(name.Length + 1)..^1]), null);
 }
 
 internal sealed class KeywordConditionForm(ConditionOperator op, string keyword) : ConditionForm
@@ -100,7 +138,7 @@ internal sealed class ComparisonConditionForm(ConditionOperator op, string symbo
     public override string Write(ConditionalRule rule) => symbol + Literals(rule)[0];
 
     public override ParsedCondition? Read(string value) =>
-        value.StartsWith(symbol, StringComparison.Ordinal) ? new ParsedCondition(op, [Text.Unquote(value[symbol.Length..])], null) : null;
+        value.StartsWith(symbol, StringComparison.Ordinal) ? Text.Parsed(op, [value[symbol.Length..].Trim()]) : null;
 }
 
 internal sealed class OdfConditionSyntax

@@ -335,7 +335,6 @@ public static class PulseMenuLayout
         ("shell.view.toolbars", "view/panels"),
         ("shell.view.commandPalette", "view/panels"),
 
-        ("ledger.window.", "view/windows"),
         ("shell.window.", "view/windows"),
 
         ("ledger.image.raster", "insert/image"),

@@ -75,7 +75,7 @@ public sealed class WordDatePictures : IWordDatePictures
             if (c is 'D') builder.Append('d');
             else if (c is 'Y') builder.Append('y');
             else if (c is '%' or '\\') builder.Append('\\').Append(c);
-            else if (char.IsLetter(c) && c is not ('d' or 'M' or 'y' or 'h' or 'H' or 'm' or 's' or 'S'))
+            else if (char.IsLetter(c) && c is not ('d' or 'M' or 'y' or 'h' or 'H' or 'm' or 's' or 'S' or 'Q' or 'W'))
                 builder.Append('\\').Append(c);
             else builder.Append(c == 'S' ? 's' : c);
         }

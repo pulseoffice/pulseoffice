@@ -43,12 +43,34 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         _workspace.ActiveUpdated += (_, _) => Refresh();
         _workspace.DocumentClosed += (_, _) => Refresh();
         _workspace.DocumentOpened += (_, _) => Refresh();
+        _workspace.DocumentMoved += (_, _) => Refresh();
         _texts.LanguageChanged += (_, _) => Refresh();
 
         Refresh();
     }
 
     public event EventHandler<OpenDocument>? CloseRequested;
+
+    private OpenDocument? _pressed;
+
+    public void Drop(OpenDocument document, double x)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var target = TabIndexAt(x);
+        if (target >= 0) _workspace.Move(document, target);
+        _workspace.Activate(document);
+    }
+
+    public int TabIndexAt(double x)
+    {
+        for (var index = 0; index < _shown.Count; index++)
+        {
+            var bounds = _shown[index].Tab.Bounds;
+            if (x >= bounds.Left && x < bounds.Right) return index;
+        }
+
+        return -1;
+    }
 
     public void Refresh()
     {
@@ -142,7 +164,26 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         tab.PointerPressed += (_, e) =>
         {
             if (e.Source is Button) return;
-            _workspace.Activate(document);
+            if (e.GetCurrentPoint(tab).Properties.IsMiddleButtonPressed)
+            {
+                CloseRequested?.Invoke(this, document);
+                e.Handled = true;
+                return;
+            }
+
+            if (ReferenceEquals(_workspace.Active, document)) return;
+            _pressed = document;
+        };
+        tab.PointerReleased += (_, e) =>
+        {
+            if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left || e.Source is Button) return;
+            _pressed = null;
+            Drop(document, e.GetPosition(_tabs).X);
+        };
+        tab.PointerCaptureLost += (_, _) =>
+        {
+            if (ReferenceEquals(_pressed, document)) _workspace.Activate(document);
+            _pressed = null;
         };
 
         return tab;

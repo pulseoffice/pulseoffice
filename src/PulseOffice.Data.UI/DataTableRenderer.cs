@@ -16,17 +16,19 @@ public sealed class DataTableRenderer : IDataTableRenderer
 {
     private readonly ITextCatalog _texts;
     private readonly ITableCellTextStyles _styles;
+    private readonly ITableCellBox _box;
     private readonly OptimalColumnSizing _optimal = new(new PulseOffice.Document.Tables.ColumnWidths());
 
     public DataTableRenderer(ITextCatalog texts)
-        : this(texts, new TableCellTextStyles())
+        : this(texts, new TableCellTextStyles(), new TableCellBox())
     {
     }
 
-    public DataTableRenderer(ITextCatalog texts, ITableCellTextStyles styles)
+    public DataTableRenderer(ITextCatalog texts, ITableCellTextStyles styles, ITableCellBox box)
     {
         _texts = texts;
         _styles = styles;
+        _box = box;
     }
 
     private const double CellPadding = 6;
@@ -133,10 +135,14 @@ public sealed class DataTableRenderer : IDataTableRenderer
                     _ => rowTop + Math.Max(0, (Math.Min(bodyRowHeight, style.FontSize * 1.9) - textHeight) / 2),
                 };
 
-                Draw(context, culture, Format(value, kind, culture), text,
-                    new Point(xs[c] + CellPadding, textY), typeface, style.FontSize,
-                    cellRight - xs[c] - CellPadding * 2,
-                    alignRight: kind == DataValueKind.Number);
+                if (index.Format(r, c) is { HasLayout: true } laidOut)
+                    CellText(context, culture, Format(value, kind, culture), text, _box.Inner(new Rect(new Point(xs[c], rowTop), new Point(cellRight, cellBottom)), laidOut.Margins),
+                        typeface, style.FontSize, TableCellLook.Plain with { Horizontal = kind == DataValueKind.Number ? CellHorizontalAlign.Right : null }, valign, laidOut.Direction);
+                else
+                    Draw(context, culture, Format(value, kind, culture), text,
+                        new Point(xs[c] + CellPadding, textY), typeface, style.FontSize,
+                        cellRight - xs[c] - CellPadding * 2,
+                        alignRight: kind == DataValueKind.Number);
 
                 if (style.Grid)
                     context.DrawRectangle(null, line, new Rect(
@@ -204,16 +210,8 @@ public sealed class DataTableRenderer : IDataTableRenderer
             var look = cell.Format?.Look ?? TableCellLook.Plain;
             var size = look.FontSize ?? table.Style.FontSize;
             var brush = new SolidColorBrush(look.TextHex is { } hex && Color.TryParse(hex, out var ink) ? ink : Colors.Black);
-            var textHeight = size * 1.3;
-            var y = (cell.Format?.VerticalAlign ?? CellVerticalAlign.Top) switch
-            {
-                CellVerticalAlign.Center => cell.Area.Y + (cell.Area.Height - textHeight) / 2,
-                CellVerticalAlign.Bottom => cell.Area.Bottom - textHeight - CellPadding / 2,
-                _ => cell.Area.Y + CellPadding / 2,
-            };
-            Draw(context, culture, cell.Text, brush, new Point(cell.Area.X + CellPadding, y), _styles.Typeface(look), size, cell.Area.Width - CellPadding * 2,
-                alignRight: look.Horizontal is CellHorizontalAlign.Right, centre: look.Horizontal is CellHorizontalAlign.Center,
-                decorations: _styles.Decorations(look));
+            CellText(context, culture, cell.Text, brush, _box.Inner(cell.Area, cell.Format?.Margins), _styles.Typeface(look), size, look,
+                cell.Format?.VerticalAlign ?? CellVerticalAlign.Top, cell.Format?.Direction ?? CellTextDirection.Horizontal);
         }
 
         foreach (var cell in cells)
@@ -225,6 +223,42 @@ public sealed class DataTableRenderer : IDataTableRenderer
             Border(context, look.Right, cell.Area.TopRight, cell.Area.BottomRight);
         }
     }
+
+    private void CellText(DrawingContext context, System.Globalization.CultureInfo culture, string content, IBrush brush, Rect inner, Typeface typeface,
+        double size, TableCellLook look, CellVerticalAlign valign, CellTextDirection direction)
+    {
+        if (content.Length == 0) return;
+        if (direction == CellTextDirection.Stacked)
+        {
+            var characters = new List<string>();
+            var elements = System.Globalization.StringInfo.GetTextElementEnumerator(content);
+            while (elements.MoveNext()) characters.Add(elements.GetTextElement());
+            var stacked = string.Join('\n', characters);
+            var column = new FormattedText(stacked, culture, FlowDirection.LeftToRight, typeface, size, brush) { MaxTextWidth = Math.Max(1, inner.Width), TextAlignment = TextAlignment.Center };
+            if (_styles.Decorations(look) is { } decorations) column.SetTextDecorations(decorations);
+            context.DrawText(column, new Point(inner.X, Aligned(inner.Y, inner.Height, column.Height, valign)));
+            return;
+        }
+        var turned = direction is CellTextDirection.Down or CellTextDirection.Up;
+        var (lineWidth, lineSpan) = turned ? (inner.Height, inner.Width) : (inner.Width, inner.Height);
+        var textHeight = size * 1.3;
+        var offset = Aligned(0, lineSpan, textHeight, valign);
+        using var frame = turned
+            ? context.PushTransform(direction == CellTextDirection.Down
+                ? Matrix.CreateRotation(Math.PI / 2) * Matrix.CreateTranslation(inner.Right, inner.Top)
+                : Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(inner.Left, inner.Bottom))
+            : context.PushTransform(Matrix.CreateTranslation(inner.X, inner.Y));
+        Draw(context, culture, content, brush, new Point(0, offset), typeface, size, lineWidth,
+            alignRight: look.Horizontal is CellHorizontalAlign.Right, centre: look.Horizontal is CellHorizontalAlign.Center,
+            decorations: _styles.Decorations(look));
+    }
+
+    private static double Aligned(double start, double span, double extent, CellVerticalAlign valign) => valign switch
+    {
+        CellVerticalAlign.Center => start + (span - extent) / 2,
+        CellVerticalAlign.Bottom => start + span - extent,
+        _ => start,
+    };
 
     private void Border(DrawingContext context, TableBorderLine? line, Point from, Point to)
     {

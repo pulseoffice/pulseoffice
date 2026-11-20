@@ -1,3 +1,5 @@
+using PulseOffice.Sheets.Addressing;
+
 namespace PulseOffice.Sheets.Engine.Operations;
 
 public sealed class FormulaTranslator
@@ -9,5 +11,11 @@ public sealed class FormulaTranslator
         return rowDelta == 0 && columnDelta == 0
             ? formula
             : new OffsetRewriter(rowDelta, columnDelta).Rewrite(formula);
+    }
+
+    public string? Transpose(string formula, CellAddress from, CellAddress to)
+    {
+        ArgumentNullException.ThrowIfNull(formula);
+        return new TransposingRewriter(from, to).Rewrite(formula);
     }
 }

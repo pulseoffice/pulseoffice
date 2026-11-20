@@ -164,11 +164,11 @@ internal sealed class XlsxThresholds
     {
         ConditionalThresholdKind.Minimum or ConditionalThresholdKind.AutomaticMinimum => new ConditionalFormatValueObject { Type = ConditionalFormatValueObjectValues.Min },
         ConditionalThresholdKind.Maximum or ConditionalThresholdKind.AutomaticMaximum => new ConditionalFormatValueObject { Type = ConditionalFormatValueObjectValues.Max },
-        ConditionalThresholdKind.Percent => Valued(ConditionalFormatValueObjectValues.Percent, threshold.Value),
-        ConditionalThresholdKind.Percentile => Valued(ConditionalFormatValueObjectValues.Percentile, threshold.Value),
+        ConditionalThresholdKind.Percent => Valued(ConditionalFormatValueObjectValues.Percent, threshold),
+        ConditionalThresholdKind.Percentile => Valued(ConditionalFormatValueObjectValues.Percentile, threshold),
         ConditionalThresholdKind.Formula when threshold.Formula is { } formula =>
             new ConditionalFormatValueObject { Type = ConditionalFormatValueObjectValues.Formula, Val = _formulas.ToOpenXml(formula) },
-        _ => Valued(ConditionalFormatValueObjectValues.Number, threshold.Value),
+        _ => Valued(ConditionalFormatValueObjectValues.Number, threshold),
     };
 
     private ConditionalThreshold Kind(ConditionalFormatValueObject element)
@@ -178,14 +178,22 @@ internal sealed class XlsxThresholds
         var type = element.Type?.Value;
         if (type == ConditionalFormatValueObjectValues.Min) return new(ConditionalThresholdKind.Minimum);
         if (type == ConditionalFormatValueObjectValues.Max) return new(ConditionalThresholdKind.Maximum);
-        if (type == ConditionalFormatValueObjectValues.Percent) return new(ConditionalThresholdKind.Percent, number ?? 0);
-        if (type == ConditionalFormatValueObjectValues.Percentile) return new(ConditionalThresholdKind.Percentile, number ?? 0);
+        var formula = number is null ? _formulas.ToInternal(text).TrimStart('=') : null;
+        if (type == ConditionalFormatValueObjectValues.Percent) return new(ConditionalThresholdKind.Percent, number ?? 0, formula);
+        if (type == ConditionalFormatValueObjectValues.Percentile) return new(ConditionalThresholdKind.Percentile, number ?? 0, formula);
         if (number is { } constant) return new(ConditionalThresholdKind.Number, constant);
+        if (type == ConditionalFormatValueObjectValues.Number) return new(ConditionalThresholdKind.Number, 0, formula);
         return new(ConditionalThresholdKind.Formula, 0, _formulas.ToInternal(text).TrimStart('='));
     }
 
-    private ConditionalFormatValueObject Valued(ConditionalFormatValueObjectValues type, double value) =>
-        new() { Type = type, Val = (double.IsFinite(value) ? value : 0).ToString("R", CultureInfo.InvariantCulture) };
+    private ConditionalFormatValueObject Valued(ConditionalFormatValueObjectValues type, ConditionalThreshold threshold) =>
+        new()
+        {
+            Type = type,
+            Val = threshold.Formula is { Length: > 0 } formula
+                ? _formulas.ToOpenXml(formula)
+                : (double.IsFinite(threshold.Value) ? threshold.Value : 0).ToString("R", CultureInfo.InvariantCulture),
+        };
 }
 
 internal sealed class XlsxDataBarCodec(SpreadsheetColours colours, XlsxThresholds thresholds, X14RuleIds ids) : XlsxRuleCodec(colours)

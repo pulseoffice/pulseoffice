@@ -76,11 +76,10 @@ internal sealed class RangeMoveSplitter(RangeMoveEdit edit)
 
     private ConditionalRule Reanchored(ConditionalRule rule, IReadOnlyList<CellRange> ranges)
     {
-        return rule with
+        return rule.WithFormulas(formula => Shifted(formula, rule.Range.Start, ranges[0].Start)) with
         {
             Range = ranges[0],
             AdditionalRanges = [.. ranges.Skip(1)],
-            Formula = Shifted(rule.Formula, rule.Range.Start, ranges[0].Start),
         };
     }
 

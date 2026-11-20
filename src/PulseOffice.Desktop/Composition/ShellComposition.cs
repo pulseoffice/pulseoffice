@@ -20,6 +20,7 @@ public sealed class ShellComposition(IServiceProvider services)
 
         registry.RegisterRange(_services.GetRequiredService<ShellCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<ShellInterfaceCommands>().GetCommands());
+        registry.RegisterRange(_services.GetRequiredService<ShellWindowCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<ShellAutoCorrectCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<ShellDictionaryCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<ShellPrintCommands>().GetCommands());

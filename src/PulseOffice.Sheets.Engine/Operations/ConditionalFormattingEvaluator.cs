@@ -327,11 +327,14 @@ internal sealed class RangeExtremes(Evaluation.Evaluator evaluator, ConditionalR
         ConditionalThresholdKind.Maximum => numbers[^1],
         ConditionalThresholdKind.AutomaticMinimum => Math.Min(0, numbers[0]),
         ConditionalThresholdKind.AutomaticMaximum => Math.Max(0, numbers[^1]),
-        ConditionalThresholdKind.Number => threshold.Value,
-        ConditionalThresholdKind.Percent => numbers[0] + (numbers[^1] - numbers[0]) * threshold.Value / 100,
-        ConditionalThresholdKind.Percentile => Percentile(numbers, threshold.Value / 100),
+        ConditionalThresholdKind.Number => Valued(threshold, cell),
+        ConditionalThresholdKind.Percent => numbers[0] + (numbers[^1] - numbers[0]) * Valued(threshold, cell) / 100,
+        ConditionalThresholdKind.Percentile => Percentile(numbers, Valued(threshold, cell) / 100),
         _ => Formula(threshold, cell) ?? threshold.Value,
     };
+
+    private double Valued(ConditionalThreshold threshold, ConditionalCell cell) =>
+        threshold.Formula is { Length: > 0 } ? Formula(threshold, cell) ?? threshold.Value : threshold.Value;
 
     private double? Formula(ConditionalThreshold threshold, ConditionalCell cell)
     {

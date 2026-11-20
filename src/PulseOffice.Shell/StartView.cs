@@ -28,6 +28,9 @@ public sealed class StartView : UserControl
     private readonly IRecentAvailability _availability;
     private readonly Dictionary<string, Button> _entries = new(StringComparer.Ordinal);
     private CancellationTokenSource? _checking;
+    private readonly HashSet<string> _marked = new(StringComparer.Ordinal);
+    private readonly Avalonia.Threading.DispatcherTimer _recheck = new() { Interval = TimeSpan.FromSeconds(30) };
+    private WindowBase? _host;
 
     public event EventHandler<string>? CommandRequested;
 
@@ -37,9 +40,15 @@ public sealed class StartView : UserControl
         _recent = recent ?? throw new ArgumentNullException(nameof(recent));
         _texts = texts ?? throw new ArgumentNullException(nameof(texts));
         _icons = icons ?? throw new ArgumentNullException(nameof(icons));
+        _recheck.Tick += OnRecheck;
 
         Rebuild();
     }
+
+    private void OnRecheck(object? sender, EventArgs e) => _ = RecheckAvailabilityAsync();
+
+    public Task RecheckAvailabilityAsync() =>
+        _entries.Count == 0 ? Task.CompletedTask : MarkMissingAsync([.. _entries.Keys]);
 
     private void OnRecentChanged(object? sender, EventArgs e) => Avalonia.Threading.Dispatcher.UIThread.Post(FillRecent);
 
@@ -50,6 +59,10 @@ public sealed class StartView : UserControl
         _recent.Changed += OnRecentChanged;
         ActualThemeVariantChanged -= OnThemeChanged;
         ActualThemeVariantChanged += OnThemeChanged;
+        if (_host is not null) _host.Activated -= OnRecheck;
+        _host = TopLevel.GetTopLevel(this) as WindowBase;
+        if (_host is not null) _host.Activated += OnRecheck;
+        _recheck.Start();
         Rebuild();
     }
 
@@ -58,6 +71,9 @@ public sealed class StartView : UserControl
         base.OnDetachedFromVisualTree(e);
         _recent.Changed -= OnRecentChanged;
         ActualThemeVariantChanged -= OnThemeChanged;
+        _recheck.Stop();
+        if (_host is not null) _host.Activated -= OnRecheck;
+        _host = null;
     }
 
     private void OnThemeChanged(object? sender, EventArgs e) => Rebuild();
@@ -317,6 +333,7 @@ public sealed class StartView : UserControl
         _recentList.Children.Clear();
         _recentList.RowDefinitions.Clear();
         _entries.Clear();
+        _marked.Clear();
 
         var items = _recent.Items.Take(RecentShown).ToList();
 
@@ -354,8 +371,18 @@ public sealed class StartView : UserControl
         }
 
         if (checking.IsCancellationRequested) return;
+        if (_marked.Any(path => !missing.Contains(path)))
+        {
+            FillRecent();
+            return;
+        }
+
         foreach (var path in missing)
-            if (_entries.TryGetValue(path, out var entry)) MarkMissing(entry, path);
+            if (!_marked.Contains(path) && _entries.TryGetValue(path, out var entry))
+            {
+                _marked.Add(path);
+                MarkMissing(entry, path);
+            }
     }
 
     private void MarkMissing(Button entry, string path)

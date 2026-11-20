@@ -24,7 +24,8 @@ public sealed class LedgerConditionalRuleCommands(
     IStatusBarService status,
     ISheetFormatGate gate,
     ITextCatalog texts,
-    Engine.Operations.IConditionalRuleRemoval ruleRemoval) : LedgerCommandSet(context)
+    Engine.Operations.IConditionalRuleRemoval ruleRemoval,
+    Engine.Operations.IConditionalRuleInsertion ruleInsertion) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() => ConditionalCommands();
 
@@ -98,17 +99,7 @@ public sealed class LedgerConditionalRuleCommands(
             var sheet = workbook.Sheets[Context.SheetIndex];
             if (gate.Refuses(sheet)) return Task.CompletedTask;
 
-            var rule = build(Context.Selection) with
-            {
-                Priority = sheet.ConditionalRules.Count,
-            };
-
-            sheet.ConditionalRules.Add(rule);
-
-            Context.History?.Push(new Document.Commands.DelegateAction(
-                texts[$"command.{id}.title"],
-                redo: () => sheet.ConditionalRules.Add(rule),
-                undo: () => sheet.ConditionalRules.Remove(rule)));
+            ruleInsertion.InsertFirst(sheet, build(Context.Selection), texts[$"command.{id}.title"], Context.History);
 
             Context.RequestRefresh();
             return Task.CompletedTask;

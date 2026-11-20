@@ -19,12 +19,51 @@ public sealed class FieldClockFormatter : IFieldClockFormatter
         if (string.IsNullOrEmpty(pattern)) return moment.ToString(fallback, culture);
         try
         {
-            return moment.ToString(pattern, culture);
+            return moment.ToString(Extended(pattern, moment, culture), culture);
         }
         catch (FormatException)
         {
             return moment.ToString(fallback, culture);
         }
+    }
+
+    private string Extended(string pattern, DateTime moment, CultureInfo culture)
+    {
+        if (pattern.IndexOfAny(['Q', 'W']) < 0) return pattern;
+        var builder = new System.Text.StringBuilder();
+        var i = 0;
+        while (i < pattern.Length)
+        {
+            var c = pattern[i];
+            if (c is '\'' or '"')
+            {
+                var end = pattern.IndexOf(c, i + 1);
+                if (end < 0) end = pattern.Length - 1;
+                builder.Append(pattern, i, end - i + 1);
+                i = end + 1;
+                continue;
+            }
+            if (c == '\\' && i + 1 < pattern.Length)
+            {
+                builder.Append(pattern, i, 2);
+                i += 2;
+                continue;
+            }
+            if (c is 'Q' or 'W')
+            {
+                var run = 1;
+                while (i + run < pattern.Length && pattern[i + run] == c) run++;
+                var value = c == 'Q'
+                    ? "Q" + ((moment.Month - 1) / 3 + 1).ToString(culture)
+                    : culture.Calendar.GetWeekOfYear(moment, culture.DateTimeFormat.CalendarWeekRule, culture.DateTimeFormat.FirstDayOfWeek).ToString(run >= 2 ? "00" : "0", culture);
+                builder.Append('\'').Append(value).Append('\'');
+                i += run;
+                continue;
+            }
+            builder.Append(c);
+            i++;
+        }
+        return builder.ToString();
     }
 }
 

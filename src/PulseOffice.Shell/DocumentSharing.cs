@@ -7,6 +7,8 @@ public sealed record ShareClaim(string User, string Machine, DateTimeOffset Take
 {
     public bool IsMine { get; init; }
 
+    public bool IsStale { get; init; }
+
     public bool SameAccount => string.Equals(User, Environment.UserName, StringComparison.Ordinal)
         && string.Equals(Machine, Environment.MachineName, StringComparison.Ordinal);
 }
@@ -120,6 +122,11 @@ public sealed class FileDocumentSharing(IRecoveryOwnership? ownership = null) : 
             : !_ownership.IsAlive(process);
     }
 
+    private bool HeldByThisProcess(ShareClaim claim) =>
+        claim.Process is { } process
+        && process.ProcessId == _ownership.Current.ProcessId
+        && (process.Started - _ownership.Current.Started).Duration() <= TimeSpan.FromSeconds(2);
+
     public ShareClaim? Holder(string documentPath)
     {
         ArgumentException.ThrowIfNullOrEmpty(documentPath);
@@ -130,7 +137,7 @@ public sealed class FileDocumentSharing(IRecoveryOwnership? ownership = null) : 
 
         try
         {
-            return _format.Read(ReadHead(path)) is { } claim ? claim with { IsMine = Owned(claim) } : null;
+            return _format.Read(ReadHead(path)) is { } claim ? claim with { IsMine = Owned(claim), IsStale = Owned(claim) && !HeldByThisProcess(claim) } : null;
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
         {
@@ -142,12 +149,15 @@ public sealed class FileDocumentSharing(IRecoveryOwnership? ownership = null) : 
     {
         ArgumentException.ThrowIfNullOrEmpty(documentPath);
 
-        if (Holder(documentPath) is { } held) return held.IsMine;
+        var held = Holder(documentPath);
+        if (held is { IsMine: false }) return false;
+        if (held is not null && HeldByThisProcess(held)) return true;
 
         var lockPath = LockPathOf(documentPath);
         try
         {
-            if (File.Exists(lockPath) && DateTime.UtcNow - File.GetLastWriteTimeUtc(lockPath) > Abandoned)
+            if (held is not null
+                || (File.Exists(lockPath) && DateTime.UtcNow - File.GetLastWriteTimeUtc(lockPath) > Abandoned))
                 File.Delete(lockPath);
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)

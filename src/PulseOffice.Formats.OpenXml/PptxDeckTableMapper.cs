@@ -18,6 +18,7 @@ public sealed class PptxDeckTableMapper
     internal PptxDeckTableMapper(PptxTableStyleResolver styles) => _styles = styles;
 
     private readonly OptimalColumnSizing _optimal = new(new PulseOffice.Document.Tables.ColumnWidths());
+    private const string GridStyleId = "{5940675A-B579-460E-94D1-54222C63F5DA}";
     private const string TableUri = "http://schemas.openxmlformats.org/drawingml/2006/table";
 
     public P.GraphicFrame Build(ObjectElement element, DataTableObject table, uint id)
@@ -38,6 +39,9 @@ public sealed class PptxDeckTableMapper
             LastColumn = table.Style.LastColumn ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
             LastRow = table.Style.LastRow ? new DocumentFormat.OpenXml.BooleanValue(true) : null,
         });
+
+        if (!table.Style.OwnLook && table.Style.Grid)
+            tbl.TableProperties!.Append(new D.TableStyleId(GridStyleId));
 
         var grid = new D.TableGrid();
         for (var c = 0; c < columns; c++)

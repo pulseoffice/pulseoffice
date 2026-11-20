@@ -160,7 +160,7 @@ public sealed class ShellDocumentCommands(
             return;
         }
 
-        if (sharing.Holder(path) is { } held)
+        if (sharing.Holder(path) is { IsStale: false } held)
         {
             if (!held.IsMine)
             {

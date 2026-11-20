@@ -136,18 +136,25 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
     private bool HeadingReference(string? style, IReadOnlyList<string> switches)
     {
         if (switches.Any(item => item != "\\n" && item != "\\*" && !item.StartsWith("\\*", StringComparison.Ordinal))) return false;
-        var digits = style is null ? null
-            : style.StartsWith(ChapterStylePrefix, StringComparison.OrdinalIgnoreCase) ? style[ChapterStylePrefix.Length..].Trim()
-            : style.Trim();
+        var digits = HeadingDigits(style);
         return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var level)
             && level is >= 1 and <= PulseOffice.Documents.Fields.ChapterLevels.Deepest;
     }
 
+    private readonly IReadOnlyList<string> _headingPrefixes = [ChapterStylePrefix, "Titolo ", "Überschrift ", "Titre ", "Título ", "Encabezado ", "Kop ", "Nagłówek ", "Rubrik ", "Overskrift "];
+
+    private string? HeadingDigits(string? style)
+    {
+        if (style is null) return null;
+        var trimmed = style.Trim();
+        foreach (var prefix in _headingPrefixes)
+            if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return trimmed[prefix.Length..].Trim();
+        return trimmed;
+    }
+
     private FieldDetail? ChapterLevel(string? style)
     {
-        var digits = style is null ? null
-            : style.StartsWith(ChapterStylePrefix, StringComparison.OrdinalIgnoreCase) ? style[ChapterStylePrefix.Length..].Trim()
-            : style.Trim();
+        var digits = HeadingDigits(style);
         return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var level)
             && level is > 1 and <= PulseOffice.Documents.Fields.ChapterLevels.Deepest
             ? new FieldDetail { Value = level.ToString(System.Globalization.CultureInfo.InvariantCulture) }

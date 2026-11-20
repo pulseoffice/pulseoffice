@@ -84,6 +84,6 @@ public sealed class FolioMergeWizardTests
         Assert.Equal([2, 0], view.Listed);
         var plan = view.Plan();
         Assert.Equal([2], plan.Rows);
-        Assert.Equal(scene.Document.MergeSelection, plan.Selection);
+        Assert.Equal(new MergeRecipients().Keyed(People, scene.Document.MergeSelection), plan.Selection);
     }, CancellationToken.None);
 }

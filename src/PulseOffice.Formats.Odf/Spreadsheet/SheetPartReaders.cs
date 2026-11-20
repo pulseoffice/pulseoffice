@@ -32,6 +32,8 @@ internal sealed class OdsReadContext(OdfPackage package, XDocument content, Work
     public IReadOnlySet<string> RowBreakStyles { get; set; } = new HashSet<string>();
     public IReadOnlyDictionary<string, string> StyleLinks { get; set; } = new Dictionary<string, string>();
     public IReadOnlySet<string> ColumnBreakStyles { get; set; } = new HashSet<string>();
+
+    public OdsStyleMaps StyleMaps { get; } = new();
 }
 
 internal interface IOdsSheetPartReader
@@ -52,6 +54,8 @@ internal sealed class ConditionalPartReader(OdfConditionalMapper conditionals) :
     public void Read(XElement table, Worksheet sheet, OdsReadContext context)
     {
         foreach (var rule in conditionals.ReadRules(table, context.NamedStyles)) sheet.ConditionalRules.Add(rule);
+        if (table.Element(Namespaces.Calcext + "conditional-formats") is not null) return;
+        foreach (var rule in conditionals.ReadStyleMaps(context.StyleMaps, table, sheet.Name, context.NamedStyles)) sheet.ConditionalRules.Add(rule);
     }
 }
 

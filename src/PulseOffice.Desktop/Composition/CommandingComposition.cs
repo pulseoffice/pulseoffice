@@ -122,6 +122,8 @@ internal static class CommandingComposition
         services.TryAddSingleton<IContextMenuKey, ContextMenuKey>();
         services.AddSingleton<ShellCommands>();
         services.AddSingleton<ShellInterfaceCommands>();
+        services.AddSingleton<ShellWindowCommands>();
+        services.AddSingleton<IDocumentWindows, DocumentWindows>();
         services.AddSingleton<ShellPrintCommands>();
         services.AddSingleton<ShellDocumentCommands>();
         services.AddSingleton<ShellPasswordCommands>();

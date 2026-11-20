@@ -19,13 +19,16 @@ public sealed class DeckTableCommands(
     IDeckTableBorders borders,
     PulseOffice.UI.Controls.Sorting.ISortLevelsDialog sortLevels,
     IDeckTableStyleOptions styleOptions,
-    PulseOffice.UI.Controls.Tables.ITableLookOptionsDialog lookOptions) : DeckCommandSet(context)
+    PulseOffice.UI.Controls.Tables.ITableLookOptionsDialog lookOptions,
+    IDeckTableCellLayout cellLayout) : DeckCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
         Table("deck.table.addRow", AddRow),
+        Table("deck.table.insertRowAbove", InsertRowAbove),
         Table("deck.table.removeRow", RemoveRow, CanRemoveRows),
         Table("deck.table.addColumn", AddColumn),
+        Table("deck.table.insertColumnLeft", InsertColumnLeft),
         Table("deck.table.removeColumn", RemoveColumn, CanRemoveColumns),
         Select("deck.table.selectRow", (table, range) => range with { FirstColumn = 0, LastColumn = table.Snapshot.Columns.Count - 1 }),
         Select("deck.table.selectColumn", (table, range) => range with { FirstRow = 0, LastRow = table.Snapshot.Rows.Count - 1 }),
@@ -35,6 +38,7 @@ public sealed class DeckTableCommands(
         StyleCommand(),
         StyleOptionsCommand(),
         BordersCommand(),
+        CellLayoutCommand(),
         EditCommand(),
         DeleteCommand(),
         .. sizings.Select(Sizing),
@@ -164,6 +168,43 @@ public sealed class DeckTableCommands(
             },
         };
 
+    private CommandDefinition CellLayoutCommand() =>
+        Prototype("deck.table.cellLayout") with
+        {
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.Target?.Selected() is ObjectElement { Content: DataTableObject },
+            Execute = async (_, ct) =>
+            {
+                if (Context.Target is not { } t || t.Selected() is not ObjectElement { Content: DataTableObject current }) return;
+                var now = cellLayout.Of(current, CellsOf());
+                var values = await dialogs.ShowAsync<Dictionary<string, object>>(
+                    new PulseOffice.UI.Controls.FormPromptView(texts["deck.table.cellLayout.explanation"],
+                    [
+                        Margin("left", now.Margins.Left),
+                        Margin("right", now.Margins.Right),
+                        Margin("top", now.Margins.Top),
+                        Margin("bottom", now.Margins.Bottom),
+                        new PulseOffice.UI.Controls.ChoiceField("direction", texts["deck.table.cellLayout.direction"],
+                            [texts["deck.table.cellLayout.horizontal"], texts["deck.table.cellLayout.down"], texts["deck.table.cellLayout.up"], texts["deck.table.cellLayout.stacked"]],
+                            (int)now.Direction),
+                    ], texts),
+                    new PulseOffice.UI.Controls.Services.DialogOptions { TitleKey = "command.deck.table.cellLayout.title", PreferredWidth = 420 }, ct).ConfigureAwait(true);
+                if (values is null || t.CurrentSlide() is not { } slide || t.Selected() is not ObjectElement { Content: DataTableObject } element) return;
+                var chosen = new DeckCellLayout(
+                    new TableCellMargins(Points(values, "left"), Points(values, "right"), Points(values, "top"), Points(values, "bottom")),
+                    values["direction"] is int direction && Enum.IsDefined((CellTextDirection)direction) ? (CellTextDirection)direction : CellTextDirection.Horizontal);
+                t.Actions.EditTable(slide, element.Id, table => cellLayout.Apply(table, CellsOf(), chosen));
+            },
+        };
+
+    private PulseOffice.UI.Controls.NumberField Margin(string side, double points) =>
+        new(side, texts[$"deck.table.cellLayout.{side}"], Math.Round(points, 1), 0, 144, 0.5) { Unit = "pt" };
+
+    private static double Points(IReadOnlyDictionary<string, object> values, string key) =>
+        Math.Clamp(Convert.ToDouble(values[key], System.Globalization.CultureInfo.InvariantCulture), 0, 144);
+
     private CommandDefinition DeleteCommand() =>
         Prototype("deck.table.delete") with
         {
@@ -218,6 +259,13 @@ public sealed class DeckTableCommands(
 
     private DataTableObject AddRow(DataTableObject table) =>
         structure.InsertRow(table, Rows(table) is { } rows ? rows.Last + 1 : table.Snapshot.Rows.Count);
+
+    private DataTableObject InsertRowAbove(DataTableObject table) =>
+        structure.InsertRow(table, Rows(table) is { } rows ? rows.First : 0);
+
+    private DataTableObject InsertColumnLeft(DataTableObject table) =>
+        structure.InsertColumn(table, Columns(table) is { } columns ? columns.First : 0,
+            new DataColumn($"{texts["deck.table.column"]} {table.Snapshot.Columns.Count + 1}", DataValueKind.Text));
 
     private bool CanRemoveRows(DataTableObject table)
     {

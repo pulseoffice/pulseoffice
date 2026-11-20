@@ -108,7 +108,7 @@ public sealed class FolioMergeRecipientsStep : UserControl
 
     public int ConditionCount => _conditions.Count;
 
-    public MergeSelection Selection => new(Filter, Sort, new HashSet<int>(_excluded));
+    public MergeSelection Selection => _recipients.Keyed(_data, new MergeSelection(Filter, Sort, new HashSet<int>(_excluded)));
 
     public void Exclude(int row, bool excluded)
     {
@@ -133,7 +133,7 @@ public sealed class FolioMergeRecipientsStep : UserControl
             _sort[index].Direction.SelectedIndex = key?.Descending == true ? 1 : 0;
         }
         _excluded.Clear();
-        foreach (var row in selection.Excluded.Where(row => row >= 0 && row < _data.Rows.Count)) _excluded.Add(row);
+        foreach (var row in _recipients.ExcludedRows(_data, selection)) _excluded.Add(row);
         _applying = false;
         Refilter();
     }

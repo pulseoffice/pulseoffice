@@ -184,6 +184,7 @@ public sealed class OdsReader
             ? _cellStyles.ReadStyles(styles, NumberFormat, styles)
             : new Dictionary<string, PulseOffice.Sheets.Styling.CellStyle>(StringComparer.Ordinal);
         context.Parents = _cellStyles.ReadParents(context.Content);
+        context.StyleMaps.Load(context.Content, context.Styles);
         context.StyleLinks = new OdfCellStyleHyperlink().Read(context.Content);
         context.ColumnWidths = _layout.ReadColumnWidths(context.Content);
         context.RowHeights = _layout.ReadRowHeights(context.Content);
@@ -228,6 +229,7 @@ public sealed class OdsReader
                 _states[table] = state = reader._tables.Begin(table, Context);
             }
             reader._tables.ReadRow(state, row, Context);
+            Context.StyleMaps.Collect(table, row);
             return true;
         }
 

@@ -53,8 +53,10 @@ public sealed class LedgerDocumentFactory(
     IInterfaceCulture culture,
     PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters,
     ICellLinkClicking cellLinks,
-    PulseOffice.UI.Controls.Links.ILinkTips linkTips) : ILedgerDocumentFactory
+    PulseOffice.UI.Controls.Links.ILinkTips linkTips) : ILedgerDocumentFactory, IDocumentViewSource
 {
+    public ModuleKind Module => ModuleKind.Sheets;
+
     private int _counter;
 
     private bool Editable => workspace.Active?.IsReadOnly != true;

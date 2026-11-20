@@ -119,7 +119,9 @@ internal static class LedgerCoreComposition
         services.AddSingleton<LedgerShapeListCommands>();
         services.AddSingleton<LedgerCommands>();
         services.AddSingleton<PulseOffice.Sheets.IFormControlBinding, PulseOffice.Sheets.FormControlBinding>();
-        services.AddSingleton<ILedgerDocumentFactory, LedgerDocumentFactory>();
+        services.AddSingleton<LedgerDocumentFactory>();
+        services.AddSingleton<ILedgerDocumentFactory>(provider => provider.GetRequiredService<LedgerDocumentFactory>());
+        services.AddSingleton<PulseOffice.Shell.IDocumentViewSource>(provider => provider.GetRequiredService<LedgerDocumentFactory>());
         services.TryAddSingleton<PulseOffice.Sheets.Engine.Localization.IFunctionNameVocabulary, PulseOffice.Sheets.Engine.Localization.FunctionNameVocabulary>();
         services.AddSingleton<PulseOffice.Sheets.Engine.Localization.IFormulaPunctuationConvention, PulseOffice.Sheets.Engine.Localization.FormulaPunctuationConvention>();
         services.AddSingleton<PulseOffice.Sheets.Engine.Localization.IFormulaLocalization, PulseOffice.Sheets.Engine.Localization.FormulaLocalization>();

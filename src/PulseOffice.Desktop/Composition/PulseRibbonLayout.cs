@@ -673,6 +673,10 @@ public static class PulseRibbonLayout
         ("shell.view.fullScreen@Sheets", "view/views"),
         ("shell.view.fullScreen@Documents", "view/modes"),
         ("shell.view.fullScreen@Presentations", "view/modes"),
+        ("shell.window.new@Documents", "view/modes"),
+        ("shell.window.close@Documents", "view/modes"),
+        ("shell.window.new@Presentations", "view/modes"),
+        ("shell.window.close@Presentations", "view/modes"),
 
         ("ledger.view.formulaBar", "view/show"),
         ("shell.view.statusBar", "view/show"),
@@ -700,8 +704,8 @@ public static class PulseRibbonLayout
         ("ledger.view.unfreeze", "view/panes"),
         ("ledger.view.splitAtSelection", "view/panes"),
         ("ledger.view.unsplit", "view/panes"),
-        ("ledger.window.new", "view/panes"),
-        ("ledger.window.close", "view/panes"),
+        ("shell.window.new@Sheets", "view/panes"),
+        ("shell.window.close@Sheets", "view/panes"),
 
         ("ledger.worksheet.insert", "view/sheets"),
         ("ledger.worksheet.duplicate", "view/sheets"),

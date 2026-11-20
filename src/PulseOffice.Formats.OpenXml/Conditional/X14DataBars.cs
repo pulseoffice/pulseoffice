@@ -13,7 +13,7 @@ internal sealed class X14Thresholds(X14Namespaces names, XlsxFormulaSyntax formu
         if (!threshold.GreaterOrEqual) entry.Add(new XAttribute("gte", "0"));
         if (threshold.Kind is not (ConditionalThresholdKind.Minimum or ConditionalThresholdKind.Maximum
             or ConditionalThresholdKind.AutomaticMinimum or ConditionalThresholdKind.AutomaticMaximum))
-            entry.Add(new XElement(names.Xm + "f", threshold.Kind == ConditionalThresholdKind.Formula && threshold.Formula is { } formula
+            entry.Add(new XElement(names.Xm + "f", threshold.Formula is { Length: > 0 } formula
                 ? formulas.ToOpenXml(formula)
                 : (double.IsFinite(threshold.Value) ? threshold.Value : 0).ToString("R", CultureInfo.InvariantCulture)));
         return entry;
@@ -30,7 +30,10 @@ internal sealed class X14Thresholds(X14Namespaces names, XlsxFormulaSyntax formu
         var text = (string?)entry.Element(names.Xm + "f") ?? (string?)entry.Attribute("val") ?? (string?)entry.Attribute("value") ?? "0";
         if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
             return new ConditionalThreshold(kind == ConditionalThresholdKind.Formula ? ConditionalThresholdKind.Number : kind, double.IsFinite(number) ? number : 0, null, greater);
-        return new ConditionalThreshold(ConditionalThresholdKind.Formula, 0, formulas.ToInternal(text).TrimStart('='), greater);
+        var expression = formulas.ToInternal(text).TrimStart('=');
+        return kind is ConditionalThresholdKind.Percent or ConditionalThresholdKind.Percentile or ConditionalThresholdKind.Number
+            ? new ConditionalThreshold(kind, 0, expression, greater)
+            : new ConditionalThreshold(ConditionalThresholdKind.Formula, 0, expression, greater);
     }
 }
 

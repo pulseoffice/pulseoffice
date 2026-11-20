@@ -181,6 +181,13 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         CellAddress origin, PasteParts parts = PasteParts.All, UndoStack? history = null) =>
         Paste(snapshot, sheet, target, origin, new PasteRequest { Parts = parts }, history);
 
+    private string? Transposed(string? formula, CellAddress from, CellAddress to)
+    {
+        if (formula is null) return null;
+        var translated = _translator.Transpose(formula.StartsWith('=') ? formula : "=" + formula, from, to);
+        return translated is null ? formula : formula.StartsWith('=') ? translated : translated.TrimStart('=');
+    }
+
     public void Paste(
         ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target,
         CellAddress origin, PasteRequest request, UndoStack? history = null)
@@ -215,25 +222,32 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         if (request.Parts.HasFlag(PasteParts.Styles)) PasteMerges(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
         if (request.Parts.HasFlag(PasteParts.Comments)) PasteComments(snapshot, sheet, target, request, history);
         if (request.Parts.HasFlag(PasteParts.Validation)) PasteValidations(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
-        if (request.Parts.HasFlag(PasteParts.Styles) && !request.Transpose) PasteConditionalRules(snapshot, sheet, target, request.HistoryLabel, history);
+        if (request.Parts.HasFlag(PasteParts.Styles)) PasteConditionalRules(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
     }
 
-    private void PasteConditionalRules(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, string label, UndoStack? history)
+    private void PasteConditionalRules(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, bool transpose, string label, UndoStack? history)
     {
         if (snapshot.ConditionalRules.Count == 0) return;
 
         List<PulseOffice.Sheets.Formatting.ConditionalRule> before = [.. sheet.ConditionalRules];
-        var area = new CellRange(target, Bounded(target.Row + snapshot.RowCount - 1, target.Column + snapshot.ColumnCount - 1));
+        var area = transpose
+            ? new CellRange(target, Bounded(target.Row + snapshot.ColumnCount - 1, target.Column + snapshot.RowCount - 1))
+            : new CellRange(target, Bounded(target.Row + snapshot.RowCount - 1, target.Column + snapshot.ColumnCount - 1));
         sheet.ConditionalRules.RemoveAll(rule => rule.Ranges.All(part => area.Contains(part.Start) && area.Contains(part.End)));
 
         var priority = sheet.ConditionalRules.Count == 0 ? 0 : sheet.ConditionalRules.Max(rule => rule.Priority) + 1;
         foreach (var copied in snapshot.ConditionalRules)
         {
-            var start = Bounded(target.Row + copied.Row, target.Column + copied.Column);
-            var end = Bounded(start.Row + copied.RowCount - 1, start.Column + copied.ColumnCount - 1);
-            var rowShift = start.Row - copied.Rule.Anchor.Row;
-            var columnShift = start.Column - copied.Rule.Anchor.Column;
-            var moved = copied.Rule.WithFormulas(formula => Shifted(formula, rowShift, columnShift));
+            var start = transpose
+                ? Bounded(target.Row + copied.Column, target.Column + copied.Row)
+                : Bounded(target.Row + copied.Row, target.Column + copied.Column);
+            var end = transpose
+                ? Bounded(start.Row + copied.ColumnCount - 1, start.Column + copied.RowCount - 1)
+                : Bounded(start.Row + copied.RowCount - 1, start.Column + copied.ColumnCount - 1);
+            var anchor = copied.Rule.Anchor;
+            var moved = transpose
+                ? copied.Rule.WithFormulas(formula => Transposed(formula, anchor, start))
+                : copied.Rule.WithFormulas(formula => Shifted(formula, start.Row - anchor.Row, start.Column - anchor.Column));
             sheet.ConditionalRules.Add(moved with { Range = new CellRange(start, end), AdditionalRanges = [], Priority = priority + copied.Rule.Priority });
         }
 

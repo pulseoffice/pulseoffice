@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace PulseOffice.Documents.Fields;
 
@@ -43,10 +45,12 @@ public sealed record MergeSelection(MergeFilter Filter, IReadOnlyList<MergeSort>
 {
     public static readonly MergeSelection All = new(MergeFilter.None, [], new HashSet<int>());
 
-    public bool IsEmpty => Filter.Conditions.All(condition => condition.Column.Length == 0) && Sort.Count == 0 && Excluded.Count == 0;
+    public IReadOnlySet<string> ExcludedRecords { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    public bool IsEmpty => Filter.Conditions.All(condition => condition.Column.Length == 0) && Sort.Count == 0 && Excluded.Count == 0 && ExcludedRecords.Count == 0;
 
     public bool Equals(MergeSelection? other) =>
-        other is not null && Filter.Equals(other.Filter) && Sort.SequenceEqual(other.Sort) && Excluded.SetEquals(other.Excluded);
+        other is not null && Filter.Equals(other.Filter) && Sort.SequenceEqual(other.Sort) && Excluded.SetEquals(other.Excluded) && ExcludedRecords.SetEquals(other.ExcludedRecords);
 
     public override int GetHashCode() => HashCode.Combine(Filter, Sort.Count, Excluded.Count);
 }
@@ -60,6 +64,12 @@ public interface IMergeRecipients
     IReadOnlyList<int> Rows(MergeData data, MergeFilter? filter, IReadOnlySet<int> excluded);
 
     IReadOnlyList<int> Rows(MergeData data, MergeSelection selection);
+
+    string RecordIdentity(MergeData data, int row);
+
+    IReadOnlySet<int> ExcludedRows(MergeData data, MergeSelection selection);
+
+    MergeSelection Keyed(MergeData data, MergeSelection selection);
 }
 
 public sealed class MergeRecipients : IMergeRecipients
@@ -145,6 +155,30 @@ public sealed class MergeRecipients : IMergeRecipients
     public IReadOnlyList<int> Rows(MergeData data, MergeSelection selection)
     {
         ArgumentNullException.ThrowIfNull(selection);
-        return Ordered(data, Rows(data, selection.Filter, selection.Excluded), selection.Sort);
+        return Ordered(data, Rows(data, selection.Filter, ExcludedRows(data, selection)), selection.Sort);
+    }
+
+    public string RecordIdentity(MergeData data, int row)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        var values = row >= 0 && row < data.Rows.Count ? data.Rows[row] : [];
+        var text = string.Join('\u001F', values.Select(value => (value ?? string.Empty).Trim()));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)), 0, 12).ToLowerInvariant();
+    }
+
+    public IReadOnlySet<int> ExcludedRows(MergeData data, MergeSelection selection)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(selection);
+        if (selection.ExcludedRecords.Count == 0) return new HashSet<int>(selection.Excluded.Where(row => row >= 0 && row < data.Rows.Count));
+        return new HashSet<int>(Enumerable.Range(0, data.Rows.Count).Where(row => selection.ExcludedRecords.Contains(RecordIdentity(data, row))));
+    }
+
+    public MergeSelection Keyed(MergeData data, MergeSelection selection)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(selection);
+        var rows = selection.Excluded.Where(row => row >= 0 && row < data.Rows.Count).ToList();
+        return selection with { ExcludedRecords = new HashSet<string>(rows.Select(row => RecordIdentity(data, row)), StringComparer.Ordinal) };
     }
 }

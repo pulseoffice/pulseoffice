@@ -92,3 +92,42 @@ public sealed class WrappingOffsetRewriter(int rowDelta, int columnDelta) : Offs
 
     private static int Wrap(int value, int size) => ((value % size) + size) % size;
 }
+
+public sealed class TransposingRewriter(CellAddress from, CellAddress to) : FormulaRewriter
+{
+    public override FormulaNode VisitReference(ReferenceNode node)
+    {
+        var moved = Move(node.Address, node.AbsoluteRow, node.AbsoluteColumn);
+        return moved is null ? Broken() : node with { Address = moved.Value };
+    }
+
+    public override FormulaNode VisitSpillReference(SpillReferenceNode node)
+    {
+        var moved = Move(node.Anchor, node.AbsoluteRow, node.AbsoluteColumn);
+        return moved is null ? Broken() : node with { Anchor = moved.Value };
+    }
+
+    public override FormulaNode VisitRange(RangeNode node)
+    {
+        var start = Move(node.Range.Start, node.StartAbsoluteRow, node.StartAbsoluteColumn);
+        var end = Move(node.Range.End, node.EndAbsoluteRow, node.EndAbsoluteColumn);
+        if (start is null || end is null) return Broken();
+        var top = Math.Min(start.Value.Row, end.Value.Row);
+        var bottom = Math.Max(start.Value.Row, end.Value.Row);
+        var left = Math.Min(start.Value.Column, end.Value.Column);
+        var right = Math.Max(start.Value.Column, end.Value.Column);
+        return node with { Range = new CellRange(new CellAddress(top, left), new CellAddress(bottom, right)) };
+    }
+
+    private CellAddress? Move(CellAddress address, bool absoluteRow, bool absoluteColumn)
+    {
+        var (row, column) = absoluteRow || absoluteColumn
+            ? (absoluteRow ? address.Row : address.Row + to.Row - from.Row,
+                absoluteColumn ? address.Column : address.Column + to.Column - from.Column)
+            : (to.Row + address.Column - from.Column, to.Column + address.Row - from.Row);
+
+        return row < 0 || column < 0 || row >= CellAddress.MaxRows || column >= CellAddress.MaxColumns
+            ? null
+            : new CellAddress(row, column);
+    }
+}

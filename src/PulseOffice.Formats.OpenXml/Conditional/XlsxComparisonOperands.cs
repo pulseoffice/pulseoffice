@@ -5,6 +5,8 @@ namespace PulseOffice.Formats.OpenXml;
 
 internal sealed class XlsxComparisonOperands(XlsxFormulaSyntax formulas)
 {
+    private readonly PulseOffice.Sheets.Engine.Operations.ConditionalComparisonFormula _comparison = new();
+
     public ConditionalRule Apply(ConditionalRule basis, ConditionOperator op, IReadOnlyList<string> expressions)
     {
         if (expressions.Count == 0) return basis with { Operator = op };
@@ -12,20 +14,7 @@ internal sealed class XlsxComparisonOperands(XlsxFormulaSyntax formulas)
         var literals = expressions.Select(Literal).ToList();
         if (literals.All(literal => literal is not null)) return basis with { Operator = op, Operands = [.. literals.OfType<string>()] };
 
-        var anchor = basis.Anchor.ToA1();
-        var first = expressions[0];
-        var second = expressions.Count > 1 ? expressions[1] : first;
-        var expression = op switch
-        {
-            ConditionOperator.Between => $"AND({anchor}>={first},{anchor}<={second})",
-            ConditionOperator.NotBetween => $"OR({anchor}<{first},{anchor}>{second})",
-            ConditionOperator.NotEqual => $"{anchor}<>{first}",
-            ConditionOperator.GreaterThan => $"{anchor}>{first}",
-            ConditionOperator.GreaterOrEqual => $"{anchor}>={first}",
-            ConditionOperator.LessThan => $"{anchor}<{first}",
-            ConditionOperator.LessOrEqual => $"{anchor}<={first}",
-            _ => $"{anchor}={first}",
-        };
+        var expression = _comparison.Expression(op, basis.Anchor, expressions);
         return basis with { Formula = formulas.ToInternal(expression) };
     }
 

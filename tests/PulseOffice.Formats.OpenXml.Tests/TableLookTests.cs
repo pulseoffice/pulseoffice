@@ -101,7 +101,8 @@ public sealed class TableLookTests
         using (var document = PresentationDocument.Open(stream, true))
         {
             var table = document.PresentationPart!.SlideParts.SelectMany(part => part.Slide!.Descendants<D.Table>()).Single();
-            table.TableProperties!.Append(new D.TableStyleId("{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"));
+            table.TableProperties!.RemoveAllChildren<D.TableStyleId>();
+            table.TableProperties.Append(new D.TableStyleId("{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"));
             document.PresentationPart.TableStylesPart?.TableStyleList?.RemoveAllChildren();
         }
         stream.Position = 0;

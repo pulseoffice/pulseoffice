@@ -48,8 +48,22 @@ public sealed class DeckDocumentFactory(
     Motion.IDeckMotionEditors motionEditors,
     PulseOffice.Drawing.Assets.IImageExtents extents,
     IInterfaceCulture culture,
-    IDeckLinkTips linkTips) : IDeckDocumentFactory
+    IDeckLinkTips linkTips) : IDeckDocumentFactory, IDocumentViewSource
 {
+    public PulseOffice.Foundation.Modules.ModuleKind Module => PulseOffice.Foundation.Modules.ModuleKind.Presentations;
+
+    public OpenDocument? CreateSecondView(OpenDocument document, string title)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrEmpty(title);
+        if (document.Model is not Presentation deck) return null;
+        OpenDocument? open = null;
+        var view = CreateView(deck, document.History, () => open?.IsReadOnly == true);
+        open = document.CreateWindow(view, title);
+        open.Changed += (_, _) => view.ApplyReadOnly();
+        return open;
+    }
+
     private int _counter;
 
     public OpenDocument CreateEmpty()
@@ -72,7 +86,20 @@ public sealed class DeckDocumentFactory(
             deck.DefaultLanguages = deck.DefaultLanguages with { Western = culture.Culture.Name };
         var history = new UndoStack();
         OpenDocument? document = null;
-        var actions = new DeckActions(deck, history, slides, texts, () => document?.IsReadOnly == true, optionGroups: optionGroups, fitting: fitting, groupEditing: groupEditing);
+        var view = CreateView(deck, history, () => document?.IsReadOnly == true);
+
+        document = new OpenDocument(ModuleKind.Presentations, title, view, history)
+        {
+            Model = deck,
+        };
+        document.Changed += (_, _) => view.ApplyReadOnly();
+
+        return document;
+    }
+
+    private DeckView CreateView(Presentation deck, UndoStack history, Func<bool> readOnly)
+    {
+        var actions = new DeckActions(deck, history, slides, texts, readOnly, optionGroups: optionGroups, fitting: fitting, groupEditing: groupEditing);
         var renderer = new SlideRenderer(objectRenderer, texts);
         var view = new DeckView(deck, actions, renderer, masters, scheduler, texts, contextMenus, deckContext, connectors, drawing, images, contextChooser, autoCorrect, autoCorrectSettings, spelling, autoSpell, userWords, design, forms, editing, formatter, zoomLadder, extents: extents, linkTips: linkTips)
         {
@@ -82,13 +109,6 @@ public sealed class DeckDocumentFactory(
             RichInsertion = richInsertion,
             MotionEditors = motionEditors,
         };
-
-        document = new OpenDocument(ModuleKind.Presentations, title, view, history)
-        {
-            Model = deck,
-        };
-        document.Changed += (_, _) => view.ApplyReadOnly();
-
-        return document;
+        return view;
     }
 }

@@ -70,6 +70,8 @@ internal sealed class OdtDatePictures : OdtXml
         's' => Element("seconds", run >= 2),
         't' when twelveHour => new XElement(Number + "am-pm"),
         'g' => Element("era", run >= 2),
+        'Q' => Element("quarter", run >= 2),
+        'W' => new XElement(Number + "week-of-year"),
         _ => null,
     };
 
@@ -96,6 +98,8 @@ internal sealed class OdtDatePictures : OdtXml
                 "seconds" => full ? "ss" : "s",
                 "am-pm" => "tt",
                 "era" => full ? "gg" : "g",
+                "quarter" => full ? "QQ" : "Q",
+                "week-of-year" => "W",
                 "text" => Quoted(part.Value),
                 _ => null,
             };

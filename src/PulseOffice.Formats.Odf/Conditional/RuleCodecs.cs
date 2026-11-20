@@ -49,7 +49,7 @@ internal sealed class OdfThresholds
     public void Write(XElement entry, ConditionalThreshold threshold)
     {
         entry.SetAttributeValue(Namespaces.Calcext + "type", _kinds.Token(threshold.Kind));
-        entry.SetAttributeValue(Namespaces.Calcext + "value", threshold.Kind == ConditionalThresholdKind.Formula && threshold.Formula is { } formula
+        entry.SetAttributeValue(Namespaces.Calcext + "value", threshold.Formula is { Length: > 0 } formula
             ? _formulas.ToOdfExpression("=" + formula.TrimStart('='))
             : threshold.Value.ToString("R", CultureInfo.InvariantCulture));
         entry.SetAttributeValue(Namespaces.Calcext + "greater_equal", threshold.GreaterOrEqual ? null : "false");
@@ -72,7 +72,12 @@ internal sealed class OdfThresholds
                 return new ConditionalThreshold(ConditionalThresholdKind.Number, constant);
             return new ConditionalThreshold(kind, 0, _formulas.ToInternalExpression(text));
         }
-        return new ConditionalThreshold(kind, double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) ? value : 0);
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value))
+            return new ConditionalThreshold(kind, value);
+        return kind is ConditionalThresholdKind.Percent or ConditionalThresholdKind.Percentile or ConditionalThresholdKind.Number
+            && _formulas.ToInternalExpression(text) is { Length: > 0 } expression
+            ? new ConditionalThreshold(kind, 0, expression)
+            : new ConditionalThreshold(kind, 0);
     }
 }
 
@@ -250,15 +255,24 @@ internal sealed class ConditionCodec(OdfConditionSyntax syntax, IConditionStyles
         var styleName = (string?)element.Attribute(Calc("apply-style-name"));
         var style = styleName is not null && context.NamedStyles.TryGetValue(styleName, out var found) ? found : CellStyle.Default;
         var parsed = syntax.Read((string?)element.Attribute(Calc("value")) ?? string.Empty);
-        var formula = parsed.Formula is { } written && addresses.Read((string?)element.Attribute(Calc("base-cell-address"))) is [var baseCell, ..] && baseCell.Start != context.Range.Start
-            ? _translator.Translate(written, context.Range.Start.Row - baseCell.Start.Row, context.Range.Start.Column - baseCell.Start.Column) ?? written
-            : parsed.Formula;
+        var baseCell = addresses.Read((string?)element.Attribute(Calc("base-cell-address"))) is [var baseRange, ..] ? baseRange.Start : context.Range.Start;
+        var internals = parsed.Expressions?.Select(_syntax.ToInternalExpression).ToList();
+        if (parsed.Expressions is not null && internals!.Any(expression => expression.Length == 0))
+        {
+            parsed = parsed with { Operands = parsed.Expressions, Expressions = null };
+            internals = null;
+        }
+        var written = parsed.Formula
+            ?? (internals is not null ? "=" + _comparison.Expression(parsed.Operator, baseCell, internals) : null);
+        var formula = written is not null && baseCell != context.Range.Start
+            ? _translator.Translate(written, context.Range.Start.Row - baseCell.Row, context.Range.Start.Column - baseCell.Column) ?? written
+            : written;
 
         return new ConditionalRule
         {
             Range = context.Range,
             Priority = context.Priority,
-            Operator = parsed.Operator,
+            Operator = parsed.Expressions is null ? parsed.Operator : ConditionOperator.GreaterThan,
             Operands = parsed.Operands,
             Formula = formula,
             Style = style,
@@ -266,6 +280,8 @@ internal sealed class ConditionCodec(OdfConditionSyntax syntax, IConditionStyles
     }
 
     private readonly PulseOffice.Sheets.Engine.Operations.FormulaTranslator _translator = new();
+    private readonly PulseOffice.Sheets.Engine.Operations.ConditionalComparisonFormula _comparison = new();
+    private readonly OdfFormulaSyntax _syntax = new();
 }
 
 internal sealed class DateIsCodec(IConditionStyles styles) : ConditionalRuleCodec

@@ -15,8 +15,6 @@ public sealed class LedgerPartialCommands(
     ISeriesFill series,
     IStandardFilter standardFilter,
     ISheetRangeFilters rangeFilters,
-    ILedgerDocumentFactory documents,
-    PulseOffice.Shell.IDocumentWorkspace workspace,
     IDialogService dialogs,
     IStatusBarService status,
     ITextCatalog texts,
@@ -32,64 +30,7 @@ public sealed class LedgerPartialCommands(
         Command("ledger.sheet.moveOrCopy", "sheet/organise", false, ct => MoveAsync(ct)),
         Command("ledger.data.standardFilter", "data/filter", false, ct => StandardFilterAsync(ct)),
         Command("ledger.file.protectStructure", "tools/protect", true, ct => ProtectAsync(ct)) with { OutsideHistory = true },
-
-        Prototype("ledger.window.new") with
-        {
-            IconKey = "ledger.window.new",
-            MenuPath = "view/windows",
-            Surface = CommandSurface.Advanced,
-            RequiredState = DocumentState.DocumentOpen,
-            EnabledWhen = _ => Context.HasTarget,
-            Execute = (_, _) =>
-            {
-                NewWindow();
-                return Task.CompletedTask;
-            },
-        },
-
-        Prototype("ledger.window.close") with
-        {
-            MenuPath = "view/windows",
-            Surface = CommandSurface.Advanced,
-            RequiredState = DocumentState.DocumentOpen,
-            EnabledWhen = _ => workspace.Active is { } active && HasAnotherWindow(active),
-            Execute = (_, _) =>
-            {
-                if (workspace.Active is { } active && HasAnotherWindow(active)) workspace.Close(active);
-                return Task.CompletedTask;
-            },
-        },
     ];
-
-    private bool HasAnotherWindow(PulseOffice.Shell.OpenDocument document) =>
-        workspace.Documents.Any(other => !ReferenceEquals(other, document) && ReferenceEquals(other.History, document.History));
-
-    private void NewWindow()
-    {
-        if (workspace.Active is not { } active) return;
-
-        if (documents.CreateSecondView(active, NextWindowTitle(active)) is not { } second)
-        {
-            status.Report(texts["window.cannotSplit"], NotificationSeverity.Error);
-            return;
-        }
-
-        workspace.Open(second);
-        status.Report(texts["window.opened"]);
-    }
-
-    private string NextWindowTitle(PulseOffice.Shell.OpenDocument document)
-    {
-        var windows = workspace.Documents.Where(other => ReferenceEquals(other.History, document.History)).ToList();
-        var first = windows.Count > 0 ? windows[0].Title : document.Title;
-        var prefix = first + " : ";
-        var highest = 1;
-        foreach (var window in windows)
-            if (window.Title.StartsWith(prefix, StringComparison.Ordinal)
-                && int.TryParse(window.Title.AsSpan(prefix.Length), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
-                highest = Math.Max(highest, number);
-        return prefix + (highest + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-    }
 
     private CommandDefinition Command(
         string id, string path, bool alwaysOn, Func<CancellationToken, Task> run) => Prototype(id) with

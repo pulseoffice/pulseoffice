@@ -131,7 +131,7 @@ internal sealed class FontCodec(SpreadsheetColours colours, SpreadsheetVocabular
         Shadow = font.Shadow is not null,
         Outline = font.Outline is not null,
         Script = vocabulary.Script.Model(font.VerticalTextAlignment?.Val?.Value),
-        ColorHex = colours.FromArgb(font.Color?.Rgb?.Value),
+        ColorHex = colours.Read(font.Color) ?? "#000000",
     };
 }
 
@@ -146,8 +146,7 @@ internal sealed class FillCodec(SpreadsheetColours colours)
 
     public string? Read(Fill? fill) =>
         fill?.PatternFill is { } pattern && pattern.PatternType?.Value == PatternValues.Solid
-        && pattern.ForegroundColor?.Rgb?.Value is { } rgb
-            ? colours.FromArgb(rgb)
+            ? colours.Read(pattern.ForegroundColor)
             : null;
 }
 
@@ -200,7 +199,7 @@ internal sealed class BorderCodec(SpreadsheetColours colours, SpreadsheetVocabul
         var style = edge?.Style?.Value;
         if (style is null || style == BorderStyleValues.None) return BorderEdge.None;
         var model = vocabulary.Borders.Model(style.Value);
-        return new BorderEdge(model, colours.FromArgb(edge?.Color?.Rgb?.Value), presets.Pen(model, string.Empty).Width);
+        return new BorderEdge(model, colours.Read(edge?.Color) ?? "#000000", presets.Pen(model, string.Empty).Width);
     }
 
     private string Describe(BorderEdge edge) => $"{edge.Style}:{edge.ColorHex}:{edge.Width.Value}";
@@ -241,10 +240,11 @@ public sealed class XlsxStyleReader
     private readonly FillCodec _fills;
     private readonly BorderCodec _borders;
     private readonly SpreadsheetVocabulary _vocabulary = new();
+    private readonly SpreadsheetColours _colours = new();
 
     public XlsxStyleReader()
     {
-        var colours = new SpreadsheetColours();
+        var colours = _colours;
         _fonts = new FontCodec(colours, _vocabulary);
         _fills = new FillCodec(colours);
         _borders = new BorderCodec(colours, _vocabulary, new BorderPresets());
@@ -280,6 +280,7 @@ public sealed class XlsxStyleReader
 
     private Func<CellFormat, PulseOffice.Sheets.Styling.CellStyle> Reading(Stylesheet stylesheet)
     {
+        _colours.UsePalette(stylesheet);
         var fonts = new StyleTable<Font>(stylesheet.Fonts ?? new Fonts(), _ => { });
         var fills = new StyleTable<Fill>(stylesheet.Fills ?? new Fills(), _ => { });
         var borders = new StyleTable<Border>(stylesheet.Borders ?? new Borders(), _ => { });

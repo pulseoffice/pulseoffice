@@ -90,7 +90,7 @@ public class LedgerProtectionOutsideHistoryTests
 
     private static CommandDefinition StructureProtect(Scene scene, object answer) =>
         new LedgerPartialCommands(scene.Context, Fake<ISeriesFill>(), Fake<Engine.Operations.IStandardFilter>(), Fake<ISheetRangeFilters>(),
-                Fake<ILedgerDocumentFactory>(), Fake<PulseOffice.Shell.IDocumentWorkspace>(), new AnsweringDialogs(answer),
+                new AnsweringDialogs(answer),
                 Fake<IStatusBarService>(), Texts, Fake<Engine.Operations.ISheetDuplicator>(), Kit(),
                 Fake<DataDialogs.ISeriesPreviewers>(), Fake<ISheetValueWrites>(), new WorksheetTabPolicy())
             .GetCommands().Single(command => command.Id.Value == "ledger.file.protectStructure");

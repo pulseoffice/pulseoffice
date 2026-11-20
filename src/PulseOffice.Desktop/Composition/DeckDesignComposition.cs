@@ -170,8 +170,11 @@ internal static class DeckDesignComposition
             provider.GetRequiredService<PulseOffice.Localization.ITextCatalog>()));
         services.AddSingleton<PulseOffice.UI.Controls.Ribbon.IRibbonThumbnailPainter, PulseOffice.Presentations.UI.Motion.TransitionRibbonThumbnailPainter>();
         services.AddSingleton<PulseOffice.Presentations.IAnimationScheduler, PulseOffice.Presentations.AnimationScheduler>();
-        services.AddSingleton<PulseOffice.Presentations.UI.IDeckDocumentFactory,
-            PulseOffice.Presentations.UI.DeckDocumentFactory>();
+        services.AddSingleton<PulseOffice.Presentations.UI.DeckDocumentFactory>();
+        services.AddSingleton<PulseOffice.Presentations.UI.IDeckDocumentFactory>(
+            provider => provider.GetRequiredService<PulseOffice.Presentations.UI.DeckDocumentFactory>());
+        services.AddSingleton<PulseOffice.Shell.IDocumentViewSource>(
+            provider => provider.GetRequiredService<PulseOffice.Presentations.UI.DeckDocumentFactory>());
 
         return services;
     }

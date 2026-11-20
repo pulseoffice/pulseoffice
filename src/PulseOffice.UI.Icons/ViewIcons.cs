@@ -30,8 +30,8 @@ public sealed class ViewIcons() : DictionaryIconCatalog(Shapes)
         ("ledger.zoom.pageWidth", "M3 6h18v12H3z M6 12h12 M9 9l-3 3 3 3 M15 9l3 3-3 3"),
         ("ledger.view.splitAtSelection", "M3 5h18v14H3z M3 12h18 M9 9l3-3 3 3 M9 15l3 3 3-3"),
         ("ledger.view.unsplit", "M3 5h18v14H3z M12 9l-3 3 3 3 M12 9h-3 M12 15h-3"),
-        ("ledger.window.new", "M4 4h12v12H4z M8 8h12v12H8z"),
-        ("ledger.window.close", "M4 4h16v16H4z M9 9l6 6 M15 9l-6 6"),
+        ("shell.window.new", "M4 4h12v12H4z M8 8h12v12H8z"),
+        ("shell.window.close", "M4 4h16v16H4z M9 9l6 6 M15 9l-6 6"),
         ("ledger.worksheet.goTo", "M4 5h16v14H4z M8 12h8 M13 9l3 3-3 3"),
     ];
 }

@@ -29,7 +29,9 @@ public sealed class MergeSelectionText : IMergeSelectionText
             sort.Add(new JsonObject { ["column"] = key.Column, ["descending"] = key.Descending });
         var excluded = new JsonArray();
         foreach (var row in selection.Excluded.Order()) excluded.Add(row);
-        return new JsonObject { ["filter"] = conditions, ["sort"] = sort, ["excluded"] = excluded }.ToJsonString();
+        var records = new JsonArray();
+        foreach (var record in selection.ExcludedRecords.Order(StringComparer.Ordinal)) records.Add(record);
+        return new JsonObject { ["filter"] = conditions, ["sort"] = sort, ["excluded"] = excluded, ["excludedRecords"] = records }.ToJsonString();
     }
 
     public MergeSelection Read(string? text)
@@ -53,7 +55,10 @@ public sealed class MergeSelectionText : IMergeSelectionText
             var excluded = new HashSet<int>();
             foreach (var item in (root["excluded"] as JsonArray ?? []).OfType<JsonValue>())
                 if (item.TryGetValue<int>(out var row) && row >= 0) excluded.Add(row);
-            return new MergeSelection(new MergeFilter(conditions), sort, excluded);
+            var records = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in (root["excludedRecords"] as JsonArray ?? []).OfType<JsonValue>())
+                if (item.TryGetValue<string>(out var record) && record.Length > 0) records.Add(record);
+            return new MergeSelection(new MergeFilter(conditions), sort, excluded) { ExcludedRecords = records };
         }
         catch (JsonException)
         {

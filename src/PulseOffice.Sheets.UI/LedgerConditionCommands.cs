@@ -103,7 +103,7 @@ public sealed class LedgerConditionCommands(
         var view = new ConditionalRulesManagerView(before, Context.Selection, this, editors, texts);
         var after = await dialogs.ShowAsync<IReadOnlyList<ConditionalRule>>(
             view, new DialogOptions { TitleKey = "command.ledger.conditional.manage.title", PreferredWidth = 680 }, ct).ConfigureAwait(true);
-        if (after is null || after.SequenceEqual(before.OrderBy(rule => rule.Priority))) return;
+        if (after is null || after.SequenceEqual(before.OrderBy(rule => rule.Priority).Select((rule, index) => rule.Priority == index ? rule : rule with { Priority = index }))) return;
 
         Replace(sheet, before, after, texts["command.ledger.conditional.manage.title"]);
     }

@@ -214,13 +214,13 @@ internal sealed class OdtStylesReader(
         {
             if (Displayed(left)) page.EvenPagesDifferent = true;
             var even = new BlockContainer(Story(left, context, blocks));
-            region.Even = (string?)left.Attribute(Pt + "same-as-default") == "true" ? null : even;
+            region.Even = (string?)left.Attribute(Pt + "same-as-default") == "true" || !Displayed(left) && Blank(left) ? null : even;
         }
         if (first is not null)
         {
             if (Displayed(first)) page.FirstPageDifferent = true;
             var firstContent = new BlockContainer(Story(first, context, blocks));
-            region.First = (string?)first.Attribute(Pt + "same-as-default") == "true" ? null : firstContent;
+            region.First = (string?)first.Attribute(Pt + "same-as-default") == "true" || !Displayed(first) && Blank(first) ? null : firstContent;
         }
     }
 
@@ -229,6 +229,9 @@ internal sealed class OdtStylesReader(
         using var story = context.Lists.Story();
         return blocks.Read(part, context);
     }
+
+    private bool Blank(XElement variant) =>
+        variant.Elements().All(child => child.Name == Text + "p" && !child.Nodes().Any());
 
     private bool Displayed(XElement variant) => (string?)variant.Attribute(Style + "display") != "false";
 

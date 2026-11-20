@@ -14275,3 +14275,26 @@ docs/deep-audit/round-288-shell-recent-pinning.md.
   labels kept out of moving unit layers; table frames follow added rows, cell margins and text direction cross PPTX
   and ODP, keyboard navigation between cells with Tab adding rows and Delete clearing cells.
   Log: docs/deep-audit/round-297-deck-tables.md.
+
+### Round 298: Deck table leftovers (2026-11-20)
+- Cell margins and turned or stacked text drawn by the shared table renderer and edited in a new dialog, merged cells
+  respected by keyboard navigation, type-to-edit in a selected cell, Insert Row Above and Insert Column Left, PPTX grid
+  tables naming the built-in Table Grid style. Log: docs/deep-audit/round-298-deck-table-leftovers.md.
+
+### Round 299: Ledger conditional formatting, remaining parts (2026-11-20)
+- ODS `style:map` conditions read as rules, reference operands of ODS conditions become formulas, rules carried by
+  paste with Transpose, XLSX theme and indexed colours of cell style fonts, fills and borders, formula-valued percent
+  thresholds kept in XLSX, x14 and ODS, clear rules trims to the selection, quick rules go first, the rule editor
+  keeps style attributes and typed values. Log: docs/deep-audit/round-299-ledger-conditional-formatting.md.
+
+### Round 300: Shell windows and document tabs (2026-11-20)
+- New Window and Close Window are shared shell commands (`shell.window.new`, `shell.window.close`) over
+  `DocumentWindows` and each module's `IDocumentViewSource`, so Folio and Deck open a second window of the same
+  document too; a lock left by our own dead process is rewritten on claim; the welcome page re-checks missing recent
+  entries on activation and every 30 seconds; closing the active tab activates its neighbour; tabs can be reordered by
+  dragging and closed with the middle button. Log: docs/deep-audit/round-300-shell-windows.md.
+
+### Round 301: Folio mail merge, fields and headers leftovers (2026-11-20)
+- Excluded merge records keyed by record content with a record-number fallback; ODF quarter and week-of-year date
+  parts; localized STYLEREF heading names become chapter fields; hidden blank ODF left/first headers read as the
+  default header. Log: docs/deep-audit/round-301-folio-merge-fields-headers.md.

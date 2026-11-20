@@ -72,6 +72,7 @@ internal static class LedgerToolsComposition
         services.AddSingleton<PulseOffice.Sheets.UI.ExternalData.ExternalLinkAutoRefresh>();
         services.AddSingleton<PulseOffice.Data.UI.ITabularSnapshots, PulseOffice.Data.UI.TabularSnapshots>();
         services.AddSingleton<PulseOffice.Data.UI.ITableCellTextStyles, PulseOffice.Data.UI.TableCellTextStyles>();
+        services.AddSingleton<PulseOffice.Data.UI.ITableCellBox, PulseOffice.Data.UI.TableCellBox>();
         services.AddSingleton<PulseOffice.Data.UI.IDataTableRenderer, PulseOffice.Data.UI.DataTableRenderer>();
         services.AddSingleton<LedgerTailCommands>();
         services.AddSingleton<ISeriesFill, SeriesFill>();

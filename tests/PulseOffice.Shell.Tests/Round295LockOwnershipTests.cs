@@ -55,4 +55,28 @@ public sealed class Round295LockOwnershipTests : IDisposable
         Assert.Equal(10, holder.Process!.ProcessId);
         Assert.True(sharing.Release(document));
     }
+
+    [Fact]
+    public void Claiming_over_a_lock_left_by_our_dead_process_rewrites_it_with_the_current_process()
+    {
+        var document = Document(Mine("pulseoffice-process:20:0"));
+        var sharing = new FileDocumentSharing(new Ownership(10, new HashSet<int> { 10 }));
+
+        Assert.True(sharing.Holder(document)!.IsStale);
+        Assert.True(sharing.Claim(document));
+
+        Assert.False(sharing.Holder(document)!.IsStale);
+        Assert.Equal(10, sharing.Holder(document)!.Process!.ProcessId);
+    }
+
+    [Fact]
+    public void Claiming_over_a_lock_of_another_live_instance_fails_and_keeps_it()
+    {
+        var document = Document(Mine("pulseoffice-process:20:0"));
+        var sharing = new FileDocumentSharing(new Ownership(10, new HashSet<int> { 10, 20 }));
+
+        Assert.False(sharing.Claim(document));
+
+        Assert.Equal(20, sharing.Holder(document)!.Process!.ProcessId);
+    }
 }

@@ -164,6 +164,8 @@ public interface IDocumentWorkspace
     void Close(OpenDocument document);
     void Activate(OpenDocument document);
 
+    void Move(OpenDocument document, int index);
+
     IDisposable Hold(OpenDocument document);
 
     CommandContext Context { get; }
@@ -176,6 +178,8 @@ public interface IDocumentWorkspace
     event EventHandler<OpenDocument>? ActiveUpdated;
     event EventHandler<OpenDocument>? DocumentOpened;
     event EventHandler<OpenDocument>? DocumentClosed;
+
+    event EventHandler<OpenDocument>? DocumentMoved;
 }
 
 public sealed class DocumentWorkspace : IDocumentWorkspace
@@ -198,6 +202,20 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
     public event EventHandler<OpenDocument>? ActiveUpdated;
     public event EventHandler<OpenDocument>? DocumentOpened;
     public event EventHandler<OpenDocument>? DocumentClosed;
+
+    public event EventHandler<OpenDocument>? DocumentMoved;
+
+    public void Move(OpenDocument document, int index)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var from = _documents.IndexOf(document);
+        if (from < 0) return;
+        var to = Math.Clamp(index, 0, _documents.Count - 1);
+        if (to == from) return;
+        _documents.RemoveAt(from);
+        _documents.Insert(to, document);
+        DocumentMoved?.Invoke(this, document);
+    }
 
     public void Open(OpenDocument document)
     {
@@ -235,14 +253,16 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
             return;
         }
 
-        if (!_documents.Remove(document)) return;
+        var position = _documents.IndexOf(document);
+        if (position < 0) return;
+        _documents.RemoveAt(position);
         if (ReferenceEquals(_deferredActivation, document)) _deferredActivation = null;
 
         if (_listeners.Remove(document, out var listener)) document.Changed -= listener;
 
         if (ReferenceEquals(Active, document))
         {
-            if (_documents.Count > 0) Activate(_documents[^1]);
+            if (_documents.Count > 0) Activate(_documents[Math.Min(position, _documents.Count - 1)]);
             else
             {
                 Active = null;

@@ -13,11 +13,14 @@ public sealed class OdfConditionalMapper
     private readonly OdfTableFormulas _tableFormulas = new();
     private readonly OdfConditionalExtras _extras = new();
     private readonly IReadOnlyList<ConditionalRuleCodec> _codecs;
+    private readonly ConditionCodec _condition;
+    private readonly StyleMapConditionText _mapConditions = new();
 
     public OdfConditionalMapper()
     {
         var thresholds = new OdfThresholds();
-        _codecs = [new DataBarCodec(thresholds), new ColorScaleCodec(thresholds), new IconSetCodec(thresholds), new DateIsCodec(_styles), new ConditionCodec(new OdfConditionSyntax(), _styles, _addresses)];
+        _condition = new ConditionCodec(new OdfConditionSyntax(), _styles, _addresses);
+        _codecs = [new DataBarCodec(thresholds), new ColorScaleCodec(thresholds), new IconSetCodec(thresholds), new DateIsCodec(_styles), _condition];
     }
 
     public IReadOnlyList<XElement> NamedStyles => _styles.Styles;
@@ -85,6 +88,27 @@ public sealed class OdfConditionalMapper
                 var rule = codec.Read(element, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] };
                 rule = _extras.Read(element, KeptThresholds(element, rule));
                 rules.Add(_tableFormulas.Read(element) is { } structured ? rule with { Formula = structured } : rule);
+            }
+        }
+        return rules;
+    }
+
+    internal IReadOnlyList<ConditionalRule> ReadStyleMaps(OdsStyleMaps maps, XElement table, string sheetName, IReadOnlyDictionary<string, CellStyle> namedStyles)
+    {
+        var rules = new List<ConditionalRule>();
+        var priority = 0;
+        foreach (var group in maps.RegionsOf(table).GroupBy(region => region.Style, StringComparer.Ordinal))
+        {
+            var ranges = group.Select(region => region.Range).ToList();
+            foreach (var map in maps.MapsOf(group.Key))
+            {
+                if (_mapConditions.ToConditionValue((string?)map.Attribute(Namespaces.Style + "condition")) is not { } value) continue;
+                var condition = new XElement(Namespaces.Calcext + "condition",
+                    new XAttribute(Namespaces.Calcext + "apply-style-name", (string?)map.Attribute(Namespaces.Style + "apply-style-name") ?? string.Empty),
+                    new XAttribute(Namespaces.Calcext + "value", value));
+                var baseCell = (string?)map.Attribute(Namespaces.Style + "base-cell-address");
+                condition.SetAttributeValue(Namespaces.Calcext + "base-cell-address", baseCell ?? _addresses.WriteAddress(sheetName, ranges[0].Start));
+                rules.Add(_condition.Read(condition, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] });
             }
         }
         return rules;

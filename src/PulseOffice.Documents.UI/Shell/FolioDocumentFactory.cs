@@ -13,8 +13,21 @@ public interface IFolioDocumentFactory
 }
 
 public sealed class FolioDocumentFactory(
-    ITextDocumentFactory documents, FolioEditingServices editing, Func<FolioViewServices> views, PulseOffice.Localization.IInterfaceCulture culture) : IFolioDocumentFactory
+    ITextDocumentFactory documents, FolioEditingServices editing, Func<FolioViewServices> views, PulseOffice.Localization.IInterfaceCulture culture) : IFolioDocumentFactory, IDocumentViewSource
 {
+    public ModuleKind Module => ModuleKind.Documents;
+
+    public OpenDocument? CreateSecondView(OpenDocument document, string title)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrEmpty(title);
+        if (document.Model is not TextDocument text) return null;
+        OpenDocument? open = null;
+        var editor = new FolioEditor(text, document.History, editing, () => open?.IsReadOnly == true);
+        open = document.CreateWindow(new FolioView(editor, views()), title);
+        return open;
+    }
+
     private int _counter;
 
     public OpenDocument CreateEmpty()

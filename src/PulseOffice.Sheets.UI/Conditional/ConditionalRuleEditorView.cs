@@ -48,6 +48,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
     private readonly TextBlock _message = new();
     private readonly DialogFooter _footer;
     private readonly Dictionary<ConditionalRuleKind, ConditionalRule> _byKind = [];
+    private readonly Dictionary<ConditionalRuleKind, string[]> _operandsByKind = [];
     private ConditionalRule _rule;
     private ConditionalRuleKind _kind;
     private string[] _operands;
@@ -131,13 +132,14 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
 
     public void SwitchKind(ConditionalRuleKind kind)
     {
+        if (kind == _kind) return;
         _byKind[_kind] = _rule;
+        _operandsByKind[_kind] = _operands;
         _kind = kind;
         var style = _services.Catalog.IsStyled(kind) ? _rule.Style : null;
         _rule = _byKind.TryGetValue(kind, out var known) ? known : _services.Catalog.Default(kind, _rule.Range) with { Priority = _rule.Priority };
         if (style is not null && _services.Catalog.IsStyled(kind)) _rule = _rule with { Style = style };
-        _operands = [.. _rule.Operands.Select(operand => DisplayOperand(kind, operand))];
-        if (kind != ConditionalRuleKind.Formula) _formula = string.Empty;
+        _operands = _operandsByKind.TryGetValue(kind, out var typed) ? typed : [.. _rule.Operands.Select(operand => DisplayOperand(kind, operand))];
         _kinds.Select(kind);
         Build();
         Update(_rule);
@@ -280,7 +282,10 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
             if (index > 0) row.Children.Add(new TextBlock { Text = _texts["conditional.and"], VerticalAlignment = VerticalAlignment.Center });
             var box = new TextBox { Text = position < _operands.Length ? _operands[position] : string.Empty, MinWidth = 120 };
             AutomationProperties.SetName(box, _texts[position == 0 ? "condition.first" : "condition.second"]);
-            box.TextChanged += (_, _) => Operand(position, box.Text ?? string.Empty);
+            box.PropertyChanged += (_, change) =>
+            {
+                if (change.Property == TextBox.TextProperty) Operand(position, box.Text ?? string.Empty);
+            };
             row.Children.Add(box);
         }
         return row;
@@ -319,10 +324,10 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
 
         void Custom()
         {
-            var style = new CellStyle
+            var style = _rule.Style with
             {
                 BackgroundHex = background.Value is { Length: > 0 } fill ? fill : null,
-                Font = CellFont.Default with { ColorHex = font.Value is { Length: > 0 } ink ? ink : CellFont.Default.ColorHex, Bold = bold.IsChecked == true },
+                Font = _rule.Style.Font with { ColorHex = font.Value is { Length: > 0 } ink ? ink : CellFont.Default.ColorHex, Bold = bold.IsChecked == true },
             };
             Update(_rule with { Style = style });
         }
