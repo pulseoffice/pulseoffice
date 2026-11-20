@@ -83,6 +83,7 @@ internal static class ShellWindowComposition
             provider.GetRequiredService<DialogHost>(),
             provider.GetRequiredService<SidePanelView>()));
         services.AddSingleton<IShellWindowFocus>(provider => new ShellWindowFocus(provider.GetRequiredService<ShellWindowScope>()));
+        services.AddSingleton<IWindowScopeLocator>(provider => new WindowScopeLocator(provider.GetRequiredService<IShellWindowFocus>()));
         services.AddSingleton<IWorkspaceSet>(provider => new WorkspaceSet(provider.GetRequiredService<DocumentWorkspace>()));
         services.AddSingleton<ApplicationQuitTarget>();
         services.AddSingleton<ShellWindowCloseGate>();

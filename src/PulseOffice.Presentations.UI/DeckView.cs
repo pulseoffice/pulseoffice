@@ -306,7 +306,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
     {
         base.OnAttachedToVisualTree(e);
         _state.Target = BuildTarget();
-        _deckContext.Attach(_state.Target);
+        _deckContext.Attach(this, _state.Target);
         _drawing.Changed += OnDrawingStateChanged;
         _texts.LanguageChanged += OnLanguageChanged;
         _proofing.StartProofing(DictionaryChanges);
@@ -578,7 +578,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
 
     private void AttachContext()
     {
-        if (_state.Target is not null) _deckContext.Attach(_state.Target);
+        if (_state.Target is not null) _deckContext.Attach(this, _state.Target);
     }
 
     public void ClaimActiveContext() => AttachContext();

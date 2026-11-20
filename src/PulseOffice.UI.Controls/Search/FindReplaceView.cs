@@ -28,6 +28,10 @@ public interface IFindReplaceTarget
     string FindNext(FindRequest request);
 
     string ReplaceAll(FindRequest request);
+
+    bool SupportsReplace => false;
+
+    string Replace(FindRequest request) => FindNext(request);
 }
 
 public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooterOwner
@@ -72,6 +76,11 @@ public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooter
         var footer = new DialogFooter(InterfaceDensity.Compact)
             .WithCancel(texts["find.close"], () => Completed?.Invoke(this, null));
         if (target.SupportsFindNext) footer.WithAction(texts["find.next"], FindNext, primary: true);
+        if (target.SupportsReplace)
+        {
+            footer.WithAction(texts["find.replace"], Replace, out var replace);
+            replace.IsEnabled = !target.IsReadOnly;
+        }
         footer.WithAction(texts["find.replaceAll"], ReplaceAll, out var replaceAll, primary: !target.SupportsFindNext);
         replaceAll.IsEnabled = !target.IsReadOnly;
         Footer = footer;
@@ -102,6 +111,13 @@ public sealed class FindReplaceView : UserControl, IDialogContent, IDialogFooter
         var request = Request();
         if (request.Query.Length == 0) return;
         _summary.Text = _target.FindNext(request);
+    }
+
+    private void Replace()
+    {
+        var request = Request();
+        if (request.Query.Length == 0 || _target.IsReadOnly) return;
+        _summary.Text = _target.Replace(request);
     }
 
     private void ReplaceAll()

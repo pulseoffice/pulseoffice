@@ -66,7 +66,11 @@ internal static class LedgerCoreComposition
         services.AddSingleton<Sheets.Formatting.IRowAutoHeight, Sheets.Formatting.RowAutoHeight>();
         services.AddSingleton<Sheets.Formatting.IColumnAutoWidth, Sheets.Formatting.ColumnAutoWidth>();
         services.AddSingleton<PulseOffice.Sheets.Engine.Operations.ConditionalFormattingEvaluator>();
-        services.AddSingleton<IActiveSheetContext, ActiveSheetContext>();
+        services.AddSingleton<PulseOffice.Shell.IWindowScopedSlots<ActiveSheetContext>>(provider => new PulseOffice.Shell.WindowScopedSlots<ActiveSheetContext>(
+            provider.GetRequiredService<PulseOffice.Shell.IShellWindowFocus>(),
+            provider.GetRequiredService<PulseOffice.Shell.IWindowScopeLocator>(),
+            () => new ActiveSheetContext()));
+        services.AddSingleton<IActiveSheetContext, FocusedSheetContext>();
         services.TryAddSingleton<PulseOffice.Document.Commands.UndoToStatePoint>();
         services.TryAddSingleton<PulseOffice.Document.Commands.RedoToStatePoint>();
         services.TryAddSingleton<PulseOffice.Document.Commands.IHistoryReversals, PulseOffice.Document.Commands.HistoryReversals>();

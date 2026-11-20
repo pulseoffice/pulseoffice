@@ -128,6 +128,7 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
             Previewed(new FormTab(texts["folio.page.tab.columns"], texts["folio.page.columns.explanation"],
             [
                 new ColumnLayoutField("columnLayout", texts["folio.page.tab.columns"], services.ColumnLayouts.Layout(style.Columns, TextWidth(style)), Centimetres, services.Columns),
+                new CheckField("balanceBeforeSection", texts["folio.page.columns.balanceBeforeSection"], style.Columns.BalancedBeforeSection),
             ]), style),
             Previewed(new FormTab(texts["folio.page.tab.watermark"], texts["folio.page.watermark.explanation"],
             [
@@ -163,7 +164,8 @@ public sealed class FolioPageTabs(FolioPageServices services) : IFolioPageTabs
         style.FirstPageDifferent = values.Flag("firstDifferent");
         style.EvenPagesDifferent = values.Flag("evenDifferent");
         var columns = Columns(style, values);
-        style.Columns = services.ColumnLayouts.Columns(columns, style.Columns.Balanced, style.Columns);
+        var chosen = services.ColumnLayouts.Columns(columns, style.Columns.Balanced, style.Columns);
+        style.Columns = chosen with { BalancedBeforeSection = chosen.Count > 1 && (values.ContainsKey("balanceBeforeSection") ? values.Flag("balanceBeforeSection") : chosen.BalancedBeforeSection) };
         style.Watermark = values.Text("mark").Trim() is { Length: > 0 } text
             ? new PageWatermark(text)
             {

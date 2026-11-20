@@ -23,7 +23,9 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
         var chartClass = (string?)chart.Attribute(Chart + "class");
         var type = vocabulary.Declared((string?)chart.Attribute(PulseChart + "type"), chartClass,
             vocabulary.Refine(vocabulary.TypeOf(chartClass, Flags(chart, plot)), Traits(chart, plot)));
-        var lines = plot.Elements(Chart + "series").Count(series => (string?)series.Attribute(Chart + "class") == "chart:line");
+        var lineIndices = plot.Elements(Chart + "series").Select((series, index) => (string?)series.Attribute(Chart + "class") == "chart:line" ? index : -1).Where(index => index >= 0).ToList();
+        var lines = lineIndices.Count;
+        var seriesCount = plot.Elements(Chart + "series").Count();
         var numbers = new OdfNumberStyleReader(chart.Document);
         var horizontalStyle = Named(chart, (string?)Axis(plot, "x")?.Attribute(Chart + "style-name"));
         var verticalStyle = Named(chart, (string?)Axis(plot, "y")?.Attribute(Chart + "style-name"));
@@ -36,6 +38,7 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
             Id = id,
             Type = combined ? ChartType.ColumnLine : type == ChartType.ColumnLine ? ChartType.Column : type,
             LineSeriesCount = combined ? lines : 1,
+            LineSeriesIndices = combined && lineIndices.Any(index => index < seriesCount - lines) ? lineIndices : null,
             SourceSheet = string.Empty,
             SourceRange = string.Empty,
             ChartTitle = string.IsNullOrEmpty(title) ? null : title,

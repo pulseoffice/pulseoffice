@@ -58,6 +58,11 @@ public sealed class LinePlot : ChartPlotBase
             var own = ScaleOf(frame, series, scale, secondary);
             foreach (var points in Runs(data.Series[series], categories, own, type is ChartType.SteppedLine))
                 DrawRun(frame, points, series, data, filled ? AreaFloor(frame, data, series, categories, own, points) : null, type);
+            var format = frame.Definition.SeriesFormat(series);
+            for (var index = 0; index < data.Series[series].Values.Count; index++)
+                if (double.IsFinite(data.Series[series].Values[index]))
+                    _strokes.Marker(frame.Context, PointBrush(frame.Definition, data, series, index), format,
+                        new Point(categories.Centre(index), own.Position(data.Series[series].Values[index])), 2.5);
         }
 
         if (frame.Definition.Type is ChartType.ControlChart) DrawControlLimits(frame, data, scale);
@@ -135,9 +140,6 @@ public sealed class LinePlot : ChartPlotBase
 
         var format = frame.Definition.SeriesFormat(series);
         frame.Context.DrawGeometry(null, _strokes.Pen(Brush(data, series), format, 2), geometry);
-
-        foreach (var point in points)
-            _strokes.Marker(frame.Context, Brush(data, series), format, point, 2.5);
     }
 
     private void DrawControlLimits(ChartFrame frame, ChartData data, PlotScale scale)

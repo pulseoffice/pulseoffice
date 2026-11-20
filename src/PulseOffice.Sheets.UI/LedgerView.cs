@@ -351,21 +351,21 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         base.OnLoaded(e);
 
         foreach (var (link, _) in _globalLinks) link();
-        _sheetContext.Attach(CurrentTarget());
+        _sheetContext.Attach(this, CurrentTarget());
 
         PublishSelectionContext();
     }
 
     public void ClaimActiveContext()
     {
-        if (IsLoaded) _sheetContext.Attach(CurrentTarget());
+        if (IsLoaded) _sheetContext.Attach(this, CurrentTarget());
     }
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
     {
         base.OnUnloaded(e);
         foreach (var (_, unlink) in _globalLinks) unlink();
-        _sheetContext.Detach(_workbook);
+        _sheetContext.Detach(this, _workbook);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -569,7 +569,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         if (_grid.SheetIndex >= _workbook.Sheets.Count)
         {
             _grid.SheetIndex = Math.Max(0, _workbook.Sheets.Count - 1);
-            _sheetContext.Attach(CurrentTarget());
+            _sheetContext.Attach(this, CurrentTarget());
         }
 
         BuildSheetTabs();
@@ -594,7 +594,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         _grid.SheetIndex = index;
         _sheetTabs.Show(_workbook.Sheets, index);
 
-        _sheetContext.Attach(CurrentTarget());
+        _sheetContext.Attach(this, CurrentTarget());
         OnSelectionChanged();
         PublishSelectionContext();
         _referencePick?.SelectionChanged();

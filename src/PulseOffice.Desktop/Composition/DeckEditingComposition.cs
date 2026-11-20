@@ -49,7 +49,12 @@ internal static class DeckEditingComposition
     public static IServiceCollection AddDeckEditing(this IServiceCollection services)
     {
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckDocumentService, PulseOffice.Presentations.UI.DeckDocumentService>();
-        services.AddSingleton<PulseOffice.Presentations.UI.IActiveDeckContext, PulseOffice.Presentations.UI.ActiveDeckContext>();
+        services.AddSingleton<PulseOffice.Shell.IWindowScopedSlots<PulseOffice.Presentations.UI.ActiveDeckContext>>(provider =>
+            new PulseOffice.Shell.WindowScopedSlots<PulseOffice.Presentations.UI.ActiveDeckContext>(
+                provider.GetRequiredService<PulseOffice.Shell.IShellWindowFocus>(),
+                provider.GetRequiredService<PulseOffice.Shell.IWindowScopeLocator>(),
+                () => new PulseOffice.Presentations.UI.ActiveDeckContext()));
+        services.AddSingleton<PulseOffice.Presentations.UI.IActiveDeckContext, PulseOffice.Presentations.UI.FocusedDeckContext>();
         services.AddSingleton<PulseOffice.Shell.IDocumentStateWitness, PulseOffice.Presentations.UI.DeckStateWitness>();
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckMediaFiles, PulseOffice.Presentations.UI.DeckMediaFiles>();
         services.AddSingleton<PulseOffice.Presentations.UI.IShowMediaPlayer, PulseOffice.Presentations.UI.ShowMediaPlayer>();

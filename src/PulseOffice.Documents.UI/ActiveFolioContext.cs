@@ -25,6 +25,8 @@ public interface IActiveFolioContext
 
     void Detach(FolioTarget target);
 
+    void Attach(Avalonia.Controls.Control owner, FolioTarget target) => Attach(target);
+
     event EventHandler? Changed;
 }
 

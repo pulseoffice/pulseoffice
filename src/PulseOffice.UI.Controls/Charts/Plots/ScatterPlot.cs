@@ -84,8 +84,9 @@ public sealed class ScatterPlot : ChartPlotBase
                 if (largest > 0 && source < sizes.Count && double.IsFinite(sizes[source]))
                     radius = 4 + 14 * Math.Sqrt(Math.Abs(sizes[source]) / largest);
 
-                if (bubble || format.Marker == MarkerSymbol.Automatic) frame.Context.DrawEllipse(Brush(frame.Data, index + 1, 0.75), null, centre, radius, radius);
-                else _strokes.Marker(frame.Context, Brush(frame.Data, index + 1, 0.75), format, centre, radius);
+                var brush = PointBrush(frame.Definition, frame.Data, index + 1, source, 0.75);
+                if (bubble || format.Marker == MarkerSymbol.Automatic) frame.Context.DrawEllipse(brush, null, centre, radius, radius);
+                else _strokes.Marker(frame.Context, brush, format, centre, radius);
             }
         }
     }

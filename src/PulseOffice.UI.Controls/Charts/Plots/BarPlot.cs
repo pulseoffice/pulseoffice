@@ -96,6 +96,15 @@ public sealed class BarPlot : ChartPlotBase
         }
     }
 
+    public override IReadOnlyList<ChartLegendItem> Legend(ChartDefinition definition, ChartData data)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var items = base.Legend(definition, data);
+        return definition.Type is ChartType.StackedBar or ChartType.PercentStackedBar && definition.Legend is LegendPosition.Right or LegendPosition.Left
+            ? [.. items.Reverse()]
+            : items;
+    }
+
     private bool Stacked(ChartType type) => type is
         ChartType.StackedColumn or ChartType.StackedBar
         or ChartType.PercentStackedColumn or ChartType.PercentStackedBar;
@@ -187,6 +196,7 @@ public sealed class BarPlot : ChartPlotBase
                     Series = segment.Series, Index = segment.Index, Across = segment.Index + 1,
                     Placement = ChartLabelPlacement.Centre,
                     Middle = horizontal ? new Point(middle, across) : new Point(across, middle),
+                    Base = horizontal ? new Point(segment.Scale.Position(segment.From), across) : new Point(across, segment.Scale.Position(segment.From)),
                 };
             }
             yield break;
@@ -218,13 +228,16 @@ public sealed class BarPlot : ChartPlotBase
                 var own = ScaleOf(frame, series, scale, secondary);
                 var value = Value(data.Series[series], index);
                 var along = own.Position(value);
-                var below = value < _marks.ValueCrossing(own,
+                var crossing = _marks.ValueCrossing(own,
                     secondary is not null && frame.Definition.SeriesFormat(series).SecondaryAxis ? frame.Definition.SecondaryValueAxis : frame.Definition.ValueAxis);
+                var below = value < crossing;
+                var from = own.Position(crossing);
                 yield return new ChartDataLabel(
                     horizontal ? new Point(along, start + width / 2) : new Point(start + width / 2, along),
                     Value(frame.Data.Series[series], index))
                 {
                     Series = series, Index = index, Across = index + 1,
+                    Base = horizontal ? new Point(from, start + width / 2) : new Point(start + width / 2, from),
                     Placement = horizontal
                         ? below ? ChartLabelPlacement.Before : ChartLabelPlacement.After
                         : below ? ChartLabelPlacement.Below : ChartLabelPlacement.Above,

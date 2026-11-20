@@ -14417,3 +14417,26 @@ not done and stays queued. Log: docs/deep-audit/round-307-shell-tear-off.md.
 - Activating a window lets its document view claim the shared Ledger, Folio or Deck context; a frozen status bar keeps
   background activity progress live; a torn-off window closed maximized reopens maximized; shape text `ToRich` callers
   checked against per-paragraph alignment. Log: docs/deep-audit/round-321-shell-shape-alignment.md.
+
+## Round 322 (2026-11-20): per-window module contexts
+
+The Ledger, Folio and Deck module contexts are per window: `WindowScopedSlots` (Shell) keeps one context per window,
+views attach into their own window's slot, and the module context services follow the focused window. A programmatic
+attach in an unfocused window no longer changes the focused window's ribbon, commands or agent target. Log:
+docs/deep-audit/round-322-window-module-contexts.md.
+### Round 323 (2026-11-20): Ledger chart leftovers
+- ODS combinations keep their line series wherever they stand (`LineSeriesIndices`); point formats follow row and
+  column insertion and deletion; line, area, radar and scatter markers draw their point colours; XLSX stock series keep
+  their colour on the marker; resizing an object past A1 stops the dragged edge; radar charts get the axis page; pie
+  of pie and bar of pie draw their second plot; horizontal stacked bar legends list series bottom up; data labels draw
+  at inside end, inside base, outside end and centre, and gain best fit in both formats and the editor.
+  Log: docs/deep-audit/round-323-ledger-chart-leftovers.md.
+### Round 324 (2026-11-20): Ledger chart round trips
+- Stacked bar and column charts carry `c:overlap 100` in XLSX; the chart editor offers the axis scale page for radar
+  charts. Styles, keyboard resizing and the statistical, hierarchy and meter plots are queued.
+  Log: docs/deep-audit/round-324-chart-round-trips.md.
+### Round 325 (2026-11-20): Folio and Deck leftovers, Folio find and replace
+- Page columns can be marked to balance before a section (page dialog switch; DOCX038 declares unmarked ones before a
+  section); the ODT next-column start writes a native column break on a leading table or nested section; justified
+  plain Deck table cells justify. Folio find and replace searches every story, gains regular expressions, caret codes
+  for special characters, match counts and a single Replace. Log: docs/deep-audit/round-325-folio-find-replace.md.

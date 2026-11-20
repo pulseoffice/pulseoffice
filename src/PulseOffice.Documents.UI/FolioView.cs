@@ -210,13 +210,13 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
 
     public void ClaimActiveContext()
     {
-        if (TopLevel.GetTopLevel(this) is not null) _services.Context.Attach(_target);
+        if (TopLevel.GetTopLevel(this) is not null) _services.Context.Attach(this, _target);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        _services.Context.Attach(_target);
+        _services.Context.Attach(this, _target);
         _services.Rulers.Layout.Changed += OnLayoutChanged;
         _editor.MoveDisplay.Link();
         ApplyScrollBars();

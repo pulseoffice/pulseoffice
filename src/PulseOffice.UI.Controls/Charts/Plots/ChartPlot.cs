@@ -28,6 +28,10 @@ public sealed record ChartDataLabel(Point Anchor, double Value)
     public ChartLabelPlacement Placement { get; init; } = ChartLabelPlacement.Above;
 
     public Point? Middle { get; init; }
+
+    public Point? Base { get; init; }
+
+    public Point? Tip { get; init; }
 }
 
 public enum ChartLabelPlacement
@@ -43,14 +47,46 @@ public sealed class ChartLabelLayout
 {
     private const double Gap = 2;
 
+    public Point Origin(ChartDataLabel label, Size size, DataLabelPlacement requested = DataLabelPlacement.Automatic)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        var tip = label.Tip ?? label.Anchor;
+        return requested switch
+        {
+            DataLabelPlacement.Center => Centred(label.Middle ?? (label.Base is { } start ? new Point((start.X + tip.X) / 2, (start.Y + tip.Y) / 2) : label.Anchor), size),
+            DataLabelPlacement.Above => Origin(label with { Placement = ChartLabelPlacement.Above }, size),
+            DataLabelPlacement.Below => Origin(label with { Placement = ChartLabelPlacement.Below }, size),
+            DataLabelPlacement.Left => Origin(label with { Placement = ChartLabelPlacement.Before }, size),
+            DataLabelPlacement.Right => Origin(label with { Placement = ChartLabelPlacement.After }, size),
+            DataLabelPlacement.OutsideEnd when label.Base is { } start => Along(tip, start, tip, size, 1),
+            DataLabelPlacement.InsideEnd when label.Base is { } start => Along(tip, start, tip, size, -1),
+            DataLabelPlacement.InsideBase when label.Base is { } start => Along(start, start, tip, size, 1),
+            _ => Origin(label, size),
+        };
+    }
+
     public Point Origin(ChartDataLabel label, Size size) => label.Placement switch
     {
         ChartLabelPlacement.Below => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y + Gap),
         ChartLabelPlacement.After => new Point(label.Anchor.X + Gap, label.Anchor.Y - size.Height / 2),
         ChartLabelPlacement.Before => new Point(label.Anchor.X - size.Width - Gap, label.Anchor.Y - size.Height / 2),
-        ChartLabelPlacement.Centre => new Point((label.Middle ?? label.Anchor).X - size.Width / 2, (label.Middle ?? label.Anchor).Y - size.Height / 2),
+        ChartLabelPlacement.Centre => Centred(label.Middle ?? label.Anchor, size),
         _ => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y - size.Height - Gap),
     };
+
+    private static Point Centred(Point centre, Size size) => new(centre.X - size.Width / 2, centre.Y - size.Height / 2);
+
+    private static Point Along(Point from, Point start, Point tip, Size size, int sign)
+    {
+        var dx = tip.X - start.X;
+        var dy = tip.Y - start.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        if (length < 1e-9) return Centred(from, size);
+        dx /= length;
+        dy /= length;
+        var extent = Math.Abs(dx) * size.Width / 2 + Math.Abs(dy) * size.Height / 2 + Gap;
+        return Centred(new Point(from.X + sign * dx * extent, from.Y + sign * dy * extent), size);
+    }
 }
 
 public interface IChartPlot
@@ -66,6 +102,8 @@ public interface IChartPlot
     bool Handles(ChartType type);
 
     bool DrawsAxes { get; }
+
+    bool ScalesValues { get; }
 
     PlotScale? ValueAxis(ChartFrame frame);
 
@@ -87,6 +125,8 @@ public abstract class ChartPlotBase : IChartPlot
     public abstract bool Handles(ChartType type);
 
     public virtual bool DrawsAxes => true;
+
+    public virtual bool ScalesValues => DrawsAxes;
 
     public virtual PlotScale? ValueAxis(ChartFrame frame) => null;
 
@@ -138,10 +178,10 @@ public abstract class ChartPlotBase : IChartPlot
     protected IBrush Brush(ChartData data, int index, double opacity = 1) =>
         new SolidColorBrush(Colour(data, index), opacity);
 
-    protected IBrush PointBrush(ChartDefinition definition, ChartData data, int series, int point) =>
+    protected IBrush PointBrush(ChartDefinition definition, ChartData data, int series, int point, double opacity = 1) =>
         definition.PointFormat(series, point).ColorHex is { } hex && Color.TryParse(hex, out var colour)
-            ? new SolidColorBrush(colour)
-            : Brush(data, series);
+            ? new SolidColorBrush(colour, opacity)
+            : Brush(data, series, opacity);
 
     protected Color Colour(ChartData data, int index) =>
         ChartColours.Resolve(index < data.Series.Count ? data.Series[index].ColorHex : null, index);

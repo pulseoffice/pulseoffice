@@ -14,6 +14,8 @@ public sealed class RadarPlot : ChartPlotBase
 
     public override bool DrawsAxes => false;
 
+    public override bool ScalesValues => true;
+
     public override void Draw(ChartFrame frame)
     {
         if (frame.Definition.Type is ChartType.ParallelCoordinates)
@@ -79,7 +81,7 @@ public sealed class RadarPlot : ChartPlotBase
                 geometry);
             if (frame.Definition.Type is ChartType.FilledRadar || format.Marker is MarkerSymbol.Automatic or MarkerSymbol.None) continue;
             for (var index = 0; index < count; index++)
-                _strokes.Marker(frame.Context, Brush(frame.Data, order), format, spokes.Corner(scale.Position(Value(series, index)), index), 2.5);
+                _strokes.Marker(frame.Context, PointBrush(frame.Definition, frame.Data, order, index), format, spokes.Corner(scale.Position(Value(series, index)), index), 2.5);
         }
     }
 

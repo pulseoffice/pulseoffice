@@ -141,8 +141,12 @@ public sealed record ChartDefinition : EmbeddedObject
 
     public int LineSeriesCount { get; init; } = 1;
 
+    public IReadOnlyList<int>? LineSeriesIndices { get; init; }
+
     public bool IsLineSeries(int series, int seriesCount) =>
-        Type == ChartType.ColumnLine && series >= seriesCount - Math.Clamp(LineSeriesCount, 1, Math.Max(seriesCount - 1, 1));
+        Type == ChartType.ColumnLine && (LineSeriesIndices is { Count: > 0 } lines && lines.Any(index => index < seriesCount) && lines.Count(index => index < seriesCount) < seriesCount
+            ? lines.Contains(series)
+            : series >= seriesCount - Math.Clamp(LineSeriesCount, 1, Math.Max(seriesCount - 1, 1)));
 
     public override EmbeddedObjectKind Kind => EmbeddedObjectKind.Chart;
 

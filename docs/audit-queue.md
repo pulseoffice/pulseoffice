@@ -11,8 +11,6 @@ the round that fixes it is joined and the join run is green.
   the text painters). (292, 297)
 - Deck table cell rich editing: shared editor, overlay, per-paragraph alignment, struck runs and turned or stacked cell
   editing not seen live. (311, 316)
-- Deck table cells: the plain-text path of the data table renderer (cells without rich text) draws a justified look as
-  left; only rich cell text justifies. (320)
 - The PPTX "PulseOffice Grid" table style and the ODP grid template have not been opened in PowerPoint or the
   reference suite; an ODP grid table from another producer keeps the default accent (only our own template names
   carry it). (302, 306)
@@ -55,21 +53,20 @@ the round that fixes it is joined and the join run is green.
 - "Number slides from" 0 is written to ODP as our extension attribute and as `text:page-adjust="-1"` on every slide
   number field (also read back alone); not opened in another application. (231, 234)
 ## Charts
-- ODS combo whose line series is not the last one is read with the last series as the line (the model keeps line
-  series last). (318)
-- Chart point formats keep their index when the source rows or columns are inserted or deleted. (318)
-- Point colours are drawn only for pie, doughnut and bars; line, area, radar and scatter points round-trip but draw in
-  the series colour. (318)
-- XLSX stock series carry no colour (the writer clears their shape properties). (318)
 - Per-point formats (`c:dPt`, `chart:data-point`) have not been opened in Excel or the reference suite. (318)
-- Not yet audited: per-type XLSX/ODS round trips other than pie, doughnut and scatter (round 318's area), chart styles
-  and colour palettes against Excel's style gallery, keyboard resizing of charts, and stock, statistical, hierarchy and
-  meter plots beyond label and axis consistency. (317, 319)
-- Resizing an object past the sheet's left or top edge keeps its size, so the opposite edge moves; Excel stops the
-  dragged edge. (319)
-- Radar charts honour value axis bounds in rendering but the chart editor disables the axis page for them. (319)
-- Pie of pie and bar of pie draw as plain pies; horizontal stacked bar legends are not reversed as in Excel. (319)
-- Data labels have no position option (inside end, inside base, outside end, best fit) in the model. (319)
+- Inserting or deleting columns inside a compact chart range with series in columns adds or removes a series, but
+  series names, colours and formats keep their index (the same holds for rows with series in rows). (323)
+- Pie of pie and bar of pie always put the last third of the points in the second plot; the split type, split
+  position and second plot size (`c:splitType`, `c:splitPos`, `c:secondPieSize`) are not in the model. (323)
+- Best fit data labels draw at the automatic position (no overlap avoidance); ODS writes them as
+  `chart:label-position="avoid-overlap"`, not opened in another application. (323)
+- The line series of a column and line combination draws its markers in the series colour, not the point colours. (323)
+- Not yet audited: chart styles and colour palettes against Excel's style gallery, and stock, statistical, hierarchy
+  and meter plots beyond label and axis consistency. (317, 319, 324)
+- Keyboard resizing of objects: the shared `ObjectNudgeKeys` makes Shift+arrow a large nudge; Office resizes with
+  Shift+arrow. Changing it touches Ledger, Deck and Folio. (324)
+- ODF legend positions `top-start`, `top-end`, `bottom-start`, `bottom-end` read back as Right. (324)
+- XLSX OHLC stock charts are written without up-down bars; an Excel OHLC chart reads back as Candlestick. (324)
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
@@ -140,12 +137,12 @@ the round that fixes it is joined and the join run is green.
   "Header") is treated as built-in while keeping its own spelling. (308)
 - Folio lists (315): ODF has no native restart level for list levels (researched in ODF 1.3 list level styles and
   `text:list` attributes); our `pt:restart-after` stays, so other applications restart after any higher level. (313, 315)
-- Folio columns (320): page columns made in Folio or read from ODT are not marked to balance before a section, so a
-  DOCX written from them balances in Word before a continuous section while Folio fills the first column; the column
-  editor has no switch for the mark. (320)
-- Folio columns (320): the ODT next-column start now also writes `fo:break-before="column"` on the section's first
-  paragraph; a section starting with a table or a nested section still relies on our attribute only. Not opened in
-  other applications. (320)
+- Folio columns (320, 325): the ODT next-column start writes `fo:break-before="column"` on the section's first paragraph,
+  leading table or nested section's first paragraph; not opened in other applications. Page columns marked to balance
+  before a section not opened in Word. (320, 325)
+- Folio find and replace (325): no `^p` paragraph marks or breaks; no format or style search and replace; no find bar
+  or match highlighting; comments not searched, while headers of unused page styles are; tracked deleted and hidden
+  text matched; Word wildcard syntax not translated (the regex option is .NET syntax); no replace with formatting. (325)
 - Folio pages (320): the blank page before a right or left page style keeps the previous style (Word places it at the
   end of the previous section, the reference suite likewise); not compared live in Word. (315, 320)
 
@@ -161,9 +158,10 @@ the round that fixes it is joined and the join run is green.
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Shell (314): the notification history is application-wide by decision. (314)
-- Shell (321): a programmatic selection change in a Deck view of an unfocused window (macro, agent, find) still attaches
-  that view to the shared Deck context until the focused window is activated again; the same holds for Ledger and Folio
-  views that attach on load or sheet change. Needs the module contexts to be per window. (321)
+- Shell (322): the per-window module contexts are covered by headless two-window tests; the switch between windows has
+  not been tried in the running app on the three systems. (322)
+- Shell (322): two windows of the same Ledger document in one window (tabs) still share that window's single context
+  slot, the last attached view wins, as before. (322)
 - Shell (321): activating a window re-claims the module context and keeps a torn-off window's maximized state, but the
   multi-window context switch has not been tried in the running app. (321)
 - Shell (310): multi-window behaviour (tab drops on a scrolled strip, side panel, status, placement) not yet tried in

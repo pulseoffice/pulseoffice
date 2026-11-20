@@ -140,7 +140,8 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
         new(document => GutterAtTop(document) && UsedPageStyles(document).Any(style => !style.GutterAtTop && style.Gutter.Value > 0),
             Diagnostic.Info("DOCX246", "Word places the gutter of every section on the same side: a left gutter in a document that also has a top gutter is written at the top in DOCX. ODT keeps both.")),
         new(document => Blocks(document.Body).OfType<SectionBlock>().Any(section => section.Columns.Count > 1 && !section.Columns.Balanced)
-                        || UsedPageStyles(document).Any(style => style.Columns.Count > 1 && !style.Columns.Balanced),
+                        || UsedPageStyles(document).Any(style => style.Columns.Count > 1 && (!style.Columns.Balanced
+                            || !style.Columns.BalancedBeforeSection && Blocks(document.Body).OfType<SectionBlock>().Any())),
             Diagnostic.Info("DOCX038", "Word balances section columns: columns set not to balance are balanced in DOCX. ODT keeps the setting.")),
         new(document => Paragraphs(document).Any(paragraph => (paragraph.IsListItem || paragraph.ListStyleName is not null) && paragraph.BulletLevel >= DocxNumberingCodec.WordLevels
                         || paragraph.OutlineLevel > DocxNumberingCodec.WordLevels),

@@ -148,7 +148,7 @@ public sealed record ChartPointFormats(IReadOnlyList<ChartPointFormat> Items)
     public override int GetHashCode() => Items.Count;
 }
 
-public enum DataLabelPlacement { Automatic, Center, InsideEnd, InsideBase, OutsideEnd, Above, Below, Left, Right }
+public enum DataLabelPlacement { Automatic, Center, InsideEnd, InsideBase, OutsideEnd, Above, Below, Left, Right, BestFit }
 
 public sealed record ChartDataLabelOptions
 {

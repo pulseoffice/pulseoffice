@@ -101,6 +101,10 @@ public interface IActiveSheetContext
 
     void Detach(Workbook workbook);
 
+    void Attach(Avalonia.Controls.Control owner, SheetTarget target) => Attach(target);
+
+    void Detach(Avalonia.Controls.Control owner, Workbook workbook) => Detach(workbook);
+
     void RequestRefresh();
 
     void FreezePanes(int rows, int columns);

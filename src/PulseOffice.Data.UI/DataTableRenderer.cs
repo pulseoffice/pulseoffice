@@ -257,6 +257,13 @@ public sealed class DataTableRenderer : IDataTableRenderer
             RichCellText(context, culture, rich, brush, inner, size, look, valign, direction);
             return;
         }
+        if (look.Horizontal is CellHorizontalAlign.Justify && direction != CellTextDirection.Stacked)
+        {
+            var paragraphs = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
+                .Select(paragraph => new TableCellParagraph([new TableTextRun(paragraph)]));
+            RichCellText(context, culture, new TableCellText(0, 0, [.. paragraphs]), brush, inner, size, look, valign, direction);
+            return;
+        }
         if (direction == CellTextDirection.Stacked)
         {
             var characters = new List<string>();

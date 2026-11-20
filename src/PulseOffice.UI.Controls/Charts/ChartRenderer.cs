@@ -83,6 +83,9 @@ public sealed class ChartRenderer
                 new Rect(bounds.X / scale, bounds.Y / scale, bounds.Width / scale, bounds.Height / scale), mode);
     }
 
+    public bool ScalesValues(ChartType type) =>
+        (_plots.FirstOrDefault(candidate => candidate.Handles(type)) ?? _fallback).ScalesValues;
+
     public bool DrawsAxes(ChartType type) =>
         (_plots.FirstOrDefault(candidate => candidate.Handles(type)) ?? _fallback).DrawsAxes;
 
@@ -202,7 +205,7 @@ public sealed class ChartRenderer
             var caption = LabelText(text, definition, data, label);
             if (caption.Length == 0) continue;
             var layout = text.Layout(caption, text.Ink.Text, 9);
-            var origin = _labelLayout.Origin(label, new Size(layout.Width, layout.Height));
+            var origin = _labelLayout.Origin(label, new Size(layout.Width, layout.Height), definition.DataLabels.Placement);
             context.FillRectangle(text.Ink.Backdrop, new Rect(origin, new Size(layout.Width, layout.Height)));
             context.DrawText(layout, origin);
         }

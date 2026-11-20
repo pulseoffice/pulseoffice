@@ -34,8 +34,10 @@ internal abstract class ChartReferenceRewrite
         var moved = sheet == chart.SourceSheet && range == chart.SourceRange && ReferenceEquals(sources, chart.SeriesSources)
             ? chart
             : chart with { SourceSheet = sheet, SourceRange = range, SeriesSources = sources };
-        return _errorValues.Map(moved, text => Reference(text)!);
+        return Points(chart, _errorValues.Map(moved, text => Reference(text)!));
     }
+
+    protected virtual ChartDefinition Points(ChartDefinition before, ChartDefinition after) => after;
 
     public PlacedObject Rewrite(PlacedObject placed, string ownerSheet)
     {
@@ -160,6 +162,9 @@ internal sealed class CellLinkTargets
 internal sealed class ChartStructureRewrite(StructureChange change) : ChartReferenceRewrite
 {
     private readonly StructureShift _shift = new(change);
+
+    protected override ChartDefinition Points(ChartDefinition before, ChartDefinition after) =>
+        new ChartPointShift(change, References).Apply(before, after);
 
     protected override (string Sheet, string Range) Compact(string sheet, CellRange range)
     {

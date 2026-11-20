@@ -80,6 +80,7 @@ internal sealed class OoxmlDataLabels
         (DataLabelPlacement.Below, C.DataLabelPositionValues.Bottom),
         (DataLabelPlacement.Left, C.DataLabelPositionValues.Left),
         (DataLabelPlacement.Right, C.DataLabelPositionValues.Right),
+        (DataLabelPlacement.BestFit, C.DataLabelPositionValues.BestFit),
     ];
 
     public C.DataLabels Write(ChartDataLabelOptions options, OpenXmlCompositeElement series)
@@ -101,7 +102,7 @@ internal sealed class OoxmlDataLabels
     public bool Allows(OpenXmlCompositeElement series, DataLabelPlacement placement) => series switch
     {
         C.BarChartSeries => placement is DataLabelPlacement.Center or DataLabelPlacement.InsideEnd or DataLabelPlacement.InsideBase or DataLabelPlacement.OutsideEnd,
-        C.PieChartSeries => placement is DataLabelPlacement.Center or DataLabelPlacement.InsideEnd or DataLabelPlacement.OutsideEnd,
+        C.PieChartSeries => placement is DataLabelPlacement.Center or DataLabelPlacement.InsideEnd or DataLabelPlacement.OutsideEnd or DataLabelPlacement.BestFit,
         C.LineChartSeries or C.ScatterChartSeries or C.BubbleChartSeries => placement is DataLabelPlacement.Center or DataLabelPlacement.Above or DataLabelPlacement.Below or DataLabelPlacement.Left or DataLabelPlacement.Right,
         _ => false,
     };

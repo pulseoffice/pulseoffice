@@ -52,21 +52,49 @@ public sealed class FolioFindCommands(
     {
         if (editor.ReadOnly()) return 0;
         _last = query;
-        var story = editor.Services.Order.StoryOf(editor.Document, editor.Caret.ParagraphId);
-        List<DocumentRange> found = [.. search.FindAll(story, query).Where(range => Editable(editor, range))];
+        var paragraphs = editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId);
+        var byId = paragraphs.GroupBy(paragraph => paragraph.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        List<(DocumentRange Range, string Text)> found = [.. search.FindAll(paragraphs, query)
+            .Where(range => Editable(editor, range))
+            .Select(range => (range, search.Replacement(byId[range.Start.ParagraphId], range, query, replacement)))];
         if (found.Count == 0) return 0;
         using (editor.History.BeginTransaction("replace-all"))
         {
-            foreach (var range in Enumerable.Reverse(found))
+            foreach (var (range, text) in Enumerable.Reverse(found))
             {
                 editor.Services.Editor.Delete(editor.Document, editor.History, range);
-                if (replacement.Length > 0) editor.Services.Editor.InsertText(editor.Document, editor.History, range.Start, replacement);
+                if (text.Length > 0) editor.Services.Editor.InsertText(editor.Document, editor.History, range.Start, text);
             }
         }
         editor.Normalize();
         editor.Select(editor.Caret, editor.Caret);
         return found.Count;
     }
+
+    public bool Replace(FolioEditor editor, SearchQuery query, string replacement)
+    {
+        _last = query;
+        if (!editor.ReadOnly() && editor.HasSelection && editor.Selection is { } selected && selected.Start.ParagraphId == selected.End.ParagraphId
+            && editor.Services.Order.SearchOrder(editor.Document, selected.Start.ParagraphId).FirstOrDefault(paragraph => paragraph.Id == selected.Start.ParagraphId) is { } paragraph
+            && search.FindAll([paragraph], query).Contains(selected) && Editable(editor, selected))
+        {
+            var text = search.Replacement(paragraph, selected, query, replacement);
+            using (editor.History.BeginTransaction("replace"))
+            {
+                editor.Services.Editor.Delete(editor.Document, editor.History, selected);
+                if (text.Length > 0) editor.Services.Editor.InsertText(editor.Document, editor.History, selected.Start, text);
+            }
+            editor.Normalize();
+            var after = selected.Start with { Offset = selected.Start.Offset + text.Length };
+            editor.Select(after, after);
+        }
+        return Next(editor, query);
+    }
+
+    public int Count(FolioEditor editor, SearchQuery query) =>
+        search.FindAll(editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId), query).Count;
+
+    public bool IsValid(SearchQuery query) => search.IsValid(query);
 
     private bool Editable(FolioEditor editor, DocumentRange range) =>
         !editor.Shielded(range)
@@ -76,9 +104,9 @@ public sealed class FolioFindCommands(
     public bool Next(FolioEditor editor, SearchQuery query)
     {
         _last = query;
-        var story = editor.Services.Order.StoryOf(editor.Document, editor.Caret.ParagraphId);
+        var paragraphs = editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId);
         var after = editor.HasSelection ? editor.Selection.End : editor.Caret;
-        if (search.FindNext(story, query, after) is { } range)
+        if (search.FindNext(paragraphs, query, after) is { } range)
         {
             editor.Select(range.Start, range.End);
             return true;

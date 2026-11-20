@@ -54,7 +54,7 @@ internal sealed class ObjectDragGesture(
 
         if (!moved && turned is null) return;
 
-        var changes = new List<SheetGridView.ObjectChange> { viewport.ChangeOf(placed, box, turned) };
+        var changes = new List<SheetGridView.ObjectChange> { viewport.ChangeOf(placed, box, turned, !_session.Moving && !_session.Rotating) };
 
         if (_session.Moving)
         {

@@ -84,6 +84,13 @@ internal sealed class BarFamily : ChartFamily
 
     public override OpenXmlCompositeElement Series() => new C.BarChartSeries();
 
+    public override void Close(OpenXmlCompositeElement chart, ChartType type, bool threeDimensional)
+    {
+        var grouping = ChartGrouping.Of(type);
+        chart.AppendChild(new C.GapWidth { Val = 150 });
+        if (!threeDimensional && (grouping.Stacked || grouping.Percent)) chart.AppendChild(new C.Overlap { Val = 100 });
+    }
+
     public override ChartFamilyRead? Read(C.PlotArea plot)
     {
         OpenXmlCompositeElement? bar = plot.GetFirstChild<C.BarChart>();
@@ -381,12 +388,17 @@ internal sealed class StockFamily : ChartFamily
 
     public override void Finish(OpenXmlCompositeElement series, ChartDefinition definition)
     {
+        string? colour = null;
         if (series.GetFirstChild<C.ChartShapeProperties>() is { } properties)
         {
+            colour = properties.Descendants<A.RgbColorModelHex>().FirstOrDefault()?.Val?.Value;
             properties.RemoveAllChildren();
             properties.AppendChild(new A.Outline(new A.NoFill()) { Width = 28575 });
         }
-        InsertAfterProperties(series, new C.Marker(new C.Symbol { Val = C.MarkerStyleValues.None }));
+        var marker = new C.Marker(new C.Symbol { Val = C.MarkerStyleValues.None });
+        if (colour is { Length: 6 })
+            marker.AppendChild(new C.ChartShapeProperties(new A.SolidFill(new A.RgbColorModelHex { Val = colour }), new A.Outline(new A.SolidFill(new A.RgbColorModelHex { Val = colour }))));
+        InsertAfterProperties(series, marker);
         series.AppendChild(new C.Smooth { Val = false });
     }
 

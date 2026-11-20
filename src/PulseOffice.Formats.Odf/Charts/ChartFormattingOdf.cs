@@ -147,6 +147,7 @@ internal sealed class OdfChartSeriesFormats : OdfChartXml
         (DataLabelPlacement.Below, "bottom"),
         (DataLabelPlacement.Left, "left"),
         (DataLabelPlacement.Right, "right"),
+        (DataLabelPlacement.BestFit, "avoid-overlap"),
     ];
 
     private readonly OdfNumberStyleWriter _numbers = new();

@@ -590,7 +590,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _categoryAxis.IsEnabled = axes;
         _valueAxis.IsEnabled = axes;
         _grid.IsEnabled = axes;
-        _axes.IsEnabled = axes;
+        _axes.IsEnabled = _services.Renderer.ScalesValues(_type);
         _preview.Show(Definition(), _data);
     }
 

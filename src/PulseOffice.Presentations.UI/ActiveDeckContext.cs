@@ -76,6 +76,8 @@ public interface IActiveDeckContext
 
     void Reannounce(DeckTarget target);
 
+    void Attach(Avalonia.Controls.Control owner, DeckTarget target) => Attach(target);
+
     event EventHandler? Changed;
 }
 

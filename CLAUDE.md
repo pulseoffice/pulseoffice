@@ -373,6 +373,11 @@ Central package management in `Directory.Packages.props`: **versions are never w
     `MediaPlaybackProvider`. The shared `MediaView` draws it; Deck's show falls back to the system player when no
     backend can open the medium. Log: docs/deep-audit/round-193-media-player.md.
 
+32. **Module contexts are per window** (round 322, 2026-11-20): `IActiveSheetContext`, `IActiveFolioContext` and
+    `IActiveDeckContext` are facades (`Focused*Context`) over `WindowScopedSlots` (Shell), one plain context per
+    `ShellWindowScope`; views attach with their own control as owner, and everything else reads the focused window's
+    slot. Log: docs/deep-audit/round-322-window-module-contexts.md.
+
 16. **Folio content controls**: a pair of inline markers with the properties on the start marker,
     not anchored objects. In DOCX form controls are distinguished by the `pulseoffice.form:` prefix in `w:tag`.
 

@@ -173,4 +173,41 @@ public sealed class ChartFamilyTests
             Assert.Equal([3d, 9d], read.InlineData.Series[2].Values);
         }
     }
+
+    [Theory]
+    [InlineData(ChartType.Column, false)]
+    [InlineData(ChartType.StackedColumn, true)]
+    [InlineData(ChartType.PercentStackedColumn, true)]
+    [InlineData(ChartType.Bar, false)]
+    [InlineData(ChartType.StackedBar, true)]
+    [InlineData(ChartType.PercentStackedBar, true)]
+    public void Le_barre_impilate_si_sovrappongono_in_XLSX_e_ogni_variante_si_rilegge(ChartType type, bool overlapped)
+    {
+        var (chart, package) = ThroughXlsx(WithColumns(type, 3));
+
+        Assert.Equal(type, chart.Type);
+        using (var document = SpreadsheetDocument.Open(package, false))
+        {
+            var bar = document.WorkbookPart!.WorksheetParts.Single().DrawingsPart!.ChartParts.Single().ChartSpace!.Descendants<DocumentFormat.OpenXml.Drawing.Charts.BarChart>().Single();
+            Assert.Equal(overlapped ? (sbyte?)100 : null, bar.GetFirstChild<DocumentFormat.OpenXml.Drawing.Charts.Overlap>()?.Val?.Value);
+        }
+        package.Position = 0;
+        Valid(package);
+    }
+
+    [Theory]
+    [InlineData(ChartType.Line)]
+    [InlineData(ChartType.SmoothLine)]
+    [InlineData(ChartType.StackedLine)]
+    [InlineData(ChartType.PercentStackedLine)]
+    [InlineData(ChartType.Area)]
+    [InlineData(ChartType.StackedArea)]
+    [InlineData(ChartType.PercentStackedArea)]
+    public void Linee_e_aree_si_rileggono_come_se_stesse_in_XLSX(ChartType type)
+    {
+        var (chart, package) = ThroughXlsx(WithColumns(type, 3));
+
+        Assert.Equal(type, chart.Type);
+        Valid(package);
+    }
 }

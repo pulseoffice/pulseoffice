@@ -89,7 +89,11 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<IFolioKeyMap, FolioKeyMap>();
         services.AddSingleton<IFolioEditingKeys, FolioEditingKeys>();
         services.AddSingleton<SpellingWaves>();
-        services.AddSingleton<IActiveFolioContext, ActiveFolioContext>();
+        services.AddSingleton<IActiveFolioContext>(provider =>
+            provider.GetService<IShellWindowFocus>() is { } focus
+                ? new FocusedFolioContext(new WindowScopedSlots<ActiveFolioContext>(
+                    focus, provider.GetService<IWindowScopeLocator>() ?? new WindowScopeLocator(focus), () => new ActiveFolioContext()))
+                : new ActiveFolioContext());
         services.TryAddSingleton<PulseOffice.Document.Commands.UndoToStatePoint>();
         services.TryAddSingleton<PulseOffice.Document.Commands.RedoToStatePoint>();
         services.TryAddSingleton<PulseOffice.Document.Commands.IHistoryReversals, PulseOffice.Document.Commands.HistoryReversals>();

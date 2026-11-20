@@ -10,6 +10,8 @@ namespace PulseOffice.Sheets.UI.GridParts;
 internal sealed class GridViewport
 {
     private const double DefaultRowHeaderWidth = 44;
+
+    private readonly SheetObjectEdges _edges = new();
     private const double DefaultColumnHeaderHeight = 20;
     private const double RowHeaderDigitWidth = 7;
     private const double RowHeaderPadding = 14;
@@ -371,10 +373,10 @@ internal sealed class GridViewport
         _ => 0,
     };
 
-    public SheetGridView.ObjectChange ChangeOf(PlacedObject placed, ObjectBox box, double? rotation)
+    public SheetGridView.ObjectChange ChangeOf(PlacedObject placed, ObjectBox box, double? rotation, bool resizing = false)
     {
         var origin = CellRect(new CellAddress(0, 0));
-        box = box with { X = Math.Max(box.X, origin.X), Y = Math.Max(box.Y, origin.Y) };
+        box = _edges.Clamp(box, origin.X, origin.Y, resizing);
         var address = AnchorAt(box.X, box.Y);
         var anchor = CellRect(address);
 

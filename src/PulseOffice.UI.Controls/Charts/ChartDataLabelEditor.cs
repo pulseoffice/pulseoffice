@@ -8,7 +8,7 @@ public sealed class ChartDataLabelEditor : UserControl
     private static readonly DataLabelPlacement[] Placements =
     [
         DataLabelPlacement.Automatic, DataLabelPlacement.Center, DataLabelPlacement.InsideEnd, DataLabelPlacement.InsideBase,
-        DataLabelPlacement.OutsideEnd, DataLabelPlacement.Above, DataLabelPlacement.Below, DataLabelPlacement.Left, DataLabelPlacement.Right,
+        DataLabelPlacement.OutsideEnd, DataLabelPlacement.Above, DataLabelPlacement.Below, DataLabelPlacement.Left, DataLabelPlacement.Right, DataLabelPlacement.BestFit,
     ];
 
     private readonly ChartEditorFields _fields;

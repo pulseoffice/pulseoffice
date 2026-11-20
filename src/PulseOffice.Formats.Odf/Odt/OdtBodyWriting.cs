@@ -789,6 +789,8 @@ internal sealed class OdtTableFormulas(ITableFormulaParser parser, ITableFormula
 
 internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec indexes, ISectionNoteCollection collection) : OdtXml
 {
+    private readonly OdtNextColumnBreak _breaks = new();
+
     public XElement Write(SectionBlock section, OdtStyleSink sink, OdtWriteSession session, IOdtBlockWriter blocks)
     {
         var properties = new XElement(Style + "section-properties", columns.Write(section.Columns));
@@ -810,6 +812,8 @@ internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec in
         if (section.LinkedFile is { } linked)
             element.Add(new XElement(Text + "section-source", new XAttribute(Xlink + "href", new LinkedFiles().ToPackageHref(linked)), new XAttribute(Xlink + "type", "simple")));
         blocks.Write(element, section.StartsInNextColumn && NeedsColumnBreak(section) ? WithColumnBreak(section.Content.Blocks) : section.Content.Blocks, sink, session);
+        if (section.StartsInNextColumn && section.Content.Blocks.FirstOrDefault() is TableBlock or SectionBlock && _breaks.Place(element, sink))
+            element.Add(new XAttribute(Pt + "next-column-break", "written"));
         return element;
     }
 
