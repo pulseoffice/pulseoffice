@@ -13,7 +13,6 @@ public sealed class XlsxReader
     private readonly OoxmlAttributeSanitizer _sanitizer = new();
     private readonly OoxmlReadFailures _failures = new();
     private readonly XlsxStyleReader _styles = new();
-    private readonly XlsxConditionalMapper _conditionals = new();
     private readonly XlsxFormControlMapper _controls = new();
     private readonly XlsxMetadataMapper _metadata = new();
     private readonly SharedStrings _strings = new();
@@ -52,7 +51,7 @@ public sealed class XlsxReader
             new SheetPartReader((part, sheet, context) =>
             {
                 if (part.Worksheet is { } content)
-                    foreach (var rule in _conditionals.ReadRules(content, context.Stylesheet)) sheet.ConditionalRules.Add(rule);
+                    foreach (var rule in new XlsxConditionalMapper(context.Workbook.NumberFormats).ReadRules(content, context.Stylesheet)) sheet.ConditionalRules.Add(rule);
             }),
             new SheetPartReader((part, sheet, _) =>
             {

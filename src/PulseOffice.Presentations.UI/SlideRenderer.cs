@@ -205,7 +205,7 @@ public sealed class SlideRenderer : ISlideRenderer
             return;
         }
 
-        var ink = element is ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject inked } ? _ink.Resolve(inked.Style, backdrop.Hex) : null;
+        var ink = element is ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject inked } ? _ink.Resolve(inked.Style, _brushes.Behind(inked.Style.Fill, backdrop).Hex) : null;
         var revealed = element switch
         {
             TextElement iterated => iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal, theme) },

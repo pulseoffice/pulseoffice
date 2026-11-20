@@ -1,3 +1,4 @@
+using PulseOffice.UI.Controls.Dialogs;
 using PulseOffice.UI.Controls.Fonts;
 using System.Text;
 using Avalonia.Controls;
@@ -81,12 +82,12 @@ public sealed class FolioFixesTests
         var sheet = new OpenDocument(ModuleKind.Sheets, "Ledger1", new Border(), sheetHistory);
         sheetHistory.Push(new DelegateAction("x", () => { }, () => { }));
         var saver = new RecordingSaver();
-        var dialogs = new CapturingDialogs(PulseOffice.Shell.CloseDecision.Save);
+        var dialogs = new CapturingDialogs(PulseOffice.Shell.CloseDecision.SaveAll);
         var guard = new UnsavedChangesGuard(new DocumentWorkspace(), [saver], dialogs, new Texts());
 
         var closed = await guard.ConfirmCloseAsync([folio, sheet], CancellationToken.None);
 
-        Assert.Contains("close.save", dialogs.Buttons);
+        Assert.Contains("close.saveAll", dialogs.Buttons);
         Assert.True(closed);
         Assert.Equal([sheet], saver.Saved);
     });
@@ -404,6 +405,7 @@ public sealed class FolioFixesTests
         {
             if (content is IDialogFooterOwner { Footer: { } footer })
                 Buttons.AddRange(footer.GetLogicalDescendants().OfType<Button>().Select(button => button.Content?.ToString() ?? string.Empty));
+            Buttons.AddRange(content.GetLogicalDescendants().OfType<ChoiceOptionCard>().Select(card => card.Choice.Label));
             return Task.FromResult((TResult?)answer);
         }
 

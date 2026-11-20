@@ -23,6 +23,15 @@ internal sealed class OoxmlValueMap<TModel, TSdk>(TModel fallback, TSdk fallback
 
 internal sealed class SpreadsheetColours
 {
+    private readonly XlsxColourPalettes _palettes = new();
+    private XlsxColourPalette? _palette;
+
+    public void UsePalette(Stylesheet? stylesheet) => _palette = _palettes.From(stylesheet);
+
+    public string? Read(ColorType? colour) => _palettes.Read(_palette ??= _palettes.Default, colour);
+
+    public string? Read(System.Xml.Linq.XElement? colour) => _palettes.Read(_palette ??= _palettes.Default, colour);
+
     public string ToArgb(string hex)
     {
         var value = hex.TrimStart('#').ToUpperInvariant();

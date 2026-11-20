@@ -44,6 +44,14 @@ public class RangeConditionEvaluationTests(EngineFixture fixture) : IClassFixtur
     }
 
     [Fact]
+    public void Top_percent_rounds_the_count_down_with_at_least_one_item_as_Excel()
+    {
+        Assert.Equal([8, 9], MarkedRows(Numbers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), new ConditionalRule { Range = Column, Operator = ConditionOperator.TopPercent, Operands = ["25"] }));
+        Assert.Equal([4], MarkedRows(Numbers(1, 2, 3, 4, 5), new ConditionalRule { Range = Column, Operator = ConditionOperator.TopPercent, Operands = ["10"] }));
+        Assert.Equal([0], MarkedRows(Numbers(1, 2, 3, 4, 5), new ConditionalRule { Range = Column, Operator = ConditionOperator.BottomPercent, Operands = ["30"] }));
+    }
+
+    [Fact]
     public void IPrimiEGliUltimiSiRiconoscono()
     {
         Assert.Equal([7, 8, 9], MarkedRows(Numbers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), new ConditionalRule { Range = Column, Operator = ConditionOperator.TopItems, Operands = ["3"] }));

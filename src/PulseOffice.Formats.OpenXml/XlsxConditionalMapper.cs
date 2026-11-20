@@ -12,11 +12,12 @@ public sealed class XlsxConditionalMapper
     private readonly XlsxIconSets _sets = new();
     private readonly XlsxConditionalExtension _extension;
     private readonly XlsxDataBarCodec _bars;
+    private readonly SpreadsheetColours _colours = new();
 
-    public XlsxConditionalMapper()
+    public XlsxConditionalMapper(NumberFormatCatalog? numberFormats = null)
     {
-        var colours = new SpreadsheetColours();
-        _formats = new DifferentialFormatTable(colours, new BorderCodec(colours, new SpreadsheetVocabulary(), new PulseOffice.Sheets.Styling.BorderPresets()));
+        var colours = _colours;
+        _formats = new DifferentialFormatTable(colours, new BorderCodec(colours, new SpreadsheetVocabulary(), new PulseOffice.Sheets.Styling.BorderPresets()), numberFormats, new ExcelBooleanFormat());
         var formulas = new XlsxFormulaSyntax();
         var names = new X14Namespaces();
         var x14Thresholds = new X14Thresholds(names, formulas, new X14ThresholdVocabulary().Kinds);
@@ -58,6 +59,7 @@ public sealed class XlsxConditionalMapper
     {
         ArgumentNullException.ThrowIfNull(worksheet);
 
+        _colours.UsePalette(stylesheet);
         var formats = stylesheet?.DifferentialFormats?.Elements<DifferentialFormat>().ToList() ?? [];
         var rules = new List<ConditionalRule>();
         var extensions = worksheet.GetFirstChild<WorksheetExtensionList>();

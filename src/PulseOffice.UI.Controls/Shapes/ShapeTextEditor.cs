@@ -340,10 +340,7 @@ public sealed class ShapeTextEditor : Decorator
         Typeset(shape, _scale);
     }
 
-    private ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop) =>
-        fill is { Kind: ShapeFillKind.Bitmap, Bitmap: { } bitmap } && fill.IsVisible && _brushes.Average(bitmap) is { } average
-            ? new ShapeSurroundings(average)
-            : backdrop;
+    private ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop) => _brushes.Behind(fill, backdrop);
 
     private void Typeset(ShapeObject shape, double pixelsPerPoint)
     {

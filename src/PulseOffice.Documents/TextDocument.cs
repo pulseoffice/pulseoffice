@@ -90,6 +90,8 @@ public sealed class TextDocument : IFormDocument, IFontDocument, IMacroDocument,
 
     public Fields.MailMergeSource? MergeSource { get; set; }
 
+    public Fields.MergeSelection MergeSelection { get; set; } = Fields.MergeSelection.All;
+
     public DocumentFonts Fonts { get; set; } = DocumentFonts.Empty;
 
     public string? FileName { get; set; }
@@ -133,6 +135,7 @@ public sealed class TextDocument : IFormDocument, IFontDocument, IMacroDocument,
             FormSettings = FormSettings,
             Protection = Protection,
             MergeSource = MergeSource,
+            MergeSelection = MergeSelection,
             Fonts = Fonts,
             FileName = FileName,
             IsMaster = IsMaster,

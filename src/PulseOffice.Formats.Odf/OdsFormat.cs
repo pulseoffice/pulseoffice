@@ -121,7 +121,7 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
 
         var stopping = workbook.Sheets.Sum(sheet => sheet.ConditionalRules.Count(r => r.StopIfTrue));
         if (stopping > 0)
-            losses.Add(Diagnostic.Warning("ODF020", $"{stopping} conditional rules use \"stop if true\": the option does not exist in ODF.").With(stopping));
+            losses.Add(Diagnostic.Warning("ODF020", $"{stopping} conditional rules use \"stop if true\": ODF has no such option; PulseOffice keeps it in its own extension, other applications apply every rule.").With(stopping));
 
         var unknownErrors = workbook.Sheets.Sum(sheet => sheet.NonEmptyCells()
             .Count(entry => entry.Value.Value.Error is Sheets.Values.CellError.Calc or Sheets.Values.CellError.Spill));
@@ -214,19 +214,19 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
 
         var reversed = workbook.Sheets.SelectMany(sheet => sheet.ConditionalRules).Count(rule => rule.Visual == Sheets.Formatting.ConditionalVisual.IconSet && rule.ReverseIcons);
         if (reversed > 0)
-            losses.Add(Diagnostic.Warning("ODF040", $"{reversed} icon sets shown in reverse order: ODF cannot store the reversal and the icons go back to their normal order.").With(reversed));
+            losses.Add(Diagnostic.Warning("ODF040", $"{reversed} icon sets shown in reverse order: ODF has no reversal; PulseOffice keeps it in its own extension, other applications show the normal order.").With(reversed));
 
         var deviating = workbook.Sheets.SelectMany(sheet => sheet.ConditionalRules).Count(rule => rule.Visual == Sheets.Formatting.ConditionalVisual.Style && rule.Formula is null && rule.StandardDeviations > 0);
         if (deviating > 0)
-            losses.Add(Diagnostic.Warning("ODF102", $"{deviating} above or below average rules use standard deviations: ODF compares only with the average and the deviations are lost.").With(deviating));
+            losses.Add(Diagnostic.Warning("ODF102", $"{deviating} above or below average rules use standard deviations: ODF compares only with the average; PulseOffice keeps the deviations in its own extension, other applications compare with the average.").With(deviating));
 
         var bars = workbook.Sheets.SelectMany(sheet => sheet.ConditionalRules).Where(rule => rule.Visual == Sheets.Formatting.ConditionalVisual.DataBar).ToList();
         var bordered = bars.Count(rule => rule.Bar.BorderColorHex is not null || rule.Bar.NegativeBorderColorHex is not null);
         if (bordered > 0)
-            losses.Add(Diagnostic.Info("ODF086", $"{bordered} data bars with a border: ODF has no border colour for data bars and the border is lost.").With(bordered));
+            losses.Add(Diagnostic.Info("ODF086", $"{bordered} data bars with a border: ODF has no border colour for data bars; PulseOffice keeps it in its own extension, other applications draw no border.").With(bordered));
         var directed = bars.Count(rule => rule.Bar.Direction != Sheets.Formatting.DataBarDirection.Context);
         if (directed > 0)
-            losses.Add(Diagnostic.Info("ODF087", $"{directed} data bars with a fixed direction (left to right or right to left): ODF does not keep the direction and the bars follow the sheet.").With(directed));
+            losses.Add(Diagnostic.Info("ODF087", $"{directed} data bars with a fixed direction (left to right or right to left): ODF has no direction; PulseOffice keeps it in its own extension, other applications follow the sheet.").With(directed));
 
         return losses.Count == 0 ? FidelityReport.Perfect : new FidelityReport(losses);
     }

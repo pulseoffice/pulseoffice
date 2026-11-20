@@ -422,14 +422,7 @@ public sealed class ShapeRenderer : IShapeRenderer
         }
     }
 
-    private ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop)
-    {
-        if (fill is not { Kind: ShapeFillKind.Bitmap, Bitmap: { } bitmap } || !fill.IsVisible || _brushes.Average(bitmap) is not { } average) return backdrop;
-        var under = _brushes.Colour(backdrop.Hex, Colors.White);
-        var opacity = Math.Clamp(fill.Opacity, 0, 1);
-        byte Mix(byte over, byte below) => (byte)Math.Round(over * opacity + below * (1 - opacity));
-        return new ShapeSurroundings(Color.FromRgb(Mix(average.R, under.R), Mix(average.G, under.G), Mix(average.B, under.B))) { Language = backdrop.Language };
-    }
+    private ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop) => _brushes.Behind(fill, backdrop);
 
     private void Format(FormattedText text, IReadOnlyList<ShapeTextRun> runs, ShapeTextStyle style)
     {

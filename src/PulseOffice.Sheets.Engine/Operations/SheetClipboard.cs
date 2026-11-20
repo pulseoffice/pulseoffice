@@ -46,11 +46,13 @@ public sealed record PasteRequest
 public sealed record ClipboardSnapshot(
     int RowCount, int ColumnCount, IReadOnlyList<(int Row, int Column, Cell Cell)> Cells)
 {
-    public bool IsEmpty => Cells.Count == 0 && Comments.Count == 0 && Validations.Count == 0;
+    public bool IsEmpty => Cells.Count == 0 && Comments.Count == 0 && Validations.Count == 0 && ConditionalRules.Count == 0;
 
     public IReadOnlyList<(int Row, int Column, CellComment Comment)> Comments { get; init; } = [];
 
     public IReadOnlyList<CopiedValidation> Validations { get; init; } = [];
+
+    public IReadOnlyList<CopiedConditionalRule> ConditionalRules { get; init; } = [];
 
     public IReadOnlyList<CellRange> Merges { get; init; } = [];
 
@@ -58,6 +60,8 @@ public sealed record ClipboardSnapshot(
 }
 
 public sealed record CopiedValidation(int Row, int Column, int RowCount, int ColumnCount, DataValidation Rule);
+
+public sealed record CopiedConditionalRule(int Row, int Column, int RowCount, int ColumnCount, PulseOffice.Sheets.Formatting.ConditionalRule Rule);
 
 public interface ISheetClipboard
 {
@@ -115,6 +119,10 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
             .Select(rule => Clipped(rule, range))
             .ToList();
 
+        var conditionals = sheet.ConditionalRules
+            .SelectMany(rule => rule.Ranges.Where(part => part.IntersectsWith(range)).Select(part => ClippedRule(rule, part, range)))
+            .ToList();
+
         var merges = sheet.Merges.All
             .Where(region => range.Contains(region.Start) && range.Contains(region.End))
             .Select(region => new CellRange(
@@ -126,6 +134,7 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         {
             Comments = comments,
             Validations = validations,
+            ConditionalRules = conditionals,
             Merges = merges,
             SourceSheet = sheet.Name,
         };
@@ -145,6 +154,26 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         var bottom = Math.Min(rule.Range.End.Row, range.End.Row);
         var right = Math.Min(rule.Range.End.Column, range.End.Column);
         return new CopiedValidation(top - range.Start.Row, left - range.Start.Column, bottom - top + 1, right - left + 1, rule);
+    }
+
+    private CopiedConditionalRule ClippedRule(PulseOffice.Sheets.Formatting.ConditionalRule rule, CellRange part, CellRange range)
+    {
+        var top = Math.Max(part.Start.Row, range.Start.Row);
+        var left = Math.Max(part.Start.Column, range.Start.Column);
+        var bottom = Math.Min(part.End.Row, range.End.Row);
+        var right = Math.Min(part.End.Column, range.End.Column);
+        var rowShift = top - rule.Anchor.Row;
+        var columnShift = left - rule.Anchor.Column;
+        var anchored = rowShift == 0 && columnShift == 0 ? rule : rule.WithFormulas(formula => Shifted(formula, rowShift, columnShift));
+        return new CopiedConditionalRule(top - range.Start.Row, left - range.Start.Column, bottom - top + 1, right - left + 1,
+            anchored with { Range = new CellRange(new CellAddress(top, left), new CellAddress(bottom, right)), AdditionalRanges = [] });
+    }
+
+    private string? Shifted(string? formula, int rowShift, int columnShift)
+    {
+        if (formula is null) return null;
+        var translated = _translator.Translate(formula.StartsWith('=') ? formula : "=" + formula, rowShift, columnShift);
+        return translated is null ? formula : formula.StartsWith('=') ? translated : translated.TrimStart('=');
     }
 
     public void Paste(
@@ -186,6 +215,33 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         if (request.Parts.HasFlag(PasteParts.Styles)) PasteMerges(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
         if (request.Parts.HasFlag(PasteParts.Comments)) PasteComments(snapshot, sheet, target, request, history);
         if (request.Parts.HasFlag(PasteParts.Validation)) PasteValidations(snapshot, sheet, target, request.Transpose, request.HistoryLabel, history);
+        if (request.Parts.HasFlag(PasteParts.Styles) && !request.Transpose) PasteConditionalRules(snapshot, sheet, target, request.HistoryLabel, history);
+    }
+
+    private void PasteConditionalRules(ClipboardSnapshot snapshot, Worksheet sheet, CellAddress target, string label, UndoStack? history)
+    {
+        if (snapshot.ConditionalRules.Count == 0) return;
+
+        List<PulseOffice.Sheets.Formatting.ConditionalRule> before = [.. sheet.ConditionalRules];
+        var area = new CellRange(target, Bounded(target.Row + snapshot.RowCount - 1, target.Column + snapshot.ColumnCount - 1));
+        sheet.ConditionalRules.RemoveAll(rule => rule.Ranges.All(part => area.Contains(part.Start) && area.Contains(part.End)));
+
+        var priority = sheet.ConditionalRules.Count == 0 ? 0 : sheet.ConditionalRules.Max(rule => rule.Priority) + 1;
+        foreach (var copied in snapshot.ConditionalRules)
+        {
+            var start = Bounded(target.Row + copied.Row, target.Column + copied.Column);
+            var end = Bounded(start.Row + copied.RowCount - 1, start.Column + copied.ColumnCount - 1);
+            var rowShift = start.Row - copied.Rule.Anchor.Row;
+            var columnShift = start.Column - copied.Rule.Anchor.Column;
+            var moved = copied.Rule.WithFormulas(formula => Shifted(formula, rowShift, columnShift));
+            sheet.ConditionalRules.Add(moved with { Range = new CellRange(start, end), AdditionalRanges = [], Priority = priority + copied.Rule.Priority });
+        }
+
+        List<PulseOffice.Sheets.Formatting.ConditionalRule> after = [.. sheet.ConditionalRules];
+        history?.Push(new DelegateAction(
+            label,
+            redo: () => { sheet.ConditionalRules.Clear(); sheet.ConditionalRules.AddRange(after); },
+            undo: () => { sheet.ConditionalRules.Clear(); sheet.ConditionalRules.AddRange(before); }));
     }
 
     private readonly Cell _uncopiedBlank = Cell.Blank with { ExplicitStyle = true };

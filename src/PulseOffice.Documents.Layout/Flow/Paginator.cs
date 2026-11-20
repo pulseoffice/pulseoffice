@@ -34,7 +34,7 @@ public sealed record PaginationRequest(
 
     public Func<int, IReadOnlyList<AnchoredObject>> PageObjects { get; init; } = _ => [];
 
-    public Func<ParagraphEntry, string, ParagraphEntry> PerPage { get; init; } = (entry, _) => entry;
+    public Func<ParagraphEntry, string, int, ParagraphEntry> PerPage { get; init; } = (entry, _, _) => entry;
 
     public string PageCount { get; init; } = "00";
 

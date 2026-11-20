@@ -14250,3 +14250,28 @@ docs/deep-audit/round-288-shell-recent-pinning.md.
 - XLSX conditional formats keep underline, strikethrough and borders; several matching style rules merge their
   formats as in Excel. Partial pass: ODS codecs, x14 extensions, dialog and range following are queued.
   Log: docs/deep-audit/round-293-ledger-conditional-formatting.md.
+
+### Round 294: Ledger conditional formatting, second pass (2026-11-20)
+- XLSX `dxf` writes and reads the number format; theme (with tint) and indexed colours of differential formats, colour
+  scales and data bars are resolved on read. Top/bottom percent counts round down with at least one item, as Excel.
+  ODS keeps stop if true, reversed icons, standard deviations and data bar borders and direction in the PulseOffice
+  extension. Copy and paste of formats carries conditional rules. Log: docs/deep-audit/round-294-ledger-conditional-formatting.md.
+
+### Round 295: Shell leftovers (2026-11-20)
+- Unsaved documents are asked about one by one (save, don't save, save all, don't save any, cancel); lock files carry
+  our process id and start time, so a lock of the same user from another program or another live instance opens the
+  document read-only; missing recent entries are marked on the welcome page from a background check; further Ledger
+  windows are numbered after the first. Log: docs/deep-audit/round-295-shell-leftovers.md.
+
+### Round 296: Folio mail merge and fields leftovers (2026-11-20)
+- Mail merge recipients take several and/or conditions and two sort keys; filter, sort and excluded records are saved
+  with the document (ODT settings item, reserved DOCX document variable); merge fields carry `\@` date pictures. Body
+  page fields use their own numerals on roman pages, the page field dialog can force Arabic, full-context reference
+  numbers are composed from parent levels, and non-heading `STYLEREF` is preserved. Log:
+  docs/deep-audit/round-296-folio-merge-fields.md.
+
+### Round 297: Deck iterated leftovers and Deck tables (2026-11-20)
+- Circular corners for the unsized rounded rectangle outline, shared picture backdrop mix for the reveal ink, list
+  labels kept out of moving unit layers; table frames follow added rows, cell margins and text direction cross PPTX
+  and ODP, keyboard navigation between cells with Tab adding rows and Delete clearing cells.
+  Log: docs/deep-audit/round-297-deck-tables.md.

@@ -6,12 +6,19 @@ the round that fixes it is joined and the join run is green.
 ## Deck
 - The iterated reveal, the pause countdown and the last-slide sound cut extension have not been seen live or opened in
   PowerPoint. (286)
-- An iterated zoom scales each unit about the element's centre, not about the unit's own centre; a unit's layer
-  also carries its paragraph's list label. (292)
-- The automatic ink of a fading or moving unit of shape text ignores the average colour of a picture fill (the
-  renderer's bitmap mix is not shared with the reveal). (292)
-- The unsized `IShapeGeometry.Outline(shape)` (ODF enhanced path, shape styling previews) still draws a model rounded
-  rectangle with elliptic corners; only the sized outline and the text area use the short side. (292)
+- An iterated zoom still scales each unit about the element's centre, not the unit's own centre: the reveal works on
+  character ranges and the renderer has no per-unit glyph bounds to scale about (needs the composed line geometry of
+  the text painters). (292, 297)
+- Deck table cell margins and text direction now cross PPTX and ODP, but the slide renderer still draws every cell
+  with the fixed padding and horizontally, and no dialog edits them. (297)
+- A Deck table without its own look is written to PPTX without `a:tableStyleId` and to ODP without
+  `table:template-name`, so PowerPoint and the reference suite show it unstyled; writing a built-in style id needs the
+  reader to keep `Grid` tables apart from resolved styles. (297)
+- Deck table keyboard navigation ignores merged cells (Tab and arrows step into covered cells), and typing into a
+  selected cell does not start in-place editing (cells are edited in the table dialog). (297)
+- Deck tables have no Insert Above / Insert Left commands (rows and columns are added after the selection only). (297)
+- PPTX table cells keep only the cell look (fill, borders, one run format); per-run formatting inside a cell is
+  flattened to text. (297)
 - Per-unit fly and zoom of iterated text have not been seen live. (292)
 - Iterated text, the sound cut, the pause screen and the new dialog fields have not been seen live. (283)
 - Looping repeats, effect sounds, kiosk keys and timings and the hidden start slide have not been seen live. (278)
@@ -98,16 +105,14 @@ the round that fixes it is joined and the join run is green.
 - Folio tables (275): the new style editor tabs (total row, columns, corners) and "no colour" in derived styles have
   not been seen live. (275)
 
-- Folio mail merge (291): the recipient filter holds one condition, records cannot be sorted, and the excluded records
-  and filter are not saved with the document; merge fields have no `\@` date pictures; the DOCX `w:mailMerge` source
-  (ODBC `DSN=` connect string, `w:query`, connection id in a reserved document variable) has not been opened in Word;
-  the new wizard step has not been seen live. (291)
-- Folio fields (291): page fields with their own numerals in body text (not headers or footers) on pages not numbered
-  in Arabic still see the rendered page number; the page field dialog cannot force Arabic numerals on a roman page
-  (Arabic means "as the page style"); a full-context reference number shows the paragraph's list label as rendered,
-  not composed from its parents when the list shows one level; ODF date styles with quarter or week-of-year parts are
-  not read (the .NET pictures used by the model have no such parts); `STYLEREF` of a non-heading style becomes a
-  level 1 chapter field; none of the round 289 and 291 changes opened in Word or the reference suite. (289, 291)
+- Folio mail merge (291, 296): the DOCX `w:mailMerge` source (ODBC `DSN=` connect string, `w:query`, connection id
+  and recipient selection in reserved document variables) has not been opened in Word; excluded records are saved by
+  record number, so a reordered or resized source points them at other records; the wizard steps (records, recipients
+  with and/or conditions and sorting, output) have not been seen live. (291, 296)
+- Folio fields (291, 296): ODF date styles with quarter or week-of-year parts are not read (the .NET pictures used by
+  the model have no such parts); `STYLEREF` with a localized heading style name is preserved instead of becoming a
+  chapter field; ODF page fields with `style:num-format="1"` now force Arabic, which may differ from producers that
+  always write it; none of the round 289, 291 and 296 changes opened in Word or the reference suite. (289, 291, 296)
 
 - Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
   and reads back as a standard tone with the same look. (282)
@@ -120,12 +125,14 @@ the round that fixes it is joined and the join run is green.
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- Shell (290): the unsaved-changes prompt for several documents offers save all / discard all / cancel; Word asks
-  document by document. (290)
-- Shell (290): a lock file left by the same user on the same machine is treated as ours, so a document open in another
-  office program opens without a read-only warning. (290)
-- Shell (290): missing recent entries are not marked on the welcome page before they are clicked. (290)
-- Shell (290): separate windows of the same document were not walked headlessly. (290)
+- Shell (295): only Ledger offers New Window; Folio and Deck have no second window of the same document (shared
+  component gap). (295)
+- Shell (295): a lock left by our own dead process is reported as ours and Claim keeps it instead of rewriting it with
+  the current process. (295)
+- Shell (295): the welcome page marks missing recent entries but does not re-check when a removable drive or network
+  share comes back while the page is shown. (295)
+- Shell (295): the Ledger window walk runs the New Window command with a stand-in view factory; the real LedgerView of a
+  second window is not driven headlessly. (295)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
 - Tagged PDF: Deck text boxes and shape text (columns and rotated shapes included since 268) are tagged by the painted
@@ -143,9 +150,11 @@ the round that fixes it is joined and the join run is green.
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
 
 ## Ledger
-- Conditional formatting XLSX `dxf`: number format (`numFmt`) not written nor read; theme and indexed colours ignored on read (293).
-- Conditional formatting not yet audited: ODS codecs (`calcext:conditional-format`, `style:map`, date-is), x14 data bar and icon set extensions, manage rules dialog and editor, ranges following insert/delete/move/copy-paste (293).
-- Top/bottom percent rule: rank count rounding (ceiling) to compare with Excel (293).
+- Conditional formatting still not audited: the manage rules dialog and editor (`ConditionalRuleEditorView`, `LedgerConditionalRuleCommands`), the ODS `style:map` reading path, the x14 icon set extension in depth, and range following on insert/delete/move (code read only, no defect found, no new test) (294).
+- Conditional formatting paste with Transpose does not carry the rules (formula translation for transposition not done) (294).
+- Conditional formatting XLSX: theme and indexed colours of cell styles (not only `dxf`) and of border colours are still read as RGB only (294).
+- Top/bottom percent count now rounds down with a minimum of one item; to confirm against real Excel (294).
+- ODS conditional format extras (stop if true, reversed icons, deviations, bar borders and direction) live in the `urn:pulseoffice:spreadsheet` extension: other applications ignore them; the ODF020/040/102/086/087 notices remain (294).
 - Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell
   order in Excel (declared XLSX244). Not opened in Excel or the reference suite. (253)
 - Remove duplicates now compares shown text, so the text "1" and the number 1 shown as "1" are duplicates; Excel's

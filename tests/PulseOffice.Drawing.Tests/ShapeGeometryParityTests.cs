@@ -29,6 +29,18 @@ public sealed class ShapeGeometryParityTests
     }
 
     [Fact]
+    public void Unsized_rounded_rectangle_outline_uses_circular_corners_from_the_natural_size()
+    {
+        var shape = new ShapeObject
+        {
+            Id = "r", Shape = ShapeKind.RoundedRectangle, CornerRatio = 0.2,
+            NaturalSize = new DocumentSize(Twip.FromPoints(400), Twip.FromPoints(100)),
+        };
+        var arc = _geometry.Outline(shape).Figures[0].Segments.OfType<ArcSegment>().First();
+        Assert.Equal(arc.RadiusX * 400, arc.RadiusY * 100, 6);
+    }
+
+    [Fact]
     public void Plain_shapes_keep_their_own_outline()
     {
         var shape = new ShapeObject { Id = "s", Shape = ShapeKind.RoundedRectangle, CornerRatio = 0.3 };

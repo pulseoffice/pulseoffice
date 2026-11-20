@@ -9,6 +9,7 @@ using TextParagraph = PulseOffice.Text.Rich.TextParagraph;
 using TextRun = PulseOffice.Text.Rich.TextRun;
 using Xunit;
 using LayoutRect = PulseOffice.Documents.Layout.Tree.LayoutRect;
+using CellTextDirection = PulseOffice.Documents.Blocks.CellTextDirection;
 
 namespace PulseOffice.Documents.UI.Tests;
 

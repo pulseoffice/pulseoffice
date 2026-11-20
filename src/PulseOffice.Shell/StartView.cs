@@ -25,11 +25,15 @@ public sealed class StartView : UserControl
     private readonly DesignTokens.Metrics _metrics = DesignTokens.For(InterfaceDensity.Compact);
     private readonly Grid _recentList = new();
     private readonly WcagColorContrast _contrast = new();
+    private readonly IRecentAvailability _availability;
+    private readonly Dictionary<string, Button> _entries = new(StringComparer.Ordinal);
+    private CancellationTokenSource? _checking;
 
     public event EventHandler<string>? CommandRequested;
 
-    public StartView(IRecentDocuments recent, ITextCatalog texts, IIconCatalog icons)
+    public StartView(IRecentDocuments recent, ITextCatalog texts, IIconCatalog icons, IRecentAvailability? availability = null)
     {
+        _availability = availability ?? new FileRecentAvailability();
         _recent = recent ?? throw new ArgumentNullException(nameof(recent));
         _texts = texts ?? throw new ArgumentNullException(nameof(texts));
         _icons = icons ?? throw new ArgumentNullException(nameof(icons));
@@ -312,6 +316,7 @@ public sealed class StartView : UserControl
     {
         _recentList.Children.Clear();
         _recentList.RowDefinitions.Clear();
+        _entries.Clear();
 
         var items = _recent.Items.Take(RecentShown).ToList();
 
@@ -329,6 +334,43 @@ public sealed class StartView : UserControl
             Grid.SetRow(entry, index);
             _recentList.Children.Add(entry);
         }
+
+        _ = MarkMissingAsync(items.Select(item => item.Path).ToList());
+    }
+
+    private async Task MarkMissingAsync(IReadOnlyList<string> paths)
+    {
+        _checking?.Cancel();
+        _checking?.Dispose();
+        var checking = _checking = new CancellationTokenSource();
+        IReadOnlySet<string> missing;
+        try
+        {
+            missing = await _availability.MissingAsync(paths, checking.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (checking.IsCancellationRequested) return;
+        foreach (var path in missing)
+            if (_entries.TryGetValue(path, out var entry)) MarkMissing(entry, path);
+    }
+
+    private void MarkMissing(Button entry, string path)
+    {
+        entry.Classes.Add("startRecentMissing");
+        entry.Opacity = 0.6;
+        ToolTip.SetTip(entry, _texts.Format("start.missingRecentTip", path));
+        if (entry.Content is Grid { Children: [.., StackPanel trailing] })
+            trailing.Children.Insert(0, new TextBlock
+            {
+                Text = _texts["start.missingRecent"],
+                Name = "startRecentMissing",
+                FontSize = _metrics.FontSizeSmall,
+                VerticalAlignment = VerticalAlignment.Center,
+            }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary));
     }
 
     private Control EmptyRecent()
@@ -453,6 +495,7 @@ public sealed class StartView : UserControl
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         button.Classes.Add("startRecent");
+        _entries[document.Path] = button;
 
         Avalonia.Automation.AutomationProperties.SetName(button,
             document.Pinned ? $"{document.Name} ({_texts["start.pinnedRecent"]})" : document.Name);

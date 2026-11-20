@@ -196,7 +196,7 @@ public sealed class DocumentLayoutEngine(
             ContinuationBackward = document.Notes.FootnoteSettings.ContinuationBackward,
             Object = document.Objects.Find,
             PageObjects = number => [.. pageObjects.Where(item => ((PageAnchor)item.Anchor).PageNumber == number)],
-            PerPage = (entry, number) => builder.PerPage(entry, number, body),
+            PerPage = (entry, number, value) => builder.PerPage(entry, number, value, body),
             Frame = id =>
             {
                 if (frameStories.TryGetValue(id, out var story)) return story;

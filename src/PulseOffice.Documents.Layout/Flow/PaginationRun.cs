@@ -120,7 +120,7 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
 
     public bool VisitParagraph(ParagraphEntry original)
     {
-        var entry = _request.PerPage(original, _request.PageNumber(_geometry.StyleName, _start.Number));
+        var entry = _request.PerPage(original, _request.PageNumber(_geometry.StyleName, _start.Number), _start.Number);
         var flow = entry.Flow;
         if (_line == 0 && _offset == 0)
         {

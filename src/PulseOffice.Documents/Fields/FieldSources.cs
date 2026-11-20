@@ -204,7 +204,8 @@ public sealed class ReferenceFieldSource(IBookmarkCatalog bookmarks, IStoryCatal
         return new FieldValue((run.FieldDetail?.Format ?? ReferenceFormats.Text) switch
         {
             ReferenceFormats.Page => context.Facts.PageOf(bookmark.ParagraphId) ?? run.Text,
-            ReferenceFormats.Number or ReferenceFormats.NumberFullContext => Number(target, context) ?? run.Text,
+            ReferenceFormats.Number => Number(target, context) ?? run.Text,
+            ReferenceFormats.NumberFullContext => FullContext(target, context) ?? run.Text,
             ReferenceFormats.NumberNoContext => Innermost(Number(target, context)) ?? run.Text,
             ReferenceFormats.Direction => context.OrderOf(bookmark.ParagraphId) < context.CurrentOrder
                 || context.OrderOf(bookmark.ParagraphId) == context.CurrentOrder && bookmark.Offset < context.Offset ? words.Above : words.Below,
@@ -217,6 +218,37 @@ public sealed class ReferenceFieldSource(IBookmarkCatalog bookmarks, IStoryCatal
 
     private string? Number(ParagraphBlock target, FieldContext context) =>
         context.Facts.ListLabel(target.Id)?.Trim() is { Length: > 0 } label ? label : Caption(target, true);
+
+    private string? FullContext(ParagraphBlock target, FieldContext context)
+    {
+        var label = context.Facts.ListLabel(target.Id)?.Trim();
+        if (label is not { Length: > 0 } || ListKey(target.Content) is not { } key) return Number(target, context);
+        if (label.Split(['.', ')', '-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length > 1) return label;
+        var level = ListLevel(target.Content);
+        var parts = new List<string> { Innermost(label)! };
+        var before = new List<ParagraphBlock>();
+        foreach (var paragraph in stories.Paragraphs(context.Document))
+        {
+            if (paragraph.Id == target.Id) break;
+            before.Add(paragraph);
+        }
+        for (var index = before.Count - 1; index >= 0 && level > 0; index--)
+        {
+            var content = before[index].Content;
+            if (ListKey(content) != key || ListLevel(content) >= level) continue;
+            if (context.Facts.ListLabel(before[index].Id)?.Trim() is not { Length: > 0 } parent) break;
+            parts.Insert(0, Innermost(parent)!);
+            level = ListLevel(content);
+        }
+        return string.Join('.', parts);
+    }
+
+    private string? ListKey(TextParagraph content) =>
+        content.ListStyleName is { } style ? style + "\u0001" + content.ListId
+            : content is { IsListItem: false, OutlineLevel: > 0 } ? "\u0001outline" : null;
+
+    private int ListLevel(TextParagraph content) =>
+        content.ListStyleName is null && content.OutlineLevel is { } outline ? outline - 1 : content.BulletLevel;
 
     private string? Innermost(string? label)
     {

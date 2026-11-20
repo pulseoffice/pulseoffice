@@ -11,6 +11,7 @@ public sealed class OdfConditionalMapper
     private readonly ConditionStyleSheet _styles = new();
     private readonly OdfRangeAddresses _addresses = new();
     private readonly OdfTableFormulas _tableFormulas = new();
+    private readonly OdfConditionalExtras _extras = new();
     private readonly IReadOnlyList<ConditionalRuleCodec> _codecs;
 
     public OdfConditionalMapper()
@@ -41,6 +42,7 @@ public sealed class OdfConditionalMapper
         var flattened = rule.WithFormulas(formula => _tableFormulas.FlattenText(formula, workbook, at));
         var element = _codecs.First(codec => codec.Writes(flattened)).Write(sheet, flattened);
         element.Add(_tableFormulas.Kept(rule.Formula, flattened.Formula));
+        _extras.Write(element, rule);
         var entries = Entries(element);
         for (var index = 0; index < Math.Min(entries.Count, rule.Thresholds.Count); index++)
             entries[index].Add(_tableFormulas.KeptOne(rule.Thresholds[index].Formula, flattened.Thresholds[index].Formula));
@@ -81,7 +83,7 @@ public sealed class OdfConditionalMapper
             {
                 if (_codecs.FirstOrDefault(codec => codec.Element == element.Name) is not { } codec) continue;
                 var rule = codec.Read(element, new RuleReadContext(ranges[0], priority++, namedStyles)) with { AdditionalRanges = [.. ranges.Skip(1)] };
-                rule = KeptThresholds(element, rule);
+                rule = _extras.Read(element, KeptThresholds(element, rule));
                 rules.Add(_tableFormulas.Read(element) is { } structured ? rule with { Formula = structured } : rule);
             }
         }

@@ -62,6 +62,20 @@ public sealed class Round292IteratedMotionTests
     }
 
     [Fact]
+    public void The_list_label_stays_in_the_still_pass_and_leaves_the_moving_layer()
+    {
+        var element = new TextElement { Id = "t1", Text = new RichText(PlaceholderRole.Body, [new TextParagraph("a b") { Bullet = true, BulletSymbol = new BulletSymbol("•") }]) };
+        var reveal = Moving(250);
+
+        var still = _reveal.Reveal(element.Text, reveal, _theme).Paragraphs[0];
+        var layered = Assert.IsType<TextElement>(_reveal.Layered(element, _reveal.Layers(element, reveal)[0].Reveal, _theme)).Text.Paragraphs[0];
+
+        Assert.NotEqual(0u, still.BulletSymbol!.Color ?? 1u);
+        Assert.Equal(0u, layered.BulletSymbol!.Color);
+        Assert.NotEqual(0u, layered.Runs[0].Color);
+    }
+
+    [Fact]
     public void A_settled_unit_stays_in_the_still_pass()
     {
         var still = _reveal.Opacities("a b", Moving(1200));

@@ -15,6 +15,8 @@ public interface IShapeBrushes
     Color Colour(string? hex, Color fallback);
 
     Color? Average(ShapeBitmap bitmap);
+
+    ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop);
 }
 
 public sealed class ShapeBrushes(PulseOffice.UI.Controls.Objects.IBitmapPixels pixels) : IShapeBrushes
@@ -47,6 +49,16 @@ public sealed class ShapeBrushes(PulseOffice.UI.Controls.Objects.IBitmapPixels p
     {
         ArgumentNullException.ThrowIfNull(bitmap);
         return _averages.GetValue(bitmap.Data, data => new StrongBox<Color?>(Averaged(data))).Value;
+    }
+
+    public ShapeSurroundings Behind(ShapeFill fill, ShapeSurroundings backdrop)
+    {
+        ArgumentNullException.ThrowIfNull(fill);
+        if (fill is not { Kind: ShapeFillKind.Bitmap, Bitmap: { } bitmap } || !fill.IsVisible || Average(bitmap) is not { } average) return backdrop;
+        var under = Colour(backdrop.Hex, Colors.White);
+        var opacity = Math.Clamp(fill.Opacity, 0, 1);
+        byte Mix(byte over, byte below) => (byte)Math.Round(over * opacity + below * (1 - opacity));
+        return new ShapeSurroundings(Color.FromRgb(Mix(average.R, under.R), Mix(average.G, under.G), Mix(average.B, under.B))) { Language = backdrop.Language, Painted = backdrop.Painted };
     }
 
     private Color? Averaged(byte[] data)

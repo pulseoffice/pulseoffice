@@ -297,7 +297,7 @@ internal sealed class OdtDocumentWriter(
     {
         var key = document.Changes.ProtectionKey;
         var protection = document.Protection;
-        if (!hasFonts && !document.Fonts.EmbedSystemFonts && key is null && !protection.IsActive && document.MergeSource is null
+        if (!hasFonts && !document.Fonts.EmbedSystemFonts && key is null && !protection.IsActive && document.MergeSource is null && document.MergeSelection.IsEmpty
             && document.Marks == PulseOffice.Documents.Protection.MarkProtection.None && document.LineNumbering is null && !document.Notes.ContinuousEndnotes && document.Changes.ShowChanges && document.Styles.TabsRelativeToIndent) return null;
         var settings = new OdfFontFaceWriter().Settings(document.Fonts);
         var set = settings.Descendants(Config + "config-item-set").First();
@@ -314,6 +314,7 @@ internal sealed class OdtDocumentWriter(
             set.Add(Item("CurrentDatabaseCommandType", "int", ((int)merge.Type).ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (merge.ConnectionId is { Length: > 0 } connection) set.Add(Item("PulseMergeConnection", "string", connection));
         }
+        if (!document.MergeSelection.IsEmpty) set.Add(Item("PulseMergeSelection", "string", new PulseOffice.Documents.Fields.MergeSelectionText().Write(document.MergeSelection)));
         if (!protection.IsActive) return settings;
         set.Add(Item("PulseDocumentRestriction", "string", protection.Restriction.ToString()));
         if (protection.Key is { } lockKey)

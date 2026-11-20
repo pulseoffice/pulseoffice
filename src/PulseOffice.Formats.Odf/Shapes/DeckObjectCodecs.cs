@@ -455,6 +455,8 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
 {
     private readonly OdfTableCellLooks _looks = new();
 
+    private readonly OdfTableCellLayout _layout = new();
+
     private readonly OptimalColumnSizing _optimal = new(new PulseOffice.Document.Tables.ColumnWidths());
 
     private XElement Sized(XElement row, DataTableObject table, string prefix, int displayed, XElement automaticStyles)
@@ -562,14 +564,17 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
             (string?)cell.Attribute(Table + "style-name") is { } name && styles.CellStyles?.GetValueOrDefault(name) is { } style ? _looks.Read(style) : null;
         CellVerticalAlign? AlignOf(XElement cell) =>
             (string?)cell.Attribute(Table + "style-name") is { } styleName && cellAligns.TryGetValue(styleName, out var found) ? found : null;
+        TableCellFormat Laid(TableCellFormat format, XElement cell) =>
+            _layout.Read(format, (string?)cell.Attribute(Table + "style-name") is { } styleName ? styles.CellStyles?.GetValueOrDefault(styleName) : null);
         if (header)
             foreach (var (cell, column) in ExpandedCells(rows[0]).Select((element, index) => (element, index)))
             {
                 if (cell.Name == Table + "table-cell" && Spans(cell) is var (rowSpan, columnSpan) && (columnSpan > 1 || rowSpan > 1))
                     merges.Add(new TableMerge(TableCellFormat.HeaderRow, column, rowSpan, columnSpan));
                 var align = AlignOf(cell);
-                if (align is { } vertical) formats.Add(new TableCellFormat(TableCellFormat.HeaderRow, column, vertical));
-                if (LookOf(cell) is { } look) looks.Add(new TableCellFormat(TableCellFormat.HeaderRow, column, align ?? CellVerticalAlign.Top) { Look = look });
+                var laid = Laid(new TableCellFormat(TableCellFormat.HeaderRow, column, align ?? CellVerticalAlign.Top), cell);
+                if (align is not null || laid.HasLayout) formats.Add(laid);
+                if (LookOf(cell) is { } look) looks.Add(laid with { Look = look });
             }
 
         foreach (var (rowElement, row) in rows.Skip(header ? 1 : 0).Select((element, index) => (element, index)))
@@ -584,8 +589,9 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
                     var (rowSpan, columnSpan) = Spans(cell);
                     if (columnSpan > 1 || rowSpan > 1) merges.Add(new TableMerge(row, column, rowSpan, columnSpan));
                     var align = AlignOf(cell);
-                    if (align is { } vertical) formats.Add(new TableCellFormat(row, column, vertical));
-                    if (LookOf(cell) is { } look) looks.Add(new TableCellFormat(row, column, align ?? CellVerticalAlign.Top) { Look = look });
+                    var laid = Laid(new TableCellFormat(row, column, align ?? CellVerticalAlign.Top), cell);
+                    if (align is not null || laid.HasLayout) formats.Add(laid);
+                    if (LookOf(cell) is { } look) looks.Add(laid with { Look = look });
                 }
                 else
                 {
@@ -685,7 +691,9 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
     private XElement Looked(XElement cell, TableCellFormat? format, int row, int column, string prefix, XElement automaticStyles)
     {
         var name = $"{prefix}_l{(row < 0 ? "h" : row.ToString(System.Globalization.CultureInfo.InvariantCulture))}_{column}";
-        automaticStyles.Add(_looks.Write(name, format?.Look ?? TableCellLook.Plain, format?.VerticalAlign ?? CellVerticalAlign.Top));
+        var style = _looks.Write(name, format?.Look ?? TableCellLook.Plain, format?.VerticalAlign ?? CellVerticalAlign.Top);
+        _layout.Write(style.Element(Style + "table-cell-properties")!, format);
+        automaticStyles.Add(style);
         cell.SetAttributeValue(Table + "style-name", name);
         return cell;
     }
@@ -709,14 +717,17 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
             var align = format?.VerticalAlign ?? CellVerticalAlign.Top;
             if (table.Style.OwnLook)
                 Looked(cell, format, row, column, prefix, automaticStyles);
-            else if (align != CellVerticalAlign.Top)
+            else if (align != CellVerticalAlign.Top || format?.HasLayout == true)
             {
                 var styleName = $"{prefix}_{(row < 0 ? "h" : row.ToString(System.Globalization.CultureInfo.InvariantCulture))}_{column}";
+                var properties = new XElement(Style + "table-cell-properties");
+                if (align != CellVerticalAlign.Top)
+                    properties.Add(new XAttribute(Style + "vertical-align", align == CellVerticalAlign.Center ? "middle" : "bottom"));
+                _layout.Write(properties, format);
                 automaticStyles.Add(new XElement(Style + "style",
                     new XAttribute(Style + "name", styleName),
                     new XAttribute(Style + "family", "table-cell"),
-                    new XElement(Style + "table-cell-properties",
-                        new XAttribute(Style + "vertical-align", align == CellVerticalAlign.Center ? "middle" : "bottom"))));
+                    properties));
                 cell.Add(new XAttribute(Table + "style-name", styleName));
             }
 

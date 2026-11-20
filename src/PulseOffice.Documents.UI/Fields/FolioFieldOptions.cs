@@ -119,16 +119,23 @@ public sealed class NamedFieldOptions(IMergeRecords merge) : FolioFieldOptions
     {
         var names = Names(choice, context.Editor);
         var label = context.Texts[choice.Kind == TextFieldKind.Database ? "folio.mailMerge.column" : "folio.field.name"];
-        return names.Count == 0
-            ? [new TextField("name", label, current.FieldArgument ?? string.Empty, context.Texts[EmptyKey(choice)])]
-            : [new ChoiceField("name", label, names, Math.Max(0, names.ToList().IndexOf(current.FieldArgument ?? string.Empty)))];
+        FormField name = names.Count == 0
+            ? new TextField("name", label, current.FieldArgument ?? string.Empty, context.Texts[EmptyKey(choice)])
+            : new ChoiceField("name", label, names, Math.Max(0, names.ToList().IndexOf(current.FieldArgument ?? string.Empty)));
+        return choice.Kind == TextFieldKind.Database
+            ? [name, new TextField("datePicture", context.Texts["folio.mailMerge.field.datePicture"], current.FieldDetail?.DatePicture ?? string.Empty, "dd/MM/yyyy")]
+            : [name];
     }
 
     public override TextRun? Compose(FolioFieldChoice choice, TextRun current, IReadOnlyDictionary<string, object> values, FieldOptionsContext context)
     {
         var names = Names(choice, context.Editor);
         var name = names.Count == 0 ? values.Text("name").Trim() : names[values.Choice("name", names.Count)];
-        return name.Length == 0 ? null : current with { FieldArgument = name };
+        if (name.Length == 0) return null;
+        if (choice.Kind != TextFieldKind.Database) return current with { FieldArgument = name };
+        var picture = values.Text("datePicture").Trim();
+        var detail = DetailOf(current) with { DatePicture = picture.Length == 0 ? null : picture };
+        return current with { FieldArgument = name, FieldDetail = detail == new FieldDetail() ? null : detail };
     }
 
     private string EmptyKey(FolioFieldChoice choice) => choice.Kind switch
@@ -274,8 +281,9 @@ public sealed class NumeralFieldOptions(ISequenceNumerals numerals) : FolioField
             var level = int.TryParse(detail.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var stored) ? Math.Clamp(stored, 1, ChapterLevels.Deepest) : 1;
             return [new ChoiceField("level", texts["folio.field.chapterLevel"], levels, level - 1)];
         }
-        var shapes = SequenceFormats.All.Select(Example).ToList();
-        var index = Math.Max(0, SequenceFormats.All.ToList().IndexOf(detail.Value ?? SequenceFormats.Arabic));
+        var formats = Formats(choice);
+        var shapes = formats.Select(format => format is null ? texts["folio.field.numerals.pageStyle"] : Example(format)).ToList();
+        var index = Math.Max(0, formats.ToList().IndexOf(choice.Kind == TextFieldKind.PageNumber ? detail.Value : detail.Value ?? SequenceFormats.Arabic));
         var numbering = new ChoiceField("numerals", texts["folio.field.numerals"], shapes, index);
         return choice.Kind == TextFieldKind.Sequence
             ? [new TextField("name", texts["folio.field.name"], current.FieldArgument ?? string.Empty, texts["folio.field.sequence.placeholder"]), numbering]
@@ -290,11 +298,15 @@ public sealed class NumeralFieldOptions(ISequenceNumerals numerals) : FolioField
             var level = values.Choice("level", ChapterLevels.Deepest) + 1;
             return current with { FieldDetail = Trimmed(detail with { Value = level == 1 ? null : level.ToString(CultureInfo.InvariantCulture) }) };
         }
-        var shape = SequenceFormats.All[values.Choice("numerals", SequenceFormats.All.Count)];
-        var updated = current with { FieldDetail = Trimmed(detail with { Value = shape == SequenceFormats.Arabic ? null : shape }) };
+        var formats = Formats(choice);
+        var shape = formats[values.Choice("numerals", formats.Count)];
+        var updated = current with { FieldDetail = Trimmed(detail with { Value = choice.Kind != TextFieldKind.PageNumber && shape == SequenceFormats.Arabic ? null : shape }) };
         if (choice.Kind != TextFieldKind.Sequence) return updated;
         return values.Text("name").Trim() is { Length: > 0 } name ? updated with { FieldArgument = name } : null;
     }
+
+    private IReadOnlyList<string?> Formats(FolioFieldChoice choice) =>
+        choice.Kind == TextFieldKind.PageNumber ? [null, .. SequenceFormats.All] : [.. SequenceFormats.All];
 
     private string Example(string format) => string.Join(", ", Enumerable.Range(1, 3).Select(value => numerals.Format(value, format)));
 

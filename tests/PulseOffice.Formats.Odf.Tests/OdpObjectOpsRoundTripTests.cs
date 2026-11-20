@@ -531,6 +531,27 @@ public sealed class OdpObjectOpsRoundTripTests
     }
 
     [Fact]
+    public void CellMarginsAndTextDirectionSurvive()
+    {
+        var (deck, slide) = Base();
+        var down = new TableCellFormat(0, 0, CellVerticalAlign.Top) { Margins = new TableCellMargins(2, 3, 4, 5), Direction = CellTextDirection.Down };
+        var stacked = new TableCellFormat(0, 1, CellVerticalAlign.Center) { Direction = CellTextDirection.Stacked };
+        var table = new DataTableObject
+        {
+            Id = "t1",
+            Query = new DataQuerySource { ConnectionId = "", Sql = "" },
+            Snapshot = new DataSnapshot { Columns = [new DataColumn("A", DataValueKind.Text), new DataColumn("B", DataValueKind.Text)], Rows = [["x", "y"]] },
+            CellFormats = [down, stacked],
+        };
+        slide.Add(new ObjectElement { Id = "t1", Bounds = new DocumentRect(new Twip(500), new Twip(500), new Twip(6000), new Twip(3000)), Content = table });
+
+        var formats = RoundTrip(deck).Slides[0].Elements.OfType<ObjectElement>().Select(o => o.Content).OfType<DataTableObject>().Single().CellFormats;
+
+        Assert.Contains(down, formats);
+        Assert.Contains(stacked, formats);
+    }
+
+    [Fact]
     public void ClickActionOnAShapeSurvives()
     {
         var (deck, slide) = Base();

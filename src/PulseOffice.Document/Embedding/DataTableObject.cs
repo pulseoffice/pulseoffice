@@ -46,6 +46,10 @@ public sealed record TableBorderLine(string ColorHex, double WidthPoints);
 
 public enum CellHorizontalAlign { Left, Center, Right }
 
+public enum CellTextDirection { Horizontal, Down, Up, Stacked }
+
+public sealed record TableCellMargins(double Left, double Right, double Top, double Bottom);
+
 public sealed record TableCellLook
 {
     public string? FillHex { get; init; }
@@ -82,6 +86,12 @@ public sealed record TableCellFormat(int Row, int Column, CellVerticalAlign Vert
     public const int HeaderRow = -1;
 
     public TableCellLook? Look { get; init; }
+
+    public TableCellMargins? Margins { get; init; }
+
+    public CellTextDirection Direction { get; init; }
+
+    public bool HasLayout => Margins is not null || Direction != CellTextDirection.Horizontal;
 }
 
 public sealed record DataTableStyle

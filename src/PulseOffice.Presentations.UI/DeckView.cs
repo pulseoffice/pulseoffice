@@ -157,7 +157,8 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
             menuKey ?? new PulseOffice.UI.Controls.Services.ContextMenuKey(), drawing);
         _canvasEditing = new DeckCanvasEditing(_state, this, connectors);
         _stageKeys = new DeckStageKeys(_state, this, _text, _shapes, _canvasEditing, drawing, keyNavigation,
-            keys ?? new PulseOffice.UI.Controls.Services.DocumentKeyScope(), _chords, nudges ?? new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys());
+            keys ?? new PulseOffice.UI.Controls.Services.DocumentKeyScope(), _chords, nudges ?? new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys(),
+            new DeckTableKeys(new PulseOffice.Document.Embedding.TableStructure(new PulseOffice.Document.Tables.TableSpans(), new PulseOffice.Document.Tables.ColumnWidths())));
         _inspector = new DeckInspector(_state, this, _player, new PulseOffice.Presentations.UI.Motion.DeckElementNames(_state.Texts));
         _modes = new DeckModeViews(_state, this, renderer,
             new DeckMasterViews(_state, this, renderer, handoutLayout ?? new HandoutLayout(), masterSlides ?? new SlideFactory(), new DeckChoiceNames(_state.Texts),

@@ -425,6 +425,7 @@ internal sealed class OdtDocumentReader(
     {
         var items = settings?.Descendants(Config + "config-item").GroupBy(item => (string?)item.Attribute(Config + "name") ?? string.Empty, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().Value, StringComparer.Ordinal);
+        if (items?.GetValueOrDefault("PulseMergeSelection") is { Length: > 0 } selection) document.MergeSelection = new PulseOffice.Documents.Fields.MergeSelectionText().Read(selection);
         if (items is null || document.MergeSource is null && !items.ContainsKey("PulseMergeConnection")) return;
         if (!items.TryGetValue("CurrentDatabaseDataSource", out var database) || database.Length == 0) return;
         var type = int.TryParse(items.GetValueOrDefault("CurrentDatabaseCommandType"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var number)

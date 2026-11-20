@@ -156,6 +156,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                 if (detail?.WhenFalse is { Length: > 0 } after) element.SetAttributeValue(Pt + "text-after", after);
                 if (detail?.Format is { Length: > 0 } casing) element.SetAttributeValue(Pt + "case", casing);
                 if (detail?.Value is { Length: > 0 } picture) element.SetAttributeValue(Pt + "number-picture", picture);
+                if (detail?.DatePicture is { Length: > 0 } dated) element.SetAttributeValue(Pt + "date-picture", dated);
                 break;
             case TextFieldKind.HiddenText:
                 element.SetAttributeValue(Text + "string-value", detail?.WhenTrue ?? shown);
@@ -244,6 +245,9 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
     private string? Shape(string? format) =>
         format is not null && format != PulseOffice.Documents.Fields.SequenceFormats.Arabic && PulseOffice.Documents.Fields.SequenceFormats.All.Contains(format) ? format : null;
 
+    private string? PageShape(string? format) =>
+        format == PulseOffice.Documents.Fields.SequenceFormats.Arabic ? format : Shape(format);
+
     private string? ChapterLevel(string? level) =>
         int.TryParse(level, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
         && value is > 1 and <= PulseOffice.Documents.Fields.ChapterLevels.Deepest
@@ -282,9 +286,10 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                 var after = (string?)element.Attribute(Pt + "text-after");
                 var casing = (string?)element.Attribute(Pt + "case") is { } token && PulseOffice.Documents.Fields.MergeCases.All.Contains(token) ? token : null;
                 var picture = (string?)element.Attribute(Pt + "number-picture") is { Length: > 0 } kept ? kept : null;
-                return before is null && after is null && casing is null && picture is null
+                var datePicture = (string?)element.Attribute(Pt + "date-picture") is { Length: > 0 } date ? date : null;
+                return before is null && after is null && casing is null && picture is null && datePicture is null
                     ? null
-                    : new FieldDetail { WhenTrue = before, WhenFalse = after, Format = casing, Value = picture };
+                    : new FieldDetail { WhenTrue = before, WhenFalse = after, Format = casing, Value = picture, DatePicture = datePicture };
             case TextFieldKind.HiddenText:
                 return new FieldDetail { WhenTrue = (string?)element.Attribute(Text + "string-value") ?? Shown(element) };
             case TextFieldKind.Sequence:
@@ -298,7 +303,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                         ? dates.Picture(data?.Find(OdtAutomaticStyles.DataFamily, (string?)element.Attribute(Style + "data-style-name")))
                         : null);
                 var stored = fixedValue ? (string?)element.Attribute(Text + "date-value") ?? (string?)element.Attribute(Text + "time-value") : null;
-                if (kind == TextFieldKind.PageNumber) stored = Shape((string?)element.Attribute(Style + "num-format"));
+                if (kind == TextFieldKind.PageNumber) stored = PageShape((string?)element.Attribute(Style + "num-format"));
                 if (kind == TextFieldKind.Chapter) stored = ChapterLevel((string?)element.Attribute(Text + "outline-level"));
                 return fixedValue || own is not null || stored is not null ? new FieldDetail { Fixed = fixedValue, Format = own, Value = stored } : null;
         }

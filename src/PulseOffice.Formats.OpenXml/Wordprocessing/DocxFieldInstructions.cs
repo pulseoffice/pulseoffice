@@ -89,6 +89,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
                 + (detail?.WhenTrue is { Length: > 0 } before ? $"\\b {Quote(before)} " : string.Empty)
                 + (detail?.WhenFalse is { Length: > 0 } after ? $"\\f {Quote(after)} " : string.Empty)
                 + (detail?.Value is { Length: > 0 } picture ? $"\\# {Quote(picture)} " : string.Empty)
+                + (detail?.DatePicture is { Length: > 0 } dated ? $"\\@ {Quote(pictures.ToWord(dated))} " : string.Empty)
                 + (MergeCase(detail?.Format) is { } casing ? $"\\* {casing} " : string.Empty),
             TextFieldKind.Citation => $" CITATION {argument} ",
             TextFieldKind.Chapter => argument == "number" ? $" STYLEREF {Quote(ChapterStyle(detail))} \\n " : $" STYLEREF {Quote(ChapterStyle(detail))} ",
@@ -107,7 +108,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         foreach (var (kind, simple) in _simple)
         {
             if (simple != keyword) continue;
-            if (kind == TextFieldKind.PageNumber) return new DocxField(kind, null, SequenceShape(words));
+            if (kind == TextFieldKind.PageNumber) return new DocxField(kind, null, PageShape(words));
             var format = Switch(words, "\\@");
             return new DocxField(kind, null, format is null ? null : new FieldDetail { Format = pictures.FromWord(format) });
         }
@@ -124,13 +125,23 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             "DOCPROPERTY" when argument is not null => new DocxField(TextFieldKind.CustomProperty, argument),
             "MERGEFIELD" when argument is not null => new DocxField(TextFieldKind.Database, argument, Affixes(words)),
             "CITATION" when argument is not null => new DocxField(TextFieldKind.Citation, argument),
-            "STYLEREF" => new DocxField(TextFieldKind.Chapter, switches.Contains("\\n") ? "number" : null, ChapterLevel(argument)),
+            "STYLEREF" when HeadingReference(argument, switches) => new DocxField(TextFieldKind.Chapter, switches.Contains("\\n") ? "number" : null, ChapterLevel(argument)),
             _ when _structural.Contains(keyword) => null,
             _ => new DocxField(TextFieldKind.Preserved, instruction),
         };
     }
 
     private string ChapterStyle(FieldDetail? detail) => ChapterStylePrefix + (detail?.Value is { Length: > 0 } level ? level : "1");
+
+    private bool HeadingReference(string? style, IReadOnlyList<string> switches)
+    {
+        if (switches.Any(item => item != "\\n" && item != "\\*" && !item.StartsWith("\\*", StringComparison.Ordinal))) return false;
+        var digits = style is null ? null
+            : style.StartsWith(ChapterStylePrefix, StringComparison.OrdinalIgnoreCase) ? style[ChapterStylePrefix.Length..].Trim()
+            : style.Trim();
+        return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var level)
+            && level is >= 1 and <= PulseOffice.Documents.Fields.ChapterLevels.Deepest;
+    }
 
     private FieldDetail? ChapterLevel(string? style)
     {
@@ -157,6 +168,11 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         words.Select((word, i) => (word, i)).Where(pair => !pair.word.Quoted && pair.word.Text.StartsWith("\\*", StringComparison.Ordinal))
             .Select(pair => pair.word.Text.Length > 2 ? pair.word.Text[2..] : pair.i + 1 < words.Count ? words[pair.i + 1].Text : string.Empty);
 
+    private FieldDetail? PageShape(IReadOnlyList<(string Text, bool Quoted)> words) =>
+        SequenceShape(words) ?? (Shapes(words).Any(shape => shape.Equals("ARABIC", StringComparison.OrdinalIgnoreCase))
+            ? new FieldDetail { Value = PulseOffice.Documents.Fields.SequenceFormats.Arabic }
+            : null);
+
     private FieldDetail? SequenceShape(IReadOnlyList<(string Text, bool Quoted)> words) =>
         Shapes(words).Select(shape => _sequenceShapes.FirstOrDefault(known => known.Word == shape).Ours).FirstOrDefault(ours => ours is not null) is { } value
             ? new FieldDetail { Value = value }
@@ -177,11 +193,12 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         var before = Switch(words, "\\b");
         var after = Switch(words, "\\f");
         var picture = Switch(words, "\\#");
+        var dated = Switch(words, "\\@");
         var casing = Shapes(words).Select(shape => _mergeCases.FirstOrDefault(known => known.Word.Equals(shape, StringComparison.OrdinalIgnoreCase)).Ours)
             .FirstOrDefault(ours => ours is not null);
-        return string.IsNullOrEmpty(before) && string.IsNullOrEmpty(after) && string.IsNullOrEmpty(picture) && casing is null
+        return string.IsNullOrEmpty(before) && string.IsNullOrEmpty(after) && string.IsNullOrEmpty(picture) && string.IsNullOrEmpty(dated) && casing is null
             ? null
-            : new FieldDetail { WhenTrue = before, WhenFalse = after, Value = string.IsNullOrEmpty(picture) ? null : picture, Format = casing };
+            : new FieldDetail { WhenTrue = before, WhenFalse = after, Value = string.IsNullOrEmpty(picture) ? null : picture, Format = casing, DatePicture = string.IsNullOrEmpty(dated) ? null : pictures.FromWord(dated) };
     }
 
     private bool PlainSequence(IReadOnlyList<(string Text, bool Quoted)> words, IReadOnlyList<string> switches) =>

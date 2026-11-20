@@ -514,7 +514,7 @@ internal sealed class RankTest(RuleOperandsReader reader, ConditionOperator @ope
         if (numbers.Count == 0) return false;
 
         var amount = reader.Read(rule.Operands).TryNumber(0, out var parsed) ? parsed : 10;
-        var wanted = Math.Clamp(percent ? (int)Math.Ceiling(numbers.Count * amount / 100.0) : (int)Math.Floor(amount), 0, numbers.Count);
+        var wanted = Math.Clamp(percent ? (amount > 0 ? Math.Max(1, (int)Math.Floor(numbers.Count * amount / 100.0)) : 0) : (int)Math.Floor(amount), 0, numbers.Count);
         if (wanted == 0) return false;
 
         var threshold = bottom ? numbers[wanted - 1] : numbers[numbers.Count - wanted];

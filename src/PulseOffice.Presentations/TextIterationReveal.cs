@@ -121,6 +121,11 @@ public sealed class TextIterationReveal : ITextIterationReveal
     public IReadOnlyList<double> Opacities(string text, TextReveal reveal)
     {
         ArgumentNullException.ThrowIfNull(text);
+        return Opacities(text, reveal, inFlightShown: false);
+    }
+
+    private double[] Opacities(string text, TextReveal reveal, bool inFlightShown)
+    {
         var units = Units(text, reveal.Unit);
         var opacities = new double[text.Length];
         if (reveal.IsWhole || units.Length == 0)
@@ -145,7 +150,7 @@ public sealed class TextIterationReveal : ITextIterationReveal
             }
 
             var since = SinceStart(reveal, reveal.Backwards ? count - 1 - units[index] : units[index]);
-            opacities[index] = InFlight(reveal, since) ? 0 : UnitOpacity(reveal, since);
+            opacities[index] = InFlight(reveal, since) ? inFlightShown ? 1 : 0 : UnitOpacity(reveal, since);
         }
 
         return opacities;
@@ -160,7 +165,9 @@ public sealed class TextIterationReveal : ITextIterationReveal
         ArgumentNullException.ThrowIfNull(theme);
         if (reveal.IsWhole) return text;
         var runs = text.Paragraphs.Select(paragraph => paragraph.EffectiveRuns()).ToList();
-        var opacities = Opacities(string.Join("\n", runs.Select(paragraph => string.Concat(paragraph.Select(run => run.Text)))), reveal);
+        var joined = string.Join("\n", runs.Select(paragraph => string.Concat(paragraph.Select(run => run.Text))));
+        var opacities = Opacities(joined, reveal);
+        var labels = Opacities(joined, reveal, inFlightShown: true);
         var offset = 0;
         var paragraphs = new List<TextParagraph>(text.Paragraphs.Count);
         for (var index = 0; index < runs.Count; index++)
@@ -168,12 +175,14 @@ public sealed class TextIterationReveal : ITextIterationReveal
             var paragraph = text.Paragraphs[index];
             var pieces = new List<TextRun>();
             var seen = false;
+            var labelled = false;
             foreach (var run in runs[index])
             {
                 if (run.Field != TextFieldKind.None || run.Text.Length == 0)
                 {
                     var opacity = offset < opacities.Count && run.Text.Length > 0 ? opacities[offset] : 1;
                     seen |= run.Text.Length > 0 && opacity > Unseen;
+                    labelled |= run.Text.Length > 0 && offset < labels.Length && labels[offset] > Unseen;
                     pieces.Add(Faded(run, paragraph, opacity, theme));
                     offset += run.Text.Length;
                     continue;
@@ -185,6 +194,7 @@ public sealed class TextIterationReveal : ITextIterationReveal
                     if (position < run.Text.Length && Alpha(opacities[offset + position]) == Alpha(opacities[offset + start])) continue;
                     var opacity = opacities[offset + start];
                     seen |= opacity > Unseen && !string.IsNullOrWhiteSpace(run.Text[start..position]);
+                    labelled |= labels[(offset + start)..(offset + position)].Any(label => label > Unseen) && !string.IsNullOrWhiteSpace(run.Text[start..position]);
                     pieces.Add(Faded(run with { Text = run.Text[start..position] }, paragraph, opacity, theme));
                     start = position;
                 }
@@ -193,8 +203,9 @@ public sealed class TextIterationReveal : ITextIterationReveal
             }
 
             offset++;
-            var revealed = paragraph with { Runs = pieces };
-            paragraphs.Add(seen || pieces.Count == 0 ? revealed : revealed with
+            var labelShown = reveal.Layer is null && labelled;
+            var revealed = paragraph with { Runs = labelShown ? pieces : [.. pieces.Select(piece => Pinned(piece, paragraph, theme))] };
+            paragraphs.Add(pieces.Count == 0 || labelShown ? revealed : revealed with
             {
                 Color = 0u,
                 ColorRole = null,
@@ -227,7 +238,7 @@ public sealed class TextIterationReveal : ITextIterationReveal
             offset += run.Text.Length;
         }
 
-        return shape with { Runs = runs, Lists = HiddenBullets(shape, content, opacities) };
+        return shape with { Runs = runs, Lists = HiddenBullets(shape, content, reveal.Layer is null ? Opacities(content, reveal, inFlightShown: true) : new double[content.Length]) };
     }
 
     private IReadOnlyList<ShapeListItem?>? HiddenBullets(ShapeObject shape, string content, IReadOnlyList<double> opacities)
@@ -271,6 +282,9 @@ public sealed class TextIterationReveal : ITextIterationReveal
             : run.Color ?? (run.ColorRole is { } role ? theme.Resolve(role) : paragraph.Color ?? theme.Resolve(paragraph.ColorRole ?? ColorRole.Text));
         return run with { Color = WithAlpha(ink, alpha), ColorRole = null, Hyperlink = null };
     }
+
+    private TextRun Pinned(TextRun run, TextParagraph paragraph, ITextTheme theme) =>
+        run.Color is not null || run.Hyperlink is not null ? run : run with { Color = run.ColorRole is { } role ? theme.Resolve(role) : paragraph.Color ?? theme.Resolve(paragraph.ColorRole ?? ColorRole.Text), ColorRole = null };
 
     private ShapeTextRun Faded(ShapeTextRun run, string fallbackHex, double opacity)
     {

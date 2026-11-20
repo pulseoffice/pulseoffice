@@ -154,7 +154,7 @@ internal sealed class X14DataBarCodec(X14Namespaces names, X14Thresholds thresho
 
     private XElement Colour(string name, string hex) => new(X14 + name, new XAttribute("rgb", colours.ToArgb(hex)));
 
-    private string? Colour(XElement? element) => colours.Parse((string?)element?.Attribute("rgb"));
+    private string? Colour(XElement? element) => colours.Read(element);
 
     private string Length(double value) => Math.Round(Math.Clamp(value, 0, 100)).ToString(CultureInfo.InvariantCulture);
 

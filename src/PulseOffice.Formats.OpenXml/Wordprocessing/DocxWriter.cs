@@ -531,6 +531,8 @@ public sealed class DocxWriter : ITextDocumentWriter
 
     private readonly DocxMailMergeCodec _mailMerge = new();
 
+    private readonly PulseOffice.Documents.Fields.MergeSelectionText _mergeSelection = new();
+
     private W.Settings Settings(TextDocument document)
     {
         var settings = new W.Settings();
@@ -552,8 +554,9 @@ public sealed class DocxWriter : ITextDocumentWriter
             Uri = "http://schemas.microsoft.com/office/word",
             Val = "15",
         }));
-        var variables = document.Variables.Where(pair => pair.Key != DocxMailMergeCodec.ConnectionVariable).Select(pair => new W.DocumentVariable { Name = pair.Key, Val = pair.Value }).ToList();
+        var variables = document.Variables.Where(pair => pair.Key is not (DocxMailMergeCodec.ConnectionVariable or DocxMailMergeCodec.SelectionVariable)).Select(pair => new W.DocumentVariable { Name = pair.Key, Val = pair.Value }).ToList();
         if (document.MergeSource?.ConnectionId is { Length: > 0 } connection) variables.Add(new W.DocumentVariable { Name = DocxMailMergeCodec.ConnectionVariable, Val = connection });
+        if (!document.MergeSelection.IsEmpty) variables.Add(new W.DocumentVariable { Name = DocxMailMergeCodec.SelectionVariable, Val = _mergeSelection.Write(document.MergeSelection) });
         if (variables.Count > 0) settings.Append(new W.DocumentVariables(variables));
         return settings;
     }

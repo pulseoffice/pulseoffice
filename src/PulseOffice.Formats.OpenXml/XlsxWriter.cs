@@ -122,7 +122,7 @@ public sealed class XlsxWriter
         if (new XlsxDateEpochs().Writes1904(workbook.Calculation.DateEpoch))
             workbookPart.Workbook.AppendChild(new WorkbookProperties { Date1904 = true });
 
-        var context = new XlsxWriteContext(workbook, new XlsxStyleMapper(), new XlsxConditionalMapper(), new SharedStrings());
+        var context = new XlsxWriteContext(workbook, new XlsxStyleMapper(), new XlsxConditionalMapper(workbook.NumberFormats), new SharedStrings());
         context.Styles.DeclareNamedStyles(workbook.NamedStyles, workbook);
         context.Styles.DeclareDefaultFormat(workbook);
 

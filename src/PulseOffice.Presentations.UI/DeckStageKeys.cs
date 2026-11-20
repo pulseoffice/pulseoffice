@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, DeckTextEditing text, DeckShapeTextEditing shapes, DeckCanvasEditing canvasEditing, IDeckDrawingState drawing, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IDocumentKeyScope keys, PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords, PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges)
+internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, DeckTextEditing text, DeckShapeTextEditing shapes, DeckCanvasEditing canvasEditing, IDeckDrawingState drawing, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IDocumentKeyScope keys, PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords, PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges, IDeckTableKeys tableKeys)
 {
     private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps TwipSteps = new(60, 300);
     private readonly DeckViewState _state = state;
@@ -103,6 +103,8 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
             return;
         }
 
+        if (ids.Count == 1 && TableKey(e, _state.Current, element)) return;
+
         if (e.Key is Key.Delete or Key.Back)
         {
             if (_actions.IsReadOnly) return;
@@ -119,5 +121,22 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
         var (dx, dy) = nudge.Distance(TwipSteps);
         _canvasEditing.MoveBy(ids, (int)dx, (int)dy);
         e.Handled = true;
+    }
+
+    private bool TableKey(KeyEventArgs e, Slide slide, SlideElement element)
+    {
+        if (element is not ObjectElement { Content: PulseOffice.Document.Embedding.DataTableObject table }) return false;
+        if (_state.Options.TableCells is not { } cells || cells.ElementId != element.Id) return false;
+        if (tableKeys.Read(table, cells.Range, e.Key, e.KeyModifiers) is not { } outcome) return false;
+        if (outcome is not TableKeyMove)
+        {
+            if (_actions.IsReadOnly) return false;
+            _actions.EditTable(slide, element.Id, current => tableKeys.Apply(current, outcome));
+            _state.Selected = slide.Find(element.Id);
+            _canvas.SelectedElement = _state.Selected;
+        }
+        _state.Options.SetTableCells((element.Id, outcome.Range));
+        e.Handled = true;
+        return true;
     }
 }

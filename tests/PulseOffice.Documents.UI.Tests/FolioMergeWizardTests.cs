@@ -69,4 +69,21 @@ public sealed class FolioMergeWizardTests
         Assert.Equal([2], view.Listed);
         Assert.Equal([2], view.Plan().Rows);
     }, CancellationToken.None);
+
+    [Fact]
+    public Task The_wizard_starts_from_the_saved_selection_and_returns_it() => FolioScene.Session.Dispatch(() =>
+    {
+        var scene = new FolioScene(Letter);
+        scene.Document.MergeSelection = new MergeSelection(
+            new MergeFilter([new MergeCondition("Città", MergeFilterOperator.Equals, "Roma"), new MergeCondition("Città", MergeFilterOperator.Equals, "Torino") { Join = MergeJoin.Or }]),
+            [new MergeSort("Nome", true)],
+            new HashSet<int> { 0 });
+        var view = new FolioMergeWizardView(scene.Document, People, new FolioMergeLetters(scene.Services.GetRequiredService<IBlockTree>(), new MergeValueFormat(), new PulseOffice.Text.Rich.TextCultures()), new MergeRecipients(), new TextCatalog(UiLanguage.Italian), null);
+
+        Assert.Equal(2, view.Recipients.ConditionCount);
+        Assert.Equal([2, 0], view.Listed);
+        var plan = view.Plan();
+        Assert.Equal([2], plan.Rows);
+        Assert.Equal(scene.Document.MergeSelection, plan.Selection);
+    }, CancellationToken.None);
 }

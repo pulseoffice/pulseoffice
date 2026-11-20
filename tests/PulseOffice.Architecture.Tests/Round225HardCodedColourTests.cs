@@ -128,7 +128,7 @@ public sealed class Round225HardCodedColourTests
         ["PulseOffice.UI.Controls/Shapes/ObjectFrameChrome.cs"] = 1,
         ["PulseOffice.UI.Controls/Shapes/Painting/Painters.cs"] = 2,
         ["PulseOffice.UI.Controls/Shapes/Painting/ScenePainter.cs"] = 8,
-        ["PulseOffice.UI.Controls/Shapes/ShapeBrushes.cs"] = 6,
+        ["PulseOffice.UI.Controls/Shapes/ShapeBrushes.cs"] = 8,
         ["PulseOffice.UI.Controls/Shapes/ShapeGalleryView.cs"] = 1,
         ["PulseOffice.UI.Controls/Shapes/ShapePickerView.cs"] = 1,
         ["PulseOffice.UI.Controls/Shapes/ShapeRenderer.cs"] = 23,

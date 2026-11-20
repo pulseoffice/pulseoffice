@@ -44,6 +44,9 @@ public sealed class ShapeGeometry : IShapeGeometry
         ArgumentNullException.ThrowIfNull(shape);
         if (shape.Dimension is { } dimension) return _dimensions.Outline(dimension, shape.NaturalSize.Width.ToPoints(), shape.NaturalSize.Height.ToPoints());
         if (shape.Computed is { } computed && _computed.Outline(computed) is { Figures.Count: > 0 } outline) return outline;
+        if (shape is { Computed: null, Shape: ShapeKind.RoundedRectangle } && shape.NaturalSize.Width.ToPoints() is var width && shape.NaturalSize.Height.ToPoints() is var height
+            && width > 0 && height > 0 && double.IsFinite(width) && double.IsFinite(height))
+            return RoundedRectangle(Corner(shape.CornerRatio), width, height);
 
         return shape.Shape is ShapeKind.Arc or ShapeKind.Pie or ShapeKind.Chord
             ? _arcs.Outline(shape.Shape, shape.ArcStartDegrees, shape.ArcEndDegrees)

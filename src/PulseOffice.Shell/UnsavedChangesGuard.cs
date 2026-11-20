@@ -4,7 +4,7 @@ using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Shell;
 
-public enum CloseDecision { Save, Discard, Cancel }
+public enum CloseDecision { Save, Discard, Cancel, SaveAll, DiscardAll }
 
 public interface IDocumentSaver
 {
@@ -53,14 +53,35 @@ public sealed class UnsavedChangesGuard(
 
         if (modified.Count == 0) return true;
 
-        var unsavable = modified.Where(document => Saver(document) is null).ToList();
-        var decision = await AskAsync(modified, unsavable, ct).ConfigureAwait(true);
+        var toSave = new List<OpenDocument>();
+        for (var index = 0; index < modified.Count; index++)
+        {
+            var document = modified[index];
+            var remaining = modified.Skip(index).ToList();
+            var decision = await AskAsync(document, remaining, ct).ConfigureAwait(true);
 
-        if (decision == CloseDecision.Cancel) return false;
-        if (decision == CloseDecision.Discard) return true;
-        if (unsavable.Count == modified.Count) return false;
+            switch (decision)
+            {
+                case CloseDecision.Cancel:
+                    return false;
+                case CloseDecision.DiscardAll:
+                    return await SaveAllAsync(toSave, ct).ConfigureAwait(true);
+                case CloseDecision.SaveAll:
+                    toSave.AddRange(remaining.Where(item => Saver(item) is not null));
+                    return await SaveAllAsync(toSave, ct).ConfigureAwait(true);
+                case CloseDecision.Save:
+                    if (Saver(document) is null) return false;
+                    toSave.Add(document);
+                    break;
+            }
+        }
 
-        foreach (var document in modified.Except(unsavable))
+        return await SaveAllAsync(toSave, ct).ConfigureAwait(true);
+    }
+
+    private async Task<bool> SaveAllAsync(IReadOnlyList<OpenDocument> documents, CancellationToken ct)
+    {
+        foreach (var document in documents)
         {
             if (Saver(document) is not { } saver) return false;
 
@@ -80,29 +101,30 @@ public sealed class UnsavedChangesGuard(
     private IDocumentSaver? Saver(OpenDocument document) =>
         savers.FirstOrDefault(saver => saver.CanSave(document));
 
-    private IReadOnlyList<PromptChoice> Choices(bool savable)
+    private IReadOnlyList<PromptChoice> Choices(bool savable, bool several, bool othersSavable)
     {
         var choices = new List<PromptChoice>();
         if (savable) choices.Add(new PromptChoice(texts["close.save"], CloseDecision.Save, IsDefault: true));
         choices.Add(new PromptChoice(texts["close.discard"], CloseDecision.Discard, IsDefault: !savable));
+        if (several && (savable || othersSavable)) choices.Add(new PromptChoice(texts["close.saveAll"], CloseDecision.SaveAll));
+        if (several) choices.Add(new PromptChoice(texts["close.discardAll"], CloseDecision.DiscardAll));
         choices.Add(new PromptChoice(texts["close.cancel"], CloseDecision.Cancel, IsCancel: true));
         return choices;
     }
 
-    private string Explanation(IReadOnlyList<OpenDocument> modified, IReadOnlyList<OpenDocument> unsavable) =>
-        unsavable.Count == 0 ? texts["close.unsaved.explanation"]
-        : unsavable.Count == modified.Count ? texts["close.unsaved.unsavable"]
-        : texts.Format("close.unsaved.partial", string.Join(", ", unsavable.Select(document => document.Title)));
-
     private async Task<CloseDecision> AskAsync(
-        IReadOnlyList<OpenDocument> modified, IReadOnlyList<OpenDocument> unsavable, CancellationToken ct)
+        OpenDocument document, IReadOnlyList<OpenDocument> remaining, CancellationToken ct)
     {
-        var names = string.Join(", ", modified.Select(document => document.Title));
+        var savable = Saver(document) is not null;
+        var several = remaining.Count > 1;
+        var others = remaining.Skip(1).ToList();
 
         var view = new ChoicePromptView(
-            modified.Count == 1 ? texts.Format("close.unsaved.one", names) : texts.Format("close.unsaved.many", modified.Count, names),
-            Explanation(modified, unsavable),
-            Choices(unsavable.Count < modified.Count),
+            several
+                ? texts.Format("close.unsaved.oneOfMany", document.Title, others.Count)
+                : texts.Format("close.unsaved.one", document.Title),
+            texts[savable ? "close.unsaved.explanation" : "close.unsaved.unsavable"],
+            Choices(savable, several, others.Any(item => Saver(item) is not null)),
             texts);
 
         var chosen = await dialogs.ShowAsync<object>(
@@ -110,7 +132,7 @@ public sealed class UnsavedChangesGuard(
             new DialogOptions
             {
                 TitleKey = "close.unsaved.heading",
-                PreferredWidth = 460,
+                PreferredWidth = 520,
                 CanCancelWithEscape = true,
             },
             ct).ConfigureAwait(true);

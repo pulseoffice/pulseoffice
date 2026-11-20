@@ -45,7 +45,7 @@ public sealed class StartViewTests(HeadlessDesktopSession headless)
         window.UpdateLayout();
 
         var folder = view.GetVisualDescendants().OfType<TextBlock>().Single(block => ToolTip.GetTip(block) as string == path);
-        var date = view.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Parent is StackPanel { Parent: Grid { ColumnDefinitions.Count: 3 } } trailing && Grid.GetColumn(trailing) == 2);
+        var date = view.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Name != "startRecentMissing" && block.Parent is StackPanel { Parent: Grid { ColumnDefinitions.Count: 3 } } trailing && Grid.GetColumn(trailing) == 2);
         var windowRight = window.Bounds.Width;
         Assert.True(Avalonia.VisualExtensions.TranslatePoint(folder, new Avalonia.Point(folder.Bounds.Width, 0), window)!.Value.X <= windowRight);
         Assert.True(Avalonia.VisualExtensions.TranslatePoint(date, new Avalonia.Point(date.Bounds.Width, 0), window)!.Value.X <= windowRight);

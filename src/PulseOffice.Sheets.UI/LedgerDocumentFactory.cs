@@ -16,7 +16,7 @@ public interface ILedgerDocumentFactory
 
     OpenDocument CreateFrom(Workbook workbook, string title);
 
-    OpenDocument? CreateSecondView(OpenDocument document);
+    OpenDocument? CreateSecondView(OpenDocument document, string title);
 }
 
 public sealed class LedgerDocumentFactory(
@@ -74,16 +74,17 @@ public sealed class LedgerDocumentFactory(
         return workbook;
     }
 
-    public OpenDocument? CreateSecondView(OpenDocument document)
+    public OpenDocument? CreateSecondView(OpenDocument document, string title)
     {
         ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrEmpty(title);
 
         if (document.Model is not Workbook workbook) return null;
         if (document.View is not LedgerView existing) return null;
 
         var view = CreateView(workbook, existing.Engine, document.History);
 
-        return document.CreateWindow(view, document.Title + " : 2");
+        return document.CreateWindow(view, title);
     }
 
     private OpenDocument Build(Workbook workbook, string title, bool recalculate)

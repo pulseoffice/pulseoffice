@@ -51,11 +51,19 @@ public sealed class DeckElementActions(Presentation deck, ITextCatalog texts, De
         var changed = change(table);
         if (ReferenceEquals(changed, table)) return;
         var before = element;
-        var after = element with { Content = changed };
+        var after = Grown(element with { Content = changed }, table, changed);
 
         Do(texts["deck.action.editTable"],
             () => { slide.Replace(after); deck.Raise(); },
             () => { slide.Replace(before); deck.Raise(); });
+    }
+
+    private ObjectElement Grown(ObjectElement element, PulseOffice.Document.Embedding.DataTableObject before, PulseOffice.Document.Embedding.DataTableObject after)
+    {
+        var delta = PulseOffice.Document.Embedding.TableMetrics.TotalHeight(after) - PulseOffice.Document.Embedding.TableMetrics.TotalHeight(before);
+        if (Math.Abs(delta) < 0.01) return element;
+        var height = Math.Max(1, element.Bounds.Height.Value + (int)Math.Round(delta * 20));
+        return element with { Bounds = element.Bounds with { Height = new PulseOffice.Foundation.Units.Twip(height) } };
     }
 
     public void ReplaceTable(Slide slide, string elementId,

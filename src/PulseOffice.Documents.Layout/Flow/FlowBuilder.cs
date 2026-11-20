@@ -67,7 +67,7 @@ public interface IFlowBuilder
 
     IReadOnlyList<FlowItem> Notes(string noteId, FlowContext context);
 
-    ParagraphEntry PerPage(ParagraphEntry entry, string number, FlowContext context);
+    ParagraphEntry PerPage(ParagraphEntry entry, string number, int value, FlowContext context);
 
     void Clear();
 }
@@ -226,8 +226,8 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         });
     }
 
-    public ParagraphEntry PerPage(ParagraphEntry entry, string number, FlowContext context) =>
-        entry.Story == StoryKind.Body && fields.HasNumber(entry.Block.Content) ? Paragraph(entry.Block, context, number) : entry;
+    public ParagraphEntry PerPage(ParagraphEntry entry, string number, int value, FlowContext context) =>
+        entry.Story == StoryKind.Body && fields.HasNumber(entry.Block.Content) ? Paragraph(entry.Block, context, number, value) : entry;
 
     public IReadOnlyList<FlowItem> Build(BlockContainer container, FlowContext context)
     {
@@ -254,13 +254,13 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         return _formatters.TryGetValue(kind, out var formatter) ? formatter.Render(value) : value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private ParagraphEntry Paragraph(ParagraphBlock block, FlowContext context, string? number = null)
+    private ParagraphEntry Paragraph(ParagraphBlock block, FlowContext context, string? number = null, int? value = null)
     {
         var document = context.Document;
         var marked = markup.Mark(document, block, block.Content);
         var source = marked?.Content ?? block.Content;
         var content = placeholders.Present(block, context.Fields?.Invoke(source) ?? source);
-        if (context.Story == StoryKind.Body) content = fields.Resolve(content, number, context.PageCount);
+        if (context.Story == StoryKind.Body) content = fields.Resolve(content, number, context.PageCount, value);
         if (content.StyleName is null && context.DefaultStyle is { } style) content = _styled.GetValue(content, source => source with { StyleName = style });
         var list = context.Lists.GetValueOrDefault(block.Id);
         if (context.Labels.TryGetValue(block.Id, out var label))

@@ -93,6 +93,8 @@ public sealed record FieldDetail
 
     public string? Value { get; init; }
 
+    public string? DatePicture { get; init; }
+
     public string? NativeOdf { get; init; }
 }
 

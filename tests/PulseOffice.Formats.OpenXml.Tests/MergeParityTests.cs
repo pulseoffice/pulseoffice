@@ -71,4 +71,52 @@ public sealed class MergeParityTests
         Assert.DoesNotContain(report.Losses, loss => loss.Code == "DOCX028");
         Assert.DoesNotContain(new OdtWriter().CheckFidelity(Letter()).Losses, loss => loss.Code.Contains("028", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Recipient_selection_and_date_pictures_cross_odt_and_docx()
+    {
+        TextDocument Prepared()
+        {
+            var document = Letter();
+            var paragraph = document.Body.Blocks.OfType<ParagraphBlock>().First();
+            paragraph.State = paragraph.State with
+            {
+                Content = paragraph.Content with { Runs = [.. paragraph.Content.Runs, new TextRun("«Data»") { Field = TextFieldKind.Database, FieldArgument = "Data", FieldDetail = new FieldDetail { DatePicture = "dd/MM/yyyy" } }] },
+            };
+            document.MergeSelection = new MergeSelection(
+                new MergeFilter([new MergeCondition("Nome", MergeFilterOperator.Contains, "a"), new MergeCondition("Nome", MergeFilterOperator.Empty, string.Empty) { Join = MergeJoin.Or }]),
+                [new MergeSort("Cognome di famiglia", true)],
+                new HashSet<int> { 4 });
+            return document;
+        }
+
+        var odt = Through(Prepared(), new OdtWriter(), new OdtReader());
+        var docx = Through(Prepared(), _composer.Writer(DocxFlavour.Document), _composer.Reader(DocxFlavour.Document));
+
+        foreach (var read in new[] { odt, docx })
+        {
+            Assert.Equal(Prepared().MergeSelection, read.MergeSelection);
+            Assert.DoesNotContain(read.Variables.Keys, key => key.StartsWith("PulseOffice.", StringComparison.Ordinal));
+            var dated = read.Body.Blocks.OfType<ParagraphBlock>().SelectMany(paragraph => paragraph.Content.Runs).Single(run => run.FieldArgument == "Data");
+            Assert.Equal("dd/MM/yyyy", dated.FieldDetail?.DatePicture);
+        }
+    }
+
+    [Fact]
+    public void A_page_field_forced_to_arabic_stays_arabic_in_odt_and_docx()
+    {
+        TextDocument Prepared()
+        {
+            var document = new TextDocumentFactory(new DefaultStyleSheetFactory()).Create();
+            TextRun[] runs = [new TextRun("1") { Field = TextFieldKind.PageNumber, FieldDetail = new FieldDetail { Value = SequenceFormats.Arabic } }, new TextRun("1") { Field = TextFieldKind.PageNumber }];
+            document.Body.Replace([new ParagraphBlock(document.NextId("p"), new TextParagraph("11") { Runs = runs })]);
+            return document;
+        }
+
+        foreach (var read in new[] { Through(Prepared(), new OdtWriter(), new OdtReader()), Through(Prepared(), _composer.Writer(DocxFlavour.Document), _composer.Reader(DocxFlavour.Document)) })
+        {
+            var pages = read.Body.Blocks.OfType<ParagraphBlock>().SelectMany(paragraph => paragraph.Content.Runs).Where(run => run.Field == TextFieldKind.PageNumber).ToList();
+            Assert.Equal([SequenceFormats.Arabic, null], pages.Select(run => run.FieldDetail?.Value));
+        }
+    }
 }

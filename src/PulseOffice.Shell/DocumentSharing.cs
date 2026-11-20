@@ -3,9 +3,11 @@ using System.Text.Json;
 
 namespace PulseOffice.Shell;
 
-public sealed record ShareClaim(string User, string Machine, DateTimeOffset Taken)
+public sealed record ShareClaim(string User, string Machine, DateTimeOffset Taken, RecoveryOwner? Process = null)
 {
-    public bool IsMine => string.Equals(User, Environment.UserName, StringComparison.Ordinal)
+    public bool IsMine { get; init; }
+
+    public bool SameAccount => string.Equals(User, Environment.UserName, StringComparison.Ordinal)
         && string.Equals(Machine, Environment.MachineName, StringComparison.Ordinal);
 }
 
@@ -24,8 +26,25 @@ public sealed class LockFileFormat
 
     private const string Moment = "dd.MM.yyyy HH:mm";
 
+    private const string ProcessPrefix = "pulseoffice-process:";
+
     public string Write(ShareClaim claim) =>
-        $",{Escape(claim.User)},{Escape(claim.Machine)},{claim.Taken.ToString(Moment, CultureInfo.InvariantCulture)},;";
+        $",{Escape(claim.User)},{Escape(claim.Machine)},{claim.Taken.ToString(Moment, CultureInfo.InvariantCulture)},{ProcessField(claim.Process)};";
+
+    private string ProcessField(RecoveryOwner? process) =>
+        process is null ? string.Empty
+        : string.Create(CultureInfo.InvariantCulture, $"{ProcessPrefix}{process.ProcessId}:{process.Started.ToUnixTimeMilliseconds()}");
+
+    private RecoveryOwner? ProcessOf(IReadOnlyList<string> fields)
+    {
+        if (fields.Count < 5 || !fields[4].StartsWith(ProcessPrefix, StringComparison.Ordinal)) return null;
+        var parts = fields[4][ProcessPrefix.Length..].Split(':');
+        if (parts.Length != 2
+            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+            || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var started)
+            || started < -62135596800000L || started > 253402300799999L) return null;
+        return new RecoveryOwner(id, DateTimeOffset.FromUnixTimeMilliseconds(started));
+    }
 
     public ShareClaim? Read(string text)
     {
@@ -49,7 +68,7 @@ public sealed class LockFileFormat
         var taken = DateTimeOffset.TryParseExact(fields[3], Moment, CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeLocal, out var parsed) ? parsed : DateTimeOffset.MinValue;
         var user = fields[1].Length > 0 ? fields[1] : fields[0];
-        return new ShareClaim(user, fields[2], taken);
+        return new ShareClaim(user, fields[2], taken, ProcessOf(fields));
     }
 
     private List<string> Fields(string text)
@@ -84,11 +103,22 @@ public sealed class LockFileFormat
         value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace(",", "\\,", StringComparison.Ordinal).Replace(";", "\\;", StringComparison.Ordinal);
 }
 
-public sealed class FileDocumentSharing : IDocumentSharing
+public sealed class FileDocumentSharing(IRecoveryOwnership? ownership = null) : IDocumentSharing
 {
     private static readonly TimeSpan Abandoned = TimeSpan.FromMinutes(1);
 
     private readonly LockFileFormat _format = new();
+
+    private readonly IRecoveryOwnership _ownership = ownership ?? new ProcessRecoveryOwnership();
+
+    private bool Owned(ShareClaim claim)
+    {
+        if (!claim.SameAccount || claim.Process is not { } process) return false;
+        var current = _ownership.Current;
+        return process.ProcessId == current.ProcessId
+            ? (process.Started - current.Started).Duration() <= TimeSpan.FromSeconds(2)
+            : !_ownership.IsAlive(process);
+    }
 
     public ShareClaim? Holder(string documentPath)
     {
@@ -100,7 +130,7 @@ public sealed class FileDocumentSharing : IDocumentSharing
 
         try
         {
-            return _format.Read(ReadHead(path));
+            return _format.Read(ReadHead(path)) is { } claim ? claim with { IsMine = Owned(claim) } : null;
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
         {
@@ -125,7 +155,7 @@ public sealed class FileDocumentSharing : IDocumentSharing
             return false;
         }
 
-        var claim = new ShareClaim(Environment.UserName, Environment.MachineName, DateTimeOffset.Now);
+        var claim = new ShareClaim(Environment.UserName, Environment.MachineName, DateTimeOffset.Now, _ownership.Current);
 
         try
         {

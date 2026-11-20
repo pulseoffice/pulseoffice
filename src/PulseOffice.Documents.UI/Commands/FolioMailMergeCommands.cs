@@ -161,6 +161,7 @@ public sealed class FolioMailMergeCommands(
             return;
         }
         if (await wizard.AskAsync(editor.Document, data, records.Current(editor.Document), ct).ConfigureAwait(true) is not { } plan) return;
+        if (!plan.Selection.Equals(editor.Document.MergeSelection)) editor.History.ApplyOutsideHistory(() => editor.Document.MergeSelection = plan.Selection);
         var target = plan.Target;
         var rows = plan.Rows.Where(row => row >= 0 && row < data.Rows.Count).ToList();
         if (rows.Count == 0)

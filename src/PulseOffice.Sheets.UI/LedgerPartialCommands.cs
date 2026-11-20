@@ -68,7 +68,7 @@ public sealed class LedgerPartialCommands(
     {
         if (workspace.Active is not { } active) return;
 
-        if (documents.CreateSecondView(active) is not { } second)
+        if (documents.CreateSecondView(active, NextWindowTitle(active)) is not { } second)
         {
             status.Report(texts["window.cannotSplit"], NotificationSeverity.Error);
             return;
@@ -76,6 +76,19 @@ public sealed class LedgerPartialCommands(
 
         workspace.Open(second);
         status.Report(texts["window.opened"]);
+    }
+
+    private string NextWindowTitle(PulseOffice.Shell.OpenDocument document)
+    {
+        var windows = workspace.Documents.Where(other => ReferenceEquals(other.History, document.History)).ToList();
+        var first = windows.Count > 0 ? windows[0].Title : document.Title;
+        var prefix = first + " : ";
+        var highest = 1;
+        foreach (var window in windows)
+            if (window.Title.StartsWith(prefix, StringComparison.Ordinal)
+                && int.TryParse(window.Title.AsSpan(prefix.Length), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
+                highest = Math.Max(highest, number);
+        return prefix + (highest + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private CommandDefinition Command(

@@ -61,6 +61,7 @@ public static class DocumentsServiceCollectionExtensions
         services.AddSingleton<Fields.IMailMergeEngine, Fields.MailMergeEngine>();
         services.TryAddSingleton<Fields.IMergeValueFormat, Fields.MergeValueFormat>();
         services.TryAddSingleton<Fields.IMergeRecipients, Fields.MergeRecipients>();
+        services.TryAddSingleton<Fields.IMergeSelectionText, Fields.MergeSelectionText>();
         services.AddSingleton<Fields.IFieldUpdater, Fields.FieldUpdater>();
         services.AddSingleton<Fields.IFieldEditing, Fields.FieldEditing>();
         services.AddSingleton<Fields.IReferenceTargets, Fields.ReferenceTargets>();

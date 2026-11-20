@@ -25,8 +25,23 @@ public sealed class MergeValueFormat : IMergeValueFormat
     {
         ArgumentNullException.ThrowIfNull(culture);
         if (string.IsNullOrEmpty(value)) return string.Empty;
-        var shaped = Cased(Numbered(value, detail?.Value, culture), detail?.Format, culture);
+        var shaped = Cased(Dated(Numbered(value, detail?.Value, culture), detail?.DatePicture, culture), detail?.Format, culture);
         return (detail?.WhenTrue ?? string.Empty) + shaped + (detail?.WhenFalse ?? string.Empty);
+    }
+
+    private string Dated(string value, string? picture, CultureInfo culture)
+    {
+        if (string.IsNullOrEmpty(picture)) return value;
+        if (!DateTime.TryParse(value, culture, DateTimeStyles.None, out var date) && !DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+            return value;
+        try
+        {
+            return date.ToString(picture, culture);
+        }
+        catch (FormatException)
+        {
+            return value;
+        }
     }
 
     private string Numbered(string value, string? picture, CultureInfo culture)

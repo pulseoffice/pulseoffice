@@ -76,6 +76,7 @@ public sealed class PptxDeckTableMapper
             var text = c < cells.Count ? cells[c]?.ToString() ?? string.Empty : string.Empty;
             var format = index.Format(rowIndex, c);
             var cell = Cell(text, format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.OwnLook ? format?.Look ?? TableCellLook.Plain : null);
+            if (format is { HasLayout: true }) Laid(cell.TableCellProperties!, format);
 
             if (index.Origin(rowIndex, c) is { } origin)
             {
@@ -128,6 +129,31 @@ public sealed class PptxDeckTableMapper
         }
         return new D.TableCell(body, properties);
     }
+
+    private void Laid(D.TableCellProperties properties, TableCellFormat format)
+    {
+        if (format.Margins is { } margins)
+        {
+            properties.LeftMargin = Emus(margins.Left);
+            properties.RightMargin = Emus(margins.Right);
+            properties.TopMargin = Emus(margins.Top);
+            properties.BottomMargin = Emus(margins.Bottom);
+        }
+        properties.Vertical = format.Direction switch
+        {
+            CellTextDirection.Down => D.TextVerticalValues.Vertical,
+            CellTextDirection.Up => D.TextVerticalValues.Vertical270,
+            CellTextDirection.Stacked => D.TextVerticalValues.WordArtVertical,
+            _ => null,
+        };
+    }
+
+    private const double MostMarginPoints = 1584;
+
+    private int Emus(double points) => (int)Math.Round(Math.Clamp(points, 0, MostMarginPoints) * PulseOffice.Foundation.Units.Emu.PerPoint);
+
+    private double Points(double? emus, double fallback) =>
+        emus is { } value && value >= 0 ? Math.Min(value / (double)PulseOffice.Foundation.Units.Emu.PerPoint, MostMarginPoints) : fallback;
 
     private D.RunProperties RunProperties(TableCellLook? look)
     {
@@ -252,12 +278,28 @@ public sealed class PptxDeckTableMapper
 
     private IEnumerable<D.TableCell> Cells(D.TableRow row) => row.Elements<D.TableCell>().Take(ImportedTableLimits.SlideTableColumns);
 
+    private const double DefaultSideMarginPoints = 7.2;
+
+    private const double DefaultEdgeMarginPoints = 3.6;
+
     private TableCellFormat? Format(D.TableCell cell, int row, int column)
     {
-        var anchor = cell.TableCellProperties?.Anchor?.Value;
-        if (anchor == D.TextAnchoringTypeValues.Center) return new TableCellFormat(row, column, CellVerticalAlign.Center);
-        if (anchor == D.TextAnchoringTypeValues.Bottom) return new TableCellFormat(row, column, CellVerticalAlign.Bottom);
-        return null;
+        var properties = cell.TableCellProperties;
+        var anchor = properties?.Anchor?.Value;
+        var align = anchor == D.TextAnchoringTypeValues.Center ? CellVerticalAlign.Center
+            : anchor == D.TextAnchoringTypeValues.Bottom ? CellVerticalAlign.Bottom
+            : CellVerticalAlign.Top;
+        var margins = properties is not null && (properties.LeftMargin is not null || properties.RightMargin is not null || properties.TopMargin is not null || properties.BottomMargin is not null)
+            ? new TableCellMargins(Points(properties.LeftMargin?.Value, DefaultSideMarginPoints), Points(properties.RightMargin?.Value, DefaultSideMarginPoints),
+                Points(properties.TopMargin?.Value, DefaultEdgeMarginPoints), Points(properties.BottomMargin?.Value, DefaultEdgeMarginPoints))
+            : null;
+        var vertical = properties?.Vertical?.Value;
+        var direction = vertical == D.TextVerticalValues.Vertical || vertical == D.TextVerticalValues.EastAsianVetical || vertical == D.TextVerticalValues.MongolianVertical ? CellTextDirection.Down
+            : vertical == D.TextVerticalValues.Vertical270 ? CellTextDirection.Up
+            : vertical == D.TextVerticalValues.WordArtVertical || vertical == D.TextVerticalValues.WordArtLeftToRight ? CellTextDirection.Stacked
+            : CellTextDirection.Horizontal;
+        var format = new TableCellFormat(row, column, align) { Margins = margins, Direction = direction };
+        return align == CellVerticalAlign.Top && !format.HasLayout ? null : format;
     }
 
     private TableLayout ReadLayout(D.Table tbl, IReadOnlyList<D.TableRow> rows)

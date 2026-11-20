@@ -9,6 +9,8 @@ public sealed partial class DocxMailMergeCodec
 {
     public const string ConnectionVariable = "PulseOffice.MergeConnection";
 
+    public const string SelectionVariable = "PulseOffice.MergeSelection";
+
     private const string DataSourceName = "DSN=";
 
     public W.MailMerge? Write(TextDocument document)

@@ -8,7 +8,7 @@ using Color = DocumentFormat.OpenXml.Spreadsheet.Color;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed class DifferentialFormatTable(SpreadsheetColours colours, BorderCodec borders)
+internal sealed class DifferentialFormatTable(SpreadsheetColours colours, BorderCodec borders, NumberFormatCatalog? numberFormats, ExcelBooleanFormat booleanFormats)
 {
     private readonly DifferentialFormats _formats = new();
     private readonly Dictionary<string, uint> _index = new(StringComparer.Ordinal);
@@ -28,7 +28,7 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours, Border
     public uint Intern(CellStyle style)
     {
         var font = style.Font;
-        var key = $"{style.BackgroundHex}|{font.ColorHex}|{font.Bold}|{font.Italic}|{font.Underline}|{font.DoubleUnderline}|{font.Strikethrough}|{borders.Key(style.Borders)}";
+        var key = $"{style.BackgroundHex}|{font.ColorHex}|{font.Bold}|{font.Italic}|{font.Underline}|{font.DoubleUnderline}|{font.Strikethrough}|{borders.Key(style.Borders)}|{style.NumberFormatId}";
         if (_index.TryGetValue(key, out var existing)) return existing;
 
         var format = new DifferentialFormat();
@@ -43,6 +43,9 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours, Border
             else if (font.Underline) element.AppendChild(new Underline());
             format.AppendChild(element);
         }
+
+        if (NumberCode(style.NumberFormatId) is { } code)
+            format.AppendChild(new NumberingFormat { NumberFormatId = (uint)style.NumberFormatId, FormatCode = code });
 
         if (style.BackgroundHex is { } background)
             format.AppendChild(new Fill(new PatternFill
@@ -86,7 +89,7 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours, Border
         var single = underline is not null && !doubled && (underline.Val is null || underline.Val.Value != UnderlineValues.None);
         return new CellStyle
         {
-            BackgroundHex = colours.Parse(pattern?.BackgroundColor?.Rgb?.Value) ?? colours.Parse(pattern?.ForegroundColor?.Rgb?.Value),
+            BackgroundHex = colours.Read(pattern?.BackgroundColor) ?? colours.Read(pattern?.ForegroundColor),
             Font = CellFont.Default with
             {
                 Bold = font?.Bold is not null && font.Bold.Val?.Value != false,
@@ -94,10 +97,24 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours, Border
                 Underline = single,
                 DoubleUnderline = doubled,
                 Strikethrough = font?.Strike is not null && font.Strike.Val?.Value != false,
-                ColorHex = colours.Parse(font?.Color?.Rgb?.Value) ?? CellFont.Default.ColorHex,
+                ColorHex = colours.Read(font?.Color) ?? CellFont.Default.ColorHex,
             },
             Borders = borders.Read(format.Border),
+            NumberFormatId = NumberFormatId(format.NumberingFormat),
         };
+    }
+
+    private string? NumberCode(int id) =>
+        id == 0 ? null
+        : id < NumberFormatCatalog.FirstCustomId ? NumberFormatCatalog.BuiltInFormats.GetValueOrDefault(id)
+        : numberFormats is null ? null
+        : booleanFormats.ToExcel(numberFormats.Get(id).Code);
+
+    private int NumberFormatId(NumberingFormat? format)
+    {
+        if (format?.NumberFormatId?.Value is not { } id) return 0;
+        if (id < NumberFormatCatalog.FirstCustomId && NumberFormatCatalog.BuiltInFormats.ContainsKey((int)id)) return (int)id;
+        return format.FormatCode?.Value is { Length: > 0 } code && numberFormats is not null ? numberFormats.Register(code) : 0;
     }
 }
 
@@ -214,7 +231,7 @@ internal sealed class XlsxDataBarCodec(SpreadsheetColours colours, XlsxThreshold
             Range = context.Range,
             Priority = context.Priority(element),
             Visual = ConditionalVisual.DataBar,
-            BarColorHex = Colours.Parse(bar?.GetFirstChild<Color>()?.Rgb?.Value) ?? "#638EC6",
+            BarColorHex = Colours.Read(bar?.GetFirstChild<Color>()) ?? "#638EC6",
             ShowValue = bar?.ShowValue?.Value ?? true,
             Thresholds = stops is [{ Kind: ConditionalThresholdKind.Minimum }, { Kind: ConditionalThresholdKind.Maximum }] ? [] : stops,
             Bar = new DataBarOptions
@@ -254,7 +271,7 @@ internal sealed class XlsxColorScaleCodec(SpreadsheetColours colours, XlsxThresh
     public override ConditionalRule Read(ConditionalFormattingRule element, XlsxRuleReadContext context)
     {
         var scale = element.GetFirstChild<ColorScale>();
-        var colors = scale?.Elements<Color>().Select(color => Colours.Parse(color.Rgb?.Value) ?? "#FFFFFF").ToList() ?? [];
+        var colors = scale?.Elements<Color>().Select(color => Colours.Read(color) ?? "#FFFFFF").ToList() ?? [];
         var stops = scale?.Elements<ConditionalFormatValueObject>().Select(thresholds.Read).ToList() ?? [];
 
         return new ConditionalRule
