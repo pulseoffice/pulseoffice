@@ -23,6 +23,18 @@ internal sealed class LedgerCellOperations(
 
     public ISheetFill Fill { get; set; } = new SheetFill();
 
+    public event EventHandler<SheetGridView.FillRequest>? Filled;
+
+    private (SheetGridView.FillRequest Request, object? State)? _lastFill;
+
+    public bool RefillAs(FillMode mode)
+    {
+        if (_lastFill is not { } last || !ReferenceEquals(history.StatePoint, last.State) || !history.CanUndo) return false;
+        history.Undo();
+        ApplyFill(last.Request with { Mode = mode, Toggled = false });
+        return true;
+    }
+
     public void ClearContents(CellRange range)
     {
         if (!writer.CanEdit()) return;
@@ -174,6 +186,13 @@ internal sealed class LedgerCellOperations(
 
     public void ApplyFill(SheetGridView.FillRequest request)
     {
+        if (ApplyFillCore(request) is not { } mode) return;
+        _lastFill = (request with { Mode = mode, Toggled = false }, history.StatePoint);
+        Filled?.Invoke(this, request);
+    }
+
+    private FillMode? ApplyFillCore(SheetGridView.FillRequest request)
+    {
         var sheet = workbook.Sheets[grid.SheetIndex];
 
         var direction =
@@ -182,15 +201,17 @@ internal sealed class LedgerCellOperations(
             request.Target.End.Column > request.Source.End.Column ? FillDirection.Right :
             FillDirection.Left;
 
-        if (!writer.CanEdit()) return;
-        if (LanesInUse(sheet, request, direction) is not { } lanes) return;
+        if (!writer.CanEdit()) return null;
+        if (LanesInUse(sheet, request, direction) is not { } lanes) return null;
 
-        var produced = Fill.Extend(sheet, lanes.Source, lanes.Target, direction);
-        if (produced.Count == 0) return;
+        var mode = request.Toggled ? Fill.Toggled(sheet, lanes.Source) : request.Mode;
+        if (sheet.Protection.IsEnabled && mode == FillMode.FormattingOnly) return null;
+        var produced = Fill.Extend(sheet, lanes.Source, lanes.Target, direction, mode);
+        if (produced.Count == 0) return null;
         if (produced.Any(pair => writer.IsLocked(sheet, pair.Address)))
         {
             status.Report(texts["status.protection.locked"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
-            return;
+            return null;
         }
         var merges = Fill.Merges(sheet, lanes.Source, lanes.Target, direction);
 
@@ -216,7 +237,9 @@ internal sealed class LedgerCellOperations(
             var target = new SheetCell(grid.SheetIndex, address);
             var previous = sheet[address];
 
-            writer.WriteValidated(target, previous with { Formula = cell.Formula, Value = cell.Value });
+            writer.WriteValidated(target, sheet.Protection.IsEnabled
+                ? previous with { Formula = cell.Formula, Value = cell.Value }
+                : previous with { Formula = cell.Formula, Value = cell.Value, StyleId = cell.StyleId, ExplicitStyle = cell.ExplicitStyle });
         }
 
         if (!sheet.Protection.IsEnabled) CopyComments(sheet, Fill.Comments(sheet, lanes.Source, lanes.Target, direction));
@@ -226,6 +249,7 @@ internal sealed class LedgerCellOperations(
 
         grid.Refresh();
         status.Report(texts.Format("status.fill.done", produced.Count));
+        return mode;
     }
 
     private void CopyComments(Worksheet sheet, IReadOnlyList<(CellAddress Address, CellComment? Comment)> comments)

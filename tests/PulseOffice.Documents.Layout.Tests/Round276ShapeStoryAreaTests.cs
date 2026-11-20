@@ -1,4 +1,5 @@
 using PulseOffice.Documents.Blocks;
+using PulseOffice.Documents.Marks;
 using PulseOffice.Documents.Objects;
 using PulseOffice.Drawing.Shapes;
 using PulseOffice.Foundation.Units;
@@ -71,5 +72,23 @@ public sealed class Round276ShapeStoryAreaTests
         Assert.Equal(Twip.FromPoints(layout.Pages[0].Objects.Single().Bounds.Height), item.Size.Height);
         Assert.Equal(Twip.FromPoints(120), item.Size.Width);
         Assert.False(sizes.Settle(f.Document, layout));
+    }
+
+    [Fact]
+    public void The_stored_size_of_an_inline_resizing_shape_follows_its_story()
+    {
+        var f = new LayoutFixture(width: 400, height: 400);
+        var block = f.Add("ab");
+        block.Marks = [new ObjectMark(1, "o")];
+        var story = new BlockContainer([new ParagraphBlock("sp", new TextParagraph("uno due tre quattro cinque sei sette otto") { Runs = [new TextRun("uno due tre quattro cinque sei sette otto")] })]);
+        var shape = new ShapeObject { Id = "s", Shape = ShapeKind.Rectangle, Style = new ShapeStyle { Text = new ShapeTextStyle { Autofit = TextAutofit.ResizeShape } } };
+        var item = new AnchoredObject("o", new AsCharacterAnchor(block.Id), new EmbeddedContent(shape, story), new DocumentSize(Twip.FromPoints(60), Twip.FromPoints(10)));
+        f.Document.Objects.Add(item);
+        var sizes = new PulseOffice.Documents.Layout.Flow.ShapeStorySizes();
+
+        Assert.True(sizes.Settle(f.Document, f.Layout()));
+        Assert.True(item.Size.Height.Value > Twip.FromPoints(10).Value);
+        Assert.Equal(Twip.FromPoints(60), item.Size.Width);
+        Assert.False(sizes.Settle(f.Document, f.Layout()));
     }
 }

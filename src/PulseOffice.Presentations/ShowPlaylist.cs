@@ -31,4 +31,20 @@ public sealed class ShowPlaylist
             if (deck.IndexOf(playlist[index]) is var placed && placed >= 0 && placed < order) position = index + 1;
         return position;
     }
+
+    public ShowPlaylistStart FromCurrent(Presentation deck, IReadOnlyList<Slide> playlist, int current, ShowStart start)
+    {
+        ArgumentNullException.ThrowIfNull(deck);
+        ArgumentNullException.ThrowIfNull(playlist);
+        ArgumentNullException.ThrowIfNull(start);
+        if (current < 0 || current >= deck.Slides.Count || deck.Slides[current] is not { Hidden: true } hidden
+            || playlist.Any(slide => ReferenceEquals(slide, hidden)) || deck.Setup.CustomShowName is not null && deck.CustomShows.Any(show => show.Name == deck.Setup.CustomShowName))
+            return new ShowPlaylistStart(playlist, start.PositionFor(deck.Slides, playlist, current));
+        var position = DetourPosition(deck, playlist, hidden);
+        var extended = playlist.ToList();
+        extended.Insert(position, hidden);
+        return new ShowPlaylistStart(extended, position);
+    }
 }
+
+public sealed record ShowPlaylistStart(IReadOnlyList<Slide> Playlist, int Position);

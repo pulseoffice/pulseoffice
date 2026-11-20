@@ -249,15 +249,23 @@ public sealed class ShapeTextEditor : Decorator
             return;
         }
         Overlay();
-        var bounds = _flow.Box(placement.Bounds, text.Layout);
+        var bounds = _flow.Box(Inner(placement.Bounds), text.Layout);
         var degrees = _flow.Degrees(text.Layout, text.RotationDegrees, placement.RotationDegrees);
         Canvas.SetLeft(this, bounds.X);
         Canvas.SetTop(this, bounds.Y);
         Width = Math.Max(bounds.Width, 1);
         Height = Math.Max(bounds.Height, 1);
+        RenderTransformOrigin = new RelativePoint(placement.Bounds.Center.X - bounds.X, placement.Bounds.Center.Y - bounds.Y, RelativeUnit.Absolute);
         RenderTransform = Math.Abs(degrees % 360) < 0.001 ? null : new RotateTransform(degrees);
         if (_base is { } shape) Typeset(shape, placement.PixelsPerPoint);
         _scale = placement.PixelsPerPoint;
+    }
+
+    public Rect Inner(Rect whole)
+    {
+        if (_base is not { } shape) return whole;
+        var margins = _area.Margins(shape, whole.Width, whole.Height);
+        return new Rect(whole.X + margins.Left, whole.Y + margins.Top, margins.Width(whole.Width), margins.Height(whole.Height));
     }
 
     private void Recompose()

@@ -19,6 +19,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
 
     private readonly OoxmlImageTypes _types = new();
     private readonly DrawingML.DrawingDuotone _duotones = new();
+    private readonly DrawingML.DrawingImageTone _tones = new();
 
     public IEnumerable<OpenXmlCompositeElement> BuildAnchors(DrawingsPart drawings, Worksheet sheet)
     {
@@ -97,7 +98,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
         if (blip.Embed?.Value is not { } embed || Part(drawings, embed) is not ImagePart image)
             return blip.Link?.Value is { } link && _externals.Of(drawings, link) is { } external
                    && _links.ToPath(external.Uri.OriginalString) is { Length: > 0 } path
-                ? new RasterImageObject { Id = name, Data = ReadOnlyMemory<byte>.Empty, MediaType = _types.MediaTypeOf(path), LinkPath = path, Duotone = _duotones.Read(blip) }
+                ? new RasterImageObject { Id = name, Data = ReadOnlyMemory<byte>.Empty, MediaType = _types.MediaTypeOf(path), LinkPath = path, Duotone = _duotones.Read(blip), Tone = _tones.Read(blip) }
                 : null;
 
         var bytes = Bytes(image);
@@ -110,6 +111,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
             PixelWidth = pixels?.Width ?? 0,
             PixelHeight = pixels?.Height ?? 0,
             Duotone = _duotones.Read(blip),
+            Tone = _tones.Read(blip),
         };
     }
 
@@ -150,6 +152,7 @@ public sealed class XlsxImageMapper(VectorFallback vectors)
                 stream.Write(raster.Data.Span);
             blip = new A.Blip { Embed = drawings.GetIdOfPart(part) };
         }
+        _tones.Write(blip, raster.Tone);
         _duotones.Write(blip, raster.Duotone);
         return blip;
     }

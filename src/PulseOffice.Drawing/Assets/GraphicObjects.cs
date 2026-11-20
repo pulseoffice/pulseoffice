@@ -26,6 +26,17 @@ public enum ImageFilter { None, Grayscale, Sepia, Invert, Mosaic, Charcoal, PopA
 
 public sealed record ImageDuotone(string DarkHex, string LightHex);
 
+public sealed record ImageTone(double Brightness = 0, double Contrast = 0, double Transparency = 0)
+{
+    public static ImageTone Neutral { get; } = new();
+
+    public bool ChangesColours => Math.Abs(Brightness) > 1e-6 || Math.Abs(Contrast) > 1e-6;
+
+    public bool IsNeutral => !ChangesColours && Math.Abs(Transparency) <= 1e-6;
+
+    public double Opacity => 1 - Math.Clamp(double.IsFinite(Transparency) ? Transparency : 0, 0, 100) / 100;
+}
+
 public sealed record RasterImageObject : EmbeddedObject, IDrawingObject
 {
     public TResult Accept<TResult>(IDrawingObjectVisitor<TResult> visitor) => visitor.VisitRaster(this);
@@ -41,6 +52,8 @@ public sealed record RasterImageObject : EmbeddedObject, IDrawingObject
     public ImageFilter Filter { get; init; } = ImageFilter.None;
 
     public ImageDuotone? Duotone { get; init; }
+
+    public ImageTone Tone { get; init; } = ImageTone.Neutral;
 
     public Document.Embedding.ImageMap Map { get; init; } = new();
 

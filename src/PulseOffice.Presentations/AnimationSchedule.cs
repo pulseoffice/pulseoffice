@@ -1,6 +1,9 @@
 namespace PulseOffice.Presentations;
 
-public readonly record struct ScheduledEffect(AnimationEffect Effect, int StartMs, int EndMs, int TriggerMs);
+public readonly record struct ScheduledEffect(AnimationEffect Effect, int StartMs, int EndMs, int TriggerMs, int LoopUntilMs = 0)
+{
+    public bool LoopsAt(int timeMs) => Effect.RepeatsIndefinitely && timeMs >= StartMs && timeMs < LoopUntilMs;
+}
 
 public readonly record struct ElementVisual(double Opacity, double OffsetX, double OffsetY, double Scale)
 {
@@ -23,7 +26,9 @@ public interface IAnimationScheduler
 
     (int StartMs, int EndMs)? EntryGroup(IReadOnlyList<ScheduledEffect> schedule);
 
-    ElementVisual VisualAt(string elementId, IReadOnlyList<ScheduledEffect> schedule, int timeMs);
+    ElementVisual VisualAt(string elementId, IReadOnlyList<ScheduledEffect> schedule, int timeMs, int loopElapsedMs = 0);
+
+    bool LoopsAt(IReadOnlyList<ScheduledEffect> schedule, int timeMs);
 
     bool HasEntrance(string elementId, IReadOnlyList<ScheduledEffect> schedule);
 }
@@ -79,7 +84,17 @@ public sealed class AnimationScheduler : IAnimationScheduler
             cursor = end;
         }
 
-        return scheduled;
+        return [.. scheduled.Select((entry, index) => entry with { LoopUntilMs = LoopEnd(scheduled, index) })];
+    }
+
+    private int LoopEnd(List<ScheduledEffect> scheduled, int index)
+    {
+        var effect = scheduled[index].Effect;
+        if (!effect.RepeatsIndefinitely) return scheduled[index].EndMs;
+        if (effect.RepeatUntil == AnimationRepeatEnd.EndOfSlide) return int.MaxValue;
+        for (var next = index + 1; next < scheduled.Count; next++)
+            if (scheduled[next].Effect.Trigger == AnimationTrigger.OnClick) return scheduled[next].TriggerMs;
+        return int.MaxValue;
     }
 
     private int Saturated(long milliseconds) => (int)Math.Min(int.MaxValue, milliseconds);
@@ -122,7 +137,9 @@ public sealed class AnimationScheduler : IAnimationScheduler
     public bool HasEntrance(string elementId, IReadOnlyList<ScheduledEffect> schedule) =>
         schedule.Any(s => s.Effect.TargetId == elementId && s.Effect.Category == AnimationCategory.Entrance);
 
-    public ElementVisual VisualAt(string elementId, IReadOnlyList<ScheduledEffect> schedule, int timeMs)
+    public bool LoopsAt(IReadOnlyList<ScheduledEffect> schedule, int timeMs) => schedule.Any(scheduled => scheduled.LoopsAt(timeMs));
+
+    public ElementVisual VisualAt(string elementId, IReadOnlyList<ScheduledEffect> schedule, int timeMs, int loopElapsedMs = 0)
     {
         var mine = schedule.Where(s => s.Effect.TargetId == elementId).ToList();
         if (mine.Count == 0) return ElementVisual.Shown;
@@ -140,13 +157,13 @@ public sealed class AnimationScheduler : IAnimationScheduler
 
             appeared |= scheduled.Effect.Category is AnimationCategory.Entrance or AnimationCategory.Exit;
 
-            if (scheduled.Effect.Rewind && timeMs >= scheduled.EndMs)
+            if (scheduled.Effect.Rewind && timeMs >= scheduled.EndMs && !scheduled.LoopsAt(timeMs))
             {
                 if (scheduled.Effect.Category == AnimationCategory.Entrance) visual = Hidden;
                 continue;
             }
 
-            var progress = Progress(scheduled, timeMs);
+            var progress = scheduled.LoopsAt(timeMs) ? Cycle(scheduled, timeMs + Math.Max(0, loopElapsedMs)) : Progress(scheduled, timeMs);
             visual = Apply(scheduled.Effect, progress, visual);
         }
 
@@ -160,6 +177,14 @@ public sealed class AnimationScheduler : IAnimationScheduler
 
         var iteration = Math.Max(1, scheduled.Effect.DurationMs);
         return (double)((timeMs - scheduled.StartMs) % iteration) / iteration;
+    }
+
+    private double Cycle(ScheduledEffect scheduled, long timeMs)
+    {
+        if (timeMs <= scheduled.StartMs) return 0;
+        var iteration = Math.Max(1, scheduled.Effect.DurationMs);
+        var remainder = (timeMs - scheduled.StartMs) % iteration;
+        return remainder == 0 ? 1 : (double)remainder / iteration;
     }
 
     private ElementVisual Apply(AnimationEffect effect, double progress, ElementVisual current) =>
@@ -246,7 +271,7 @@ internal sealed class PulseMotion : EffectMotion
     public override AnimationCategory Category => AnimationCategory.Emphasis;
 
     protected override ElementVisual Shape(double progress, double eased, ElementVisual current) =>
-        current with { Opacity = Math.Max(current.Opacity, 1 - 0.6 * Math.Sin(progress * Math.PI)) };
+        current with { Opacity = Math.Min(current.Opacity, 1 - 0.6 * Math.Sin(progress * Math.PI)) };
 }
 
 internal sealed class PathMotion : EffectMotion

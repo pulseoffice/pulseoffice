@@ -131,7 +131,8 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
         var advancing = (string?)properties.Attribute(Presentation + "transition-type") == "automatic";
         var type = (string?)properties.Attribute(Smil + "type");
         if (type is null && !advancing && sound is null
-            && properties.Attribute(transitions.ExtensionNamespace + "advance-on-click") is null) return null;
+            && properties.Attribute(transitions.ExtensionNamespace + "advance-on-click") is null
+            && properties.Attribute(transitions.ExtensionNamespace + "stop-sound") is null) return null;
 
         var native = type is null
             ? SlideTransition.None
@@ -157,7 +158,8 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
             },
             AdvanceAfterMs = values.XmlDuration((string?)properties.Attribute(Presentation + "duration")),
             SoundPath = (string?)sound?.Attribute(OdfPackage.Namespaces.Xlink + "href"),
-            LoopSoundUntilNext = (string?)sound?.Attribute(Presentation + "play-full") == "false",
+            LoopSoundUntilNext = sound is not null && (string?)properties.Attribute(transitions.ExtensionNamespace + "loop-sound") == "true",
+            StopPreviousSound = sound is null && (string?)properties.Attribute(transitions.ExtensionNamespace + "stop-sound") == "true",
         };
     }
 }

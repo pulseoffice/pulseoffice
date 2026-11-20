@@ -402,6 +402,7 @@ internal sealed class OdtNoteWriter(OdtVocabulary vocabulary) : OdtXml
 internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, OdtStyleNames names, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingWriter drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
     private readonly OdfImageClip _clip = new(measure);
+    private readonly OdfImageTone _tones = new();
 
     private XElement? SignatureFallback(AnchoredObject item, OdtWriteSession session)
     {
@@ -484,6 +485,7 @@ internal sealed class OdtObjectWriter(OdtMeasure measure, OdtFrameCodec frames, 
         {
             if (picture.Filter == ImageFilter.Grayscale) graphic.Add(new XAttribute(Draw + "color-mode", "greyscale"));
             if (picture.Crop != default) graphic.Add(new XAttribute(Fo + "clip", _clip.Write(picture, item.Size)));
+            _tones.Write(graphic, picture.Tone);
         }
         var parentStyle = item.StyleName is null ? null : names.Encode(item.StyleName);
         if (drawing is not null)
@@ -643,7 +645,9 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
             new XAttribute(Table + "style-name", tableStyle),
             new XAttribute(Xml + "id", table.Id),
             table.RepeatHeaderRows ? null : new XAttribute(Pt + "repeat-header", "false"),
-            table.Banding.BandedRows ? null : new XAttribute(Table + "use-banding-rows-styles", "false"),
+            table.StyleName is { } template ? new XAttribute(Table + "template-name", names.Encode(template)) : null,
+            table.HeaderRows > 0 ? new XAttribute(Table + "use-first-row-styles", "true") : null,
+            new XAttribute(Table + "use-banding-rows-styles", table.Banding.BandedRows ? "true" : "false"),
             table.Banding.BandedColumns ? new XAttribute(Table + "use-banding-columns-styles", "true") : null,
             table.Banding.FirstColumn ? new XAttribute(Table + "use-first-column-styles", "true") : null,
             table.Banding.LastColumn ? new XAttribute(Table + "use-last-column-styles", "true") : null,
@@ -710,7 +714,7 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
         properties.Add(directions.Write(cell.TextDirection));
         if (!resolved.OwnBorders) inherited.Add("borders");
         var content = cell.Content.Blocks;
-        if (resolved.Ink is not null || resolved.Bold)
+        if (resolved.StylesText)
         {
             content = [.. content.Select(block => block is ParagraphBlock paragraph ? Inked(paragraph, resolved) : block)];
             inherited.Add("ink");
@@ -730,6 +734,9 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
             new XAttribute(Pt + "from-table-style", string.Join(' ', inherited)),
             resolved.Ink is { } ink && inherited.Contains("ink") ? new XAttribute(Pt + "header-ink", measure.Hex(ink)) : null,
             resolved.Bold && inherited.Contains("ink") ? new XAttribute(Pt + "header-bold", "true") : null,
+            resolved.Italic && inherited.Contains("ink") ? new XAttribute(Pt + "region-italic", "true") : null,
+            resolved.Font is { } regionFont && inherited.Contains("ink") ? new XAttribute(Pt + "region-font", regionFont) : null,
+            resolved.FontSize is { } regionSize && inherited.Contains("ink") ? new XAttribute(Pt + "region-font-size", measure.Points(regionSize)) : null,
             cell.Formula is null ? null : new XAttribute(Pt + "formula", cell.Formula));
         blocks.Write(element, content, sink, session);
         return element;
@@ -739,7 +746,7 @@ internal sealed class OdtTableWriter(OdtMeasure measure, OdtStyleNames names, Od
     {
         var content = paragraph.Content;
         var runs = content.Runs.Count == 0 ? [new TextRun(content.Text)] : content.Runs;
-        return new ParagraphBlock(paragraph.Id, content.WithRuns([.. runs.Select(run => run with { Bold = run.Bold || look.Bold, Color = run.Color ?? look.Ink })])) { Marks = paragraph.Marks };
+        return new ParagraphBlock(paragraph.Id, content.WithRuns([.. runs.Select(run => run with { Bold = run.Bold || look.Bold, Italic = run.Italic || look.Italic, Font = run.Font ?? look.Font, FontSize = run.FontSize ?? look.FontSize, Color = run.Color ?? look.Ink })])) { Marks = paragraph.Marks };
     }
 }
 

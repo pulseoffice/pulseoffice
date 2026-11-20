@@ -147,7 +147,17 @@ internal sealed class ShowPropertiesReader : IPptxPresentationPartReader
             FromSlide = range?.Start?.Value is { } start ? (int)Math.Min(start, int.MaxValue) : 0,
             ToSlide = range?.End?.Value is { } end ? (int)Math.Min(end, int.MaxValue) : 0,
             PenColor = pen is { Length: 6 } ? $"#{pen.ToUpperInvariant()}" : "#E11D2E",
+            KioskRestartMs = show.GetFirstChild<P.KioskSlideMode>()?.Restart?.Value is { } restart
+                ? (int)Math.Min(restart, int.MaxValue) : ShowSetup.DefaultKioskRestartMs,
+            LoopPauseMs = LoopPause(show),
         };
+    }
+
+    private int LoopPause(P.ShowProperties show)
+    {
+        var pause = show.Descendants().FirstOrDefault(element => element.LocalName == "loopPause" && element.NamespaceUri == ShowPropertiesWriter.ExtensionNamespace);
+        var value = pause?.GetAttributes().FirstOrDefault(attribute => attribute.LocalName == "ms").Value;
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ms) && ms > 0 ? ms : 0;
     }
 }
 

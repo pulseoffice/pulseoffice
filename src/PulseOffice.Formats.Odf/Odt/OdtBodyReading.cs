@@ -563,6 +563,7 @@ internal sealed class OdtNoteReader(OdtVocabulary vocabulary) : OdtXml
 internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, OdfImageTypes images, OdfImageMapCodec imageMaps, OdtDrawingReader drawings, OdtContours contours, OdfSignatureLineCodec signatures) : OdtXml
 {
     private readonly OdfImageClip _clip = new(measure);
+    private readonly OdfImageTone _tones = new();
 
     public bool Handles(XElement element) => element.Name == Draw + "frame" || element.Name == Draw + "a" || drawings.Handles(element);
 
@@ -642,6 +643,7 @@ internal sealed class OdtObjectReader(OdtMeasure measure, OdtFrameCodec frames, 
             {
                 Filter = (string?)graphic?.Attribute(Draw + "color-mode") == "greyscale" ? ImageFilter.Grayscale : picture.Filter,
                 Crop = _clip.Read((string?)graphic?.Attribute(Fo + "clip"), picture, size),
+                Tone = _tones.Read(graphic),
                 Map = imageMaps.Read(frame, size),
             });
         if (content is null) return null;
@@ -808,7 +810,7 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
         var table = new TableBlock(id, header.Concat(body), columns)
         {
             Name = (string?)element.Attribute(Pt + "unnamed") == "true" ? null : (string?)element.Attribute(Table + "name"),
-            StyleName = styleName,
+            StyleName = styleName ?? ((string?)element.Attribute(Table + "template-name") is { Length: > 0 } template ? context.StyleNames.Resolve(template) : null),
             HeaderRows = header.Count,
             RepeatHeaderRows = (string?)element.Attribute(Pt + "repeat-header") != "false",
             Banding = new PulseOffice.Document.Tables.TableBanding
@@ -967,7 +969,7 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
         if (!inherited.Contains("background")) cell.Background = measure.Color((string?)properties?.Attribute(Fo + "background-color"));
         if (!inherited.Contains("borders") && properties is not null && borders.Read(properties) is { } lines)
             cell.Borders = new PulseOffice.Text.Rich.BoxBorders { Top = lines.Top, Bottom = lines.Bottom, Left = lines.Left, Right = lines.Right };
-        if (inherited.Contains("ink")) Uninked(cell, measure.Color((string?)element.Attribute(Pt + "header-ink")), (string?)element.Attribute(Pt + "header-bold") == "true");
+        if (inherited.Contains("ink")) Uninked(cell, element);
         cell.Formula = (string?)element.Attribute(Pt + "formula")
             ?? formulas.Read((string?)element.Attribute(Table + "formula"))
             ?? formulas.Read((string?)element.Descendants(Text + "table-formula").FirstOrDefault()?.Attribute(Text + "formula"));
@@ -980,8 +982,13 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
         return cell;
     }
 
-    private void Uninked(TableCell cell, uint? ink, bool bold)
+    private void Uninked(TableCell cell, XElement element)
     {
+        var ink = measure.Color((string?)element.Attribute(Pt + "header-ink"));
+        var bold = (string?)element.Attribute(Pt + "header-bold") == "true";
+        var italic = (string?)element.Attribute(Pt + "region-italic") == "true";
+        var font = (string?)element.Attribute(Pt + "region-font");
+        var size = measure.Points((string?)element.Attribute(Pt + "region-font-size"));
         foreach (var paragraph in cell.Content.Blocks.OfType<ParagraphBlock>())
         {
             if (paragraph.Content.Runs.Count == 0) continue;
@@ -989,6 +996,9 @@ internal sealed class OdtTableReader(OdtMeasure measure, OdtStyleNames names, Od
             {
                 Color = ink is not null && run.Color == ink ? null : run.Color,
                 Bold = !bold && run.Bold,
+                Italic = !italic && run.Italic,
+                Font = font is not null && run.Font == font ? null : run.Font,
+                FontSize = size is { } points && run.FontSize is { } own && Math.Abs(own - points) < 0.01 ? null : run.FontSize,
             })]);
         }
     }

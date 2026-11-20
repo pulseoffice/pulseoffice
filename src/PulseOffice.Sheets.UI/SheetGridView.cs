@@ -481,7 +481,14 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
 
     public event EventHandler<Outline.OutlineButton>? OutlineRequested { add => Events.OutlineRequested += value; remove => Events.OutlineRequested -= value; }
 
-    public sealed record FillRequest(CellRange Source, CellRange Target);
+    public sealed record FillRequest(CellRange Source, CellRange Target)
+    {
+        public Engine.Operations.FillMode Mode { get; init; }
+
+        public bool Toggled { get; init; }
+    }
+
+    public Rect CellBounds(CellAddress address) => Viewport.ToScreen(Viewport.MergedRect(address));
 
     public sealed record ObjectChange(
         PlacedObject Object, CellAddress Anchor, Twip OffsetX, Twip OffsetY,

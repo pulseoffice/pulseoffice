@@ -485,7 +485,7 @@ public sealed class DocxComposer
         var tree = new PulseOffice.Documents.Blocks.BlockTree();
         var catalog = new PulseOffice.Documents.Controls.ContentControlCatalog(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree);
         var inlineWriter = new DocxInlineWriter(_formatting, characters, fields, drawings, revisions, controls, catalog, new PulseOffice.Documents.Marks.MarkOrder(), new PulseOffice.Documents.Blocks.BlockTree(), new DocxFieldCodeWriter(new PulseOffice.Documents.Editing.StoryCatalog(tree), tree));
-        var tableStyles = new DocxTableStyleCodec(_values);
+        var tableStyles = new DocxTableStyleCodec(_values, borders);
         var floatingTables = new DocxFloatingTables();
         var cellGeometry = new DocxCellGeometry();
         var tabPositions = new DocxTabPositions(new StyleResolver());

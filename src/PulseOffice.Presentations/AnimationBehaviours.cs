@@ -214,6 +214,8 @@ public sealed record AnimationBehaviours
 
     public double? IterateInterval { get; init; }
 
+    public bool IterateBackwards { get; init; }
+
     public bool TextOnly { get; init; }
 
     public BehaviourTiming RootTiming { get; init; } = new();
@@ -232,7 +234,7 @@ public sealed record AnimationBehaviours
 
     public bool Equals(AnimationBehaviours? other) =>
         other is not null && Nodes.SequenceEqual(other.Nodes) && IterateType == other.IterateType
-        && IterateInterval == other.IterateInterval && TextOnly == other.TextOnly && RootTiming == other.RootTiming;
+        && IterateInterval == other.IterateInterval && IterateBackwards == other.IterateBackwards && TextOnly == other.TextOnly && RootTiming == other.RootTiming;
 
     public override int GetHashCode() => HashCode.Combine(Nodes.Count, IterateType, IterateInterval, TextOnly);
 }

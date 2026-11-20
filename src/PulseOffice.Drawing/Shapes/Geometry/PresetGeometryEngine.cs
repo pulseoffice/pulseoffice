@@ -9,7 +9,11 @@ public interface IPresetGeometryEngine
     ShapeOutline Outline(PresetGeometry geometry, double width, double height);
 
     bool Adjusted(PresetGeometry geometry);
+
+    PresetTextBounds? TextBounds(PresetGeometry geometry, double width, double height);
 }
+
+public readonly record struct PresetTextBounds(double Left, double Top, double Right, double Bottom);
 
 public sealed class PresetGeometryEngine(IPresetShapeCatalog catalog, IDrawingBuiltIns builtIns, IGuideOperators operators) : IPresetGeometryEngine
 {
@@ -43,14 +47,7 @@ public sealed class PresetGeometryEngine(IPresetShapeCatalog catalog, IDrawingBu
         if (catalog.Find(geometry.Name) is not { } definition) return ShapeOutline.Empty;
         var w = width > 0 ? width : 1;
         var h = height > 0 ? height : 1;
-        var scope = new DrawingGuideScope(w, h, builtIns, operators);
-        foreach (var adjustment in definition.Adjustments)
-        {
-            var given = geometry.Adjustments.FirstOrDefault(value => value.Name == adjustment.Name)
-                ?? (definition.Adjustments.Count == 1 ? geometry.Adjustments.FirstOrDefault() : null);
-            scope.Set(adjustment.Name, given?.Value ?? scope.Evaluate(adjustment));
-        }
-        foreach (var guide in definition.Guides) scope.Define(guide);
+        var scope = Scope(definition, geometry, w, h);
 
         var builder = new GeometryPathBuilder();
         foreach (var path in definition.Paths)
@@ -61,6 +58,31 @@ public sealed class PresetGeometryEngine(IPresetShapeCatalog catalog, IDrawingBu
             builder.End();
         }
         return builder.Build(0, 0, w, h);
+    }
+
+    public PresetTextBounds? TextBounds(PresetGeometry geometry, double width, double height)
+    {
+        ArgumentNullException.ThrowIfNull(geometry);
+        if (catalog.Find(geometry.Name) is not { TextRect: { } rect } definition || width <= 0 || height <= 0) return null;
+        var scope = Scope(definition, geometry, width, height);
+        var left = Math.Clamp(scope.Value(rect.Left), 0, width);
+        var top = Math.Clamp(scope.Value(rect.Top), 0, height);
+        var right = Math.Clamp(scope.Value(rect.Right), left, width);
+        var bottom = Math.Clamp(scope.Value(rect.Bottom), top, height);
+        return new PresetTextBounds(left, top, right, bottom);
+    }
+
+    private DrawingGuideScope Scope(PresetShapeDefinition definition, PresetGeometry geometry, double width, double height)
+    {
+        var scope = new DrawingGuideScope(width, height, builtIns, operators);
+        foreach (var adjustment in definition.Adjustments)
+        {
+            var given = geometry.Adjustments.FirstOrDefault(value => value.Name == adjustment.Name)
+                ?? (definition.Adjustments.Count == 1 ? geometry.Adjustments.FirstOrDefault() : null);
+            scope.Set(adjustment.Name, given?.Value ?? scope.Evaluate(adjustment));
+        }
+        foreach (var guide in definition.Guides) scope.Define(guide);
+        return scope;
     }
 
     private sealed class Walker(DrawingGuideScope scope, GeometryPathBuilder builder, double scaleX, double scaleY) : IPresetPathVisitor

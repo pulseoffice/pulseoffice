@@ -18,10 +18,11 @@ public sealed class ShapeStorySizes : IShapeStorySizes
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(layout);
         var settled = false;
-        foreach (var box in layout.Pages.SelectMany(page => page.Objects).Where(box => box.Layer != ObjectLayer.Inline))
+        foreach (var box in layout.Pages.SelectMany(page => page.Objects))
         {
             if (document.Objects.Find(box.ObjectId) is not { } item || !Resizes(item)) continue;
-            var height = Twip.FromPoints(box.Bounds.Height);
+            if (box.Layer == ObjectLayer.Inline && box.FittedHeight is null) continue;
+            var height = Twip.FromPoints(box.Layer == ObjectLayer.Inline ? box.FittedHeight!.Value : box.Bounds.Height);
             if (Math.Abs(height.Value - item.Size.Height.Value) <= Tolerance) continue;
             item.Size = new DocumentSize(item.Size.Width, height);
             settled = true;

@@ -11,15 +11,18 @@ internal sealed class FillGesture(
 
     public CellRange Preview { get; private set; } = source;
 
+    public bool Toggled { get; private set; }
+
     public override void Move(Point point, KeyModifiers modifiers)
     {
+        Toggled = (modifiers & (KeyModifiers.Control | KeyModifiers.Alt)) != KeyModifiers.None;
         if (viewport.CellAt(point) is not { } over) return;
 
         Preview = PreviewFor(_source, over);
         surface.Invalidate();
     }
 
-    public override void Release() => notifications.Fill(new SheetGridView.FillRequest(_source, Preview));
+    public override void Release() => notifications.Fill(new SheetGridView.FillRequest(_source, Preview) { Toggled = Toggled });
 
     private CellRange PreviewFor(CellRange origin, CellAddress over)
     {

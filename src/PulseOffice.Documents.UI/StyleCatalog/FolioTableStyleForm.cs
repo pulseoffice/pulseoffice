@@ -1,6 +1,7 @@
 using PulseOffice.Documents.Styles;
 using PulseOffice.Documents.UI.Commands;
 using PulseOffice.Localization;
+using PulseOffice.Text.Rich;
 using PulseOffice.UI.Controls;
 
 namespace PulseOffice.Documents.UI.StyleCatalog;
@@ -38,6 +39,7 @@ public sealed class FolioTableStyleForm(ITextCatalog texts) : IFolioTableStyleFo
                 new ColorField("headerBackground", texts["folio.tableStyle.headerBackground"], _colors.Hex(Shown(effective.HeaderBackground))),
                 new ColorField("headerColor", texts["folio.tableStyle.headerColor"], _colors.Hex(Shown(effective.HeaderColor))),
                 new CheckField("headerBold", texts["folio.tableStyle.headerBold"], effective.HeaderBold == true),
+                .. ExtraFields(effective, TableRegion.HeaderRow),
             ]),
             new(texts["folio.tableStyle.tab.bands"], texts["folio.tableStyle.bands.explanation"],
             [
@@ -45,6 +47,8 @@ public sealed class FolioTableStyleForm(ITextCatalog texts) : IFolioTableStyleFo
                 new ChoiceField("firstBandAxes", texts["folio.tableStyle.firstBandAxes"], axes, Index(effective.FirstBandAxes)),
                 new ColorField("secondBand", texts["folio.tableStyle.secondBand"], _colors.Hex(Shown(effective.BandBackground))),
                 new ChoiceField("secondBandAxes", texts["folio.tableStyle.secondBandAxes"], axes, Index(effective.BandAxes)),
+                .. ExtraFields(effective, TableRegion.FirstBand),
+                .. ExtraFields(effective, TableRegion.SecondBand),
             ]),
             new(texts["folio.tableStyle.tab.totalRow"], texts["folio.tableStyle.totalRow.explanation"], RegionFields(effective, TableRegion.TotalRow)),
             new(texts["folio.tableStyle.tab.columns"], texts["folio.tableStyle.columns.explanation"],
@@ -64,7 +68,46 @@ public sealed class FolioTableStyleForm(ITextCatalog texts) : IFolioTableStyleFo
             new ColorField(key + ".background", texts.Format("folio.tableStyle.region.background", name), _colors.Hex(Shown(format?.Background))),
             new ColorField(key + ".color", texts.Format("folio.tableStyle.region.color", name), _colors.Hex(Shown(format?.Ink))),
             new CheckField(key + ".bold", texts.Format("folio.tableStyle.region.bold", name), format?.Bold == true),
+            .. ExtraFields(effective, region),
         ];
+    }
+
+    private IReadOnlyList<FormField> ExtraFields(TableProperties effective, TableRegion region)
+    {
+        var format = effective.Region(region);
+        var key = Key(region);
+        var name = texts["folio.tableStyle.region." + key];
+        var line = Line(format?.Borders);
+        return
+        [
+            new CheckField(key + ".italic", texts.Format("folio.tableStyle.region.italic", name), format?.Italic == true),
+            new TextField(key + ".font", texts.Format("folio.tableStyle.region.font", name), format?.Font ?? string.Empty),
+            new NumberField(key + ".fontSize", texts.Format("folio.tableStyle.region.fontSize", name), format?.FontSize ?? 0, 0, 96, 0.5) { Unit = "pt" },
+            new ColorField(key + ".lineColor", texts.Format("folio.tableStyle.region.lineColor", name), _colors.Hex(line?.Color)),
+            new NumberField(key + ".lineWidth", texts.Format("folio.tableStyle.region.lineWidth", name), line?.Width ?? 0, 0, 12, 0.25) { Unit = "pt" },
+        ];
+    }
+
+    private BorderLine? Line(BoxBorders? borders) =>
+        borders is null ? null : borders.Top ?? borders.Bottom ?? borders.Left ?? borders.Right;
+
+    private TableRegionFormat ReadExtras(TableRegionFormat format, TableRegionFormat? shown, TableRegionFormat? kept, IReadOnlyDictionary<string, object> values, string key)
+    {
+        var italic = values.Flag(key + ".italic");
+        var font = values.Text(key + ".font").Trim();
+        var size = values.Number(key + ".fontSize", shown?.FontSize ?? 0);
+        var shownLine = Line(shown?.Borders);
+        var width = values.Number(key + ".lineWidth", shownLine?.Width ?? 0);
+        var colour = _colors.Argb(values.Text(key + ".lineColor"));
+        var lineChanged = Math.Abs(width - (shownLine?.Width ?? 0)) >= 0.001 || colour is not null && !Equal(colour, shownLine?.Color);
+        var line = width > 0 ? new BorderLine(width, colour ?? shownLine?.Color ?? 0xFF000000) : null;
+        return format with
+        {
+            Italic = italic == (shown?.Italic == true) ? kept?.Italic : italic,
+            Font = string.Equals(font, shown?.Font ?? string.Empty, StringComparison.Ordinal) ? kept?.Font : string.IsNullOrEmpty(font) ? null : font,
+            FontSize = Math.Abs(size - (shown?.FontSize ?? 0)) < 0.001 ? kept?.FontSize : size > 0 ? size : null,
+            Borders = !lineChanged ? kept?.Borders : line is null ? null : new BoxBorders { Top = line, Bottom = line, Left = line, Right = line },
+        };
     }
 
     private TableProperties ReadRegion(TableProperties result, TableProperties effective, TableProperties own, IReadOnlyDictionary<string, object> values, TableRegion region)
@@ -79,7 +122,8 @@ public sealed class FolioTableStyleForm(ITextCatalog texts) : IFolioTableStyleFo
             Ink = Colour(values, key + ".color", shown?.Ink, kept?.Ink),
             Bold = bold == (shown?.Bold == true) ? kept?.Bold : bold,
         };
-        return result.WithRegion(region, format);
+        if (region is TableRegion.HeaderRow or TableRegion.FirstBand or TableRegion.SecondBand) format = new TableRegionFormat();
+        return result.WithRegion(region, ReadExtras(format, shown, kept, values, key));
     }
 
     private string Key(TableRegion region) => region.ToString();

@@ -8,6 +8,8 @@ namespace PulseOffice.Sheets.Engine.Operations;
 
 public enum FillDirection { Down, Up, Right, Left }
 
+public enum FillMode { Automatic, Copy, Series, FormattingOnly, WithoutFormatting }
+
 public sealed record FillMergePlan(IReadOnlyList<CellRange> Removed, IReadOnlyList<CellRange> Added)
 {
     public static FillMergePlan None { get; } = new([], []);
@@ -19,6 +21,10 @@ public interface ISheetFill
 {
     IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 
+    IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(Worksheet sheet, CellRange source, CellRange target, FillDirection direction, FillMode mode);
+
+    FillMode Toggled(Worksheet sheet, CellRange source);
+
     FillMergePlan Merges(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 
     IReadOnlyList<(CellAddress Address, CellComment? Comment)> Comments(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
@@ -28,6 +34,7 @@ public sealed class SheetFill : ISheetFill
 {
     private readonly IReadOnlyDictionary<FillDirection, FillAxis> _axes;
     private readonly IReadOnlyList<FillRule> _rules;
+    private readonly IReadOnlyList<FillRule> _copyRules;
 
     private readonly PulseOffice.Sheets.Formatting.ICalendarFormats _calendars;
 
@@ -40,13 +47,29 @@ public sealed class SheetFill : ISheetFill
         ArgumentNullException.ThrowIfNull(locale);
         _calendars = calendars ?? throw new ArgumentNullException(nameof(calendars));
         _axes = new FillAxis[] { new DownAxis(), new UpAxis(), new RightAxis(), new LeftAxis() }.ToDictionary(axis => axis.Direction);
-        _rules = [new FormulaFillRule(), new ProgressionFillRule(), new SingleDateFillRule(), new NamedListFillRule(locale), new NumberedTextFillRule(), new RepeatFillRule()];
+        _rules = [new FormulaFillRule(), new ProgressionFillRule(), new SingleDateFillRule(), new NamedListFillRule(locale), new NumberedTextFillRule(), new SingleNumberSeriesFillRule(), new RepeatFillRule()];
+        _copyRules = [new FormulaFillRule(), new RepeatFillRule()];
+    }
+
+    public FillMode Toggled(Worksheet sheet, CellRange source)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        if (source.IsSingleCell
+            && sheet[source.Start] is { HasFormula: false } cell && cell.Value.Kind == ValueKind.Number
+            && !(sheet.Owner is { } owner && _calendars.NamesDays(owner, sheet.StyleIdAt(source.Start))))
+            return FillMode.Series;
+        return FillMode.Copy;
     }
 
     public IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(
-        Worksheet sheet, CellRange source, CellRange target, FillDirection direction)
+        Worksheet sheet, CellRange source, CellRange target, FillDirection direction) =>
+        Extend(sheet, source, target, direction, FillMode.Automatic);
+
+    public IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(
+        Worksheet sheet, CellRange source, CellRange target, FillDirection direction, FillMode mode)
     {
         ArgumentNullException.ThrowIfNull(sheet);
+        var rules = mode == FillMode.Copy ? _copyRules : _rules;
 
         var axis = _axes[direction];
         var result = new List<(CellAddress, Cell)>();
@@ -66,8 +89,15 @@ public sealed class SheetFill : ISheetFill
                 if (!address.IsValid || axis.Hidden(sheet, address)) continue;
 
                 visible++;
-                var fill = new FillStep(seed, visible, address, axis.Origin(source, lane, visible), axis.Backwards) { SingleDate = singleDate };
-                result.Add((address, _rules.Select(rule => rule.Produce(fill)).First(cell => cell is not null)!));
+                var fill = new FillStep(seed, visible, address, axis.Origin(source, lane, visible), axis.Backwards) { SingleDate = singleDate, Mode = mode };
+                var produced = rules.Select(rule => rule.Produce(fill)).First(cell => cell is not null)!;
+                var previous = sheet[address];
+                result.Add((address, mode switch
+                {
+                    FillMode.FormattingOnly => previous with { StyleId = fill.Template.StyleId, ExplicitStyle = fill.Template.ExplicitStyle },
+                    FillMode.WithoutFormatting => produced with { StyleId = previous.StyleId, ExplicitStyle = previous.ExplicitStyle },
+                    _ => produced,
+                }));
             }
         }
 
@@ -137,6 +167,8 @@ public sealed class SheetFill : ISheetFill
 internal sealed record FillStep(IReadOnlyList<Cell> Seed, int Step, CellAddress Address, CellAddress Origin, bool Backwards)
 {
     public bool SingleDate { get; init; }
+
+    public FillMode Mode { get; init; }
 
     public int Cycle => (Step - 1) / Seed.Count + 1;
 
@@ -323,12 +355,40 @@ internal sealed class NumberedTextFillRule : FillRule
         var prefix = match.Groups["prefix"].Value;
         if (prefix.Length > 0 && char.IsAsciiDigit(prefix[^1])) return null;
         var number = long.Parse(digits, CultureInfo.InvariantCulture);
-        var increment = (long)step.Cycle * step.Seed.Count;
+        var increment = (long)step.Cycle * Stride(step, prefix);
         var next = Math.Max(0, number + (step.Backwards ? -increment : increment));
 
         var text = match.Groups["prefix"].Value + next.ToString(CultureInfo.InvariantCulture).PadLeft(digits.Length, '0');
         return template with { Value = CellValue.Text(text), Formula = null };
     }
+
+    private long Stride(FillStep step, string prefix)
+    {
+        if (step.Seed.Count < 2) return step.Seed.Count;
+        var numbers = new List<long>();
+        foreach (var cell in step.Seed)
+        {
+            if (cell.HasFormula || cell.Value.Kind != ValueKind.Text
+                || _trailingNumber.Match(cell.Value.AsText()) is not { Success: true } match
+                || !string.Equals(match.Groups["prefix"].Value, prefix, StringComparison.Ordinal)
+                || match.Groups["number"].Value.Length > 18)
+                return step.Seed.Count;
+            numbers.Add(long.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture));
+        }
+
+        var difference = numbers[1] - numbers[0];
+        for (var index = 2; index < numbers.Count; index++)
+            if (numbers[index] - numbers[index - 1] != difference) return step.Seed.Count;
+        return difference * step.Seed.Count;
+    }
+}
+
+internal sealed class SingleNumberSeriesFillRule : FillRule
+{
+    public override Cell? Produce(FillStep step) =>
+        step.Mode == FillMode.Series && step.Seed.Count == 1 && !step.Template.HasFormula && step.Template.Value.Kind == ValueKind.Number
+            ? step.Template with { Value = CellValue.Number(step.Template.Value.AsNumber() + (step.Backwards ? -step.Step : step.Step)), Formula = null }
+            : null;
 }
 
 internal sealed class RepeatFillRule : FillRule

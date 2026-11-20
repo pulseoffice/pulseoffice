@@ -15,6 +15,12 @@ public sealed class FunctionWizardView : UserControl, IDialogContent, PulseOffic
 {
     private readonly IReadOnlyList<FunctionDefinition> _functions;
     private readonly ITextCatalog _texts;
+
+    public IFunctionSignatures Signatures { get; set; } = new FunctionSignatures();
+
+    private string ArgumentLabel(int index) => Chosen is { } function && Signatures.ArgumentName(function.Name, index) is { Length: > 0 } name
+        ? name
+        : _texts.Format("functions.argument", index + 1);
     private readonly DesignTokens.Metrics _metrics = DesignTokens.For(InterfaceDensity.Compact);
 
     private readonly ListBox _categories = new();
@@ -291,17 +297,17 @@ public sealed class FunctionWizardView : UserControl, IDialogContent, PulseOffic
         }
 
         var slots = function.MaxArguments is int.MaxValue or > 6
-            ? Math.Max(function.MinArguments, 3)
+            ? Math.Max(Math.Max(function.MinArguments, 3), Signatures.Arguments(function.Name).Count)
             : function.MaxArguments;
 
         _signature.Text = $"{Shown(function)}({string.Join(ArgumentSeparator,
-            Enumerable.Range(1, slots).Select(index => _texts.Format("functions.argument", index)))})";
+            Enumerable.Range(0, slots).Select(ArgumentLabel))})";
 
         _description.Text = function.Description ?? _texts.Format("functions.category", CategoryLabel(function.Category));
 
         for (var index = 0; index < slots; index++)
         {
-            var box = new TextBox { PlaceholderText = _texts.Format("functions.argument", index + 1) };
+            var box = new TextBox { PlaceholderText = ArgumentLabel(index) };
             box.TextChanged += (_, _) => UpdatePreview();
 
             _argumentBoxes.Add(box);

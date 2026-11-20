@@ -26,6 +26,8 @@ internal sealed class OdtStylesWriter(
 {
     private readonly OdtTableRegionNames _regionNames = new();
 
+    private readonly OdtTableTemplates _templates = new(measure, borders, characters);
+
     public XElement Styles(TextDocument document, OdtWriteSession session)
     {
         var sheet = document.Styles;
@@ -45,6 +47,7 @@ internal sealed class OdtStylesWriter(
         foreach (var style in sheet.Frame.All)
             styles.Add(Named(style, "graphic", null, frames.Graphic(style.Frame)));
         foreach (var style in sheet.Table.All) styles.Add(TableStyle(style));
+        foreach (var style in sheet.Table.All) styles.Add(_templates.Write(style.Table, names.Encode(style.Name)));
         foreach (var style in sheet.List.All) styles.Add(ListStyle(style, session));
         styles.Add(Outline(sheet.Outline));
 
@@ -220,9 +223,21 @@ internal sealed class OdtStylesWriter(
                 new XAttribute(Pt + "region", _regionNames.Token(region)),
                 format.Background is { } fill ? new XAttribute(Pt + "background", measure.Fill(fill)) : null,
                 format.Ink is { } regionInk ? new XAttribute(Pt + "color", measure.Fill(regionInk)) : null,
-                format.Bold is { } regionBold ? new XAttribute(Pt + "bold", regionBold ? "true" : "false") : null));
+                format.Bold is { } regionBold ? new XAttribute(Pt + "bold", regionBold ? "true" : "false") : null,
+                format.Italic is { } regionItalic ? new XAttribute(Pt + "italic", regionItalic ? "true" : "false") : null,
+                format.Font is { } regionFont ? new XAttribute(Pt + "font", regionFont) : null,
+                format.FontSize is { } regionSize ? new XAttribute(Pt + "font-size", measure.Points(regionSize)) : null,
+                RegionBorders(format.Borders)));
         }
         return element;
+    }
+
+    private XElement? RegionBorders(BoxBorders? lines)
+    {
+        if (lines is null) return null;
+        var cell = new XElement(Style + "table-cell-properties");
+        borders.Write(cell, lines);
+        return cell;
     }
 
     private XElement Named(DocumentStyle style, string family, string? next, params object?[] content)

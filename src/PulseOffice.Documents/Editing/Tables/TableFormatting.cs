@@ -188,6 +188,13 @@ public sealed class TableFormatting(ITableGrid grid, IStyleEditing styles, IBloc
                 BandBackground = look.BandFill,
                 Background = look.BodyFill,
                 InnerLines = look.InnerLines,
+                TotalRow = new TableRegionFormat
+                {
+                    Bold = true,
+                    Borders = new BoxBorders { Top = new BorderLine(Math.Max(look.BorderWidth, 0.5) * 3, look.BorderColor) { Style = BorderLineStyle.Double } },
+                },
+                FirstColumn = new TableRegionFormat { Bold = true },
+                LastColumn = new TableRegionFormat { Bold = true },
             },
         }, "add-table-style");
         return name;

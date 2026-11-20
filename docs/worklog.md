@@ -14145,3 +14145,31 @@ docs/deep-audit/round-272-shape-autofit-modules.md.
   completes function and range names with Tab and shows argument tips; F4 cycles whole columns and rows; paste special
   operations count blanks as zero and keep target formulas; the fill handle advances single dates and day and month
   names. Log: docs/deep-audit/round-277-ledger-cell-editing.md.
+
+### Round 278: Deck slide show leftovers (2026-11-20)
+- Repeats until next click or end of slide keep looping in the show; effect sounds and the sounds of non-sound actions
+  play; "stop previous sound" is modelled (PPTX `p:endSnd`, ODP extension); ODP `play-full="false"` is no longer read as
+  a loop; a kiosk accepts only Esc and carries its restart delay and the pause between loops in both formats; backwards
+  iteration is modelled; from current slide on a hidden slide shows it. Log:
+  docs/deep-audit/round-278-deck-show-leftovers.md.
+
+### Round 279: Folio table templates and region text formats (2026-11-20)
+- ODT writes and reads a native `table:table-template` per table style with region cell styles, and tables name it;
+  region formats (and new header and band regions) carry italics, fonts, sizes and lines through layout, editor, DOCX
+  `tblStylePr` and ODT; quick looks set total-row and column formats. Log: docs/deep-audit/round-279-folio-table-templates.md.
+
+### Round 280: Ledger formula entry and fill handle leftovers (2026-11-20)
+
+- Switching sheet while typing a formula keeps the entry and inserts sheet-qualified references; AutoComplete is a list
+  of matching functions and names in the cell editor and the formula bar, both with argument tips that name the
+  arguments from a new signature table for every function; the fill handle toggles copy and series with Ctrl or Alt,
+  offers fill options after the drag, copies formats, and numbered text steps by the seed's difference.
+  Log: docs/deep-audit/round-280-ledger-formula-entry.md.
+
+### Round 281: shape autofit leftovers and Folio images (2026-11-20)
+- Shape text areas evaluate the DrawingML text rectangle with the shape's adjust values for adjusted presets and for
+  stars, heart, sun, cloud and pentagon; the overlay shape text editor covers the inner text area and rotates about
+  the shape centre; inline resize-shape shapes store their fitted height. Folio images keep brightness, contrast and
+  transparency (`ImageTone`) through DOCX (`a:lum`, `a:alphaModFix`), ODT (`draw:luminance`, `draw:contrast`,
+  `draw:image-opacity`) and XLSX, drawn by the shared raster painter. Log:
+  docs/deep-audit/round-281-shape-areas-folio-images.md.

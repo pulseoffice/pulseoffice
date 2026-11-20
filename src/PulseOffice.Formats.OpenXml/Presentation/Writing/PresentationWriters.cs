@@ -123,6 +123,10 @@ internal sealed class ExtensionsWriter(IReadOnlyList<IPresentationExtension> ext
 
 internal sealed class ShowPropertiesWriter
 {
+    public const string ExtensionNamespace = "urn:pulseoffice:presentation-show";
+
+    public const string ExtensionUri = "{6E3C5B0A-6B1D-4F0E-9C77-2F1B8D5A4C21}";
+
     public void Write(PptxWriteSession session)
     {
         var setup = session.Deck.Setup;
@@ -133,7 +137,8 @@ internal sealed class ShowPropertiesWriter
             UseTimings = setup.Advance == ShowAdvanceMode.UseTimings,
         };
 
-        if (setup.Kind == ShowKind.Kiosk) show.Append(new P.KioskSlideMode());
+        if (setup.Kind == ShowKind.Kiosk)
+            show.Append(new P.KioskSlideMode { Restart = setup.KioskRestartMs == ShowSetup.DefaultKioskRestartMs ? null : (uint)Math.Max(0, setup.KioskRestartMs) });
         else if (setup.Kind == ShowKind.Window) show.Append(new P.BrowseSlideMode());
         else show.Append(new P.PresenterSlideMode());
 
@@ -149,6 +154,13 @@ internal sealed class ShowPropertiesWriter
                 ? new P.SlideRange { Start = (uint)start, End = (uint)end }
                 : new P.SlideAll());
         show.Append(new P.PenColor(new D.RgbColorModelHex { Val = Pen(setup.PenColor) }));
+        if (setup.LoopPauseMs > 0)
+        {
+            var pause = new DocumentFormat.OpenXml.OpenXmlUnknownElement("pulseshow", "loopPause", ExtensionNamespace);
+            pause.SetAttribute(new DocumentFormat.OpenXml.OpenXmlAttribute("ms", string.Empty,
+                setup.LoopPauseMs.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            show.Append(new P.ShowPropertiesExtensionList(new P.ShowPropertiesExtension(pause) { Uri = ExtensionUri }));
+        }
 
         var part = session.Part.AddNewPart<PresentationPropertiesPart>();
         part.PresentationProperties = new P.PresentationProperties(show);
@@ -386,3 +398,4 @@ internal sealed class PptxFidelityRules
     private IEnumerable<ObjectElement> Objects(PulseOffice.Presentations.Presentation deck) =>
         deck.Slides.SelectMany(s => s.Elements).OfType<ObjectElement>();
 }
+

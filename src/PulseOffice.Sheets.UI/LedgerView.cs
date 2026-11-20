@@ -60,6 +60,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
     private readonly LedgerCellEditing _editing;
     private readonly LedgerObjectEditing _objects;
     private readonly LedgerCellOperations _operations;
+    private readonly LedgerFillOptions _fillOptions;
     private readonly LedgerShapeTextSession _shapeText;
 
     private readonly IActiveSheetContext _sheetContext;
@@ -205,6 +206,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _objects = new LedgerObjectEditing(_workbook, _grid, _history, _status, _texts,
             connectors ?? new SheetConnectors(), binding, _writer);
         _operations = new LedgerCellOperations(_workbook, _engine, _grid, _selection, _history, _status, _texts, _writer, new Outline.OutlineGutter());
+        _fillOptions = new LedgerFillOptions(_grid, _operations, _texts);
         var textEditing = shapeTextEditing ?? new Drawing.Shapes.ShapeTextEditing();
         _shapeText = new LedgerShapeTextSession(_workbook, _grid, _overlay, this, _texts,
             shapeTextStyle ?? new ShapeText.ShapeTextCellStyle(textEditing), textEditing,
@@ -244,7 +246,6 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
         _overlay.Children.Add(_editing.CellEditor);
         _overlay.Children.Add(_editing.AnnotatedRange);
-        _overlay.Children.Add(_editing.ArgumentTip);
         _overlay.Children.Add(_shapeText.Editor);
 
         _grid.ZoomChanged += (_, zoom) => ShowZoom(zoom);
@@ -254,6 +255,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
         _selection.Changed += (_, _) =>
         {
+            _fillOptions.Hide();
             if (_editing.TryPoint(_selection.Range)) return;
             if (_editing.IsEditing) _editing.CommitEditor();
             _editing.CommitFormulaBar();
@@ -550,9 +552,14 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
     private void SelectSheet(int index)
     {
         if (index < 0 || index >= _workbook.Sheets.Count) return;
-        _editing.CommitEditor();
-        _editing.CommitFormulaBar();
+        var pointing = index != _grid.SheetIndex && _editing.KeepEntryAcrossSheets();
+        if (!pointing)
+        {
+            _editing.CommitEditor();
+            _editing.CommitFormulaBar();
+        }
 
+        _fillOptions.Hide();
         _grid.SheetIndex = index;
         _sheetTabs.Show(_workbook.Sheets, index);
 
@@ -560,6 +567,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         OnSelectionChanged();
         PublishSelectionContext();
         _referencePick?.SelectionChanged();
+        if (pointing) _editing.TryPoint(_selection.Range);
     }
 
     private void OnSelectionChanged()

@@ -46,6 +46,9 @@ public sealed class PresetShapeCatalog : IPresetShapeCatalog
         [.. (Child(shape, "pathLst")?.Elements().Where(element => element.Name.LocalName == "path") ?? []).Select(Path)])
     {
         Handles = [.. (Child(shape, "ahLst")?.Elements() ?? []).Select(Handle).OfType<PresetHandle>()],
+        TextRect = Child(shape, "rect") is { } rect
+            ? new PresetTextRect((string?)rect.Attribute("l") ?? "l", (string?)rect.Attribute("t") ?? "t", (string?)rect.Attribute("r") ?? "r", (string?)rect.Attribute("b") ?? "b")
+            : null,
     };
 
     private PresetHandle? Handle(XElement handle)

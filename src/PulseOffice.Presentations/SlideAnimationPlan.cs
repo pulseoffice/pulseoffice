@@ -30,7 +30,9 @@ public sealed class SlideAnimationPlan
     public IReadOnlyList<(int StartMs, int EndMs)> TriggerGroups(string triggerShapeId) =>
         _triggered.TryGetValue(triggerShapeId, out var schedule) ? _scheduler.TriggerGroups(schedule) : [];
 
-    public ElementVisual VisualAt(string elementId, int mainTimeMs, Func<string, int> triggerTimeMs)
+    public bool LoopsAt(int mainTimeMs) => _scheduler.LoopsAt(Main, mainTimeMs);
+
+    public ElementVisual VisualAt(string elementId, int mainTimeMs, Func<string, int> triggerTimeMs, int loopElapsedMs = 0)
     {
         ArgumentNullException.ThrowIfNull(triggerTimeMs);
         var inMain = Main.Any(scheduled => scheduled.Effect.TargetId == elementId);
@@ -40,6 +42,6 @@ public sealed class SlideAnimationPlan
             var time = triggerTimeMs(trigger);
             if (time >= 0 || !inMain) return _scheduler.VisualAt(elementId, schedule, time);
         }
-        return _scheduler.VisualAt(elementId, Main, mainTimeMs);
+        return _scheduler.VisualAt(elementId, Main, mainTimeMs, loopElapsedMs);
     }
 }

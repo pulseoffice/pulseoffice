@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using PulseOffice.Formats.Odf;
 using PulseOffice.Formats.Odf.Odt;
 using PulseOffice.Documents;
 using PulseOffice.Documents.Blocks;
@@ -89,5 +90,25 @@ public class Round233FolioImageTests
         Assert.Equal(90, item.RotationDegrees, 3);
         Assert.Equal(10, item.Placement.X.ToPoints(), 0);
         Assert.Equal(20, item.Placement.Y.ToPoints(), 0);
+    }
+
+    [Fact]
+    public void Brightness_contrast_and_transparency_of_an_image_round_trip_through_odt()
+    {
+        var image = new RasterImageObject { Id = "r", Data = new byte[] { 1, 2, 3 }, MediaType = "image/png", Tone = new ImageTone(20, -30, 40) };
+
+        var (read, content) = RoundTrip(WithImage(image, new DocumentSize(Twip.FromPoints(60), Twip.FromPoints(30))));
+
+        Assert.Contains("draw:luminance=\"20%\"", content, StringComparison.Ordinal);
+        Assert.Contains("draw:image-opacity=\"60%\"", content, StringComparison.Ordinal);
+        Assert.Equal(new ImageTone(20, -30, 40), Raster(Assert.Single(read.Objects.All)).Tone);
+    }
+
+    [Fact]
+    public void A_watermark_colour_mode_reads_as_a_washed_out_tone()
+    {
+        var graphic = new System.Xml.Linq.XElement("g", new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Get("urn:oasis:names:tc:opendocument:xmlns:drawing:1.0") + "color-mode", "watermark"));
+
+        Assert.Equal(new ImageTone(70, -70, 0), new OdfImageTone().Read(graphic));
     }
 }

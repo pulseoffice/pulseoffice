@@ -12,6 +12,7 @@ public sealed class OdfAnimationBehaviourCodec
     private static readonly XNamespace Anim = OdfPackage.Namespaces.Anim;
     private static readonly XNamespace Smil = OdfPackage.Namespaces.Smil;
     private static readonly XNamespace Svg = OdfPackage.Namespaces.Svg;
+    private static readonly XNamespace PulseAnimation = "urn:pulseoffice:presentation-animation";
 
     public XElement Write(AnimationBehaviours behaviours, string targetId)
     {
@@ -23,6 +24,8 @@ public sealed class OdfAnimationBehaviourCodec
                 new XAttribute(Anim + "iterate-interval", Seconds(behaviours.IterateInterval ?? 0)))
             : new XElement(Anim + "par");
         if (iterating && behaviours.TextOnly) root.Add(new XAttribute(Anim + "sub-item", "text"));
+        if (iterating && behaviours.IterateBackwards)
+            root.Add(new XAttribute(XNamespace.Xmlns + "pulseanim", PulseAnimation.NamespaceName), new XAttribute(PulseAnimation + "iterate-backwards", "true"));
         root.Add(TimingAttributes(behaviours.RootTiming));
         var visitor = new ElementVisitor(this, iterating ? null : targetId);
         foreach (var node in behaviours.Nodes) root.Add(node.Accept(visitor));
@@ -37,6 +40,7 @@ public sealed class OdfAnimationBehaviourCodec
             Nodes = [.. effect.Elements().Select(element => Node(element, 1)).OfType<AnimationBehaviour>()],
             IterateType = iterating ? (string?)effect.Attribute(Anim + "iterate-type") ?? "by-letter" : null,
             IterateInterval = iterating ? Interval((string?)effect.Attribute(Anim + "iterate-interval")) ?? 0 : null,
+            IterateBackwards = iterating && (string?)effect.Attribute(PulseAnimation + "iterate-backwards") == "true",
             TextOnly = iterating && (string?)effect.Attribute(Anim + "sub-item") == "text",
             RootTiming = ReadTiming(effect) with { Begin = null, Duration = null, Fill = null, RepeatCount = null, RepeatsIndefinitely = false },
         };

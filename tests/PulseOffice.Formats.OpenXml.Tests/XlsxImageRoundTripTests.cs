@@ -79,4 +79,19 @@ public class XlsxImageRoundTripTests
         Assert.Equal(new ImageDuotone("#1F2937", "#FDE68A"), raster.Duotone);
         Assert.Contains("ODF044", new PulseOffice.Formats.Odf.OdsSpreadsheetWriter().CheckFidelity(workbook).Losses.Select(loss => loss.Code));
     }
+
+    [Fact]
+    public void Image_tone_survives_xlsx_and_is_declared_lost_in_ods()
+    {
+        var workbook = ConImmagine();
+        workbook.Sheets[0].Objects[0] = workbook.Sheets[0].Objects[0] with
+        {
+            Content = ((RasterImageObject)workbook.Sheets[0].Objects[0].Content) with { Tone = new ImageTone(10, 20, 30) },
+        };
+
+        var raster = Assert.IsType<RasterImageObject>(Assert.Single(RoundTrip(workbook).Sheets[0].Objects).Content);
+
+        Assert.Equal(new ImageTone(10, 20, 30), raster.Tone);
+        Assert.Contains("ODF022", new PulseOffice.Formats.Odf.OdsSpreadsheetWriter().CheckFidelity(workbook).Losses.Select(loss => loss.Code));
+    }
 }

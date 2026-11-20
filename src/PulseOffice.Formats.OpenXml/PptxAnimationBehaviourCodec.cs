@@ -57,6 +57,7 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
             ? null
             : new XElement(P + "iterate",
                 new XAttribute("type", _iterations.FirstOrDefault(pair => pair.Odf == type).Ooxml ?? "lt"),
+                behaviours.IterateBackwards ? new XAttribute("backwards", "1") : null,
                 new XElement(P + "tmAbs", new XAttribute("val", Milliseconds(behaviours.IterateInterval ?? 0))));
 
     public IEnumerable<XElement> Children(AnimationBehaviours behaviours, uint shapeId, TimeNodeIdSequence ids)
@@ -75,6 +76,7 @@ public sealed class PptxAnimationBehaviourCodec(IAnimationAttributeTable attribu
                 ? null
                 : _iterations.FirstOrDefault(pair => pair.Ooxml == ((string?)iterate.Attribute("type") ?? "el")).Odf ?? "by-paragraph",
             IterateInterval = iterate is null ? null : Interval(iterate, effectCommonTimeNode),
+            IterateBackwards = (string?)iterate?.Attribute("backwards") is "1" or "true",
             TextOnly = false,
             RootTiming = new BehaviourTiming
             {

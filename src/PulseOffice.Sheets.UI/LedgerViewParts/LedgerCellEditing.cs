@@ -13,7 +13,7 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI.LedgerViewParts;
 
-internal sealed class LedgerCellEditing
+internal sealed class LedgerCellEditing : IFormulaVocabulary
 {
     private readonly Workbook _workbook;
     private readonly CalculationEngine _engine;
@@ -32,7 +32,7 @@ internal sealed class LedgerCellEditing
     private CellAddress _editingAddress;
     private int _editingSheet;
     private bool _suggesting;
-    private bool _functionSuggested;
+    private bool _crossSheet;
     private string? _namesLanguage;
     private IReadOnlyList<string> _functionNames = [];
     private Dictionary<string, string> _canonicalNames = new(StringComparer.OrdinalIgnoreCase);
@@ -91,25 +91,15 @@ internal sealed class LedgerCellEditing
         AnnotatedRange = new PulseOffice.UI.Controls.Text.TextRangeHighlight(CellEditor);
 
         CellEditor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        ArgumentTip = new TextBlock
-        {
-            FontSize = _metrics.FontSizeSmall,
-            Padding = new Thickness(6, 2),
-            IsVisible = false,
-            IsHitTestVisible = false,
-        }.Themed(TextBlock.BackgroundProperty, Palette.Keys.SurfaceRaised).Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary);
-        CellEditor.PropertyChanged += (_, args) =>
-        {
-            if (args.Property == TextBox.CaretIndexProperty) ShowArgumentTip();
-        };
+        CellAssist = new LedgerFormulaAssist(CellEditor, this, _texts, () => IsEditing && !_suggesting, _metrics);
+        BarAssist = new LedgerFormulaAssist(FormulaBox, this, _texts, () => _formulaTarget is not null && !_updatingFromSelection && FormulaBox.IsFocused, _metrics);
         CellEditor.TextChanged += (_, _) =>
         {
-            if (CellEditor.Text != _suggestedText) _functionSuggested = false;
             if (CellEditor.Text != _pointedText) _pointed = null;
             Suggest();
             MirrorEditor();
         };
-        FormulaBox.KeyDown += OnFormulaKeyDown;
+        FormulaBox.AddHandler(InputElement.KeyDownEvent, OnFormulaKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         FormulaBox.TextChanged += (_, _) =>
         {
             if (FormulaBox.Text != _pointedText) _pointed = null;
@@ -145,9 +135,21 @@ internal sealed class LedgerCellEditing
 
     public Engine.Operations.IFormulaPointing Pointing { get; set; } = new Engine.Operations.FormulaPointing();
 
-    public Engine.Operations.IFormulaCompletion Completion { get; set; } = new Engine.Operations.FormulaCompletion();
+    public LedgerFormulaAssist CellAssist { get; }
 
-    public TextBlock ArgumentTip { get; }
+    public LedgerFormulaAssist BarAssist { get; }
+
+    public bool IsCarriedAcrossSheets => _crossSheet && _formulaTarget is not null;
+
+    public char ArgumentSeparator => _writer.Formulas?.Punctuation(_writer.Language).Argument ?? ',';
+
+    public IEnumerable<string> Names() => CompletionNames();
+
+    public Engine.Evaluation.Functions.FunctionDefinition? FunctionShownAs(string shown)
+    {
+        CompletionNames();
+        return _canonicalNames.TryGetValue(shown, out var canonical) ? _engine.Functions.Find(canonical) : null;
+    }
 
     private IEnumerable<string> CompletionNames()
     {
@@ -163,72 +165,10 @@ internal sealed class LedgerCellEditing
         return _functionNames.Concat(_workbook.DefinedNames.Select(name => name.Name));
     }
 
-    private void ShowArgumentTip()
-    {
-        var text = CellEditor.Text ?? string.Empty;
-        var separator = _writer.Formulas?.Punctuation(_writer.Language).Argument ?? ',';
-        if (!IsEditing || Completion.CallAt(text, CellEditor.CaretIndex, separator) is not { } call
-            || _engine.Functions.Find(CanonicalName(call.Name)) is not { } function)
-        {
-            ArgumentTip.IsVisible = false;
-            return;
-        }
-
-        var slots = function.MaxArguments is int.MaxValue or > 6 ? Math.Max(function.MinArguments, call.Argument + 1) + 1 : function.MaxArguments;
-        var inlines = new Avalonia.Controls.Documents.InlineCollection { new Avalonia.Controls.Documents.Run(call.Name + "(") };
-        for (var index = 0; index < slots; index++)
-        {
-            if (index > 0) inlines.Add(new Avalonia.Controls.Documents.Run(separator + " "));
-            var label = _texts.Format("functions.argument", index + 1);
-            if (index >= function.MinArguments) label = "[" + label + "]";
-            var run = new Avalonia.Controls.Documents.Run(label);
-            if (index == call.Argument) run.FontWeight = Avalonia.Media.FontWeight.Bold;
-            inlines.Add(run);
-        }
-        if (function.MaxArguments is int.MaxValue) inlines.Add(new Avalonia.Controls.Documents.Run(separator + " …"));
-        inlines.Add(new Avalonia.Controls.Documents.Run(")"));
-        ArgumentTip.Inlines = inlines;
-        Canvas.SetLeft(ArgumentTip, Canvas.GetLeft(CellEditor));
-        Canvas.SetTop(ArgumentTip, Canvas.GetTop(CellEditor) + CellEditor.Height + 2);
-        ArgumentTip.IsVisible = true;
-    }
-
-    private string CanonicalName(string shown)
+    public string CanonicalName(string shown)
     {
         CompletionNames();
         return _canonicalNames.GetValueOrDefault(shown, shown);
-    }
-
-    private bool AcceptFunction()
-    {
-        var text = CellEditor.Text ?? string.Empty;
-        var suggested = _functionSuggested && CellEditor.SelectionStart != CellEditor.SelectionEnd;
-        _functionSuggested = false;
-        if (!text.StartsWith('=') || (!suggested && CellEditor.CaretIndex != text.Length)) return false;
-        CompletionNames();
-        var isFunction = _canonicalNames.ContainsKey(LastName(text));
-        if (!isFunction && !suggested) return false;
-        CellEditor.Text = isFunction ? text + "(" : text;
-        CellEditor.CaretIndex = CellEditor.Text.Length;
-        return true;
-    }
-
-    private void DropFunctionSuggestion()
-    {
-        if (!_functionSuggested || CellEditor.SelectionStart == CellEditor.SelectionEnd) return;
-        var text = CellEditor.Text ?? string.Empty;
-        var start = Math.Min(CellEditor.SelectionStart, CellEditor.SelectionEnd);
-        _suggesting = true;
-        CellEditor.Text = text[..Math.Clamp(start, 0, text.Length)];
-        _suggesting = false;
-        _functionSuggested = false;
-    }
-
-    private string LastName(string text)
-    {
-        var start = text.Length;
-        while (start > 1 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '.')) start--;
-        return text[start..];
     }
 
     public bool TryPoint(CellRange range)
@@ -236,7 +176,9 @@ internal sealed class LedgerCellEditing
         var box = IsEditing ? CellEditor : _formulaTarget is not null ? FormulaBox : null;
         if (box is null) return false;
         var sheet = IsEditing ? _editingSheet : _formulaTarget!.Value.SheetIndex;
-        if (sheet != _grid.SheetIndex) return false;
+        var reference = sheet == _grid.SheetIndex
+            ? range.ToString()
+            : Pointing.Qualify(_workbook.Sheets[_grid.SheetIndex].Name, range.ToString());
 
         var text = box.Text ?? string.Empty;
         int start, length;
@@ -247,7 +189,7 @@ internal sealed class LedgerCellEditing
             (start, length) = (box.CaretIndex, 0);
         }
 
-        var placed = Pointing.Place(text, start, length, range.ToString());
+        var placed = Pointing.Place(text, start, length, reference);
         _suggesting = true;
         try
         {
@@ -269,12 +211,26 @@ internal sealed class LedgerCellEditing
         return true;
     }
 
-    private void ReturnToEditedCell(CellAddress address)
+    public bool KeepEntryAcrossSheets()
     {
-        if (!_pointedAway) return;
+        var box = IsEditing ? CellEditor : _formulaTarget is not null ? FormulaBox : null;
+        if (box is null) return false;
+        var text = box.Text ?? string.Empty;
+        if (_pointed is null && (box.SelectionStart != box.SelectionEnd || !Pointing.AcceptsReference(text, box.CaretIndex))) return false;
+        if (IsEditing) TakeOverEditor();
+        _crossSheet = true;
+        return true;
+    }
+
+    private void ReturnToEditedCell(SheetCell edited)
+    {
+        var crossed = _crossSheet;
+        _crossSheet = false;
+        if (!_pointedAway && !crossed) return;
         _pointedAway = false;
         _pointed = null;
-        _selection.MoveTo(address);
+        if (edited.SheetIndex != _grid.SheetIndex) SheetRequested?.Invoke(this, edited.SheetIndex);
+        _selection.MoveTo(edited.Address);
     }
 
     private bool PointByKey(KeyEventArgs e)
@@ -317,11 +273,18 @@ internal sealed class LedgerCellEditing
     {
         var cell = sheet[_selection.Active];
 
-        _formulaTarget = null;
         _updatingFromSelection = true;
         NameBox.Text = _selection.IsSingleCell
             ? _selection.Active.ToA1()
             : _selection.Range.ToString();
+        if (IsCarriedAcrossSheets)
+        {
+            _updatingFromSelection = false;
+            return;
+        }
+
+        _formulaTarget = null;
+        _crossSheet = false;
 
         FormulaBox.Text = _writer.EditableText(cell, sheet, _selection.Active);
         _shownLanguage = _writer.Language;
@@ -424,7 +387,7 @@ internal sealed class LedgerCellEditing
 
         IsEditing = false;
         CellEditor.IsVisible = false;
-        ArgumentTip.IsVisible = false;
+        CellAssist.Hide();
         _overlay.IsHitTestVisible = false;
 
         _writer.Write(text, address, _editingSheet);
@@ -483,24 +446,7 @@ internal sealed class LedgerCellEditing
         if (_editingSheet < 0 || _editingSheet >= _workbook.Sheets.Count) return;
         var sheet = _workbook.Sheets[_editingSheet];
 
-        if (typed.StartsWith('='))
-        {
-            if (Completion.Complete(typed, typed.Length, CompletionNames()) is not { } name) return;
-            _suggesting = true;
-            try
-            {
-                CellEditor.Text = name;
-                CellEditor.SelectionStart = typed.Length;
-                CellEditor.SelectionEnd = name.Length;
-            }
-            finally
-            {
-                _suggesting = false;
-            }
-            _functionSuggested = true;
-            _suggestedText = name;
-            return;
-        }
+        if (typed.StartsWith('=')) return;
 
         if (_autoInput.Complete(sheet, _editingAddress, typed) is not { } completion) return;
 
@@ -531,7 +477,7 @@ internal sealed class LedgerCellEditing
     private void EndEdit()
     {
         IsEditing = false;
-        ArgumentTip.IsVisible = false;
+        CellAssist.Hide();
         CellEditor.IsVisible = false;
         _overlay.IsHitTestVisible = false;
         SelectionStale?.Invoke(this, EventArgs.Empty);
@@ -553,10 +499,11 @@ internal sealed class LedgerCellEditing
 
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)
     {
+        if (CellAssist.HandleKey(e)) return;
         if (CycleReference(CellEditor, e)) return;
         if (PointByKey(e)) return;
 
-        var edited = _editingAddress;
+        var edited = new SheetCell(_editingSheet, _editingAddress);
         switch (e.Key)
         {
             case Key.F2 when e.KeyModifiers == KeyModifiers.None:
@@ -566,16 +513,11 @@ internal sealed class LedgerCellEditing
                 break;
 
             case Key.Enter:
-                DropFunctionSuggestion();
                 CommitEditor();
                 ReturnToEditedCell(edited);
                 _selection.Advance(byRow: true, backwards: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 _grid.EnsureVisible(_selection.Active);
                 _grid.Focus();
-                e.Handled = true;
-                break;
-
-            case Key.Tab when e.KeyModifiers == KeyModifiers.None && AcceptFunction():
                 e.Handled = true;
                 break;
 
@@ -600,9 +542,11 @@ internal sealed class LedgerCellEditing
     private void OnFormulaKeyDown(object? sender, KeyEventArgs e)
     {
         if (_updatingFromSelection) return;
+        if (BarAssist.HandleKey(e)) return;
         if (CycleReference(FormulaBox, e)) return;
+        if (PointAcrossSheetsByKey(e)) return;
 
-        var edited = _formulaTarget?.Address ?? _selection.Active;
+        var edited = _formulaTarget ?? new SheetCell(_grid.SheetIndex, _selection.Active);
         switch (e.Key)
         {
             case Key.Enter:
@@ -617,6 +561,7 @@ internal sealed class LedgerCellEditing
             case Key.Escape:
 
                 _formulaTarget = null;
+                BarAssist.Hide();
                 ReturnToEditedCell(edited);
                 SelectionStale?.Invoke(this, EventArgs.Empty);
                 _grid.Focus();
@@ -649,7 +594,25 @@ internal sealed class LedgerCellEditing
     {
         var target = _formulaTarget ?? new SheetCell(_grid.SheetIndex, _selection.Active);
         _formulaTarget = null;
+        BarAssist.Hide();
         _writer.Write(FormulaBox.Text ?? string.Empty, target.Address, target.SheetIndex);
+    }
+
+    private bool PointAcrossSheetsByKey(KeyEventArgs e)
+    {
+        if (!_crossSheet || (e.KeyModifiers & ~KeyModifiers.Shift) != KeyModifiers.None) return false;
+        var (rows, columns) = e.Key switch
+        {
+            Key.Left => (0, -1),
+            Key.Right => (0, 1),
+            Key.Up => (-1, 0),
+            Key.Down => (1, 0),
+            _ => (0, 0),
+        };
+        if (rows == 0 && columns == 0) return false;
+        _selection.Move(rows, columns, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        e.Handled = true;
+        return true;
     }
 
     private void TakeOverEditor()
@@ -657,15 +620,17 @@ internal sealed class LedgerCellEditing
         if (!IsEditing) return;
 
         var text = CellEditor.Text ?? string.Empty;
+        var caret = CellEditor.CaretIndex;
         IsEditing = false;
         CellEditor.IsVisible = false;
-        ArgumentTip.IsVisible = false;
+        CellAssist.Hide();
         _overlay.IsHitTestVisible = false;
 
         _updatingFromSelection = true;
         FormulaBox.Text = text;
         _updatingFromSelection = false;
         _formulaTarget = new SheetCell(_editingSheet, _editingAddress);
-        FormulaBox.CaretIndex = text.Length;
+        FormulaBox.CaretIndex = Math.Clamp(caret, 0, text.Length);
+        FormulaBox.Focus();
     }
 }

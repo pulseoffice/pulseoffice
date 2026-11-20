@@ -143,6 +143,9 @@ internal sealed class PptxSlideWriter(
         if (_sounds.Write(slide.Transition.SoundPath, part, session) is { } transitionSound)
             foreach (var transition in part.Slide.Descendants<P.Transition>())
                 transition.Append(_sounds.Transition(transitionSound, slide.Transition.LoopSoundUntilNext));
+        else if (slide.Transition.StopPreviousSound)
+            foreach (var transition in part.Slide.Descendants<P.Transition>())
+                transition.Append(new P.SoundAction(new P.EndSoundAction()));
         if (animations.ToTiming(slide, shapes, path => _sounds.Write(path, part, session)) is { } timing) part.Slide.Append(timing);
 
         part.AddPart(layout);

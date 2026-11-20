@@ -113,6 +113,9 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
         if (layer == ObjectLayer.Wrapped) _obstacles.Add(Obstacle(item, rect, turned));
     }
 
+    private bool Resizes(AnchoredObject item) =>
+        item.Content is EmbeddedContent { Value: PulseOffice.Drawing.Shapes.ShapeObject { Style.Text.Autofit: PulseOffice.Text.Rich.TextAutofit.ResizeShape } } && request.Frame(item.Id) is { Atoms.Count: > 0 };
+
     private LayoutRect Grown(AnchoredObject item, LayoutRect rect)
     {
         if (request.Frame(item.Id) is not { } frame) return rect;
@@ -164,6 +167,7 @@ internal sealed class ObjectFlow(PaginationRun pagination, PaginationRequest req
             _objects.Add(new ObjectBox(run.ObjectId!, rect, ObjectLayer.Inline)
             {
                 Content = content,
+                FittedHeight = item is not null && Resizes(item) ? Grown(item, rect).Height : null,
                 RotationDegrees = item?.RotationDegrees ?? 0,
                 FlipHorizontal = item?.FlipHorizontal ?? false,
                 FlipVertical = item?.FlipVertical ?? false,

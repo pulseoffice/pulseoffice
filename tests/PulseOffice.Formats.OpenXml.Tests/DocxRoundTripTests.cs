@@ -593,6 +593,23 @@ public class DocxRoundTripTests
     }
 
     [Fact]
+    public void Brightness_contrast_and_transparency_of_an_image_round_trip_through_docx()
+    {
+        var document = NewDocument();
+        var paragraph = new ParagraphBlock(document.NextId("p"), "Foto", DefaultStyleNames.Standard);
+        document.Body.Add(paragraph);
+        document.Objects.Add(new AnchoredObject("obj1", new AsCharacterAnchor(paragraph.Id),
+            new EmbeddedContent(new RasterImageObject { Id = "img", Data = Png, MediaType = "image/png", Tone = new ImageTone(20, -30, 40) }),
+            new DocumentSize(Twip.FromCentimeters(2), Twip.FromCentimeters(1))));
+        paragraph.Marks = [new ObjectMark(2, "obj1")];
+
+        var read = RoundTrip(document);
+        var raster = read.Objects.All.Select(item => item.Content).OfType<EmbeddedContent>().Select(content => content.Value).OfType<RasterImageObject>().Single();
+
+        Assert.Equal(new ImageTone(20, -30, 40), raster.Tone);
+    }
+
+    [Fact]
     public void IlDuotonoDiUnImmagineSopravviveInDocxESiDichiaraPersoInOdt()
     {
         var document = NewDocument();

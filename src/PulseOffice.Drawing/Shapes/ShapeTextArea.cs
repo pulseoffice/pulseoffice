@@ -1,3 +1,5 @@
+using PulseOffice.Drawing.Shapes.Geometry;
+
 namespace PulseOffice.Drawing.Shapes;
 
 public readonly record struct ShapeTextMargins(double Left, double Top, double Right, double Bottom)
@@ -18,8 +20,17 @@ public interface IShapeTextArea
     ShapeTextMargins Margins(ShapeObject shape, double width, double height);
 }
 
-public sealed class ShapeTextArea : IShapeTextArea
+public sealed class ShapeTextArea(IPresetGeometryEngine presets, IShapePresets names) : IShapeTextArea
 {
+    private readonly IReadOnlySet<ShapeKind> _presetAreas = new HashSet<ShapeKind>
+    {
+        ShapeKind.Star4, ShapeKind.Star5, ShapeKind.Star6, ShapeKind.Star8, ShapeKind.Heart, ShapeKind.Sun, ShapeKind.Cloud, ShapeKind.Pentagon,
+    };
+
+    public ShapeTextArea() : this(new PresetGeometryEngine(), new ShapePresets())
+    {
+    }
+
     private const double InscribedEllipse = 0.1464466;
 
     private const double RoundedCornerInset = 0.2928932;
@@ -27,7 +38,10 @@ public sealed class ShapeTextArea : IShapeTextArea
     public ShapeTextMargins Margins(ShapeObject shape, double width, double height)
     {
         ArgumentNullException.ThrowIfNull(shape);
-        if (shape.Computed is not null || shape.Dimension is not null || width <= 0 || height <= 0) return ShapeTextMargins.None;
+        if (shape.Dimension is not null || width <= 0 || height <= 0) return ShapeTextMargins.None;
+        if (shape.Computed is PresetGeometry preset) return Preset(preset, width, height);
+        if (shape.Computed is not null) return ShapeTextMargins.None;
+        if (_presetAreas.Contains(shape.Shape)) return Preset(new PresetGeometry(names.OoxmlName(shape.Shape)), width, height);
         var shorter = Math.Min(width, height);
         return shape.Shape switch
         {
@@ -43,17 +57,9 @@ public sealed class ShapeTextArea : IShapeTextArea
             ShapeKind.FlowTerminator => Fractions(width, height, 1018.0 / 21600, 3163.0 / 21600, 1018.0 / 21600, 3163.0 / 21600),
             ShapeKind.FlowSequentialAccess or ShapeKind.SmileyFace or ShapeKind.NoSymbol or ShapeKind.Donut
                 => Fractions(width, height, InscribedEllipse, InscribedEllipse, InscribedEllipse, InscribedEllipse),
-            ShapeKind.Sun => Fractions(width, height, 0.3, 0.3, 0.3, 0.3),
-            ShapeKind.Cloud => Fractions(width, height, 0.17, 0.17, 0.17, 0.2),
-            ShapeKind.Heart => Fractions(width, height, 0.15, 0.2, 0.15, 0.3),
             ShapeKind.Parallelogram => new ShapeTextMargins(shorter / 6, height / 12, shorter / 6, height / 12),
             ShapeKind.Trapezoid => new ShapeTextMargins(shorter / 12, height * shorter / (6 * width), shorter / 12, 0),
-            ShapeKind.Pentagon => Fractions(width, height, 0.19, 0.25, 0.19, 0),
             ShapeKind.Hexagon => new ShapeTextMargins(shorter / 8, height * InscribedEllipse, shorter / 8, height * InscribedEllipse),
-            ShapeKind.Star4 => Fractions(width, height, 0.32, 0.32, 0.32, 0.32),
-            ShapeKind.Star5 => Fractions(width, height, 0.3, 0.38, 0.3, 0.2),
-            ShapeKind.Star6 => Fractions(width, height, 0.25, 0.25, 0.25, 0.25),
-            ShapeKind.Star8 => Fractions(width, height, 0.15, 0.15, 0.15, 0.15),
             ShapeKind.ArrowRight => new ShapeTextMargins(0, height / 4, shorter / 4, height / 4),
             ShapeKind.ArrowLeft => new ShapeTextMargins(shorter / 4, height / 4, 0, height / 4),
             ShapeKind.ArrowUp => new ShapeTextMargins(width / 4, shorter / 4, width / 4, 0),
@@ -82,6 +88,11 @@ public sealed class ShapeTextArea : IShapeTextArea
             _ => ShapeTextMargins.None,
         };
     }
+
+    private ShapeTextMargins Preset(PresetGeometry geometry, double width, double height) =>
+        presets.TextBounds(geometry, width, height) is { } bounds
+            ? new ShapeTextMargins(bounds.Left, bounds.Top, width - bounds.Right, height - bounds.Bottom)
+            : ShapeTextMargins.None;
 
     private ShapeTextMargins Uniform(double inset) => new(inset, inset, inset, inset);
 

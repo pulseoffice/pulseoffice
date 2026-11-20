@@ -99,10 +99,18 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
             }
         }
 
-        if (!string.IsNullOrEmpty(transition.SoundPath))
+        var hasSound = !string.IsNullOrEmpty(transition.SoundPath);
+        if (hasSound && transition.LoopSoundUntilNext || !hasSound && transition.StopPreviousSound)
+        {
+            if (properties.Attribute(XNamespace.Xmlns + "pulsetransition") is null)
+                properties.Add(new XAttribute(XNamespace.Xmlns + "pulsetransition", transitions.ExtensionNamespace.NamespaceName));
+            properties.Add(new XAttribute(transitions.ExtensionNamespace + (hasSound ? "loop-sound" : "stop-sound"), "true"));
+        }
+
+        if (hasSound)
             properties.Add(new XElement(Presentation + "sound",
-                new XAttribute(Xlink + "href", transition.SoundPath),
-                new XAttribute(Presentation + "play-full", transition.LoopSoundUntilNext ? "false" : "true")));
+                new XAttribute(Xlink + "href", transition.SoundPath!),
+                new XAttribute(Presentation + "play-full", "true")));
     }
 }
 

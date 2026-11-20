@@ -13,6 +13,9 @@ internal sealed class OdtTableRegionNames
         [TableRegion.NorthEastCell] = "top-right-cell",
         [TableRegion.SouthWestCell] = "bottom-left-cell",
         [TableRegion.SouthEastCell] = "bottom-right-cell",
+        [TableRegion.HeaderRow] = "header-row",
+        [TableRegion.FirstBand] = "first-band",
+        [TableRegion.SecondBand] = "second-band",
     };
 
     public string Token(TableRegion region) => _tokens[region];

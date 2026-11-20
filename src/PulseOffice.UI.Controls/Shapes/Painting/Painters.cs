@@ -72,8 +72,8 @@ public sealed class VectorPainter(IVectorOutlineReader vectors) : RotatingPainte
 
 public sealed class RasterPainter(IPixelFilterCatalog filters, PulseOffice.UI.Controls.Objects.IBitmapPixels pixels, PulseOffice.Drawing.Assets.Gif.IGifCodec gifs)
 {
-    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<(ImageFilter, ImageDuotone?), Avalonia.Media.Imaging.Bitmap>> _bitmaps = new();
-    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<(ImageFilter, ImageDuotone?), AnimatedFrames>> _animations = new();
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<(ImageFilter, ImageDuotone?, ImageTone), Avalonia.Media.Imaging.Bitmap>> _bitmaps = new();
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<(ImageFilter, ImageDuotone?, ImageTone), AnimatedFrames>> _animations = new();
     private readonly System.Threading.Lock _gate = new();
 
     public bool IsAnimated(RasterImageObject raster) => AnimationOf(raster) is { Frames.Count: > 1 };
@@ -99,7 +99,12 @@ public sealed class RasterPainter(IPixelFilterCatalog filters, PulseOffice.UI.Co
                 Math.Max(1, bitmap.Size.Width * (1 - left - right)),
                 Math.Max(1, bitmap.Size.Height * (1 - top - bottom)));
 
-        context.DrawImage(bitmap, source, bounds);
+        if (raster.Tone.Opacity >= 1)
+        {
+            context.DrawImage(bitmap, source, bounds);
+            return;
+        }
+        using (context.PushOpacity(raster.Tone.Opacity)) context.DrawImage(bitmap, source, bounds);
     }
 
     private void PaintUnloadedLink(DrawingContext context, string link, Rect bounds)
@@ -123,18 +128,18 @@ public sealed class RasterPainter(IPixelFilterCatalog filters, PulseOffice.UI.Co
         lock (_gate)
         {
             var variants = _bitmaps.GetValue(identity, _ => []);
-            if (variants.TryGetValue((raster.Filter, raster.Duotone), out var cached)) return cached;
+            if (variants.TryGetValue(Key(raster), out var cached)) return cached;
 
             if (pixels.Decode(raster.Data.ToArray()) is not { } bitmap) return null;
-            var result = Apply(bitmap, raster.Filter, raster.Duotone);
+            var result = Apply(bitmap, raster);
 
-            foreach (var stale in variants.Where(entry => entry.Key != (ImageFilter.None, null)).ToList())
+            foreach (var stale in variants.Where(entry => entry.Key != (ImageFilter.None, null, ImageTone.Neutral)).ToList())
             {
                 variants.Remove(stale.Key);
                 stale.Value.Dispose();
             }
 
-            variants[(raster.Filter, raster.Duotone)] = result;
+            variants[Key(raster)] = result;
             return result;
         }
     }
@@ -148,30 +153,34 @@ public sealed class RasterPainter(IPixelFilterCatalog filters, PulseOffice.UI.Co
         lock (_gate)
         {
             var variants = _animations.GetValue(identity, _ => []);
-            if (variants.TryGetValue((raster.Filter, raster.Duotone), out var cached)) return cached;
+            if (variants.TryGetValue(Key(raster), out var cached)) return cached;
 
             var animation = gifs.Decode(raster.Data.Span);
             var frames = new AnimatedFrames(animation is null
                 ? []
-                : [.. animation.Frames.Select(frame => (Apply((Avalonia.Media.Imaging.Bitmap)pixels.Create(frame.Image), raster.Filter, raster.Duotone), Math.Max(20, frame.DelayMilliseconds)))]);
+                : [.. animation.Frames.Select(frame => (Apply((Avalonia.Media.Imaging.Bitmap)pixels.Create(frame.Image), raster), Math.Max(20, frame.DelayMilliseconds)))]);
 
-            foreach (var stale in variants.Where(entry => entry.Key != (ImageFilter.None, null)).ToList())
+            foreach (var stale in variants.Where(entry => entry.Key != (ImageFilter.None, null, ImageTone.Neutral)).ToList())
             {
                 variants.Remove(stale.Key);
                 stale.Value.Dispose();
             }
 
-            variants[(raster.Filter, raster.Duotone)] = frames;
+            variants[Key(raster)] = frames;
             return frames;
         }
     }
 
-    private Avalonia.Media.Imaging.Bitmap Apply(Avalonia.Media.Imaging.Bitmap bitmap, ImageFilter filter, ImageDuotone? duotone)
+    private (ImageFilter, ImageDuotone?, ImageTone) Key(RasterImageObject raster) => (raster.Filter, raster.Duotone, raster.Tone with { Transparency = 0 });
+
+    private Avalonia.Media.Imaging.Bitmap Apply(Avalonia.Media.Imaging.Bitmap bitmap, RasterImageObject raster)
     {
-        if (filter == ImageFilter.None && duotone is null) return bitmap;
+        var (filter, duotone, tone) = (raster.Filter, raster.Duotone, raster.Tone);
+        if (filter == ImageFilter.None && duotone is null && !tone.ChangesColours) return bitmap;
 
         var filtered = pixels.Edit(bitmap, image =>
         {
+            if (tone.ChangesColours) filters.Adjust(new ColorAdjustment(tone.Brightness, tone.Contrast)).Apply(image);
             if (filter != ImageFilter.None) filters.For(filter).Apply(image);
             if (duotone is not null) filters.Duotone(duotone).Apply(image);
         });

@@ -233,6 +233,12 @@ public sealed record TableProperties
 
     public TableRegionFormat? SouthEastCell { get; init; }
 
+    public TableRegionFormat? HeaderRow { get; init; }
+
+    public TableRegionFormat? FirstBand { get; init; }
+
+    public TableRegionFormat? SecondBand { get; init; }
+
     public TableRegionFormat? Region(TableRegion region) => region switch
     {
         TableRegion.TotalRow => TotalRow,
@@ -241,6 +247,9 @@ public sealed record TableProperties
         TableRegion.NorthWestCell => NorthWestCell,
         TableRegion.NorthEastCell => NorthEastCell,
         TableRegion.SouthWestCell => SouthWestCell,
+        TableRegion.HeaderRow => HeaderRow,
+        TableRegion.FirstBand => FirstBand,
+        TableRegion.SecondBand => SecondBand,
         _ => SouthEastCell,
     };
 
@@ -255,6 +264,9 @@ public sealed record TableProperties
             TableRegion.NorthWestCell => this with { NorthWestCell = kept },
             TableRegion.NorthEastCell => this with { NorthEastCell = kept },
             TableRegion.SouthWestCell => this with { SouthWestCell = kept },
+            TableRegion.HeaderRow => this with { HeaderRow = kept },
+            TableRegion.FirstBand => this with { FirstBand = kept },
+            TableRegion.SecondBand => this with { SecondBand = kept },
             _ => this with { SouthEastCell = kept },
         };
     }
@@ -268,6 +280,9 @@ public sealed record TableProperties
         NorthEastCell = TableRegionFormat.Merge(NorthEastCell, under.NorthEastCell),
         SouthWestCell = TableRegionFormat.Merge(SouthWestCell, under.SouthWestCell),
         SouthEastCell = TableRegionFormat.Merge(SouthEastCell, under.SouthEastCell),
+        HeaderRow = TableRegionFormat.Merge(HeaderRow, under.HeaderRow),
+        FirstBand = TableRegionFormat.Merge(FirstBand, under.FirstBand),
+        SecondBand = TableRegionFormat.Merge(SecondBand, under.SecondBand),
         HeaderColor = HeaderColor ?? under.HeaderColor,
         InnerLines = InnerLines ?? under.InnerLines,
         BorderColor = BorderColor ?? under.BorderColor,
@@ -293,6 +308,9 @@ public enum TableRegion
     NorthEastCell,
     SouthWestCell,
     SouthEastCell,
+    HeaderRow,
+    FirstBand,
+    SecondBand,
 }
 
 public sealed record TableRegionFormat
@@ -305,10 +323,32 @@ public sealed record TableRegionFormat
 
     public bool? Bold { get; init; }
 
-    public bool IsEmpty => Background is null && Ink is null && Bold is null;
+    public bool? Italic { get; init; }
+
+    public string? Font { get; init; }
+
+    public double? FontSize { get; init; }
+
+    public BoxBorders? Borders { get; init; }
+
+    public bool IsEmpty => Background is null && Ink is null && Bold is null && Italic is null && Font is null && FontSize is null && Borders is null;
 
     public static TableRegionFormat? Merge(TableRegionFormat? over, TableRegionFormat? under) =>
         over is null ? under
         : under is null ? over
-        : new TableRegionFormat { Background = over.Background ?? under.Background, Ink = over.Ink ?? under.Ink, Bold = over.Bold ?? under.Bold };
+        : new TableRegionFormat
+        {
+            Background = over.Background ?? under.Background,
+            Ink = over.Ink ?? under.Ink,
+            Bold = over.Bold ?? under.Bold,
+            Italic = over.Italic ?? under.Italic,
+            Font = over.Font ?? under.Font,
+            FontSize = over.FontSize ?? under.FontSize,
+            Borders = MergeBorders(over.Borders, under.Borders),
+        };
+
+    public static BoxBorders? MergeBorders(BoxBorders? over, BoxBorders? under) =>
+        over is null ? under
+        : under is null ? over
+        : over with { Top = over.Top ?? under.Top, Bottom = over.Bottom ?? under.Bottom, Left = over.Left ?? under.Left, Right = over.Right ?? under.Right };
 }

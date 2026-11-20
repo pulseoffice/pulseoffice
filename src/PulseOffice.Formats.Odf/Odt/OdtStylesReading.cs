@@ -6,6 +6,7 @@ using PulseOffice.Documents.Blocks;
 using PulseOffice.Documents.Styles;
 using PulseOffice.Foundation.Pages;
 using PulseOffice.Foundation.Units;
+using PulseOffice.Text.Rich;
 using OdfListPictures = PulseOffice.Formats.Odf.TextCodecs.OdfListPictures;
 
 namespace PulseOffice.Formats.Odf.Odt;
@@ -41,6 +42,8 @@ internal sealed class OdtStylesReader(
     OdfListPictures pictures) : OdtXml
 {
     private readonly OdtTableRegionNames _regionNames = new();
+
+    private readonly OdtTableTemplates _templates = new(measure, borders, characters);
 
     public void RegisterNames(XElement? styles, XElement? masters, XElement? contentAutomatic, XElement? stylesAutomatic, OdtReadContext context)
     {
@@ -94,6 +97,16 @@ internal sealed class OdtStylesReader(
                     sheet.Table.Add(TableStyle(style, name, context));
                     break;
             }
+        }
+
+        foreach (var template in styles?.Elements(Table + "table-template") ?? [])
+        {
+            if ((string?)template.Attribute(Table + "name") is not { Length: > 0 } encoded) continue;
+            var name = context.StyleNames.Resolve(encoded);
+            if (sheet.Table.Contains(name)) continue;
+            XElement? CellStyle(string cell) => styles!.Elements(Style + "style")
+                .FirstOrDefault(style => (string?)style.Attribute(Style + "name") == cell && (string?)style.Attribute(Style + "family") == "table-cell");
+            sheet.Table.Add(new PulseOffice.Documents.Styles.TableStyle(name) { Table = _templates.Read(template, CellStyle, context.FontFaces) });
         }
 
         foreach (var list in (styles?.Elements(Text + "list-style") ?? []).Concat(contentAutomatic?.Elements(Text + "list-style") ?? []).Concat(stylesAutomatic?.Elements(Text + "list-style") ?? []))
@@ -328,6 +341,12 @@ internal sealed class OdtStylesReader(
                 Background = measure.Fill((string?)child.Attribute(Pt + "background")),
                 Ink = measure.Fill((string?)child.Attribute(Pt + "color")),
                 Bold = (string?)child.Attribute(Pt + "bold") is { } bold ? bold == "true" : null,
+                Italic = (string?)child.Attribute(Pt + "italic") is { } italic ? italic == "true" : null,
+                Font = (string?)child.Attribute(Pt + "font"),
+                FontSize = measure.Points((string?)child.Attribute(Pt + "font-size")),
+                Borders = child.Element(Style + "table-cell-properties") is { } cell && borders.Read(cell) is { } lines
+                    ? new BoxBorders { Top = lines.Top, Bottom = lines.Bottom, Left = lines.Left, Right = lines.Right }
+                    : null,
             });
         }
         return table;

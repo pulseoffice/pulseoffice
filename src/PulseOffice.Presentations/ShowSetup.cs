@@ -33,6 +33,12 @@ public sealed record ShowSetup
 
     public string PenColor { get; init; } = "#E11D2E";
 
+    public const int DefaultKioskRestartMs = 300000;
+
+    public int KioskRestartMs { get; init; } = DefaultKioskRestartMs;
+
+    public int LoopPauseMs { get; init; }
+
     public bool HasRange => FromSlide > 0 || ToSlide > 0;
 
     public ShowSetup WithoutSlide(int position, int remaining)

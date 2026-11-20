@@ -13,4 +13,8 @@
     <ProjectReference Include="../PulseOffice.Text.Rich/PulseOffice.Text.Rich.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Evaluation/Functions/FunctionSignatures.txt" LogicalName="PulseOffice.Sheets.Engine.FunctionSignatures.txt" />
+  </ItemGroup>
+
 </Project>

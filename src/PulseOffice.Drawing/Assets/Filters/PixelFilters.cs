@@ -287,11 +287,15 @@ public interface IPixelFilterCatalog
     IPixelFilter For(ImageFilter filter);
 
     IPixelFilter Duotone(ImageDuotone duotone);
+
+    IPixelFilter Adjust(ColorAdjustment adjustment);
 }
 
 public sealed class PixelFilterCatalog : IPixelFilterCatalog
 {
     public IPixelFilter Duotone(ImageDuotone duotone) => new DuotoneFilter(duotone);
+
+    public IPixelFilter Adjust(ColorAdjustment adjustment) => new ColorAdjustmentFilter(adjustment);
 
     private readonly IReadOnlyDictionary<ImageFilter, IPixelFilter> _filters = new Dictionary<ImageFilter, IPixelFilter>
     {

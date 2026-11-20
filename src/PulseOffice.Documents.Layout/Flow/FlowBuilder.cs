@@ -366,7 +366,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
     private TableCellItem Cell(CellAppearance? look, TableCell cell, int column, FlowContext context)
     {
         if (look is null) return new TableCellItem(cell, column, Build(cell.Content, context));
-        var styled = look.Ink is null && !look.Bold ? context : context with { Fields = Header(context.Fields, look) };
+        var styled = !look.StylesText ? context : context with { Fields = Header(context.Fields, look) };
         return new TableCellItem(cell, column, Build(cell.Content, styled)) { Appearance = look };
     }
 
@@ -376,7 +376,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         return _headers.GetValue(source, content =>
         {
             var runs = content.Runs.Count == 0 ? [new TextRun(content.Text)] : content.Runs;
-            return content.WithRuns([.. runs.Select(run => run with { Bold = run.Bold || look.Bold, Color = run.Color ?? look.Ink })]);
+            return content.WithRuns([.. runs.Select(run => run with { Bold = run.Bold || look.Bold, Italic = run.Italic || look.Italic, Font = run.Font ?? look.Font, FontSize = run.FontSize ?? look.FontSize, Color = run.Color ?? look.Ink })]);
         });
     };
 

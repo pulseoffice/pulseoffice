@@ -10,6 +10,8 @@ public interface IFormulaPointing
     bool AcceptsReference(string text, int caret);
 
     PointedReference Place(string text, int start, int length, string reference);
+
+    string Qualify(string sheetName, string reference);
 }
 
 public sealed class FormulaPointing : IFormulaPointing
@@ -31,6 +33,20 @@ public sealed class FormulaPointing : IFormulaPointing
         while (after < text.Length && text[after] == ' ') after++;
         return after == text.Length || Closers.Contains(text[after], StringComparison.Ordinal);
     }
+
+    public string Qualify(string sheetName, string reference)
+    {
+        ArgumentNullException.ThrowIfNull(sheetName);
+        ArgumentNullException.ThrowIfNull(reference);
+        var plain = sheetName.Length > 0 && (char.IsLetter(sheetName[0]) || sheetName[0] == '_')
+            && sheetName.All(letter => char.IsLetterOrDigit(letter) || letter is '_' or '.')
+            && !LooksLikeCell(sheetName);
+        var sheet = plain ? sheetName : "'" + sheetName.Replace("'", "''", StringComparison.Ordinal) + "'";
+        return sheet + "!" + reference;
+    }
+
+    private bool LooksLikeCell(string name) =>
+        System.Text.RegularExpressions.Regex.IsMatch(name, "^([A-Za-z]{1,3}[0-9]+|[Rr][0-9]*[Cc]?[0-9]*)$");
 
     public PointedReference Place(string text, int start, int length, string reference)
     {

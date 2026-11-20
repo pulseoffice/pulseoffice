@@ -6,7 +6,7 @@ using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace PulseOffice.Formats.OpenXml.Wordprocessing;
 
-public sealed class DocxTableStyleCodec(DocxValues values)
+public sealed class DocxTableStyleCodec(DocxValues values, DocxBorders borders)
 {
     private static readonly (TableRegion Region, W.TableStyleOverrideValues Kind)[] _regions =
     [
@@ -34,49 +34,77 @@ public sealed class DocxTableStyleCodec(DocxValues values)
                 border.Color = color;
                 return border;
             }
-            var borders = new W.TableBorders(Line(new W.TopBorder()), Line(new W.LeftBorder()), Line(new W.BottomBorder()), Line(new W.RightBorder()));
-            if (table.InnerLines != false) borders.Append(Line(new W.InsideHorizontalBorder()), Line(new W.InsideVerticalBorder()));
-            properties.Append(borders);
+            var outline = new W.TableBorders(Line(new W.TopBorder()), Line(new W.LeftBorder()), Line(new W.BottomBorder()), Line(new W.RightBorder()));
+            if (table.InnerLines != false) outline.Append(Line(new W.InsideHorizontalBorder()), Line(new W.InsideVerticalBorder()));
+            properties.Append(outline);
         }
         if (Margins(table) is { } margins) properties.Append(margins);
         if (properties.HasChildren) element.Append(properties);
         if (table.Background is { } background)
             element.Append(new W.StyleTableCellProperties(Shading(background)));
-        if (table.HeaderBackground is not null || table.HeaderColor is not null || table.HeaderBold is not null)
-        {
-            var header = new W.TableStyleProperties { Type = W.TableStyleOverrideValues.FirstRow };
-            var run = new W.RunPropertiesBaseStyle();
-            if (table.HeaderBold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
-            if (table.HeaderColor is { } ink) run.Append(new W.Color { Val = Ink(ink) });
-            if (run.HasChildren) header.Append(run);
-            if (table.HeaderBackground is { } fill) header.Append(new W.TableStyleConditionalFormattingTableCellProperties(Shading(fill)));
-            element.Append(header);
-        }
+        var header = TableRegionFormat.Merge(new TableRegionFormat { Background = table.HeaderBackground, Ink = table.HeaderColor, Bold = table.HeaderBold }, table.HeaderRow);
+        if (header is { IsEmpty: false }) element.Append(Conditional(W.TableStyleOverrideValues.FirstRow, header));
         foreach (var (region, kind) in _regions)
         {
             var format = table.Region(region);
             if (table.HeaderBold == true && Emphasis(region)) format = (format ?? new TableRegionFormat()) with { Bold = format?.Bold ?? true };
             if (format is null || format.IsEmpty) continue;
-            var conditional = new W.TableStyleProperties { Type = kind };
-            var run = new W.RunPropertiesBaseStyle();
-            if (format.Bold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
-            if (format.Ink is { } ink) run.Append(new W.Color { Val = Ink(ink) });
-            if (run.HasChildren) conditional.Append(run);
-            if (format.Background is { } fill) conditional.Append(new W.TableStyleConditionalFormattingTableCellProperties(Shading(fill)));
-            element.Append(conditional);
+            element.Append(Conditional(kind, format));
         }
-        if (table.FirstBandBackground is { } first)
+        Bands(element, table.FirstBandBackground, table.FirstBandAxes, table.FirstBand, W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical);
+        Bands(element, table.BandBackground, table.BandAxes, table.SecondBand, W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical);
+    }
+
+    private void Bands(W.Style element, uint? background, TableBandAxes? axes, TableRegionFormat? region, W.TableStyleOverrideValues rows, W.TableStyleOverrideValues columns)
+    {
+        var format = TableRegionFormat.Merge(new TableRegionFormat { Background = background }, region);
+        if (format is null || format.IsEmpty) return;
+        var along = axes ?? TableBandAxes.Both;
+        if (along.HasFlag(TableBandAxes.Columns)) element.Append(Conditional(columns, format));
+        if (along.HasFlag(TableBandAxes.Rows)) element.Append(Conditional(rows, format));
+    }
+
+    private W.TableStyleProperties Conditional(W.TableStyleOverrideValues kind, TableRegionFormat format)
+    {
+        var conditional = new W.TableStyleProperties { Type = kind };
+        var run = new W.RunPropertiesBaseStyle();
+        if (format.Font is { } font) run.Append(new W.RunFonts { Ascii = font, HighAnsi = font, ComplexScript = font });
+        if (format.Bold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
+        if (format.Italic is { } italic) run.Append(new W.Italic { Val = OnOffValue.FromBoolean(italic) });
+        if (format.Ink is { } ink) run.Append(new W.Color { Val = Ink(ink) });
+        if (format.FontSize is { } size) run.Append(new W.FontSize { Val = ((int)Math.Round(size * 2)).ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        if (run.HasChildren) conditional.Append(run);
+        var cell = new W.TableStyleConditionalFormattingTableCellProperties();
+        if (format.Borders is { } lines) cell.Append(Edges(lines));
+        if (format.Background is { } fill) cell.Append(Shading(fill));
+        if (cell.HasChildren) conditional.Append(cell);
+        return conditional;
+    }
+
+    private W.TableCellBorders Edges(BoxBorders lines)
+    {
+        var written = borders.Write(new W.TableCellBorders(), lines);
+        foreach (var side in written.Elements<W.BorderType>().Where(side => side.Val?.Value == W.BorderValues.Nil && side.Size is null).ToList()) side.Remove();
+        return written;
+    }
+
+    private TableRegionFormat Format(W.TableStyleProperties conditional)
+    {
+        var run = conditional.GetFirstChild<W.RunPropertiesBaseStyle>();
+        var cell = conditional.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>();
+        var fonts = run?.GetFirstChild<W.RunFonts>();
+        var size = run?.GetFirstChild<W.FontSize>()?.Val?.Value is { } half && double.TryParse(half, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var halves) ? halves / 2 : (double?)null;
+        var lines = cell?.GetFirstChild<W.TableCellBorders>() is { } edges ? borders.Read(edges) : null;
+        return new TableRegionFormat
         {
-            var axes = table.FirstBandAxes ?? TableBandAxes.Both;
-            if (axes.HasFlag(TableBandAxes.Columns)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Vertical });
-            if (axes.HasFlag(TableBandAxes.Rows)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(first))) { Type = W.TableStyleOverrideValues.Band1Horizontal });
-        }
-        if (table.BandBackground is { } band)
-        {
-            var axes = table.BandAxes ?? TableBandAxes.Both;
-            if (axes.HasFlag(TableBandAxes.Columns)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Vertical });
-            if (axes.HasFlag(TableBandAxes.Rows)) element.Append(new W.TableStyleProperties(new W.TableStyleConditionalFormattingTableCellProperties(Shading(band))) { Type = W.TableStyleOverrideValues.Band2Horizontal });
-        }
+            Background = Fill(cell?.GetFirstChild<W.Shading>()?.Fill?.Value),
+            Ink = Ink(run?.GetFirstChild<W.Color>()?.Val?.Value),
+            Bold = run?.GetFirstChild<W.Bold>() is { } bold ? bold.Val?.Value ?? true : null,
+            Italic = run?.GetFirstChild<W.Italic>() is { } italic ? italic.Val?.Value ?? true : null,
+            Font = fonts?.Ascii?.Value ?? fonts?.HighAnsi?.Value,
+            FontSize = size,
+            Borders = lines is { Top: null, Bottom: null, Left: null, Right: null } ? null : lines is null ? null : new BoxBorders { Top = lines.Top, Bottom = lines.Bottom, Left = lines.Left, Right = lines.Right },
+        };
     }
 
     public W.TableCellMarginDefault? Margins(TableProperties table)
@@ -139,17 +167,22 @@ public sealed class DocxTableStyleCodec(DocxValues values)
             BandAxes = Axes(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
             FirstBandAxes = Axes(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
         };
+        TableRegionFormat? Extras(params W.TableStyleOverrideValues[] kinds) => kinds
+            .Select(kind => element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind))
+            .Where(item => item is not null)
+            .Select(item => Format(item!) with { Background = null, Ink = null, Bold = null })
+            .FirstOrDefault(format => !format.IsEmpty);
+        read = read with
+        {
+            HeaderRow = header is null ? null : Format(header) with { Background = null, Ink = null, Bold = null } is { IsEmpty: false } headerExtras ? headerExtras : null,
+            FirstBand = Extras(W.TableStyleOverrideValues.Band1Horizontal, W.TableStyleOverrideValues.Band1Vertical),
+            SecondBand = Extras(W.TableStyleOverrideValues.Band2Horizontal, W.TableStyleOverrideValues.Band2Vertical),
+        };
         foreach (var (region, kind) in _regions)
         {
             var conditional = element.Elements<W.TableStyleProperties>().FirstOrDefault(item => item.Type?.Value == kind);
             if (conditional is null) continue;
-            var regionRun = conditional.GetFirstChild<W.RunPropertiesBaseStyle>();
-            var format = new TableRegionFormat
-            {
-                Background = Fill(conditional.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>()?.GetFirstChild<W.Shading>()?.Fill?.Value),
-                Ink = Ink(regionRun?.GetFirstChild<W.Color>()?.Val?.Value),
-                Bold = regionRun?.GetFirstChild<W.Bold>() is { } regionBold ? regionBold.Val?.Value ?? true : null,
-            };
+            var format = Format(conditional);
             if (headerBold == true && Emphasis(region) && format.Bold == true) format = format with { Bold = null };
             read = read.WithRegion(region, format);
         }
@@ -164,15 +197,15 @@ public sealed class DocxTableStyleCodec(DocxValues values)
 
     private uint? Fill(string? hex) => string.Equals(hex, "auto", StringComparison.OrdinalIgnoreCase) ? TableRegionFormat.NoColour : values.Color(hex);
 
-    public TableProperties Borders(W.TableBorders? borders)
+    public TableProperties Borders(W.TableBorders? outline)
     {
-        if (borders is null) return TableProperties.None;
+        if (outline is null) return TableProperties.None;
         bool Drawn(W.BorderType? border) => border?.Val?.Value is { } value && value != W.BorderValues.None && value != W.BorderValues.Nil;
-        W.BorderType? outer = borders.GetFirstChild<W.TopBorder>();
-        if (!Drawn(outer)) outer = new W.BorderType?[] { borders.GetFirstChild<W.BottomBorder>(), borders.GetFirstChild<W.LeftBorder>(), borders.GetFirstChild<W.StartBorder>(), borders.GetFirstChild<W.RightBorder>(), borders.GetFirstChild<W.EndBorder>() }.FirstOrDefault(Drawn) ?? outer;
+        W.BorderType? outer = outline.GetFirstChild<W.TopBorder>();
+        if (!Drawn(outer)) outer = new W.BorderType?[] { outline.GetFirstChild<W.BottomBorder>(), outline.GetFirstChild<W.LeftBorder>(), outline.GetFirstChild<W.StartBorder>(), outline.GetFirstChild<W.RightBorder>(), outline.GetFirstChild<W.EndBorder>() }.FirstOrDefault(Drawn) ?? outer;
         var top = outer;
         var lined = Drawn(top);
-        var inside = borders.GetFirstChild<W.InsideHorizontalBorder>()?.Val?.Value;
+        var inside = outline.GetFirstChild<W.InsideHorizontalBorder>()?.Val?.Value;
         return new TableProperties
         {
             BorderWidth = lined ? Math.Min(top!.Size?.Value ?? 4, 96u) / 8.0 : 0,

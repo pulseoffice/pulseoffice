@@ -44,7 +44,7 @@ public sealed class DeckCommands(
             Surface = CommandSurface.Common,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => workspace.Active?.Model is Presentation,
-            Execute = (_, _) => PresentVisible(0, withPresenter: false),
+            Execute = (_, _) => PresentVisible(-1, withPresenter: false),
         },
 
         new CommandDefinition
@@ -68,7 +68,7 @@ public sealed class DeckCommands(
             Surface = CommandSurface.Advanced,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => workspace.Active?.Model is Presentation,
-            Execute = (_, _) => PresentVisible(0, withPresenter: true),
+            Execute = (_, _) => PresentVisible(-1, withPresenter: true),
         },
 
         new CommandDefinition
@@ -146,10 +146,9 @@ public sealed class DeckCommands(
     {
         if (workspace.Active?.Model is not Presentation deck) return Task.CompletedTask;
 
-        var playlist = _playlists.Main(deck);
-        var shownStart = _showStart.PositionFor(deck.Slides, playlist, startIndex);
+        var start = _playlists.FromCurrent(deck, _playlists.Main(deck), startIndex, _showStart);
 
-        return Present(deck, playlist, shownStart, withPresenter);
+        return Present(deck, start.Playlist, start.Position, withPresenter);
     }
 
     private async Task ManageCustomShowsAsync(CancellationToken ct)
@@ -280,6 +279,8 @@ public sealed class DeckCommands(
                 WithoutAnimation = deck.Setup.WithoutAnimation,
                 ManualAdvance = deck.Setup.Advance == ShowAdvanceMode.Manual && deck.Setup.Kind != ShowKind.Kiosk,
                 Kiosk = deck.Setup.Kind == ShowKind.Kiosk,
+                LoopPauseMs = deck.Setup.LoopPauseMs,
+                KioskRestartMs = deck.Setup.KioskRestartMs,
                 PenColor = deck.Setup.PenColor,
                 MonitorIndex = _monitorIndex,
                 EndOfShowText = texts["deck.present.endOfShow"],

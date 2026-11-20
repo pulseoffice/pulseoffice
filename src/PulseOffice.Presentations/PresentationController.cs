@@ -158,9 +158,16 @@ public sealed class PresentationController
         return step < groups.Count ? groups[step].EndMs : -1;
     }
 
-    public ElementVisual VisualAt(string elementId, int mainTimeMs, string? liveTrigger = null, int liveTimeMs = -1) =>
+    public ElementVisual VisualAt(string elementId, int mainTimeMs, string? liveTrigger = null, int liveTimeMs = -1, int loopElapsedMs = 0) =>
         Plan is not { } plan ? ElementVisual.Shown
-            : plan.VisualAt(elementId, mainTimeMs, trigger => string.Equals(trigger, liveTrigger, StringComparison.Ordinal) ? liveTimeMs : TriggeredTimeMs(trigger));
+            : plan.VisualAt(elementId, mainTimeMs, trigger => string.Equals(trigger, liveTrigger, StringComparison.Ordinal) ? liveTimeMs : TriggeredTimeMs(trigger), loopElapsedMs);
+
+    public IReadOnlyList<string> SoundsIn((int StartMs, int EndMs) window) =>
+        Plan is not { } plan ? []
+            : [.. plan.Main.Where(scheduled => scheduled.StartMs >= window.StartMs && scheduled.StartMs <= window.EndMs)
+                .Select(scheduled => scheduled.Effect.SoundPath).OfType<string>().Where(path => path.Length > 0).Distinct(StringComparer.Ordinal)];
+
+    public bool LoopsAt(int mainTimeMs) => !_ignoreSteps && Plan is { } plan && plan.LoopsAt(mainTimeMs);
 
     public (int StartMs, int EndMs)? CurrentStepWindow()
     {

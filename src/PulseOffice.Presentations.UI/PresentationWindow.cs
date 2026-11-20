@@ -19,6 +19,8 @@ public sealed class PresentationWindow : Window
     private readonly bool _withoutAnimation;
     private readonly bool _manualAdvance;
     private readonly bool _kiosk;
+    private readonly ShowLoopClock _loopClock;
+    private readonly ShowEffectLoop _effectLoop = new();
     private readonly IBrush _penBrush;
     private readonly int _monitorIndex;
 
@@ -97,6 +99,7 @@ public sealed class PresentationWindow : Window
         _withoutAnimation = options.WithoutAnimation;
         _manualAdvance = options.ManualAdvance;
         _kiosk = options.Kiosk;
+        _loopClock = new ShowLoopClock(options.Kiosk, options.LoopPauseMs, options.KioskRestartMs);
         _monitorIndex = options.MonitorIndex;
         _forms = options.Forms;
         _linkTips = options.LinkTips;
@@ -134,6 +137,7 @@ public sealed class PresentationWindow : Window
         PlayEntry();
 
         if (_rehearse) _rehearsal.Start(_controller.Current?.Id);
+        _loopClock.Touch(() => Restart(_controller.SlideIndex));
 
         Focusable = true;
         KeyDown += OnKeyDown;
@@ -158,8 +162,7 @@ public sealed class PresentationWindow : Window
         WindowState = WindowState.FullScreen;
     }
 
-    private static Color ParseColor(string? hex) =>
-        !string.IsNullOrWhiteSpace(hex) && Color.TryParse(hex, out var color) ? color : Color.FromRgb(225, 29, 46);
+    private static Color ParseColor(string? hex) => !string.IsNullOrWhiteSpace(hex) && Color.TryParse(hex, out var color) ? color : Color.FromRgb(225, 29, 46);
 
     private readonly ShowSlideSetup _setup = new();
 
@@ -200,6 +203,7 @@ public sealed class PresentationWindow : Window
             _inkSlideIndex = _controller.SlideIndex;
             if (_controller.Current?.Transition is { SoundPath: { Length: > 0 } sound } arriving)
                 _media.PlaySound(sound, arriving.LoopSoundUntilNext);
+            else if (_controller.Current?.Transition is { StopPreviousSound: true }) _media.StopSound();
             _media.StartAutomatic(_controller.Current);
             _announcer.Slide(SlideNumber, SlideTotal);
         }
@@ -212,17 +216,15 @@ public sealed class PresentationWindow : Window
         else
         {
             var frozen = _controller.FrozenTimeMs();
-            _front.PlaybackVisual = frozen < 0 && _controller.Plan is not { NeedsVisuals: true }
-                ? null
-                : id => _controller.VisualAt(id, frozen);
+            _front.PlaybackVisual = frozen < 0 && _controller.Plan is not { NeedsVisuals: true } ? null : id => _controller.VisualAt(id, frozen);
             _front.InvalidateVisual();
+            if (_controller.LoopsAt(frozen)) _effectLoop.Start(elapsed => { _front.PlaybackVisual = id => _controller.VisualAt(id, frozen, loopElapsedMs: elapsed); _front.InvalidateVisual(); });
         }
 
         if (_rehearse) _rehearsal.Mark(_controller.Current?.Id);
         RestartAutoAdvance();
         SlideChanged?.Invoke(this, EventArgs.Empty);
     }
-
 
     public ShowCurtain Screen => _keypad.Screen;
 
@@ -294,7 +296,7 @@ public sealed class PresentationWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (HandleScreenKey(e.Key))
+        if (!_loopClock.AllowsKey(e.Key) || HandleScreenKey(e.Key))
         {
             e.Handled = true;
             return;
@@ -322,13 +324,10 @@ public sealed class PresentationWindow : Window
                 Back();
                 break;
             case Key.Home:
-                _controller.GoTo(0);
-                _controller.Back();
-                Jump();
+                FirstExternal();
                 break;
             case Key.End:
-                _controller.GoTo(Playlist.Count - 1);
-                Jump();
+                LastExternal();
                 break;
         }
 
@@ -398,14 +397,7 @@ public sealed class PresentationWindow : Window
                 PlayTransition(slideBefore, _controller.SlideIndex);
                 break;
             case AdvanceResult.Finished:
-                if (_loop && Playlist.Count > 0)
-                {
-                    var last = _controller.SlideIndex;
-                    _controller.GoTo(0);
-                    _controller.Back();
-                    if (last == 0) Jump();
-                    else PlayTransition(last, 0);
-                }
+                if (_loop && Playlist.Count > 0) _loopClock.Loop(() => Restart(_controller.SlideIndex));
                 else if (_rehearse) Close();
                 else
                 {
@@ -414,6 +406,14 @@ public sealed class PresentationWindow : Window
                 }
                 break;
         }
+    }
+
+    private void Restart(int last)
+    {
+        _controller.GoTo(0);
+        _controller.Back();
+        if (last == 0) Jump();
+        else PlayTransition(last, 0);
     }
 
     private void Back()
@@ -449,6 +449,7 @@ public sealed class PresentationWindow : Window
     private void OnPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         var move = _gestures.ForPress(e.GetCurrentPoint(this).Properties.PointerUpdateKind);
+        _loopClock.Touch(() => Restart(_controller.SlideIndex));
         if (_keypad.Screen != ShowCurtain.Slide)
         {
             Move(move);
@@ -523,6 +524,7 @@ public sealed class PresentationWindow : Window
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
+        _loopClock.Touch(() => Restart(_controller.SlideIndex));
         if (_tool == PointerTool.Laser)
         {
             var at = e.GetPosition(_stage);
@@ -560,6 +562,7 @@ public sealed class PresentationWindow : Window
 
     private bool Follow(InteractiveAction action)
     {
+        if (action.Kind != InteractionKind.PlaySound) _media.PlaySound(action.SoundPath, loop: false);
         var current = _controller.SlideIndex;
         switch (action.Kind)
         {
@@ -625,8 +628,13 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        var span = Math.Max(1, window.EndMs - window.StartMs);
+        PlayWindow(window);
+    }
 
+    private void PlayWindow((int StartMs, int EndMs) window)
+    {
+        foreach (var sound in _controller.SoundsIn(window)) _media.PlaySound(sound, loop: false);
+        var span = Math.Max(1, window.EndMs - window.StartMs);
         AnimateOver(span, progress =>
         {
             var t = window.StartMs + (int)(progress * span);
@@ -703,16 +711,9 @@ public sealed class PresentationWindow : Window
             return;
         }
 
-        var span = Math.Max(1, window.EndMs - window.StartMs);
         _front.PlaybackVisual = id => _controller.VisualAt(id, window.StartMs);
         _front.InvalidateVisual();
-
-        AnimateOver(span, progress =>
-        {
-            var t = window.StartMs + (int)(progress * span);
-            _front.PlaybackVisual = id => _controller.VisualAt(id, t);
-            _front.InvalidateVisual();
-        }, FreezeFront);
+        PlayWindow(window);
     }
 
     private Func<string, ElementVisual>? InitialVisualFor(int index)
@@ -750,6 +751,7 @@ public sealed class PresentationWindow : Window
 
     private void StopAnimator()
     {
+        _effectLoop.Stop();
         _animator?.Stop();
         _animator = null;
         _finishAnimation = null;
@@ -784,6 +786,7 @@ public sealed class PresentationWindow : Window
         _media.Clear();
         _media.StopSound();
         _autoAdvance?.Stop();
+        _loopClock.Stop();
 
         if (_rehearse) RehearsalFinished?.Invoke(this, _rehearsal.Finish());
 

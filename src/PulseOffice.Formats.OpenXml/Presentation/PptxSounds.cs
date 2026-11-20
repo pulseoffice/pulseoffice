@@ -71,6 +71,8 @@ internal sealed class PptxSoundReader(PptxSounds sounds, PptxTransitionMapper tr
         if (transitions.Find(source.Slide.Slide)?.Descendants<P.StartSoundAction>().FirstOrDefault() is { } start
             && sounds.Read(start.GetFirstChild<P.Sound>(), source.Slide, library) is { } transitionSound)
             slide.Transition = slide.Transition with { SoundPath = transitionSound, LoopSoundUntilNext = start.Loop?.Value == true };
+        else if (transitions.Find(source.Slide.Slide)?.Descendants<P.EndSoundAction>().Any() == true)
+            slide.Transition = slide.Transition with { StopPreviousSound = true };
 
         foreach (var drawing in source.Tree?.Descendants<P.NonVisualDrawingProperties>() ?? [])
         {

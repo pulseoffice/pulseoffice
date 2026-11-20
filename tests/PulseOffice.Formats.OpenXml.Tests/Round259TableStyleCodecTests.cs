@@ -6,7 +6,13 @@ namespace PulseOffice.Formats.OpenXml.Tests;
 
 public sealed class Round259TableStyleCodecTests
 {
-    private readonly DocxTableStyleCodec _codec = new(new DocxValues());
+    private readonly DocxTableStyleCodec _codec = CreateCodec();
+
+    private static DocxTableStyleCodec CreateCodec()
+    {
+        var values = new DocxValues();
+        return new DocxTableStyleCodec(values, new DocxBorders(values));
+    }
 
     [Fact]
     public void Side_margins_alone_leave_the_vertical_padding_to_the_style()

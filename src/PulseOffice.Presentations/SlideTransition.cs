@@ -61,6 +61,8 @@ public sealed record SlideTransition
 
     public bool LoopSoundUntilNext { get; init; }
 
+    public bool StopPreviousSound { get; init; }
+
     public NativeTransition? Native { get; init; }
 
     public NativeTransition? CurrentNative => Native is { } native && native.Describes(this) ? native : null;
@@ -77,7 +79,7 @@ public sealed record SlideTransition
 
     public bool IsNone => Kind == TransitionKind.None;
 
-    public bool IsEmpty => IsNone && Advance == AdvanceMode.OnClick && string.IsNullOrEmpty(SoundPath);
+    public bool IsEmpty => IsNone && Advance == AdvanceMode.OnClick && string.IsNullOrEmpty(SoundPath) && !StopPreviousSound;
 }
 
 public sealed record NativeTransition(string Format, string Payload, TransitionKind Kind, TransitionDirection Direction)

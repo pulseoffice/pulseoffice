@@ -9,7 +9,13 @@ namespace PulseOffice.Formats.OpenXml.Tests;
 
 public sealed class Round263TableBandTests
 {
-    private readonly DocxTableStyleCodec _codec = new(new DocxValues());
+    private readonly DocxTableStyleCodec _codec = CreateCodec();
+
+    private static DocxTableStyleCodec CreateCodec()
+    {
+        var values = new DocxValues();
+        return new DocxTableStyleCodec(values, new DocxBorders(values));
+    }
 
     [Fact]
     public void A_style_shading_only_the_first_band_keeps_its_banding()

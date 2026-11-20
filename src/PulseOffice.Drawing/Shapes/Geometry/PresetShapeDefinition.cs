@@ -81,4 +81,8 @@ public sealed record PresetShapeDefinition(
     IReadOnlyList<PresetPath> Paths)
 {
     public IReadOnlyList<PresetHandle> Handles { get; init; } = [];
+
+    public PresetTextRect? TextRect { get; init; }
 }
+
+public sealed record PresetTextRect(string Left, string Top, string Right, string Bottom);

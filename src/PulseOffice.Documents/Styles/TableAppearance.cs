@@ -3,7 +3,16 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Documents.Styles;
 
-public sealed record CellAppearance(BoxBorders Borders, uint? Background, uint? Ink, bool Bold, bool OwnBorders, bool OwnBackground);
+public sealed record CellAppearance(BoxBorders Borders, uint? Background, uint? Ink, bool Bold, bool OwnBorders, bool OwnBackground)
+{
+    public bool Italic { get; init; }
+
+    public string? Font { get; init; }
+
+    public double? FontSize { get; init; }
+
+    public bool StylesText => Ink is not null || Bold || Italic || Font is not null || FontSize is not null;
+}
 
 public interface ITableAppearance
 {
@@ -37,20 +46,19 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
     {
         var cell = table.Cell(row, column);
         var regions = Regions(table, style, row, column);
-        uint? ink = null;
-        bool? bold = null;
-        foreach (var region in regions)
-        {
-            ink = region.Ink ?? ink;
-            bold = region.Bold ?? bold;
-        }
+        var text = regions.Aggregate(new TableRegionFormat(), (under, over) => TableRegionFormat.Merge(over, under)!);
         return new CellAppearance(
             cell.Borders ?? StyleBorders(table, style, row, column),
             cell.Background ?? Visible(StyleBackground(table, style, row, column)),
-            Visible(ink),
-            bold ?? (style.HeaderBold == true && Emphasized(table, row, column)),
+            Visible(text.Ink),
+            text.Bold ?? (style.HeaderBold == true && Emphasized(table, row, column)),
             cell.Borders is not null,
-            cell.Background is not null);
+            cell.Background is not null)
+        {
+            Italic = text.Italic == true,
+            Font = text.Font,
+            FontSize = text.FontSize,
+        };
     }
 
     private IReadOnlyList<TableRegionFormat> Regions(TableBlock table, TableProperties style, int row, int column)
@@ -59,14 +67,17 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
         var last = table.Banding.LastColumn && column == table.ColumnCount - 1;
         var header = row < table.HeaderRows;
         var total = table.Banding.LastRow && row == table.Rows.Count - 1 && row >= table.HeaderRows;
+        var body = row - Math.Max(0, table.HeaderRows);
         var regions = new List<TableRegionFormat>();
         void Add(bool applies, TableRegionFormat? format)
         {
             if (applies && format is not null) regions.Add(format);
         }
+        Add(!header && !total && FirstBanded(table, style, body, column), style.FirstBand);
+        Add(!header && !total && SecondBanded(table, style, body, column), style.SecondBand);
         Add(first, style.FirstColumn);
         Add(last, style.LastColumn);
-        Add(header, new TableRegionFormat { Ink = style.HeaderColor, Bold = style.HeaderBold });
+        Add(header, TableRegionFormat.Merge(new TableRegionFormat { Ink = style.HeaderColor, Bold = style.HeaderBold }, style.HeaderRow));
         Add(total, style.TotalRow);
         Add(header && first, style.NorthWestCell);
         Add(header && last, style.NorthEastCell);
@@ -78,6 +89,19 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
     private uint? Visible(uint? colour) => colour is { } value && value >> 24 == 0 ? null : colour;
 
     public BoxBorders StyleBorders(TableBlock table, TableProperties style, int row, int column)
+    {
+        var lines = BaseBorders(table, style, row, column);
+        var regional = Regions(table, style, row, column).Aggregate((BoxBorders?)null, (under, over) => TableRegionFormat.MergeBorders(over.Borders, under));
+        return regional is null ? lines : lines with
+        {
+            Top = regional.Top ?? lines.Top,
+            Bottom = regional.Bottom ?? lines.Bottom,
+            Left = regional.Left ?? lines.Left,
+            Right = regional.Right ?? lines.Right,
+        };
+    }
+
+    private BoxBorders BaseBorders(TableBlock table, TableProperties style, int row, int column)
     {
         if (style.BorderWidth is not { } width || width <= 0) return new BoxBorders();
         var line = new BorderLine(width, style.BorderColor ?? 0xFF000000);
@@ -114,6 +138,20 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
         };
         if (corner?.Background is { } cornerFill) fill = cornerFill;
         return fill ?? BodyBackground(table, style, row, column);
+    }
+
+    private bool SecondBanded(TableBlock table, TableProperties style, int body, int column)
+    {
+        var axes = style.BandAxes ?? TableBandAxes.Both;
+        return body >= 0 && (axes.HasFlag(TableBandAxes.Rows) && table.Banding.BandsRow(body) || axes.HasFlag(TableBandAxes.Columns) && table.Banding.BandsColumn(column));
+    }
+
+    private bool FirstBanded(TableBlock table, TableProperties style, int body, int column)
+    {
+        var axes = style.FirstBandAxes ?? TableBandAxes.Both;
+        return body >= 0 && !SecondBanded(table, style, body, column)
+            && (axes.HasFlag(TableBandAxes.Rows) && table.Banding.BandedRows && !table.Banding.BandsRow(body)
+                || axes.HasFlag(TableBandAxes.Columns) && table.Banding.BandedColumns && !table.Banding.BandsColumn(column));
     }
 
     private uint? BodyBackground(TableBlock table, TableProperties style, int row, int column)

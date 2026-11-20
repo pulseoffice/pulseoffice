@@ -76,6 +76,7 @@ public abstract class DocxGraphicCodec
 public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, VectorFallback vectors) : DocxGraphicCodec
 {
     private readonly DrawingML.DrawingDuotone _duotones = new();
+    private readonly DrawingML.DrawingImageTone _tones = new();
     private readonly DrawingML.OoxmlSvgBlip _svgBlips = new();
 
     public DocxPictureCodec(OoxmlImageTypes types, ImageHeader header) : this(types, header, new VectorFallback())
@@ -91,6 +92,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
         if (((EmbeddedContent)item.Content).Value is VectorGraphicObject vector) return Vector(item, vector, context);
         var image = (RasterImageObject)((EmbeddedContent)item.Content).Value;
         var blip = Blip(image, context);
+        _tones.Write(blip, image.Tone);
         if (image.Filter == ImageFilter.Grayscale) blip.Append(new A.Grayscale());
         _duotones.Write(blip, image.Duotone);
         var fill = new PIC.BlipFill(blip);
@@ -123,6 +125,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
                 LinkPath = path,
                 Filter = blip.GetFirstChild<A.Grayscale>() is not null ? ImageFilter.Grayscale : ImageFilter.None,
                 Duotone = _duotones.Read(blip),
+                Tone = _tones.Read(blip),
             }
             : null;
 
@@ -187,6 +190,7 @@ public sealed class DocxPictureCodec(OoxmlImageTypes types, ImageHeader header, 
             MediaType = part.ContentType,
             Filter = blip.GetFirstChild<A.Grayscale>() is not null ? ImageFilter.Grayscale : ImageFilter.None,
             Duotone = _duotones.Read(blip),
+            Tone = _tones.Read(blip),
             Crop = crop,
         };
         return new DocxGraphic(new EmbeddedContent(image), picture.NonVisualPictureProperties?.NonVisualDrawingProperties?.Name?.Value is { Length: > 0 } pictureName ? pictureName : null, null,

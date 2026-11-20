@@ -18,7 +18,7 @@ public sealed class OriginalImageSources : IOriginalImageSources
         ArgumentNullException.ThrowIfNull(content);
         if (content is not RasterImageObject image || image.Data.IsEmpty || !_passThrough.Contains(image.MediaType)) return null;
         if (flipped || !double.IsFinite(rotationDegrees) || Math.Abs(rotationDegrees % 360) > 0.001) return null;
-        if (image.Crop != default || image.Filter != ImageFilter.None || image.Duotone is not null) return null;
+        if (image.Crop != default || image.Filter != ImageFilter.None || image.Duotone is not null || !image.Tone.IsNeutral) return null;
         return new PageImageSource(image.Data, "image/jpeg");
     }
 }

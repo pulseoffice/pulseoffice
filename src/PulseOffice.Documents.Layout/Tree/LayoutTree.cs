@@ -285,6 +285,8 @@ public sealed class ObjectBox(string objectId, LayoutRect bounds, ObjectLayer la
 
     public IReadOnlyList<LayoutBox> Content { get; init; } = [];
 
+    public double? FittedHeight { get; init; }
+
     public double RotationDegrees { get; init; }
 
     public bool FlipHorizontal { get; init; }

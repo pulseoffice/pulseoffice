@@ -6,6 +6,12 @@ public interface IFormulaCompletion
 {
     string? Complete(string text, int caret, IEnumerable<string> names);
 
+    IReadOnlyList<string> Matches(string text, int caret, IEnumerable<string> names);
+
+    int NameStart(string text, int caret);
+
+    string Accept(string text, int caret, string name, bool isFunction);
+
     FunctionCall? CallAt(string text, int caret, char argumentSeparator);
 }
 
@@ -14,21 +20,50 @@ public sealed class FormulaCompletion : IFormulaCompletion
     public string? Complete(string text, int caret, IEnumerable<string> names)
     {
         ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(names);
-        if (text.Length == 0 || text[0] != '=' || caret != text.Length || InsideQuotes(text, caret)) return null;
-
-        var start = caret;
-        while (start > 1 && IsNamePart(text[start - 1])) start--;
-        if (start == caret || !char.IsLetter(text[start]) && text[start] != '_') return null;
-        if (start > 1 && (text[start - 1] is '$' or '!' or '\'' || char.IsDigit(text[start - 1]))) return null;
-
+        if (caret != text.Length) return null;
+        var start = NameStart(text, caret);
+        if (start < 0) return null;
         var typed = text[start..caret];
-        var match = names
-            .Where(name => name.Length > typed.Length && name.StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+        var match = Matches(text, caret, names).Where(name => name.Length > typed.Length)
             .OrderBy(name => name.Length)
             .ThenBy(name => name, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
         return match is null ? null : text + match[typed.Length..];
+    }
+
+    public IReadOnlyList<string> Matches(string text, int caret, IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(names);
+        var start = NameStart(text, caret);
+        if (start < 0) return [];
+        var typed = text[start..caret];
+        return [.. names
+            .Where(name => name.StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    public int NameStart(string text, int caret)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Length == 0 || text[0] != '=' || caret < 1 || caret > text.Length || InsideQuotes(text, caret)) return -1;
+        if (caret < text.Length && IsNamePart(text[caret])) return -1;
+        var start = caret;
+        while (start > 1 && IsNamePart(text[start - 1])) start--;
+        if (start == caret || !char.IsLetter(text[start]) && text[start] != '_') return -1;
+        if (start > 1 && (text[start - 1] is '$' or '!' or '\'' || char.IsDigit(text[start - 1]))) return -1;
+        return start;
+    }
+
+    public string Accept(string text, int caret, string name, bool isFunction)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(name);
+        var start = NameStart(text, caret);
+        if (start < 0) return text;
+        var opens = isFunction && (caret >= text.Length || text[caret] != '(');
+        return text[..start] + name + (opens ? "(" : string.Empty) + text[caret..];
     }
 
     public FunctionCall? CallAt(string text, int caret, char argumentSeparator)
