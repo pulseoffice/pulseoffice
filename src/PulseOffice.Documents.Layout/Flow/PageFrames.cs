@@ -207,8 +207,14 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
     private double Height(TextDocument document, PageStyle style, HeaderFooterContent content, PageSide side, string number, string count, double width)
     {
         if (!content.Enabled) return 0;
-        var story = Story(document, Choose(style, content, side), number, side.Number, count, width);
+        var story = Story(document, Choose(style, content, side), number, side.Number, count, width, Placeholder(side));
         return Math.Max(content.MinimumHeight.ToPoints(), story.Height) + content.Spacing.ToPoints();
+    }
+
+    private SectionPages Placeholder(PageSide side)
+    {
+        var total = int.TryParse(side.Count, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > 0 ? parsed : 99;
+        return new SectionPages(total, total);
     }
 
     private ComposedStory Story(TextDocument document, BlockContainer container, string number, int value, string count, double width, SectionPages? section = null)

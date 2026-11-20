@@ -423,6 +423,25 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         }, () => _grid.Focus());
     }
 
+    public string? InputMessageAt(CellAddress address)
+    {
+        if (_validator?.RuleAt(_workbook.Sheets[_grid.SheetIndex], address) is not { ShowInputMessage: true } rule) return null;
+        var title = rule.InputTitle?.Trim() ?? string.Empty;
+        var message = rule.InputMessage?.Trim() ?? string.Empty;
+        if (title.Length == 0 && message.Length == 0) return null;
+        return title.Length == 0 ? message : message.Length == 0 ? title : $"{title}: {message}";
+    }
+
+    public void AnnounceInputMessage()
+    {
+        var shown = (_grid.SheetIndex, _selection.Active);
+        if (shown == _inputMessageShownAt) return;
+        _inputMessageShownAt = shown;
+        if (InputMessageAt(_selection.Active) is { } text) _status.Report(text, NotificationSeverity.Info);
+    }
+
+    private (int Sheet, CellAddress Cell)? _inputMessageShownAt;
+
     private DataValidation? ListRuleAt(CellAddress address) =>
         _validator?.RuleAt(_workbook.Sheets[_grid.SheetIndex], address) is { Kind: ValidationKind.List, ShowDropdown: true } rule ? rule : null;
 

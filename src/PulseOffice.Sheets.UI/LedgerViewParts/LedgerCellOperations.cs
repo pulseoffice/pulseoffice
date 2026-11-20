@@ -243,6 +243,9 @@ internal sealed class LedgerCellOperations(
         }
 
         if (!sheet.Protection.IsEnabled) CopyComments(sheet, Fill.Comments(sheet, lanes.Source, lanes.Target, direction));
+        if (!sheet.Protection.IsEnabled && mode != FillMode.WithoutFormatting
+            && Fill.Validations(sheet, lanes.Source, lanes.Target, direction) is { } validations)
+            ReplaceValidations(sheet, validations);
 
         selection.MoveTo(request.Target.Start);
         selection.ExtendTo(request.Target.End);
@@ -250,6 +253,24 @@ internal sealed class LedgerCellOperations(
         grid.Refresh();
         status.Report(texts.Format("status.fill.done", produced.Count));
         return mode;
+    }
+
+    private void ReplaceValidations(Worksheet sheet, IReadOnlyList<DataValidation> validations)
+    {
+        List<DataValidation> before = [.. sheet.Validations];
+        List<DataValidation> after = [.. validations];
+
+        void Set(List<DataValidation> rules)
+        {
+            sheet.Validations.Clear();
+            sheet.Validations.AddRange(rules);
+        }
+
+        Set(after);
+        history.Push(new PulseOffice.Document.Commands.DelegateAction(
+            texts["history.fill"],
+            redo: () => Set(after),
+            undo: () => Set(before)));
     }
 
     private void CopyComments(Worksheet sheet, IReadOnlyList<(CellAddress Address, CellComment? Comment)> comments)

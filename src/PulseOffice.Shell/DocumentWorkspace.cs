@@ -166,6 +166,8 @@ public interface IDocumentWorkspace
 
     void Move(OpenDocument document, int index);
 
+    bool Detach(OpenDocument document);
+
     IDisposable Hold(OpenDocument document);
 
     CommandContext Context { get; }
@@ -180,6 +182,8 @@ public interface IDocumentWorkspace
     event EventHandler<OpenDocument>? DocumentClosed;
 
     event EventHandler<OpenDocument>? DocumentMoved;
+
+    event EventHandler<OpenDocument>? DocumentDetached;
 }
 
 public sealed class DocumentWorkspace : IDocumentWorkspace
@@ -204,6 +208,17 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
     public event EventHandler<OpenDocument>? DocumentClosed;
 
     public event EventHandler<OpenDocument>? DocumentMoved;
+
+    public event EventHandler<OpenDocument>? DocumentDetached;
+
+    public bool Detach(OpenDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_holds > 0 && ReferenceEquals(_held, document)) return false;
+        if (!Remove(document, releaseShared: false)) return false;
+        DocumentDetached?.Invoke(this, document);
+        return true;
+    }
 
     public void Move(OpenDocument document, int index)
     {
@@ -253,13 +268,20 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
             return;
         }
 
+        if (!Remove(document, releaseShared: true)) return;
+        DocumentClosed?.Invoke(this, document);
+    }
+
+    private bool Remove(OpenDocument document, bool releaseShared)
+    {
         var position = _documents.IndexOf(document);
-        if (position < 0) return;
+        if (position < 0) return false;
         _documents.RemoveAt(position);
         if (ReferenceEquals(_deferredActivation, document)) _deferredActivation = null;
+        _deferredClosures.Remove(document);
 
         if (_listeners.Remove(document, out var listener)) document.Changed -= listener;
-        if (_documents.Any(other => ReferenceEquals(other.History, document.History)))
+        if (releaseShared && _documents.Any(other => ReferenceEquals(other.History, document.History)))
             (document.View as IDocumentViewRelease)?.ReleaseSharedModel();
 
         if (ReferenceEquals(Active, document))
@@ -272,7 +294,7 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
             }
         }
 
-        DocumentClosed?.Invoke(this, document);
+        return true;
     }
 
     private const DocumentState DocumentFacts =

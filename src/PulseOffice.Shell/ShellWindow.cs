@@ -244,6 +244,10 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         {
             if (_workspace.Active is null) ShowWelcome();
         });
+        _workspace.DocumentDetached += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_workspace.Active is null) ShowWelcome();
+        });
 
         _workspace.ContextChanged += (_, _) => UpdateForContext(_workspace.Context);
         _workspace.ActiveChanged += (_, document) => ShowDocument(document);

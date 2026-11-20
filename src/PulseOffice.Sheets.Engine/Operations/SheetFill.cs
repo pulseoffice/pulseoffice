@@ -28,6 +28,8 @@ public interface ISheetFill
     FillMergePlan Merges(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 
     IReadOnlyList<(CellAddress Address, CellComment? Comment)> Comments(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
+
+    IReadOnlyList<DataValidation>? Validations(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 }
 
 public sealed class SheetFill : ISheetFill
@@ -37,6 +39,8 @@ public sealed class SheetFill : ISheetFill
     private readonly IReadOnlyList<FillRule> _copyRules;
 
     private readonly PulseOffice.Sheets.Formatting.ICalendarFormats _calendars;
+
+    private readonly FillValidations _validations = new();
 
     public SheetFill() : this(new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale(), new PulseOffice.Sheets.Formatting.CalendarFormats())
     {
@@ -141,6 +145,15 @@ public sealed class SheetFill : ISheetFill
         }
 
         return result;
+    }
+
+    public IReadOnlyList<DataValidation>? Validations(Worksheet sheet, CellRange source, CellRange target, FillDirection direction)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+
+        var axis = _axes[direction];
+        var steps = axis.Steps(source, target);
+        return steps <= 0 ? null : _validations.Plan(sheet, source, axis.Filled(source, steps), axis.Vertical, axis.Backwards);
     }
 
     public FillMergePlan Merges(Worksheet sheet, CellRange source, CellRange target, FillDirection direction)

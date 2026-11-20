@@ -74,6 +74,7 @@ internal static class LedgerDataComposition
         services.AddSingleton<PulseOffice.Sheets.UI.ISheetRangeFilters, PulseOffice.Sheets.UI.SheetRangeFilters>();
         services.AddSingleton<IStatisticsProcedures, StatisticsProcedures>();
         services.AddSingleton<IDataValidator, DataValidator>();
+        services.AddSingleton<IInvalidDataFinder, InvalidDataFinder>();
         services.AddSingleton<IDuplicateRemover, DuplicateRemover>();
         services.AddSingleton<PulseOffice.Foundation.Text.IDelimitedText, PulseOffice.Foundation.Text.DelimitedText>();
         services.AddSingleton<ITextToColumns, TextToColumns>();

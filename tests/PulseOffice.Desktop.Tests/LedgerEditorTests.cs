@@ -738,6 +738,28 @@ public sealed class LedgerEditorTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
+    public Task Selecting_a_cell_with_an_input_message_shows_it_in_the_status_bar() => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        ledger.Active.Validations.Add(new DataValidation
+        {
+            Range = new CellRange(new CellAddress(1, 0), new CellAddress(1, 0)),
+            Kind = ValidationKind.WholeNumber,
+            FirstFormula = "1",
+            SecondFormula = "9",
+            InputTitle = "Quantity",
+            InputMessage = "From 1 to 9",
+        });
+        var status = ledger.Service<PulseOffice.UI.Controls.Services.IStatusBarService>();
+        var shown = false;
+        status.Changed += (_, _) => shown |= status.Segments.Any(segment => segment.Text == "Quantity: From 1 to 9");
+
+        ledger.Select(1, 0, 1, 0);
+
+        Assert.True(shown);
+    }, CancellationToken.None);
+
+    [Fact]
     public Task Su_un_foglio_protetto_la_cella_bloccata_non_apre_l_editor() => Session.Dispatch(async () =>
     {
         await using var ledger = await Open();

@@ -64,7 +64,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
         _operands = [.. initial.Operands.Select(operand => DisplayOperand(_kind, operand))];
         _formula = displayFormula ?? string.Empty;
         _byKind[_kind] = initial;
-        _visual = new ConditionalVisualOptions(services.Painting, texts, _metrics, () => _rule, Update);
+        _visual = new ConditionalVisualOptions(services.Painting, services.Navigator, texts, _metrics, () => _rule, Update);
 
         _kinds = new ThumbnailGallery<ConditionalRuleKind>(
             [.. services.Catalog.Kinds.Select(kind => new ThumbnailGalleryItem<ConditionalRuleKind>(

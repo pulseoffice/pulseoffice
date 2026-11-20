@@ -295,7 +295,7 @@ public class LedgerRound6bAuditTests
         var commands = new LedgerAnalysisCommands(scene.Context, new FixedGoalSeek(), Fake<Engine.Operations.ISolver>(), Fake<Engine.Operations.IScenarioManager>(),
             Fake<Engine.Operations.IDependencyTracer>(), Fake<Analysis.ISolverConstraintRows>(), Fake<Dialogs.IScenarioPlanner>(),
             new AnsweringDialogs(new DataDialogs.GoalSeekChoice("A1", 10, "Other!A1")), status, sources, reader, Texts, kit,
-            System.Reflection.DispatchProxy.Create<DataDialogs.ILedgerDialogProbes, Probes>(), new SheetEditGuard(), new PulseOffice.UI.Controls.Preview.DispatcherDebounceTimerFactory());
+            System.Reflection.DispatchProxy.Create<DataDialogs.ILedgerDialogProbes, Probes>(), new SheetEditGuard(), new PulseOffice.UI.Controls.Preview.DispatcherDebounceTimerFactory(), new Engine.Operations.InvalidDataFinder(new Engine.Operations.DataValidator()));
 
         await Run(commands.GetCommands(), "ledger.analysis.goalSeek", TestContext.Current.CancellationToken);
 

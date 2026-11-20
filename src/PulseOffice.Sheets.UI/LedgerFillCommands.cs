@@ -77,6 +77,11 @@ public sealed class LedgerFillCommands(
             foreach (var (address, comment) in fill.Comments(sheet, source, selection, direction))
                 if (comment is null) sheet.Comments.Remove(address);
                 else sheet.Comments[address] = comment;
+            if (fill.Validations(sheet, source, selection, direction) is { } validations)
+            {
+                sheet.Validations.Clear();
+                sheet.Validations.AddRange(validations);
+            }
         });
 
     private static CellRange SourceOf(CellRange selection, FillDirection direction) => direction switch

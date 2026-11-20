@@ -43,6 +43,9 @@ internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys ke
             VerticalContentAlignment = VerticalAlignment.Center,
             ContextFlyout = null,
         }.Themed(TextBox.BackgroundProperty, Palette.Keys.Surface);
+        if (look?.FontFamily is { Length: > 0 } family) box.FontFamily = Avalonia.Media.FontFamily.Parse(family);
+        if (look?.Bold == true) box.FontWeight = Avalonia.Media.FontWeight.Bold;
+        if (look?.Italic == true) box.FontStyle = Avalonia.Media.FontStyle.Italic;
 
         state.Overlay.Margin = new Thickness(state.Canvas.Target.X, state.Canvas.Target.Y, 0, 0);
         Canvas.SetLeft(box, bounds.X + area.X * bounds.Width - state.Canvas.Target.X);

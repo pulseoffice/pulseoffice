@@ -72,7 +72,7 @@ public sealed class DocxStyleMap
     }
 }
 
-public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraphCodec paragraphs, DocxTableStyleCodec tables, DocxTabPositions tabs)
+public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraphCodec paragraphs, DocxTableStyleCodec tables, DocxTabPositions tabs, DocxBuiltInStyles builtIns)
 {
     public void Bind(StyleSheet sheet, DocxStyleMap map)
     {
@@ -121,7 +121,9 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     {
         if (extras.OutlineLevel is not { } outline || extras.ListLevel != outline - 1 || lists.NameOf(extras.ListId) is not { } name) return false;
         if (sheet.List.Find(name) is not { } list) return false;
+        if (lists.OutlineSource is { } source) return source == name;
         if (sheet.Outline.Levels.All(level => level.Format == NumberFormat.None)) sheet.Outline = new ListStyle(StyleSheet.OutlineStyleName, list.Levels);
+        lists.OutlineSource = name;
         return true;
     }
 
@@ -189,14 +191,19 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next, string? linked)
     {
         var id = map.Bind(family, style.Name);
-        var element = new W.Style { Type = type, StyleId = id, CustomStyle = !map.IsDefaultParagraph(id) };
+        var wordName = map.WordName(id, style.Name);
+        var builtIn = builtIns.Find(wordName);
+        var element = new W.Style { Type = type, StyleId = id };
+        if (builtIn is null && !map.IsDefaultParagraph(id)) element.CustomStyle = true;
         if (family == StyleFamily.Paragraph && map.IsDefaultParagraph(id)) element.Default = true;
-        element.Append(new W.StyleName { Val = map.WordName(id, style.Name) });
+        element.Append(new W.StyleName { Val = wordName });
         if (style.DisplayName is not null) element.Append(new W.Aliases { Val = style.DisplayName });
         if (style.ParentName is not null && map.IdOf(family, style.ParentName) is { } parent) element.Append(new W.BasedOn { Val = parent });
         if (next is not null) element.Append(new W.NextParagraphStyle { Val = next });
         if (linked is not null) element.Append(new W.LinkedStyle { Val = linked });
+        if (builtIn is not null) element.Append(new W.UIPriority { Val = builtIn.UiPriority });
         if (style.Hidden) element.Append(new W.SemiHidden());
+        if (builtIn is { PrimaryFormat: true } && !style.Hidden) element.Append(new W.PrimaryStyle());
         return element;
     }
 

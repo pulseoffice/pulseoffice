@@ -82,10 +82,16 @@ public sealed class DataTableRenderer : IDataTableRenderer
                 new SolidColorBrush(accent.Color, 0.14), new Rect(bounds.X, y, bounds.Width, rowHeight));
 
             var x = bounds.X;
+            var headerIndex = new TableCellIndex(table);
             for (var i = 0; i < snapshot.Columns.Count; i++)
             {
                 var span = HeaderSpan(table, i);
-                if (span > 0)
+                var headerRich = headerIndex.Text(TableCellFormat.HeaderRow, i, snapshot.Columns[i].Name);
+                if (span > 0 && headerRich is not null)
+                    CellText(context, culture, snapshot.Columns[i].Name, accent,
+                        _box.Inner(new Rect(x, y, widths.Skip(i).Take(span).Sum(), rowHeight), null), typeface, style.FontSize,
+                        TableCellLook.Plain with { Bold = true }, CellVerticalAlign.Center, CellTextDirection.Horizontal, headerRich);
+                else if (span > 0)
                     Draw(context, culture, snapshot.Columns[i].Name, accent,
                         new Point(x + CellPadding, y + rowHeight * 0.2), typeface, style.FontSize,
                         widths.Skip(i).Take(span).Sum() - CellPadding * 2, bold: true);
@@ -241,7 +247,12 @@ public sealed class DataTableRenderer : IDataTableRenderer
         double size, TableCellLook look, CellVerticalAlign valign, CellTextDirection direction, TableCellText? rich = null)
     {
         if (content.Length == 0) return;
-        if (rich is not null && direction != CellTextDirection.Stacked)
+        if (rich is not null && direction == CellTextDirection.Stacked)
+        {
+            RichCellText(context, culture, rich.Stacked(), brush, inner, size, look with { Horizontal = CellHorizontalAlign.Center }, valign, CellTextDirection.Horizontal);
+            return;
+        }
+        if (rich is not null)
         {
             RichCellText(context, culture, rich, brush, inner, size, look, valign, direction);
             return;

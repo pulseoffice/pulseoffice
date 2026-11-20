@@ -3810,7 +3810,7 @@
   "trace.autoRefresh.on": "Spuren aktualisieren sich selbst",
   "trace.fillMode.off": "Füllmodus aus",
   "trace.fillMode.on": "Füllmodus ein: klicken zum Verfolgen",
-  "trace.invalid": "{0} Zellen mit Fehler",
+  "trace.invalid": "{0} Zellen verletzen ihre Gültigkeitsregel",
   "versions.choose": "Version",
   "versions.comment": "Kommentar zur neuen Version",
   "versions.delete": "Gewählte Version löschen",

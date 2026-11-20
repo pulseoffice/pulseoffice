@@ -14,7 +14,7 @@ public sealed class Round305SectionFieldTests
     [Fact]
     public void Runs_of_one_page_style_are_numbered_sections_with_their_page_counts()
     {
-        var sections = new SectionPageRuns().Sections([Page(0, "A"), Page(1, "A"), Page(2, "B"), Page(3, "A")]);
+        var sections = new SectionPageRuns().Sections([Page(0, "A"), Page(1, "A"), Page(2, "B"), Page(3, "A")], []);
 
         Assert.Equal([new SectionPages(1, 2), new SectionPages(1, 2), new SectionPages(2, 1), new SectionPages(3, 1)], sections);
     }

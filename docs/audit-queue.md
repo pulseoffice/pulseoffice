@@ -9,14 +9,17 @@ the round that fixes it is joined and the join run is green.
 - An iterated zoom still scales each unit about the element's centre, not the unit's own centre: the reveal works on
   character ranges and the renderer has no per-unit glyph bounds to scale about (needs the composed line geometry of
   the text painters). (292, 297)
-- Deck table cell runs are drawn in body cells and own-look cells, but the header row of a grid table and stacked
-  cell text still draw the plain value; paragraph alignment is per cell (the cell look), not per paragraph. (302)
-- The Deck table cell editor is a plain text box: editing a cell's text drops that cell's runs, there are no
-  character formatting commands for a part of a cell's text, and the editor uses the default font family rather
-  than the cell's; sharing the shape text editor (rich runs, composed frame) is still to do. Not seen live. (302)
-- Reading an ODP grid table does not restore the accent colour from its `table:table-template`; the PPTX
-  "PulseOffice Grid" table style and the ODP grid template have not been opened in PowerPoint or the reference
-  suite. (302)
+- Deck table cell editing (306): the cell editor is still a plain text box. Since round 306 an edit rebases the
+  cell's runs onto the new text (typed text takes the format of the run before it) and the box uses the cell's font
+  family, weight and slant, but there are no character formatting commands for a part of a cell's text and runs
+  are not shown while editing; sharing the shape text editor (rich runs, composed frame) is still to do: it needs the
+  shape text session to target a `TableCellText` instead of a `ShapeObject`. Not seen live. (302, 306)
+- Deck table paragraph alignment is per cell (the cell look), not per paragraph: `TableCellParagraph` carries no
+  alignment, so PPTX `a:pPr/@algn` and ODP paragraph alignment differing between paragraphs of one cell collapse to
+  the cell's. Needs a model field and both codecs. (302, 306)
+- The PPTX "PulseOffice Grid" table style and the ODP grid template have not been opened in PowerPoint or the
+  reference suite; an ODP grid table from another producer keeps the default accent (only our own template names
+  carry it). (302, 306)
 - Turned and stacked Deck table cell text and the new cell layout dialog have not been seen live. (298)
 - Per-unit fly and zoom of iterated text have not been seen live. (292)
 - Iterated text, the sound cut, the pause screen and the new dialog fields have not been seen live. (283)
@@ -116,15 +119,18 @@ the round that fixes it is joined and the join run is green.
   still has no field data. The ODF page field rule (`style:num-format="1"`
   forces Arabic, absent follows the page style, as ODF 1.3 says) still needs a look at real producers' files. (289,
   291, 296, 301)
-- Folio headers (305): `SECTION` and `SECTIONPAGES` are computed per run of pages with one page style, which is how
-  DOCX sections map in; continuous sections inside a page do not count as sections, and the header height reserved
-  before pagination uses the stored text. ODF has no section fields: `SECTIONPAGES` is written as `text:page-count`
-  with our marker (other readers show the document page count) and `SECTION` as our own element (other readers show
-  its stored text). No insert command offers them yet. (305)
-- Folio styles (305): DOCX styles are written with `customStyle` even when they carry a built-in Word name, without
-  `w:qFormat` or `w:uiPriority`, so Word's style gallery does not list them; not checked in Word. (305)
-- Folio styles (305): a DOCX heading style whose numbering uses a second list while the outline already comes from
-  another list keeps only the first list's outline. (305)
+- Folio headers (305, 308): ODF has no section fields: `SECTIONPAGES` is written as `text:page-count` with our marker
+  (other readers show the document page count) and `SECTION` as our own element (other readers show its stored text).
+  No insert command offers them yet. Since round 308 body sections that become continuous Word sections count as
+  sections, but a DOCX continuous section that changes neither columns nor line numbering is still not kept in the
+  model, so it neither counts nor round-trips; a section starting mid-page counts from the next page. (305, 308)
+- Folio styles (308): built-in Word style names are now written as built-in with Word's `w:uiPriority` and
+  `w:qFormat`; not checked in Word's gallery. A model style whose name differs from Word's only in case (for example
+  "Header") is treated as built-in while keeping its own spelling. (308)
+- Folio lists (308): Word's `w:lvlJc` (right or centred numbers) and ODF `fo:text-align` on list levels are read and
+  written as left aligned without a declared loss; `w:lvlRestart` (restart after a chosen higher level) is not read;
+  levels an `abstractNum` does not define read back as Arabic numbering. The list level editor offers no choice for
+  what follows the label (tab, space, nothing) added in round 308. (308)
 
 - Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
   and reads back as a standard tone with the same look. (282)
@@ -135,28 +141,16 @@ the round that fixes it is joined and the join run is green.
 - Images (287): compressing all pictures and the Size dialog lock checkbox are tested at service and format level, not
   through a headless walk of the three modules' commands. (287)
 
-- Deck tables (join of 302-305): add an own-look table round trip through `PptxWriter` and `PptxReader` asserting that
-  no header or body cell text comes back as rich text (`TableTextRun.Beyond` stripping is only covered indirectly;
-  `Round302PptxTableRunsTests` reads without a style resolver).
-
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- Shell (303): tab tear-off into separate operating system windows is not implemented; design for the next cycle:
-  (1) `IShellWindowHost` (Shell) owns N `ShellWindow` instances per process; each window gets its own
-  `IDocumentWorkspace` scope (documents, active, command context) while the command registry, settings, recents,
-  recovery, autosave and agent stay process-wide services; (2) `ShellWindow`'s per-window dependencies (workspace,
-  ribbon, menus, status bar, dialog host, notification center) move into a window scope created by a factory, and the
-  services that today take `IDocumentWorkspace` (RecoveryCoordinator, AutosaveCoordinator, QuitCoordinator, agent
-  document lookup, UnsavedChangesGuard) take an `IWorkspaceSet` that enumerates every window's documents;
-  (3) `DocumentTabsView` starts a tear-off when a drag leaves the strip by more than the system drag threshold: the
-  document is closed in the source workspace without release (`Detach`, which must not call `ReleaseSharedModel` nor
-  discard recovery) and opened in a new window at the pointer, or dropped into another window's strip found through
-  the host's hit test; (4) the native macOS menu and the quit flow iterate all windows; window placement is stored per
-  window. Not attempted in round 303 because it changes the singleton composition of the shell. (300, 303)
+- Shell (303, 307): tab tear-off is in place at the model level only (`ShellWindowHost`, `IWorkspaceSet`,
+  `IDocumentWorkspace.Detach`, `DocumentTabsView.TearOffRequested`); still to do: a per-window DI scope (workspace,
+  ribbon, menus, status bar, dialog host, notifications, command context) built by an `IShellWindowFactory`, `ShellWindow`
+  as `IShellWindowHandle`, registration of the host and wiring of `TearOffRequested`, command and shortcut routing to the
+  focused window, recovery, autosave, quit, unsaved-changes guard and agent lookup over `IWorkspaceSet`, the native
+  macOS menu over all windows, window placement per window, headless tests with two real windows. (300, 303, 307)
 - Shell (303): the keyboard tab move (Ctrl+Shift+PageUp/PageDown) takes the gesture Ledger would use to select sheet
   groups; Ledger has no sheet group selection yet, revisit when it gets one. (303)
-- Shell (303): the drop indicator and drag move only within the strip's visible part; a drag does not scroll an
-  overflowing tab strip. (303)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
 - Tagged PDF: Deck text boxes and shape text (columns and rotated shapes included since 268) are tagged by the painted
@@ -177,10 +171,14 @@ the round that fixes it is joined and the join run is green.
 - Conditional formatting paste with Transpose turns relative references by swapping their row and column offsets from
   the rule anchor; references with mixed absolute parts are only shifted. To compare with Excel and the reference
   suite (299, 304).
-- ODS `style:map` writing gives every cell of a conditional range a derived `cfN` style, empty padded cells included:
-  check file size on whole-column rules and the reader's style blocks on reopening (304).
-- Conditional rule editor: the per-icon picker is one long combo box of every icon; a grouped gallery would read
-  better (304).
+- Validation error alerts go to the status bar only: no modal with Retry/Cancel (stop), Yes/No/Cancel (warning) or
+  OK/Cancel (information), no error title; warning and information accept silently (309).
+- Validation input messages are shown in the status bar (and its history), not in a note box beside the cell (309).
+- XLSX: a literal validation list longer than Excel's 255-character `formula1` limit is written as is; Excel may
+  refuse it (309).
+- Transposed paste of validation, and fill copies clipped at the first row or column, reanchor only the anchor cell;
+  relative references are not swapped (309).
+- Grouped icon gallery of the conditional rule editor and the invalid data circles not yet seen in the running app (309).
 - Top/bottom percent count now rounds down with a minimum of one item; to confirm against real Excel (294).
 - ODS conditional format extras (stop if true, reversed icons, deviations, bar borders and direction) live in the `urn:pulseoffice:spreadsheet` extension: other applications ignore them; the ODF020/040/102/086/087 notices remain (294).
 - Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell

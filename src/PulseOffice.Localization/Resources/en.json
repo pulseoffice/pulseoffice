@@ -3810,7 +3810,7 @@
   "trace.autoRefresh.on": "Traces refresh on their own",
   "trace.fillMode.off": "Fill mode off",
   "trace.fillMode.on": "Fill mode on: click to follow the dependencies",
-  "trace.invalid": "{0} cells with an error",
+  "trace.invalid": "{0} cells break their validation rule",
   "versions.choose": "Version",
   "versions.comment": "Comment for the new version",
   "versions.delete": "Delete the chosen version",

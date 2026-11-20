@@ -121,7 +121,12 @@ public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
 
     private static DataTableObject WithText(DataTableObject table, int row, int column, string text)
     {
-        table = table with { CellTexts = [.. table.CellTexts.Where(rich => rich.Row != row || rich.Column != column || rich.Matches(text))] };
+        table = table with
+        {
+            CellTexts = [.. table.CellTexts
+                .Select(rich => rich.Row != row || rich.Column != column || rich.Matches(text) ? rich : rich.Rebased(text))
+                .OfType<TableCellText>()],
+        };
         var snapshot = table.Snapshot;
         if (row == TableCellFormat.HeaderRow)
             return table with { Snapshot = snapshot with { Columns = [.. snapshot.Columns.Select((c, i) => i == column ? c with { Name = text } : c)] } };

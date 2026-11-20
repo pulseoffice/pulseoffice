@@ -140,8 +140,10 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
             NumberFormat.Bullet => definition.Bullet,
             _ => definition.Prefix + Numbers(style, counts, level, definition.DisplayLevels, language) + definition.Suffix,
         };
+        if (definition.Follow == ListLabelFollow.Space && label.Length > 0) label += " ";
         return new ListPlacement(label, definition.Indent + definition.Hanging, -definition.Hanging)
         {
+            FollowedByTab = definition.Follow == ListLabelFollow.Tab,
             Picture = definition.Format == NumberFormat.Bullet && definition.Picture is { Data.Length: > 0 } picture ? picture : null,
         };
     }

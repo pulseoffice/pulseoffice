@@ -20,6 +20,8 @@ internal sealed class OdfTableTemplateSink
 
 internal sealed class OdfDeckGridTemplates
 {
+    private const string Prefix = "PulseOfficeGrid";
+
     private readonly ITableGridLook _look;
 
     private readonly OdtTableTemplates _templates;
@@ -36,9 +38,18 @@ internal sealed class OdfDeckGridTemplates
         ArgumentNullException.ThrowIfNull(style);
         ArgumentNullException.ThrowIfNull(sink);
         var accent = _look.Accent(style);
-        var name = "PulseOfficeGrid" + accent.TrimStart('#');
+        var name = Prefix + accent.TrimStart('#');
         sink.Add(name, () => _templates.Write(Properties(style), name));
         return name;
+    }
+
+    public string? Accent(string? templateName)
+    {
+        if (templateName is null || !templateName.StartsWith(Prefix, StringComparison.Ordinal)) return null;
+        var hex = templateName[Prefix.Length..];
+        if (hex.Length != 6 || !uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _)) return null;
+        var accent = "#" + hex.ToUpperInvariant();
+        return string.Equals(accent, _look.Accent(new DataTableStyle()), StringComparison.Ordinal) ? null : accent;
     }
 
     public TableProperties Properties(DataTableStyle style) => new()

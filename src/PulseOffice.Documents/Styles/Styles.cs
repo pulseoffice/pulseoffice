@@ -125,8 +125,17 @@ public enum NumberFormat
     RussianUpper,
 }
 
+public enum ListLabelFollow
+{
+    Tab,
+    Space,
+    Nothing,
+}
+
 public sealed record ListLevel(NumberFormat Format)
 {
+    public ListLabelFollow Follow { get; init; }
+
     public string Prefix { get; init; } = string.Empty;
 
     public string Suffix { get; init; } = ".";

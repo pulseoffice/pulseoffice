@@ -16,6 +16,8 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
     private readonly DesignTokens.Metrics _metrics;
     private readonly StackPanel _tabs;
     private readonly Border _dropIndicator;
+    private readonly ScrollViewer _scroller;
+    private readonly TabStripDragGeometry _geometry = new();
     private OpenDocument? _dragged;
     private readonly List<(Control Tab, OpenDocument Document)> _shown = [];
 
@@ -45,12 +47,13 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         strip.Children.Add(_tabs);
         strip.Children.Add(_dropIndicator);
 
-        Content = new ScrollViewer
+        _scroller = new ScrollViewer
         {
             Content = strip,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
         };
+        Content = _scroller;
 
         Height = _metrics.ControlHeight + 4;
         _workspace.ActiveChanged += (_, _) => Refresh();
@@ -58,12 +61,35 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         _workspace.DocumentClosed += (_, _) => Refresh();
         _workspace.DocumentOpened += (_, _) => Refresh();
         _workspace.DocumentMoved += (_, _) => Refresh();
+        _workspace.DocumentDetached += (_, _) => Refresh();
         _texts.LanguageChanged += (_, _) => Refresh();
 
         Refresh();
     }
 
     public event EventHandler<OpenDocument>? CloseRequested;
+
+    public event EventHandler<TabTearOffRequest>? TearOffRequested;
+
+    public double ScrollDuringDrag(double viewportX)
+    {
+        var step = _geometry.ScrollStep(viewportX, _scroller.Viewport.Width);
+        if (step == 0) return 0;
+        var offset = _scroller.Offset;
+        var next = _geometry.ScrolledOffset(offset.X, step, _scroller.Extent.Width, _scroller.Viewport.Width);
+        if (next == offset.X) return 0;
+        _scroller.Offset = new Vector(next, offset.Y);
+        return next - offset.X;
+    }
+
+    public bool ReleaseDrag(OpenDocument document, Point inView, PixelPoint onScreen)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (!_geometry.IsTornOff(inView, Bounds.Size) || TearOffRequested is null) return false;
+        HideDropIndicator();
+        TearOffRequested.Invoke(this, new TabTearOffRequest(document, onScreen));
+        return true;
+    }
 
     private OpenDocument? _pressed;
 
@@ -220,13 +246,17 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         tab.PointerMoved += (_, e) =>
         {
             if (!ReferenceEquals(_dragged, document) || !e.GetCurrentPoint(tab).Properties.IsLeftButtonPressed) return;
-            ShowDropIndicator(document, e.GetPosition(_tabs).X);
+            ScrollDuringDrag(e.GetPosition(_scroller).X);
+            if (_geometry.IsTornOff(e.GetPosition(this), Bounds.Size)) HideDropIndicator();
+            else ShowDropIndicator(document, e.GetPosition(_tabs).X);
         };
         tab.PointerReleased += (_, e) =>
         {
             if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left || e.Source is Button) return;
             _pressed = null;
             _dragged = null;
+            var screen = this.PointToScreen(e.GetPosition(this));
+            if (ReleaseDrag(document, e.GetPosition(this), screen)) return;
             Drop(document, e.GetPosition(_tabs).X);
         };
         tab.PointerCaptureLost += (_, _) =>
@@ -240,3 +270,5 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         return tab;
     }
 }
+
+public sealed record TabTearOffRequest(OpenDocument Document, PixelPoint ScreenPoint);

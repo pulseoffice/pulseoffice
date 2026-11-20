@@ -591,6 +591,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
     {
         var sheet = _workbook.Sheets[_grid.SheetIndex];
         _editing.ShowSelection(sheet);
+        _editing.AnnounceInputMessage();
         _segments.UpdateSummary(sheet);
     }
 

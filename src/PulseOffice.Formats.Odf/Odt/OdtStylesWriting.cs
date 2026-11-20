@@ -295,7 +295,7 @@ internal sealed class OdtStylesWriter(
         new(Style + "list-level-properties",
             new XAttribute(Text + "list-level-position-and-space-mode", "label-alignment"),
             new XElement(Style + "list-level-label-alignment",
-                new XAttribute(Text + "label-followed-by", "listtab"),
+                new XAttribute(Text + "label-followed-by", level.Follow switch { ListLabelFollow.Space => "space", ListLabelFollow.Nothing => "nothing", _ => "listtab" }),
                 new XAttribute(Text + "list-tab-stop-position", measure.Points(level.Indent + level.Hanging)),
                 new XAttribute(Fo + "text-indent", measure.Points(-level.Hanging)),
                 new XAttribute(Fo + "margin-left", measure.Points(level.Indent + level.Hanging))));

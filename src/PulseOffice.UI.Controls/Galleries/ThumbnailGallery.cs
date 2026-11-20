@@ -349,21 +349,23 @@ public sealed class ThumbnailGallery<T> : UserControl
             Padding = padding,
             BorderThickness = default,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Content = new StackPanel
-            {
-                Spacing = _options.CaptionGap,
-                Children =
+            Content = _options.ShowsCaptions
+                ? new StackPanel
                 {
-                    frame,
-                    new TextBlock
+                    Spacing = _options.CaptionGap,
+                    Children =
                     {
-                        Text = item.Caption,
-                        FontSize = _metrics.FontSizeSmall,
-                        TextTrimming = TextTrimming.CharacterEllipsis,
-                        TextAlignment = TextAlignment.Center,
+                        frame,
+                        new TextBlock
+                        {
+                            Text = item.Caption,
+                            FontSize = _metrics.FontSizeSmall,
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                            TextAlignment = TextAlignment.Center,
+                        },
                     },
-                },
-            },
+                }
+                : frame,
         };
         tile.Classes.Add("ribbon");
         tile.Classes.Add("tile");

@@ -2,18 +2,18 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
 using PulseOffice.Localization;
 using PulseOffice.Sheets.Formatting;
 using PulseOffice.UI.Controls;
+using PulseOffice.UI.Controls.Galleries;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI.Conditional;
 
-public sealed class ConditionalVisualOptions(ConditionalPainting painting, ITextCatalog texts, DesignTokens.Metrics metrics, Func<ConditionalRule> current, Action<ConditionalRule> update)
+public sealed class ConditionalVisualOptions(ConditionalPainting painting, IGalleryNavigator navigator, ITextCatalog texts, DesignTokens.Metrics metrics, Func<ConditionalRule> current, Action<ConditionalRule> update)
 {
     private readonly IReadOnlyList<DataBarAxis> _axes = Enum.GetValues<DataBarAxis>();
     private readonly IReadOnlyList<DataBarDirection> _directions = Enum.GetValues<DataBarDirection>();
@@ -80,21 +80,12 @@ public sealed class ConditionalVisualOptions(ConditionalPainting painting, IText
             RowSpacing = metrics.SpacingSmall,
         };
         for (var row = 0; row < count; row++) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        var all = AllIcons();
         for (var row = 0; row < count; row++)
         {
             var position = count - 1 - row;
-            var icon = new ComboBox
+            var icon = new ConditionalIconPicker(painting, navigator, texts, metrics, IconChoices(rule)[position], texts.Format("conditional.icons.icon", row + 1), IconCell);
+            icon.Picked += (_, picked) =>
             {
-                ItemsSource = all,
-                SelectedItem = all.FirstOrDefault(choice => choice == IconChoices(rule)[position]) ?? all[0],
-                ItemTemplate = new FuncDataTemplate<ConditionalIconChoice?>((choice, _) => choice is null ? new Panel() : IconCell(choice), supportsRecycling: false),
-                MinWidth = 64,
-            };
-            AutomationProperties.SetName(icon, texts.Format("conditional.icons.icon", row + 1));
-            icon.SelectionChanged += (_, _) =>
-            {
-                if (icon.SelectedItem is not ConditionalIconChoice picked) return;
                 var choices = IconChoices(current()).ToList();
                 choices[position] = picked;
                 update(current() with { CustomIcons = choices, ReverseIcons = false });
@@ -145,11 +136,6 @@ public sealed class ConditionalVisualOptions(ConditionalPainting painting, IText
         thresholds[position] = change(thresholds[position]);
         update(current() with { Thresholds = thresholds });
     }
-
-    private List<ConditionalIconChoice> AllIcons() =>
-        [new ConditionalIconChoice(ConditionalIconChoice.NoIcons, -1),
-            .. painting.Icons.Names.Where(name => name != ConditionalIconChoice.NoIcons)
-                .SelectMany(name => Enumerable.Range(0, painting.Icons.Count(name)).Select(index => new ConditionalIconChoice(name, index)))];
 
     private Control IconCell(ConditionalIconChoice choice) =>
         choice.IsNone

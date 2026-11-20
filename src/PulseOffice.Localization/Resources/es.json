@@ -3810,7 +3810,7 @@
   "trace.autoRefresh.on": "Los rastros se actualizan solos",
   "trace.fillMode.off": "Modo de relleno desactivado",
   "trace.fillMode.on": "Modo de relleno activo",
-  "trace.invalid": "{0} celdas con error",
+  "trace.invalid": "{0} celdas no cumplen su validación",
   "versions.choose": "Versión",
   "versions.comment": "Comentario de la nueva versión",
   "versions.delete": "Eliminar la versión elegida",

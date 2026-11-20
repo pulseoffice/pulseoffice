@@ -14325,3 +14325,30 @@ docs/deep-audit/round-288-shell-recent-pinning.md.
   `w:fldData`; linked paragraph and character styles keep their character part in step; ODT linked styles also
   written and read with the extension attribute other readers know; Word's default paragraph font is no longer
   imported as a custom style; dangling style links dropped on reading. Log: docs/deep-audit/round-305-folio-styles.md.
+
+## Round 306: Deck table cell editing (2026-11-20)
+
+Cell edits keep their rich runs (`TableCellText.Rebased`), grid header and stacked cell text draw their runs, ODP grid
+tables read their accent back from the template name, the cell editor uses the cell's font, and an own-look PPTX round
+trip test checks that no rich text is invented. The shared rich cell editor and per-paragraph alignment stay queued.
+Log: docs/deep-audit/round-306-deck-table-cell-editing.md.
+
+## Round 307: shell tab tear-off (2026-11-20)
+Model for multiple shell windows: `IDocumentWorkspace.Detach`/`DocumentDetached`, `IWorkspaceSet`, `ShellWindowHost`
+over `IShellWindowHandle`/`IShellWindowFactory` (tear-off, move between windows, last window quits), and
+`TabStripDragGeometry` for edge scrolling and tear-off detection in `DocumentTabsView`. The per-window composition is
+not done and stays queued. Log: docs/deep-audit/round-307-shell-tear-off.md.
+
+### Round 308: Folio styles, headers and lists (2026-11-20)
+
+- Built-in Word style names written as built-in with `w:uiPriority` and `w:qFormat`; a heading numbered by a second
+  list keeps it when the outline comes from another list; body sections that become Word sections count for `SECTION`
+  and `SECTIONPAGES`; header height before pagination uses section numbers; what follows a list label (tab, space,
+  nothing) crosses ODT and DOCX. Log: docs/deep-audit/round-308-folio-lists.md.
+
+### Round 309 — Ledger conditional leftovers and data validation (2026-11-20)
+- Grouped icon gallery in the conditional rule editor (shared `ThumbnailGallery`, captionless tiles); ODS style map
+  size verified bounded with a test. Mark Invalid Data now circles the cells breaking their validation rule (it only
+  counted error values); paste and fill carry validation with reanchored formulas and cut the rules they cover; XLSX
+  multi-area `sqref` reanchors formulas per area; input messages shown on selection. Log:
+  docs/deep-audit/round-309-ledger-validation.md.

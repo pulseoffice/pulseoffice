@@ -634,6 +634,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
                     LastRow = TemplateFlag(settings, tableElement, "use-last-row-styles"),
                     OwnLook = looks.Count > 0,
                     Grid = looks.Count == 0,
+                    AccentHex = looks.Count == 0 ? _grids.Accent((string?)tableElement.Attribute(Table + "template-name")) : null,
                 },
                 Merges = merges,
                 CellFormats = looks.Count > 0 ? looks : formats,

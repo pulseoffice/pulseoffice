@@ -404,6 +404,7 @@ internal sealed class OdtStylesReader(
             Separators = Gaps(element),
             Indent = indent,
             Hanging = hanging,
+            Follow = Follow(element.Element(Style + "list-level-properties")),
             CharacterStyleName = characterStyle is { Length: > 0 } character ? context.StyleNames.Resolve(character) : null,
             Picture = picture,
         };
@@ -414,6 +415,14 @@ internal sealed class OdtStylesReader(
         var gaps = element.Elements(Pt + "level-gap").Select(gap => (string?)gap.Attribute(Pt + "separator") ?? ".").ToArray();
         return gaps.Length == 0 ? [] : gaps;
     }
+
+    private ListLabelFollow Follow(XElement? properties) =>
+        (string?)properties?.Element(Style + "list-level-label-alignment")?.Attribute(Text + "label-followed-by") switch
+        {
+            "space" => ListLabelFollow.Space,
+            "nothing" => ListLabelFollow.Nothing,
+            _ => ListLabelFollow.Tab,
+        };
 
     private (double Indent, double Hanging) Geometry(XElement? properties)
     {

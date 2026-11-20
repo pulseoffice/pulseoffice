@@ -152,6 +152,12 @@ internal sealed class GridOverlayPainter(
 
         foreach (var arrow in sheet.TraceArrows)
         {
+            if (arrow.Kind == TraceKind.Invalid)
+            {
+                PaintInvalidMark(context, viewport.CellRect(arrow.From));
+                continue;
+            }
+
             var from = viewport.CellRect(arrow.From);
             var to = viewport.CellRect(arrow.To);
 
@@ -170,6 +176,13 @@ internal sealed class GridOverlayPainter(
 
             context.DrawEllipse(pen.Brush, null, start, 3, 3);
         }
+    }
+
+    private void PaintInvalidMark(DrawingContext context, Rect cell)
+    {
+        var pen = new Pen(theme.Brush(Palette.Keys.Danger, theme.Accent), 1.6);
+        var center = new Point(cell.X + cell.Width / 2, cell.Y + cell.Height / 2);
+        context.DrawEllipse(null, pen, center, cell.Width / 2 + 4, cell.Height / 2 + 3);
     }
 
     private void PaintArrowHead(DrawingContext context, IPen pen, Point start, Point end)

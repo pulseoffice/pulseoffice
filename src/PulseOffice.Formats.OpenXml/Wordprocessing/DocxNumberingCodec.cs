@@ -19,6 +19,8 @@ public sealed class DocxListMap
 
     public IReadOnlyList<DocxListRestart> Restarts => _restarts;
 
+    public string? OutlineSource { get; set; }
+
     public void Bind(string name, int id)
     {
         _ids[name] = id;
@@ -181,6 +183,8 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             }))
         { LevelIndex = index };
         if (level.Legal && level.Format != NumberFormat.Bullet) element.InsertAfter(new W.IsLegalNumberingStyle(), element.GetFirstChild<W.NumberingFormat>());
+        if (level.Follow != ListLabelFollow.Tab)
+            element.InsertBefore(new W.LevelSuffix { Val = level.Follow == ListLabelFollow.Space ? W.LevelSuffixValues.Space : W.LevelSuffixValues.Nothing }, element.GetFirstChild<W.LevelText>());
         return element;
     }
 
@@ -248,8 +252,11 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         var hanging = values.Points(indentation?.Hanging?.Value) ?? 0;
         var left = values.Points(indentation?.Left?.Value ?? indentation?.Start?.Value) ?? hanging;
         var start = values.Bounded(level.StartNumberingValue?.Val?.Value ?? 1, 0, LargestStart);
+        var follow = level.LevelSuffix?.Val?.Value is { } suffix
+            ? suffix == W.LevelSuffixValues.Space ? ListLabelFollow.Space : suffix == W.LevelSuffixValues.Nothing ? ListLabelFollow.Nothing : ListLabelFollow.Tab
+            : ListLabelFollow.Tab;
         if (kind == NumberFormat.Bullet)
-            return new ListLevel(kind) { Bullet = text.Length > 0 ? text : "•", Prefix = string.Empty, Suffix = string.Empty, StartAt = start, Indent = left - hanging, Hanging = hanging };
+            return new ListLevel(kind) { Bullet = text.Length > 0 ? text : "•", Prefix = string.Empty, Suffix = string.Empty, StartAt = start, Indent = left - hanging, Hanging = hanging, Follow = follow };
         var first = text.IndexOf('%');
         var last = text.LastIndexOf('%');
         var placeholders = text.Count(character => character == '%');
@@ -265,6 +272,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             StartAt = start,
             Indent = left - hanging,
             Hanging = hanging,
+            Follow = follow,
         };
     }
 }

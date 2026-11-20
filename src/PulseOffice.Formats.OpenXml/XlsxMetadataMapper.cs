@@ -10,11 +10,12 @@ using PulseOffice.Sheets;
 
 namespace PulseOffice.Formats.OpenXml;
 
-public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder? order = null)
+public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder? order = null, PulseOffice.Sheets.Engine.Operations.IValidationAnchoring? anchoring = null)
 {
     private readonly ValidationVocabulary _vocabulary = new();
     private readonly PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder _order = order ?? new PulseOffice.Sheets.Engine.Operations.ValidationChoiceOrder();
     private readonly XlsxValidationExtension _validationExtension = new(new X14Namespaces());
+    private readonly PulseOffice.Sheets.Engine.Operations.IValidationAnchoring _anchoring = anchoring ?? new PulseOffice.Sheets.Engine.Operations.ValidationAnchoring();
 
     public DataValidations? BuildValidations(IReadOnlyList<Rule> validations)
     {
@@ -77,17 +78,23 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
         foreach (var element in elements)
         {
             var references = element.SequenceOfReferences?.InnerText ?? string.Empty;
+            Rule? anchored = null;
 
             foreach (var part in references.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (!CellRange.TryParseA1(part.Replace("$", string.Empty, StringComparison.Ordinal), out var range))
                     continue;
+                if (anchored is not null)
+                {
+                    sheet.Validations.Add(_anchoring.Reanchored(anchored, range.Start, range));
+                    continue;
+                }
 
                 var kind = _vocabulary.Kinds.Model(element.Type?.Value);
                 var first = element.GetFirstChild<Formula1>()?.Text;
                 var second = element.GetFirstChild<Formula2>()?.Text;
 
-                sheet.Validations.Add(new Rule
+                anchored = new Rule
                 {
                     Range = range,
                     Kind = kind,
@@ -107,7 +114,8 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
                     InputTitle = element.PromptTitle?.Value,
                     ShowInputMessage = element.ShowInputMessage?.Value == true || (element.Prompt?.Value is not { Length: > 0 } && element.PromptTitle?.Value is not { Length: > 0 }),
                     ShowErrorAlert = element.ShowErrorMessage?.Value == true || kind == ValidationKind.Any,
-                });
+                };
+                sheet.Validations.Add(anchored);
             }
         }
     }

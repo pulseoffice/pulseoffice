@@ -3810,7 +3810,7 @@
   "trace.autoRefresh.on": "Le frecce si aggiornano da sole",
   "trace.fillMode.off": "Modo riempimento spento",
   "trace.fillMode.on": "Modo riempimento attivo: clicca per seguire le dipendenze",
-  "trace.invalid": "{0} celle con errore",
+  "trace.invalid": "{0} celle non rispettano la convalida",
   "versions.choose": "Versione",
   "versions.comment": "Commento della nuova versione",
   "versions.delete": "Elimina la versione scelta",

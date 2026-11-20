@@ -84,6 +84,10 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
 
     private readonly FormulaTranslator _translator = new();
 
+    private readonly ValidationAnchoring _validationAnchoring = new();
+
+    private readonly ValidationPlacement _validationPlacement = new();
+
     private readonly IReadOnlyDictionary<PasteOperation, PasteArithmetic> _operations =
         new PasteArithmetic[] { new KeepSource(), new AddValues(), new SubtractValues(), new MultiplyValues(), new DivideValues() }
             .ToDictionary(operation => operation.Operation);
@@ -153,7 +157,9 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
         var left = Math.Max(rule.Range.Start.Column, range.Start.Column);
         var bottom = Math.Min(rule.Range.End.Row, range.End.Row);
         var right = Math.Min(rule.Range.End.Column, range.End.Column);
-        return new CopiedValidation(top - range.Start.Row, left - range.Start.Column, bottom - top + 1, right - left + 1, rule);
+        var clipped = new CellRange(new CellAddress(top, left), new CellAddress(bottom, right));
+        return new CopiedValidation(top - range.Start.Row, left - range.Start.Column, bottom - top + 1, right - left + 1,
+            _validationAnchoring.Reanchored(rule, clipped.Start, clipped));
     }
 
     private CopiedConditionalRule ClippedRule(PulseOffice.Sheets.Formatting.ConditionalRule rule, CellRange part, CellRange range)
@@ -439,7 +445,9 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
             ? new CellRange(target, Bounded(target.Row + snapshot.ColumnCount - 1, target.Column + snapshot.RowCount - 1))
             : new CellRange(target, Bounded(target.Row + snapshot.RowCount - 1, target.Column + snapshot.ColumnCount - 1));
 
-        sheet.Validations.RemoveAll(rule => area.Contains(rule.Range.Start) && area.Contains(rule.Range.End));
+        var kept = _validationPlacement.Place(before, area, null);
+        sheet.Validations.Clear();
+        sheet.Validations.AddRange(kept);
 
         foreach (var copied in snapshot.Validations)
         {
@@ -449,7 +457,8 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
             var end = transpose
                 ? Bounded(start.Row + copied.ColumnCount - 1, start.Column + copied.RowCount - 1)
                 : Bounded(start.Row + copied.RowCount - 1, start.Column + copied.ColumnCount - 1);
-            sheet.Validations.Add(copied.Rule with { Range = new CellRange(start, end) });
+            var placed = new CellRange(start, end);
+            sheet.Validations.Add(_validationAnchoring.Reanchored(copied.Rule, start, placed));
         }
 
         List<DataValidation> after = [.. sheet.Validations];

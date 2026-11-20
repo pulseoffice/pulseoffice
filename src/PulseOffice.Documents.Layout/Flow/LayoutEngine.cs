@@ -74,7 +74,7 @@ public sealed class DocumentLayoutEngine(
             }
             if (!changed || ++pass >= CountPasses) break;
         }
-        return Finish(document, pages, [.. flow.Select(item => item.Key)], frames.Signature(document));
+        return Finish(document, pages, flow, [.. flow.Select(item => item.Key)], frames.Signature(document));
     }
 
     private bool PageNotes(TextDocument document) => document.Notes.FootnoteSettings.Restart == NoteNumbering.Page && document.Notes.All.Any(note => note.Kind == NoteKind.Footnote);
@@ -135,7 +135,7 @@ public sealed class DocumentLayoutEngine(
         var probe = new SuffixProbe(previous, keys.Count - suffix, keys.Count - old.Count, stable);
         var pages = paginator.Paginate(Request(document, flow, notes, body, [.. previous.Pages.Take(resumePage)], resume, probe, estimate));
         if (pages.Count != estimate && counts.Present(document)) return Layout(document, pages.Count);
-        return Finish(document, pages, keys, signature);
+        return Finish(document, pages, flow, keys, signature);
     }
 
     private int SectionStart(IReadOnlyList<FlowItem> flow, int index)
@@ -154,10 +154,10 @@ public sealed class DocumentLayoutEngine(
         return start;
     }
 
-    private DocumentLayout Finish(TextDocument document, IReadOnlyList<PageBox> pages, IReadOnlyList<FlowKey> keys, FlowKey signature)
+    private DocumentLayout Finish(TextDocument document, IReadOnlyList<PageBox> pages, IReadOnlyList<FlowItem> flow, IReadOnlyList<FlowKey> keys, FlowKey signature)
     {
         var decorated = new List<PageBox>(pages.Count);
-        var sections = sectionPages.Sections(pages);
+        var sections = sectionPages.Sections(pages, flow);
         for (var i = 0; i < pages.Count; i++)
         {
             var first = i == 0 || pages[i - 1].StyleName != pages[i].StyleName;

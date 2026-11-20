@@ -28,7 +28,8 @@ public sealed class LedgerAnalysisCommands(
     DataDialogs.LedgerDialogKit kit,
     DataDialogs.ILedgerDialogProbes probes,
     ISheetEditGuard guard,
-    PulseOffice.UI.Controls.Preview.IDebounceTimerFactory timers) : LedgerCommandSet(context)
+    PulseOffice.UI.Controls.Preview.IDebounceTimerFactory timers,
+    IInvalidDataFinder invalidData) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -159,8 +160,11 @@ public sealed class LedgerAnalysisCommands(
         var origins = sheet.TraceArrows.Select(arrow => (arrow.To, arrow.Kind)).Distinct().ToList();
 
         sheet.TraceArrows.Clear();
+        if (origins.Any(origin => origin.Kind == TraceKind.Invalid))
+            foreach (var address in invalidData.Find(engine, Context.SheetIndex, InvalidMarkLimit))
+                sheet.TraceArrows.Add(new TraceArrow(address, address, TraceKind.Invalid));
 
-        foreach (var (cell, kind) in origins)
+        foreach (var (cell, kind) in origins.Where(origin => origin.Kind != TraceKind.Invalid))
         {
             var target = new SheetCell(Context.SheetIndex, cell);
 
@@ -178,17 +182,20 @@ public sealed class LedgerAnalysisCommands(
         Context.RequestRefresh();
     }
 
+    private const int InvalidMarkLimit = 255;
+
     private void MarkInvalid()
     {
         if (Context.Workbook is not { } workbook) return;
+        if (Context.Engine is not { } engine) return;
 
         var sheet = workbook.Sheets[Context.SheetIndex];
-        var invalid = 0;
+        sheet.TraceArrows.RemoveAll(arrow => arrow.Kind == TraceKind.Invalid);
+        var invalid = invalidData.Find(engine, Context.SheetIndex, InvalidMarkLimit);
+        foreach (var address in invalid) sheet.TraceArrows.Add(new TraceArrow(address, address, TraceKind.Invalid));
 
-        foreach (var (address, cell) in sheet.NonEmptyCells())
-            if (cell.Value.IsError) invalid++;
-
-        status.Report(texts.Format("trace.invalid", invalid), NotificationSeverity.Warning);
+        Context.RequestRefresh();
+        status.Report(texts.Format("trace.invalid", invalid.Count), invalid.Count > 0 ? NotificationSeverity.Warning : NotificationSeverity.Info);
     }
 
     private CommandDefinition Trace(

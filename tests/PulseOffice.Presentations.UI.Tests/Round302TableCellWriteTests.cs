@@ -32,12 +32,12 @@ public sealed class Round302TableCellWriteTests
     }
 
     [Fact]
-    public void Writing_the_same_text_changes_nothing_and_new_text_drops_stale_runs()
+    public void Writing_the_same_text_changes_nothing_and_new_text_keeps_the_runs()
     {
         var table = Table();
 
         Assert.Same(table, _keys.Write(table, Cell(0, 1), "2"));
-        Assert.Empty(_keys.Write(table, Cell(0, 1), "22").CellTexts);
+        Assert.Equal("22", Assert.Single(_keys.Write(table, Cell(0, 1), "22").CellTexts).PlainText);
         Assert.Equal("H", _keys.Write(table, Cell(TableCellFormat.HeaderRow, 1), "H").Snapshot.Columns[1].Name);
     }
 }

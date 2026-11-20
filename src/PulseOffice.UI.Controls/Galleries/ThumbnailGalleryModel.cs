@@ -34,6 +34,8 @@ public sealed record ThumbnailGalleryOptions
 
     public double CaptionGap { get; init; } = 4;
 
+    public bool ShowsCaptions { get; init; } = true;
+
     public double FrameRadius { get; init; } = 4;
 
     public bool FrameBorder { get; init; } = true;

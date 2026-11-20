@@ -246,8 +246,10 @@ public sealed class LedgerFormatSurfacesTests(HeadlessDesktopSession headless)
         Assert.Equal(count, view.Rule.Thresholds.Count);
         Assert.Equal(80, view.Rule.Thresholds[^1].Value);
 
-        var icon = view.GetLogicalDescendants().OfType<ComboBox>().First(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts.Format("conditional.icons.icon", 1));
-        icon.SelectedIndex = 0;
+        var icon = view.GetLogicalDescendants().OfType<ConditionalIconPicker>().First(picker => Avalonia.Automation.AutomationProperties.GetName(picker) == _texts.Format("conditional.icons.icon", 1));
+        Assert.True(icon.Gallery.Items.Select(item => item.Group).Distinct().Count() > 2);
+        icon.Gallery.Select(0);
+        icon.Gallery.Invoke();
         Assert.Equal(count, view.Rule.CustomIcons.Count);
         Assert.True(view.Rule.CustomIcons[^1].IsNone);
         return Task.CompletedTask;
