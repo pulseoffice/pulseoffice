@@ -54,6 +54,7 @@ public sealed class LedgerDocumentFactory(
     PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters,
     ICellLinkClicking cellLinks,
     PulseOffice.UI.Controls.Links.ILinkTips linkTips,
+    PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges,
     IValidationAlertPrompt validationAlerts,
     ILedgerFindHighlights findHighlights) : ILedgerDocumentFactory, IDocumentViewSource
 {
@@ -118,7 +119,7 @@ public sealed class LedgerDocumentFactory(
     {
         var view = new LedgerView(
             workbook, engine, presenter, conditional, sheetContext, workspace, history, status, texts,
-            validator, contextMenus, design, tools, spelling, autoCorrect, autoCorrectSettings, formBinding: formBinding, linkTips: linkTips)
+            validator, contextMenus, design, tools, spelling, autoCorrect, autoCorrectSettings, formBinding: formBinding, linkTips: linkTips, nudges: nudges)
         {
             FormEvents = formEvents,
             Fill = fill,

@@ -34,6 +34,7 @@ public sealed class XlsxChartMapper
     private readonly XlsxChartTableSources _tableSources = new();
     private readonly ChartExReader _chartEx = new();
     private readonly ChartExAnchors _chartExAnchors;
+    private readonly ChartStyleParts _styleParts = new();
 
     public XlsxChartMapper()
     {
@@ -63,6 +64,7 @@ public sealed class XlsxChartMapper
             _pivotLink.Write(chartPart.ChartSpace, definition.PivotSource, definition.SourceSheet);
             _tableSources.Write(chartPart.ChartSpace, structured);
             chartPart.ChartSpace.Save();
+            _styleParts.Write(chartPart, definition.Style);
 
             var classic = _anchors.Build(sheet.Layout, placed, drawingsPart.GetIdOfPart(chartPart));
             yield return _chartExAnchors.Writes(definition)
@@ -88,7 +90,9 @@ public sealed class XlsxChartMapper
                 if (_chartExAnchors.FallbackAnchor(anchor) is { } fallback && Classic(drawings, anchors, fallback, ordinal + 1) is { } kept && _chartExAnchors.Writes((ChartDefinition)kept.Content))
                 {
                     ordinal++;
-                    placed.Add(kept);
+                    placed.Add(ChartExLayout(drawings, anchor) is { IsAutomatic: false } statistical
+                        ? kept with { Content = (ChartDefinition)kept.Content with { Statistical = statistical } }
+                        : kept);
                     continue;
                 }
                 if (ChartEx(drawings, anchor, ++ordinal) is { } extended) placed.Add(anchors.Place(extended.Anchor, extended.Placed, new DocumentSize(Twip.FromCentimeters(12), Twip.FromCentimeters(7))));
@@ -127,7 +131,7 @@ public sealed class XlsxChartMapper
             SourceSheet = sourceSheet,
             SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sourceSheet, StringComparison.CurrentCultureIgnoreCase))]),
         }), Sources(content.Series, pivot)));
-        definition = definition with { PivotSource = _pivotLink.Read(space) };
+        definition = definition with { PivotSource = _pivotLink.Read(space), Style = _styleParts.Read((ChartPart)found, definition.Style) };
         if (_tableSources.Read(space) is { } kept) definition = definition with { SeriesSources = kept };
         if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
             definition = _inlineErrors.Refresh(definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null });
@@ -152,7 +156,24 @@ public sealed class XlsxChartMapper
         return (anchor, new PlacedObject { Id = string.IsNullOrEmpty(name) ? definition.Id : name, Content = definition, Anchor = new CellAddress(0, 0) });
     }
 
-    private ChartDefinition ChartExDefinition(ChartExContent content, string id)
+    private ChartStatisticalLayout? ChartExLayout(DrawingsPart drawings, OpenXmlElement alternate) =>
+        _chartEx.ChoiceAnchor(alternate) is { } anchor && _chartEx.ChartId(anchor) is { } id
+        && drawings.TryGetPartById(id, out var part) && _chartEx.Read(part) is { } content
+            ? content.Statistical
+            : null;
+
+    private ChartDefinition ChartExDefinition(ChartExContent content, string id) =>
+        Levelled(ChartExSources(content, id), content.Series[0].CachedLevels) with { Statistical = content.Statistical };
+
+    private ChartDefinition Levelled(ChartDefinition definition, IReadOnlyList<IReadOnlyList<string>> levels)
+    {
+        if (levels.Count == 0) return definition;
+        return definition.InlineData is { } data
+            ? definition with { InlineData = data.WithCategoryLevels(levels) }
+            : definition with { CategoryLevels = levels };
+    }
+
+    private ChartDefinition ChartExSources(ChartExContent content, string id)
     {
         var literalNames = content.Series.Any(series => series.NameFormula is null && !string.IsNullOrEmpty(series.Name))
             ? content.Series.Select(series => series.NameFormula is null ? series.Name ?? string.Empty : string.Empty).ToList()

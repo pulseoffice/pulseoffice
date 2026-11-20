@@ -7,10 +7,15 @@ namespace PulseOffice.UI.Controls.Charts.Plots;
 public sealed class StatisticalPlot : ChartPlotBase
 {
     private readonly IChartStatistics _statistics;
+    private readonly IChartHierarchy _hierarchy;
 
-    public StatisticalPlot(IChartStatistics statistics) => _statistics = statistics;
+    public StatisticalPlot(IChartStatistics statistics, IChartHierarchy hierarchy)
+    {
+        _statistics = statistics;
+        _hierarchy = hierarchy;
+    }
 
-    public StatisticalPlot() : this(new ChartStatistics()) { }
+    public StatisticalPlot() : this(new ChartStatistics(), new ChartHierarchy()) { }
 
     public override bool Handles(ChartType type) => type is
         ChartType.Histogram or ChartType.Pareto or ChartType.BoxPlot or ChartType.ViolinPlot
@@ -52,16 +57,9 @@ public sealed class StatisticalPlot : ChartPlotBase
         var series = frame.Data.Series.FirstOrDefault();
         if (series is null) return new PlotScale(0, 1, frame.Plot.Bottom, frame.Plot.Y);
 
-        var running = 0.0;
-        var lowest = 0.0;
-        var highest = 0.0;
-
-        foreach (var value in Finite(series.Values))
-        {
-            running += value;
-            lowest = Math.Min(lowest, running);
-            highest = Math.Max(highest, running);
-        }
+        var steps = _statistics.Waterfall(series.Values, frame.Definition.Statistical.Subtotals);
+        var lowest = Math.Min(0, steps.Select(step => Math.Min(step.From, step.To)).DefaultIfEmpty(0).Min());
+        var highest = Math.Max(0, steps.Select(step => Math.Max(step.From, step.To)).DefaultIfEmpty(0).Max());
 
         return PlotScale.Nice(lowest, highest, frame.Plot.Bottom, frame.Plot.Y);
     }
@@ -151,53 +149,80 @@ public sealed class StatisticalPlot : ChartPlotBase
             return [.. categories.Select((label, index) => (Label: label, Value: index < series.Values.Count && double.IsFinite(series.Values[index]) ? Math.Max(0, series.Values[index]) : 0))
                 .OrderByDescending(bar => bar.Value)];
 
-        var bins = _statistics.Histogram(Values(frame));
+        var bins = _statistics.Histogram(Values(frame), frame.Definition.Statistical);
         var bars = bins.Select(bin => (Label: bin.Lower.ToString("0.#", frame.Formatting), Value: (double)bin.Count));
         return pareto ? [.. bars.OrderByDescending(bar => bar.Value)] : [.. bars];
     }
 
     private void DrawBoxes(ChartFrame frame)
     {
-        var categories = Across(frame, Math.Max(1, frame.Data.Series.Count));
-
         var everything = Values(frame);
         if (everything.Count == 0) return;
 
+        var layout = frame.Definition.Statistical;
+        var buckets = _hierarchy.Buckets(frame.Data);
+        var seriesCount = Math.Max(1, frame.Data.Series.Count);
+        var categories = Across(frame, Math.Max(1, buckets.Count));
         var scale = PlotScale.Nice(everything.Min(), everything.Max(), frame.Plot.Bottom, frame.Plot.Y);
         var pen = new Pen(frame.Marks.Stroke, 1.2);
+        var slot = categories.Width * 0.8 / seriesCount;
+
+        for (var bucket = 0; bucket < buckets.Count; bucket++)
+            if (buckets[bucket].Label.Length > 0)
+                Label(frame, buckets[bucket].Label, new Point(categories.Start(bucket), frame.Plot.Bottom + 2), 8);
 
         for (var index = 0; index < frame.Data.Series.Count; index++)
         {
             var series = frame.Data.Series[index];
-            var summary = _statistics.Summary(series.Values);
+            var means = new List<Point>();
 
-            var centre = categories.Centre(index);
-            var half = categories.Width * 0.25;
+            for (var bucket = 0; bucket < buckets.Count; bucket++)
+            {
+                var values = buckets[bucket].Points.Where(point => point < series.Values.Count).Select(point => series.Values[point]).Where(double.IsFinite).ToList();
+                if (values.Count == 0) continue;
 
-            var top = scale.Position(summary.UpperQuartile);
-            var bottom = scale.Position(summary.LowerQuartile);
+                var centre = categories.Start(bucket) + categories.Width * 0.1 + slot * (index + 0.5);
+                var half = slot * 0.35;
+                var summary = _statistics.Summary(values, layout.QuartileMethod);
+                IReadOnlyList<double> outliers = layout.Outliers ? _statistics.Outliers(values, layout.QuartileMethod) : [];
+                var inside = values.Where(value => !outliers.Contains(value)).DefaultIfEmpty(summary.Median).ToList();
 
-            if (frame.Definition.Type is ChartType.ViolinPlot)
-                DrawViolin(frame, series.Values, centre, half * 2, scale);
+                var top = scale.Position(summary.UpperQuartile);
+                var bottom = scale.Position(summary.LowerQuartile);
 
-            frame.Context.DrawRectangle(
-                Brush(frame.Data, index, 0.55), pen,
-                new Rect(centre - half, Math.Min(top, bottom), half * 2, Math.Abs(bottom - top)));
+                if (frame.Definition.Type is ChartType.ViolinPlot)
+                    DrawViolin(frame, values, centre, half * 2, scale);
 
-            var median = scale.Position(summary.Median);
-            frame.Context.DrawLine(new Pen(frame.Marks.Strong, 1.5),
-                new Point(centre - half, median), new Point(centre + half, median));
+                frame.Context.DrawRectangle(
+                    Brush(frame.Data, index, 0.55), pen,
+                    new Rect(centre - half, Math.Min(top, bottom), half * 2, Math.Abs(bottom - top)));
 
-            frame.Context.DrawLine(pen,
-                new Point(centre, scale.Position(summary.Minimum)), new Point(centre, bottom));
+                var median = scale.Position(summary.Median);
+                frame.Context.DrawLine(new Pen(frame.Marks.Strong, 1.5), new Point(centre - half, median), new Point(centre + half, median));
+                frame.Context.DrawLine(pen, new Point(centre, scale.Position(inside.Min())), new Point(centre, bottom));
+                frame.Context.DrawLine(pen, new Point(centre, top), new Point(centre, scale.Position(inside.Max())));
 
-            frame.Context.DrawLine(pen,
-                new Point(centre, top), new Point(centre, scale.Position(summary.Maximum)));
+                foreach (var outlier in outliers)
+                    frame.Context.DrawEllipse(null, pen, new Point(centre, scale.Position(outlier)), 2.5, 2.5);
 
-            foreach (var outlier in _statistics.Outliers(series.Values))
-                frame.Context.DrawEllipse(
-                    null, pen, new Point(centre, scale.Position(outlier)), 2.5, 2.5);
+                if (layout.InnerPoints)
+                    foreach (var value in inside)
+                        frame.Context.DrawEllipse(Brush(frame.Data, index, 0.8), null, new Point(centre, scale.Position(value)), 1.8, 1.8);
+
+                var mean = new Point(centre, scale.Position(values.Average()));
+                means.Add(mean);
+                if (layout.MeanMarker) DrawCross(frame, mean, half * 0.4, pen);
+            }
+
+            if (layout.MeanLine) DrawPolyline(frame, means, Colour(frame.Data, index));
         }
+    }
+
+    private void DrawCross(ChartFrame frame, Point centre, double size, Pen pen)
+    {
+        var arm = Math.Clamp(size, 2, 5);
+        frame.Context.DrawLine(pen, new Point(centre.X - arm, centre.Y - arm), new Point(centre.X + arm, centre.Y + arm));
+        frame.Context.DrawLine(pen, new Point(centre.X - arm, centre.Y + arm), new Point(centre.X + arm, centre.Y - arm));
     }
 
     private void DrawViolin(
@@ -325,31 +350,24 @@ public sealed class StatisticalPlot : ChartPlotBase
         var series = frame.Data.Series.FirstOrDefault();
         if (series is null || series.Values.Count == 0) return;
 
-        var running = 0.0;
-        var totals = new List<(double From, double To)>();
-
-        foreach (var value in series.Values.Select(value => double.IsFinite(value) ? value : 0))
-        {
-            totals.Add((running, running + value));
-            running += value;
-        }
-
-        var lowest = Math.Min(0, totals.Min(step => Math.Min(step.From, step.To)));
-        var highest = Math.Max(0, totals.Max(step => Math.Max(step.From, step.To)));
+        var steps = _statistics.Waterfall(series.Values, frame.Definition.Statistical.Subtotals);
+        var lowest = Math.Min(0, steps.Min(step => Math.Min(step.From, step.To)));
+        var highest = Math.Max(0, steps.Max(step => Math.Max(step.From, step.To)));
 
         var scale = PlotScale.Nice(lowest, highest, frame.Plot.Bottom, frame.Plot.Y);
-        var categories = Across(frame, totals.Count);
+        var categories = Across(frame, steps.Count);
         var rising = new SolidColorBrush(frame.Marks.Mark(Color.FromRgb(0x16, 0xA3, 0x4A)));
         var falling = new SolidColorBrush(frame.Marks.Mark(Color.FromRgb(0xDC, 0x26, 0x26)));
+        var total = Brush(frame.Data, 0);
 
-        for (var index = 0; index < totals.Count; index++)
+        for (var index = 0; index < steps.Count; index++)
         {
-            var (from, to) = totals[index];
+            var (from, to, isTotal) = steps[index];
 
             var top = Math.Min(scale.Position(from), scale.Position(to));
             var height = Math.Max(1, Math.Abs(scale.Position(to) - scale.Position(from)));
 
-            var brush = to >= from ? rising : falling;
+            var brush = isTotal ? total : to >= from ? rising : falling;
 
             frame.Context.FillRectangle(brush, new Rect(
                 categories.Start(index) + categories.Width * 0.15,

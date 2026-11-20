@@ -49,7 +49,7 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
     {
         if (points.Minimum >= 0 || points.Maximum <= 0) return;
         var span = Math.Max(1e-9, points.Maximum - points.Minimum);
-        var y = area.Bottom - (0 - points.Minimum) / span * area.Height;
+        var y = Math.Floor(area.Bottom - (0 - points.Minimum) / span * area.Height) + 0.5;
         context.DrawLine(new Pen(Brush(style.AxisHex), 0.75), new Point(area.Left, y), new Point(area.Right, y));
     }
 

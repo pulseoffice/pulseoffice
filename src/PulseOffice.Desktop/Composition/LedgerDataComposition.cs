@@ -143,6 +143,7 @@ internal static class LedgerDataComposition
         services.AddSingleton<LedgerSparklineCommands>();
         services.AddSingleton<Sheets.UI.ISparklinePainter>(_ => new Sheets.UI.SparklinePainter());
         services.AddSingleton<Sheets.Engine.Operations.ISparklineData, Sheets.Engine.Operations.SparklineData>();
+        services.AddSingleton<Sheets.Engine.Operations.ISparklineGroups, Sheets.Engine.Operations.SparklineGroups>();
         services.AddSingleton<Sheets.UI.CellFormat.SparklineDialogServices>();
         services.AddSingleton<IFormControlCatalog, FormControlCatalog>();
         services.AddSingleton<IFormControlNaming, FormControlNaming>();

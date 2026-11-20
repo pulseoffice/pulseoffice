@@ -14,6 +14,7 @@ public sealed class DeckFindCommands(
         Prototype("deck.edit.find") with
         {
             Surface = CommandSurface.Advanced,
+            DefaultGesture = "Ctrl+F",
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => Context.Target is not null,
             Execute = (_, _) =>
@@ -30,7 +31,7 @@ public sealed class DeckFindCommands(
         {
             Surface = CommandSurface.Advanced,
             RequiredState = DocumentState.DocumentOpen,
-            DefaultGesture = "Ctrl+F",
+            DefaultGesture = "Ctrl+Shift+H",
             EnabledWhen = _ => Context.Target is not null,
             Execute = (_, ct) => Dialog(ct),
         },
@@ -39,7 +40,7 @@ public sealed class DeckFindCommands(
     private void Highlight(FindRequest request)
     {
         if (Context.Target is not { } target) return;
-        highlights.Show(target.Deck, new TextFindQuery(request.Query, request.Has(DeckFindTarget.MatchCase)));
+        highlights.Show(target.Deck, new TextFindQuery(request.Query, request.Has(DeckFindTarget.MatchCase), request.Has(DeckFindTarget.WholeWords), request.Has(DeckFindTarget.Regex)));
     }
 
     private Task Dialog(CancellationToken ct) => dialogs.ShowAsync<object>(

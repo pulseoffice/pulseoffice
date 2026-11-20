@@ -58,7 +58,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         if (_sorterStrip is null || _sorterView is null)
         {
             _sorterStrip = new SlideSorterStrip(new Thickness(_metrics.SpacingLarge), SorterFrame, sectionHeaders, stripLayout);
-            _drag = new SlideDragSession(sectionHeaders, _deck, _actions, horizontal: true);
+            _drag = new SlideDragSession(sectionHeaders, _deck, _actions, horizontal: true) { Companions = _state.DraggedSlides };
             _sorterView = new ScrollViewer
             {
                 Content = _sorterStrip.Panel,

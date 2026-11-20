@@ -48,6 +48,9 @@ public sealed class DrawingIcons() : DictionaryIconCatalog(Shapes)
         ("ledger.insert.sheetName", "M4 4h10l6 6v10H4z M14 4v6h6 M8 14h8"),
         ("ledger.insert.signatureLine", "M4 18h16 M6 15c3-7 5 2 7-3s3 3 5 0"),
         ("ledger.sparkline.insert", "M3 5h18v14H3z M6 15l3-4 3 3 3-6 3 4"),
+        ("ledger.sparkline.edit", "M3 5h18v14H3z M6 15l3-4 3 3 3-6 M15 19l5-5 2 2-5 5h-2z"),
+        ("ledger.sparkline.group", "M2 3h20v18H2z M5 9l3-3 3 2 3-3 M5 17l3-3 3 2 3-3 M18 6v12"),
+        ("ledger.sparkline.ungroup", "M2 3h9v18H2z M13 3h9v18h-9z M4 12l2-2 2 1 2-2 M15 12l2-2 2 1 2-2"),
         ("ledger.sparkline.delete", "M3 5h18v14H3z M6 15l3-4 3 3 3-6 M16 16l5 5 M21 16l-5 5"),
     ];
 }

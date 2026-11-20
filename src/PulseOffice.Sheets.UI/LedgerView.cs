@@ -184,7 +184,8 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         Drawing.Shapes.IShapeTextEditing? shapeTextEditing = null,
         IContextMenuKey? menuKey = null,
         Drawing.Shapes.IShapeTextParagraphs? shapeParagraphs = null,
-        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null)
+        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null,
+        PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys? nudges = null)
     {
         _menuKey = menuKey ?? new ContextMenuKey();
         _contextMenus = contextMenus;
@@ -203,7 +204,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         _history.Changed += OnHistoryChanged;
 
         var binding = formBinding ?? new FormControlBinding(new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale());
-        _grid = new SheetGridView(_engine, presenter, conditional, _selection, formBinding: binding, linkTips: linkTips)
+        _grid = new SheetGridView(_engine, presenter, conditional, _selection, formBinding: binding, linkTips: linkTips, nudges: nudges)
         {
             ChartRenderer = new PulseOffice.UI.Controls.Charts.ChartRenderer(_texts),
             ChartData = new Engine.Operations.ChartDataExtractor(new LocalizedSeriesNames(_texts), new Engine.Operations.PresentedChartCellText(presenter)),

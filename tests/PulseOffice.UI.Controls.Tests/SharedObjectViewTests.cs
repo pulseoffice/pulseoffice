@@ -1,4 +1,5 @@
 using Avalonia.Input;
+using PulseOffice.Foundation.Modules;
 using PulseOffice.Foundation.Zoom;
 using PulseOffice.Text.Rich;
 using PulseOffice.UI.Controls.Prompts;
@@ -45,18 +46,18 @@ public sealed class SharedObjectViewTests
     {
         var steps = new NudgeSteps(5, 1);
 
-        var move = _nudges.Read(Key.Left, KeyModifiers.None)!.Value;
+        var move = _nudges.Read(ModuleKind.Presentations, Key.Left, KeyModifiers.None)!.Value;
         Assert.Equal((-5.0, 0.0), move.Distance(steps));
         Assert.False(move.Resizes);
-        Assert.Equal((0.0, 1.0), _nudges.Read(Key.Down, KeyModifiers.Control)!.Value.Distance(steps));
-        var grow = _nudges.Read(Key.Right, KeyModifiers.Shift)!.Value;
+        Assert.Equal((0.0, 1.0), _nudges.Read(ModuleKind.Presentations, Key.Down, KeyModifiers.Control)!.Value.Distance(steps));
+        var grow = _nudges.Read(ModuleKind.Presentations, Key.Right, KeyModifiers.Shift)!.Value;
         Assert.True(grow.Resizes);
         Assert.Equal((10.0, 20.0, 35.0, 40.0), grow.Apply(10, 20, 30, 40, steps, 1));
-        Assert.Equal((10.0, 20.0, 30.0, 39.0), _nudges.Read(Key.Up, KeyModifiers.Shift | KeyModifiers.Control)!.Value.Apply(10, 20, 30, 40, steps, 1));
-        Assert.Equal((0.0, 0.0, 1.0, 2.0), _nudges.Read(Key.Left, KeyModifiers.Shift)!.Value.Apply(0, 0, 2, 2, steps, 1));
-        Assert.True(_nudges.Read(Key.Left, KeyModifiers.Meta)!.Value.Fine);
-        Assert.Null(_nudges.Read(Key.Left, KeyModifiers.Control | KeyModifiers.Alt));
-        Assert.Null(_nudges.Read(Key.A, KeyModifiers.None));
+        Assert.Equal((10.0, 20.0, 30.0, 39.0), _nudges.Read(ModuleKind.Presentations, Key.Up, KeyModifiers.Shift | KeyModifiers.Control)!.Value.Apply(10, 20, 30, 40, steps, 1));
+        Assert.Equal((0.0, 0.0, 1.0, 2.0), _nudges.Read(ModuleKind.Presentations, Key.Left, KeyModifiers.Shift)!.Value.Apply(0, 0, 2, 2, steps, 1));
+        Assert.True(_nudges.Read(ModuleKind.Presentations, Key.Left, KeyModifiers.Meta)!.Value.Fine);
+        Assert.Null(_nudges.Read(ModuleKind.Presentations, Key.Left, KeyModifiers.Control | KeyModifiers.Alt));
+        Assert.Null(_nudges.Read(ModuleKind.Presentations, Key.A, KeyModifiers.None));
     }
 
     [Fact]

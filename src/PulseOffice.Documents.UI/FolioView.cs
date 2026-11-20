@@ -276,7 +276,7 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
             e.Handled = true;
             return;
         }
-        if (_editor.SelectedObjectId is not null && _services.Nudges.Read(e.Key, e.KeyModifiers) is { } nudge)
+        if (_editor.SelectedObjectId is not null && _services.Nudges.Read(PulseOffice.Foundation.Modules.ModuleKind.Documents, e.Key, e.KeyModifiers) is { } nudge)
         {
             NudgeSelectedObject(nudge);
             e.Handled = true;

@@ -115,6 +115,7 @@ internal static class LedgerCoreComposition
         services.AddSingleton<INumberFormatCodeEditor, NumberFormatCodeEditor>();
         services.AddSingleton<LedgerCellFormatCommands>();
         services.AddSingleton<LedgerPaneCommands>();
+        services.AddSingleton<ILedgerFindScope, LedgerFindScope>();
         services.AddSingleton<LedgerEditDataCommands>();
         services.AddSingleton<LedgerConditionalRuleCommands>();
         services.AddSingleton<LedgerChartCommands>();
@@ -123,7 +124,13 @@ internal static class LedgerCoreComposition
         services.AddSingleton<LedgerShapeListCommands>();
         services.AddSingleton<LedgerCommands>();
         services.AddSingleton<PulseOffice.Sheets.IFormControlBinding, PulseOffice.Sheets.FormControlBinding>();
-        services.AddSingleton<PulseOffice.Sheets.UI.ILedgerFindHighlights, PulseOffice.Sheets.UI.LedgerFindHighlights>();
+        services.AddSingleton<PulseOffice.Sheets.Engine.Operations.ICellSearchText, PulseOffice.Sheets.Engine.Operations.PresentedCellSearchText>();
+        services.AddSingleton<PulseOffice.Sheets.Engine.Operations.ISheetSearch>(provider =>
+            new PulseOffice.Sheets.Engine.Operations.SheetSearch(provider.GetRequiredService<PulseOffice.Sheets.Engine.Operations.ICellSearchText>()));
+        services.AddSingleton<PulseOffice.Sheets.Engine.Operations.IWorkbookSearch>(provider =>
+            new PulseOffice.Sheets.Engine.Operations.WorkbookSearch(provider.GetRequiredService<PulseOffice.Sheets.Engine.Operations.ISheetSearch>()));
+        services.AddSingleton<PulseOffice.Sheets.UI.ILedgerFindHighlights>(provider =>
+            new PulseOffice.Sheets.UI.LedgerFindHighlights(provider.GetRequiredService<PulseOffice.Sheets.Engine.Operations.ISheetSearch>()));
         services.AddSingleton<LedgerDocumentFactory>();
         services.AddSingleton<ILedgerDocumentFactory>(provider => provider.GetRequiredService<LedgerDocumentFactory>());
         services.AddSingleton<PulseOffice.Shell.IDocumentViewSource>(provider => provider.GetRequiredService<LedgerDocumentFactory>());

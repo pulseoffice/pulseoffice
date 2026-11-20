@@ -35,6 +35,15 @@ public sealed class ShellCommands(
 
         new CommandDefinition
         {
+            Id = new CommandId("shell.file.newBlank"),
+            MenuPath = "file/new",
+            DefaultGesture = "Ctrl+N",
+            Surface = CommandSurface.Advanced,
+            Execute = (ctx, ct) => New(ctx.Module is ModuleKind.Sheets or ModuleKind.Presentations ? ctx.Module : ModuleKind.Documents).Execute(ctx, ct),
+        },
+
+        new CommandDefinition
+        {
             Id = new CommandId("shell.view.commandPalette"),
             MenuPath = "view",
             DefaultGesture = "Ctrl+Shift+P",

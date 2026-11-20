@@ -222,6 +222,15 @@ public sealed record CellLinkChange(Worksheet Owner, CellAddress Address, string
     }
 }
 
+public sealed record SparklineSourceChange(Worksheet Owner, IReadOnlyList<SparklineGroup> Before, IReadOnlyList<SparklineGroup> After) : SheetReferenceChange(Owner)
+{
+    internal override void Apply(bool forward)
+    {
+        Owner.Sparklines.Clear();
+        Owner.Sparklines.AddRange(forward ? After : Before);
+    }
+}
+
 public interface IChartSheetReferences
 {
     IReadOnlyList<SheetReferenceChange> Renamed(Workbook workbook, string oldName, string newName);
@@ -260,8 +269,34 @@ public sealed class ChartSheetReferences : IChartSheetReferences
 
             foreach (var (address, before, after) in rewrite.LinkedCells(owner))
                 changes.Add(new CellLinkChange(owner, address, before.Hyperlink!, after.Hyperlink!));
+
+            if (skipped is not null && SparklinesWithout(owner, skipped.Name) is { } change) changes.Add(change);
         }
         return changes;
+    }
+
+    private static SparklineSourceChange? SparklinesWithout(Worksheet owner, string removed)
+    {
+        var before = owner.Sparklines.Groups.ToList();
+        var after = before
+            .Select(group => Without(group, removed))
+            .OfType<SparklineGroup>()
+            .ToList();
+        return after.Count == before.Count && after.Zip(before).All(pair => ReferenceEquals(pair.First, pair.Second))
+            ? null
+            : new SparklineSourceChange(owner, before, after);
+    }
+
+    private static SparklineGroup? Without(SparklineGroup group, string removed)
+    {
+        var lines = group.Sparklines
+            .Where(sparkline => !string.Equals(sparkline.SourceSheet, removed, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (lines.Count == 0) return null;
+        var datesGone = string.Equals(group.DateSheet, removed, StringComparison.OrdinalIgnoreCase);
+        return lines.Count == group.Sparklines.Count && !datesGone
+            ? group
+            : group with { Sparklines = lines, DateRange = datesGone ? null : group.DateRange, DateSheet = datesGone ? null : group.DateSheet };
     }
 }
 

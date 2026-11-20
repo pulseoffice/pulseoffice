@@ -24,6 +24,9 @@ internal sealed class DeckViewState(Presentation deck, DeckActions actions, ITex
 
     public SlideSelection Slides { get; } = new();
 
+    public IReadOnlyList<Slide> DraggedSlides(Slide pressed) =>
+        Slides.Marks(pressed, Current) ? Slides.Ordered(Deck, Current) : [pressed];
+
     public SlideElement? Selected { get; set; }
 
     public TextElement? SelectedText { get; set; }

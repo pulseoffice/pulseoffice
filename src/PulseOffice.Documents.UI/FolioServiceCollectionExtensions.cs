@@ -64,7 +64,7 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<IFolioLineNumberMarks, FolioLineNumberMarks>();
         services.AddSingleton<IFolioSpotlight, FolioSpotlight>();
         services.AddSingleton<IFolioFieldNames, FolioFieldNames>();
-        services.TryAddSingleton<PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys, PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys>();
+        services.TryAddSingleton<PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys>(_ => new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys());
         services.TryAddSingleton<PulseOffice.UI.Controls.Rulers.IParagraphRuler, PulseOffice.UI.Controls.Rulers.ParagraphRuler>();
         services.AddSingleton<FolioRulerServices>();
         services.AddSingleton<IPageSurfaceFactory, PageSurfaceFactory>();

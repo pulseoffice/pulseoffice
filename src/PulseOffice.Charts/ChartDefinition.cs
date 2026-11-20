@@ -141,6 +141,10 @@ public sealed record ChartDefinition : EmbeddedObject
 
     public ChartPieSplit PieSplit { get; init; } = ChartPieSplit.Automatic;
 
+    public ChartStatisticalLayout Statistical { get; init; } = ChartStatisticalLayout.Automatic;
+
+    public ChartStyleReference Style { get; init; } = ChartStyleReference.None;
+
     public int LineSeriesCount { get; init; } = 1;
 
     public IReadOnlyList<int>? LineSeriesIndices { get; init; }

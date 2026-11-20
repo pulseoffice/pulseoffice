@@ -142,7 +142,7 @@ public sealed class CommandRegistry(ITextCatalog texts)
     {
         lock (_gate)
         {
-            if (!_commands.TryGetValue(id.Value, out var command) || command.GestureRoutedByView) return false;
+            if (!_commands.TryGetValue(id.Value, out var command)) return false;
 
             _commands[id.Value] = command with
             {

@@ -28,11 +28,23 @@ public interface IChartStatistics
     IReadOnlyList<(double Theoretical, double Observed)> QuantilePairs(IReadOnlyList<double> values);
 
     IReadOnlyList<double> RunningTotals(IReadOnlyList<double> values);
+
+    IReadOnlyList<HistogramBin> Histogram(IReadOnlyList<double> values, ChartStatisticalLayout layout);
+
+    FiveNumbers Summary(IReadOnlyList<double> values, ChartQuartileMethod method);
+
+    IReadOnlyList<double> Outliers(IReadOnlyList<double> values, ChartQuartileMethod method);
+
+    IReadOnlyList<WaterfallStep> Waterfall(IReadOnlyList<double> values, IReadOnlyList<int> subtotals);
 }
+
+public readonly record struct WaterfallStep(double From, double To, bool Total);
 
 public sealed class ChartStatistics : IChartStatistics
 {
     private const double NominalBinWidth = 1;
+
+    private const int MostBins = 10_000;
 
     public IReadOnlyList<HistogramBin> Histogram(IReadOnlyList<double> values, int bins = 0)
     {
@@ -160,6 +172,98 @@ public sealed class ChartStatistics : IChartStatistics
         }
 
         return totals;
+    }
+
+    public IReadOnlyList<HistogramBin> Histogram(IReadOnlyList<double> values, ChartStatisticalLayout layout)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(layout);
+        if (!layout.HasBinning) return Histogram(values);
+        if (layout.BinWidth is null && layout.Underflow is null && layout.Overflow is null && layout.IntervalClosedRight)
+            return Histogram(values, Math.Max(0, layout.BinCount ?? 0));
+
+        var sorted = Clean(values);
+        if (sorted.Count == 0) return [];
+
+        var start = layout.Underflow is { } under && double.IsFinite(under) ? under : sorted[0];
+        var end = layout.Overflow is { } over && double.IsFinite(over) ? over : sorted[^1];
+        if (end <= start) end = start + NominalBinWidth;
+
+        var count = layout.BinWidth is { } width && double.IsFinite(width) && width > 0
+            ? (int)Math.Clamp(Math.Ceiling((end - start) / width), 1, MostBins)
+            : Math.Clamp(layout.BinCount ?? (int)Math.Ceiling(Math.Sqrt(sorted.Count)), 1, MostBins);
+        var step = layout.BinWidth is { } fixedWidth && double.IsFinite(fixedWidth) && fixedWidth > 0 ? fixedWidth : (end - start) / count;
+
+        var below = 0;
+        var above = 0;
+        var counts = new int[count];
+        foreach (var value in sorted)
+        {
+            if (layout.Underflow is not null && (layout.IntervalClosedRight ? value <= start : value < start)) { below++; continue; }
+            if (layout.Overflow is not null && (layout.IntervalClosedRight ? value > end : value >= end)) { above++; continue; }
+            var position = (value - start) / step;
+            var index = layout.IntervalClosedRight ? (int)Math.Ceiling(position) - 1 : (int)Math.Floor(position);
+            counts[Math.Clamp(index, 0, count - 1)]++;
+        }
+
+        var bins = new List<HistogramBin>(count + 2);
+        if (layout.Underflow is not null) bins.Add(new HistogramBin(sorted[0], start, below));
+        bins.AddRange(counts.Select((found, index) => new HistogramBin(start + step * index, start + step * (index + 1), found)));
+        if (layout.Overflow is not null) bins.Add(new HistogramBin(end, sorted[^1], above));
+        return bins;
+    }
+
+    public FiveNumbers Summary(IReadOnlyList<double> values, ChartQuartileMethod method)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (method == ChartQuartileMethod.Inclusive) return Summary(values);
+
+        var sorted = Clean(values);
+        if (sorted.Count == 0) return default;
+
+        return new FiveNumbers(sorted[0], Exclusive(sorted, 0.25), Exclusive(sorted, 0.5), Exclusive(sorted, 0.75), sorted[^1]);
+    }
+
+    public IReadOnlyList<double> Outliers(IReadOnlyList<double> values, ChartQuartileMethod method)
+    {
+        var summary = Summary(values, method);
+        if (summary.InterQuartile <= 0) return [];
+
+        var low = summary.LowerQuartile - 1.5 * summary.InterQuartile;
+        var high = summary.UpperQuartile + 1.5 * summary.InterQuartile;
+
+        return [.. Clean(values).Where(value => value < low || value > high)];
+    }
+
+    public IReadOnlyList<WaterfallStep> Waterfall(IReadOnlyList<double> values, IReadOnlyList<int> subtotals)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(subtotals);
+
+        var totals = subtotals.ToHashSet();
+        var running = 0.0;
+        var steps = new List<WaterfallStep>(values.Count);
+        for (var index = 0; index < values.Count; index++)
+        {
+            var value = double.IsFinite(values[index]) ? values[index] : 0;
+            if (totals.Contains(index))
+            {
+                steps.Add(new WaterfallStep(0, value, true));
+                running = value;
+                continue;
+            }
+            steps.Add(new WaterfallStep(running, running + value, false));
+            running += value;
+        }
+        return steps;
+    }
+
+    private static double Exclusive(IReadOnlyList<double> sorted, double fraction)
+    {
+        var position = Math.Clamp(fraction * (sorted.Count + 1), 1, sorted.Count) - 1;
+        var lower = (int)Math.Floor(position);
+        var upper = Math.Min(lower + 1, sorted.Count - 1);
+        return sorted[lower] + (position - lower) * (sorted[upper] - sorted[lower]);
     }
 
     private static double Kernel(double u) =>

@@ -17,7 +17,10 @@ namespace PulseOffice.Presentations.UI;
 
 internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISlideRenderer renderer, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IContextMenuFactory contextMenus, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe stillImages, DeckSectionHeaders sectionHeaders, SlideStripLayout layout)
 {
-    private readonly SlideDragSession _drag = new(sectionHeaders, state.Deck, state.Actions, horizontal: false);
+    private readonly SlideDragSession _drag = new(sectionHeaders, state.Deck, state.Actions, horizontal: false)
+    {
+        Companions = state.DraggedSlides,
+    };
     private IReadOnlyList<Control> _frames = [];
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
@@ -142,9 +145,20 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
             e.Handled = true;
             return;
         }
+        if (e.Key is Key.Up or Key.Down && e.KeyModifiers == KeyModifiers.Shift)
+        {
+            var next = _deck.IndexOf(_state.Current) + (e.Key == Key.Up ? -1 : 1);
+            e.Handled = true;
+            if (next < 0 || next >= _deck.Slides.Count) return;
+            _state.Slides.ExtendTo(_deck, _state.Current, _deck.Slides[next]);
+            _filmstripHadFocus = true;
+            _host.GoToSlide(next);
+            return;
+        }
         if (_slideKeys.Target(e.Key, e.KeyModifiers, _deck.IndexOf(_state.Current), _deck.Slides.Count, listFocused: true) is not { } target) return;
         e.Handled = true;
         if (target == _deck.IndexOf(_state.Current)) return;
+        _state.Slides.Collapse(_deck.Slides[target]);
         _filmstripHadFocus = true;
         _host.GoToSlide(target);
     }

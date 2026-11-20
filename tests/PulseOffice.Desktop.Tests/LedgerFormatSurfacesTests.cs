@@ -307,11 +307,54 @@ public sealed class LedgerFormatSurfacesTests(HeadlessDesktopSession headless)
         var sheet = new Worksheet("Dati");
         for (var column = 0; column < 4; column++) sheet.SetValue(new CellAddress(0, column), CellValue.Number(column * 2 + 1));
         var view = new SparklineDialogView(sheet, "A1:D1", new NoReferences(),
-            text => CellRange.TryParseA1(text, out var range) ? range : null,
+            text => CellRange.TryParseA1(text, out var range) ? new SparklineSource(range, null) : null,
             new SparklineDialogServices(new PulseOffice.Sheets.UI.SparklinePainter(), new SparklineData(), new GalleryNavigator()), _texts);
         var points = view.Points();
         Assert.Equal([1d, 3d, 5d, 7d], points.Values.Select(value => value ?? 0));
         Assert.Equal(3, view.Kinds.Items.Count);
+        return Task.CompletedTask;
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task Editing_a_sparkline_group_starts_from_its_options_and_returns_bounds_and_dates() => headless.Session.Dispatch(() =>
+    {
+        var workbook = Workbook.CreateDefault();
+        var host = workbook.Sheets[0];
+        var other = workbook.AddSheet("Altro");
+        for (var column = 0; column < 3; column++) other.SetValue(new CellAddress(0, column), CellValue.Number(column + 10));
+        var group = new SparklineGroup
+        {
+            Id = "g",
+            Sparklines = [],
+            Kind = SparklineKind.Column,
+            MinimumAxis = SparklineAxisBound.Custom,
+            ManualMinimum = 5,
+            MaximumAxis = SparklineAxisBound.Group,
+            RightToLeft = true,
+        };
+        var view = new SparklineDialogView(host, "Altro!A1:C1", new NoReferences(),
+            text => text.StartsWith("Altro!", StringComparison.Ordinal) && CellRange.TryParseA1(text.AsSpan(6), out var range)
+                ? new SparklineSource(range, "Altro")
+                : null,
+            new SparklineDialogServices(new PulseOffice.Sheets.UI.SparklinePainter(), new SparklineData(), new GalleryNavigator()), _texts,
+            new SparklineDialogStart("E1", "Altro!A2:C2", group));
+
+        Assert.Equal([10d, 11d, 12d], view.Points().Values.Select(value => value ?? 0));
+        Assert.Equal(5, view.Points().Minimum);
+
+        view.Maximum.Mode.SelectedIndex = 2;
+        view.Maximum.ValueBox.Text = "20";
+        var result = view.Result;
+
+        Assert.Equal("E1", result.Destination);
+        Assert.Equal("Altro!A2:C2", result.Dates);
+        Assert.Equal(SparklineKind.Column, result.Kind);
+        Assert.Equal(SparklineAxisBound.Custom, result.MinimumAxis);
+        Assert.Equal(5, result.ManualMinimum);
+        Assert.Equal(SparklineAxisBound.Custom, result.MaximumAxis);
+        Assert.Equal(20, result.ManualMaximum);
+        Assert.True(result.RightToLeft);
+        Assert.False(result.SameScale);
         return Task.CompletedTask;
     }, CancellationToken.None);
 }

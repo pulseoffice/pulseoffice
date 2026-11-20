@@ -2,7 +2,6 @@ using PulseOffice.UI.Controls.Notifications;
 using PulseOffice.Document.Commands;
 using PulseOffice.Foundation.Modules;
 using PulseOffice.Localization;
-using PulseOffice.Sheets.Addressing;
 using PulseOffice.Sheets.Engine.Operations;
 using PulseOffice.UI.Commands;
 using PulseOffice.UI.Controls;
@@ -18,6 +17,7 @@ public sealed class LedgerSparklineCommands(
     Dialogs.ISheetReferenceSources sources,
     Dialogs.ISheetReferenceReader reader,
     CellFormat.SparklineDialogServices sparklineServices,
+    ISparklineGroups groups,
     ITextCatalog texts) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
@@ -31,6 +31,51 @@ public sealed class LedgerSparklineCommands(
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.HasTarget,
             Execute = (_, ct) => InsertAsync(ct),
+        },
+
+        Prototype("ledger.sparkline.edit") with
+        {
+            IconKey = "ledger.sparkline.edit",
+            MenuPath = "insert/sparkline",
+            ContextPaths = ["cell/object"],
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => GroupAtSelection() is not null,
+            Execute = (_, ct) => GroupAtSelection() is { } group ? EditAsync(group, ct) : Task.CompletedTask,
+        },
+
+        Prototype("ledger.sparkline.group") with
+        {
+            IconKey = "ledger.sparkline.group",
+            MenuPath = "insert/sparkline",
+            Surface = CommandSurface.Advanced,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.Workbook is { } workbook
+                && groups.Grouped(workbook.Sheets[Context.SheetIndex].Sparklines, Context.Selection, Context.Selection.Start, "probe") is not null,
+            Execute = (_, _) =>
+            {
+                Regroup("ledger.sparkline.group", sparklines =>
+                    groups.Grouped(sparklines, Context.Selection, Context.Selection.Start, Guid.NewGuid().ToString("N")));
+                return Task.CompletedTask;
+            },
+        },
+
+        Prototype("ledger.sparkline.ungroup") with
+        {
+            IconKey = "ledger.sparkline.ungroup",
+            MenuPath = "insert/sparkline",
+            Surface = CommandSurface.Advanced,
+            RequiredState = DocumentState.DocumentOpen,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.Workbook is { } workbook
+                && groups.Ungrouped(workbook.Sheets[Context.SheetIndex].Sparklines, Context.Selection) is not null,
+            Execute = (_, _) =>
+            {
+                Regroup("ledger.sparkline.ungroup", sparklines => groups.Ungrouped(sparklines, Context.Selection));
+                return Task.CompletedTask;
+            },
         },
 
         Prototype("ledger.sparkline.delete") with
@@ -50,83 +95,90 @@ public sealed class LedgerSparklineCommands(
         },
     ];
 
-    private async Task InsertAsync(CancellationToken ct)
+    private async Task InsertAsync(CancellationToken ct) =>
+        await EditAsync(null, ct).ConfigureAwait(true);
+
+    private async Task EditAsync(SparklineGroup? editing, CancellationToken ct)
     {
         if (Context.Workbook is not { } workbook) return;
 
         var sheetIndex = Context.SheetIndex;
-        if (Refused(workbook.Sheets[sheetIndex])) return;
+        var sheet = workbook.Sheets[sheetIndex];
+        if (Refused(sheet)) return;
 
+        var described = editing is null ? null : groups.Describe(workbook, sheetIndex, editing);
         var view = new CellFormat.SparklineDialogView(
-            workbook.Sheets[sheetIndex], Context.Selection.ToString(), sources.For(Dialogs.ReferenceShape.Range),
-            text => reader.ReadLocal(workbook, text, sheetIndex, Dialogs.ReferenceShape.Range), sparklineServices, texts);
+            sheet, described?.Data ?? Context.Selection.ToString(), sources.For(Dialogs.ReferenceShape.Range),
+            text => Source(workbook, text, sheetIndex), sparklineServices, texts,
+            editing is null || described is null ? null : new CellFormat.SparklineDialogStart(described.Destination, described.Dates, editing));
 
+        var titleKey = editing is null ? "command.ledger.sparkline.insert.title" : "command.ledger.sparkline.edit.title";
         var values = await dialogs.ShowAsync<CellFormat.SparklineDialogResult>(
-            view, new DialogOptions { TitleKey = "command.ledger.sparkline.insert.title", PreferredWidth = 700 }, ct)
+            view, new DialogOptions { TitleKey = titleKey, PreferredWidth = 700 }, ct)
             .ConfigureAwait(true);
 
         if (values is null) return;
 
-        if (reader.ReadLocal(workbook, values.Data, sheetIndex, Dialogs.ReferenceShape.Range) is not { } requested
-            || reader.ReadLocal(workbook, values.Destination, sheetIndex, Dialogs.ReferenceShape.Range) is not { } target)
+        var dates = values.Dates.Length == 0 ? null : ReadOne(workbook, values.Dates, sheetIndex);
+        if (ReadOne(workbook, values.Data, sheetIndex) is not { } data
+            || reader.ReadLocal(workbook, values.Destination, sheetIndex, Dialogs.ReferenceShape.Range) is not { } target
+            || (values.Dates.Length > 0 && dates is null))
         {
             status.Report(texts["status.analysis.badReference"], NotificationSeverity.Error);
             return;
         }
 
-        if (workbook.Sheets[sheetIndex].UsedRange() is not { } used
-            || used.End.Row < requested.Start.Row || used.End.Column < requested.Start.Column)
+        var options = (editing ?? new SparklineGroup { Id = Guid.NewGuid().ToString("N"), Sparklines = [] }) with
         {
-            status.Report(texts["status.tools.nothing"], NotificationSeverity.Warning);
-            return;
-        }
-
-        var data = new CellRange(requested.Start,
-            new CellAddress(Math.Min(requested.End.Row, used.End.Row), Math.Min(requested.End.Column, used.End.Column)));
-
-        var byRow = data.RowCount >= data.ColumnCount || target.ColumnCount == 1;
-
-        var lines = new List<Sparkline>();
-        var destinations = target.ColumnCount == 1 ? target.RowCount : target.ColumnCount;
-        var slots = byRow ? data.RowCount : data.ColumnCount;
-        if (destinations > 1) slots = Math.Min(slots, destinations);
-
-        for (var index = 0; index < slots; index++)
-        {
-            var source = byRow
-                ? new CellRange(
-                    new CellAddress(data.Start.Row + index, data.Start.Column),
-                    new CellAddress(data.Start.Row + index, data.End.Column))
-                : new CellRange(
-                    new CellAddress(data.Start.Row, data.Start.Column + index),
-                    new CellAddress(data.End.Row, data.Start.Column + index));
-
-            var cell = target.ColumnCount == 1
-                ? new CellAddress(target.Start.Row + index, target.Start.Column)
-                : new CellAddress(target.Start.Row, target.Start.Column + index);
-
-            if (!cell.IsValid) continue;
-
-            lines.Add(new Sparkline(cell, source));
-        }
-
-        if (lines.Count == 0) return;
-
-        var group = new SparklineGroup
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            Sparklines = lines,
             Kind = values.Kind,
             Style = values.Style,
-            SameScale = values.SameScale,
+            MinimumAxis = values.MinimumAxis,
+            MaximumAxis = values.MaximumAxis,
+            ManualMinimum = values.ManualMinimum,
+            ManualMaximum = values.ManualMaximum,
             EmptyCells = values.EmptyCells,
             ShowHidden = values.ShowHidden,
             RightToLeft = values.RightToLeft,
         };
 
-        Apply("ledger.sparkline.insert", sheet => sheet.Sparklines.Add(group));
+        if (groups.Lay(workbook, new SparklineLayoutRequest(sheetIndex, data, target, dates, options)) is not { } group)
+        {
+            status.Report(texts["status.tools.nothing"], NotificationSeverity.Warning);
+            return;
+        }
 
-        status.Report(texts.Format("sparkline.created", lines.Count));
+        Apply(editing is null ? "ledger.sparkline.insert" : "ledger.sparkline.edit", owner =>
+        {
+            if (editing is not null) owner.Sparklines.RemoveAt(editing.Sparklines.Select(line => line.Cell));
+            owner.Sparklines.Add(group);
+        });
+
+        status.Report(texts.Format("sparkline.created", group.Sparklines.Count));
+    }
+
+    private SheetRangeReference? ReadOne(Workbook workbook, string text, int sheetIndex) =>
+        reader.Read(workbook, text, sheetIndex, Dialogs.ReferenceShape.Range) is [var reference] ? reference : null;
+
+    private CellFormat.SparklineSource? Source(Workbook workbook, string text, int sheetIndex) =>
+        ReadOne(workbook, text, sheetIndex) is { } reference
+            ? new CellFormat.SparklineSource(reference.Range, reference.SheetIndex == sheetIndex ? null : workbook.Sheets[reference.SheetIndex].Name)
+            : null;
+
+    private SparklineGroup? GroupAtSelection() =>
+        Context.Workbook is { } workbook
+            ? workbook.Sheets[Context.SheetIndex].Sparklines.At(Context.Selection.Start)?.Group
+            : null;
+
+    private void Regroup(string id, Func<SparklineCollection, IReadOnlyList<SparklineGroup>?> plan)
+    {
+        if (Context.Workbook is not { } workbook) return;
+        if (plan(workbook.Sheets[Context.SheetIndex].Sparklines) is not { } regrouped) return;
+
+        Apply(id, sheet =>
+        {
+            sheet.Sparklines.Clear();
+            foreach (var group in regrouped) sheet.Sparklines.Add(group);
+        });
     }
 
     private void Delete() =>

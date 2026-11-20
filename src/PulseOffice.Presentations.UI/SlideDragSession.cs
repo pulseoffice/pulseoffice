@@ -25,6 +25,8 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
 
     public int From { get; private set; } = -1;
 
+    public Func<Slide, IReadOnlyList<Slide>> Companions { get; init; } = slide => [slide];
+
     public bool Dragging { get; private set; }
 
     public void Begin(Slide slide, Point origin, Size slop)
@@ -78,7 +80,9 @@ public sealed class SlideDragSession(DeckSectionHeaders headers, Presentation de
                 actions.MoveSlideIntoSection(slide!, drop.Section!);
                 return true;
             case SlideDropKind.Move:
-                actions.MoveSlide(slide!, drop.To);
+                var moved = Companions(slide!);
+                if (moved.Count > 1 && moved.Contains(slide!)) actions.MoveSlides(moved, deck.Slides[drop.To]);
+                else actions.MoveSlide(slide!, drop.To);
                 return true;
             default:
                 return false;

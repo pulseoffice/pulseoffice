@@ -37,7 +37,8 @@ internal sealed record SheetGridDependencies(
     IAdjustHandleChrome Adjusting,
     IObjectFrameChrome Frame,
     IGroupChildLinks GroupLinks,
-    PulseOffice.UI.Controls.Links.ILinkTips LinkTips);
+    PulseOffice.UI.Controls.Links.ILinkTips LinkTips,
+    IObjectNudgeKeys Nudges);
 
 internal sealed record SheetGridParts(
     GridViewport Viewport,
@@ -105,7 +106,7 @@ internal sealed class SheetGridPartsFactory
 
         var keyboard = new GridKeyboardInput(
             viewport, selection, options, surface, notifications, objects, services, drawing, chords,
-            new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys());
+            dependencies.Nudges);
 
         return new SheetGridParts(
             viewport, notifications, services, options, objects, drawing,

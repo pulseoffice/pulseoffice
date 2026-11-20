@@ -15,6 +15,10 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI.CellFormat;
 
+public sealed record SparklineSource(CellRange Range, string? Sheet);
+
+public sealed record SparklineDialogStart(string Destination, string Dates, SparklineGroup Group);
+
 public sealed record SparklineDialogResult(string Data, string Destination, SparklineKind Kind, SparklineStyle Style, bool SameScale)
 {
     public SparklineEmptyCells EmptyCells { get; init; }
@@ -22,6 +26,16 @@ public sealed record SparklineDialogResult(string Data, string Destination, Spar
     public bool ShowHidden { get; init; }
 
     public bool RightToLeft { get; init; }
+
+    public SparklineAxisBound MinimumAxis { get; init; } = SparklineAxisBound.Group;
+
+    public SparklineAxisBound MaximumAxis { get; init; } = SparklineAxisBound.Group;
+
+    public double? ManualMinimum { get; init; }
+
+    public double? ManualMaximum { get; init; }
+
+    public string Dates { get; init; } = string.Empty;
 }
 
 public sealed class SparklineDialogServices(ISparklinePainter painter, ISparklineData data, IGalleryNavigator navigator)
@@ -59,13 +73,15 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
     private static readonly string[] Colours = ["#2563EB", "#16A34A", "#DC2626", "#EA580C", "#7C3AED", "#0F172A", "#64748B"];
 
     private readonly Worksheet _sheet;
-    private readonly Func<string, CellRange?> _read;
+    private readonly Func<string, SparklineSource?> _read;
     private readonly SparklineDialogServices _services;
     private readonly RangeFieldControl _data;
     private readonly RangeFieldControl _destination;
+    private readonly RangeFieldControl _dates;
+    private readonly SparklineBoundField _minimum;
+    private readonly SparklineBoundField _maximum;
     private readonly ThumbnailGallery<SparklineKind> _kinds;
     private readonly SparklineSample _preview;
-    private readonly CheckBox _sameScale;
     private readonly CheckBox _showHidden;
     private readonly CheckBox _rightToLeft;
     private readonly ComboBox _emptyCells;
@@ -74,16 +90,22 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
     private SparklineStyle _style = new();
 
     public SparklineDialogView(
-        Worksheet sheet, string data, IReferenceSource ranges, Func<string, CellRange?> read, SparklineDialogServices services, ITextCatalog texts)
+        Worksheet sheet, string data, IReferenceSource ranges, Func<string, SparklineSource?> read, SparklineDialogServices services, ITextCatalog texts,
+        SparklineDialogStart? start = null)
     {
         _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
         _read = read ?? throw new ArgumentNullException(nameof(read));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         ArgumentNullException.ThrowIfNull(texts);
         var metrics = DesignTokens.For(InterfaceDensity.Compact);
+        var initial = start?.Group ?? new SparklineGroup { Id = "new", Sparklines = [], SameScale = true };
+        _kind = initial.Kind;
+        _style = initial.Style;
 
         _data = new RangeFieldControl(new RangeField("data", texts["sparkline.data"], data, ranges), texts, metrics);
-        _destination = new RangeFieldControl(new RangeField("destination", texts["sparkline.destination"], string.Empty, ranges), texts, metrics);
+        _destination = new RangeFieldControl(new RangeField("destination", texts["sparkline.destination"], start?.Destination ?? string.Empty, ranges), texts, metrics);
+        _dates = new RangeFieldControl(new RangeField("dates", texts["sparkline.dates"], start?.Dates ?? string.Empty, ranges) { Optional = true }, texts, metrics);
+        _dates.LostFocus += (_, _) => Refresh();
 
         _kinds = new ThumbnailGallery<SparklineKind>(
         [
@@ -93,7 +115,7 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         ], new SparklineKindPainter(services.Painter, Points, () => _style), services.Navigator,
             new ThumbnailGalleryOptions { TileWidth = 112, ThumbnailHeight = 40, Columns = 3, FrameRadius = metrics.RadiusTight, AccessibleName = texts["sparkline.kind"] },
             metrics);
-        _kinds.Select(SparklineKind.Line);
+        _kinds.Select(_kind);
         _kinds.SelectionChanged += (_, kind) =>
         {
             _kind = kind;
@@ -105,21 +127,14 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         _data.LostFocus += (_, _) => Refresh();
         _data.KeyUp += (_, _) => Refresh();
 
-        var colour = new SwatchStrip([.. Colours.Select(hex => new Swatch(hex, hex, hex))], texts, metrics, texts["sparkline.colour"], _style.ColorHex);
-        colour.Changed += (_, _) =>
-        {
-            if (colour.Value is { } value) Change(_style with { ColorHex = value });
-        };
-        var negative = new SwatchStrip([.. Colours.Select(hex => new Swatch(hex, hex, hex))], texts, metrics, texts["sparkline.negativeColour"], _style.NegativeHex);
-        negative.Changed += (_, _) =>
-        {
-            if (negative.Value is { } value) Change(_style with { NegativeHex = value });
-        };
-        var markers = new SwatchStrip([.. Colours.Select(hex => new Swatch(hex, hex, hex))], texts, metrics, texts["sparkline.markerColour"], _style.MarkerHex);
-        markers.Changed += (_, _) =>
-        {
-            if (markers.Value is { } value) Change(_style with { MarkerHex = value });
-        };
+        var colour = Strip(texts, metrics, texts["sparkline.colour"], _style.ColorHex, value => _style with { ColorHex = value });
+        var negative = Strip(texts, metrics, texts["sparkline.negativeColour"], _style.NegativeHex, value => _style with { NegativeHex = value });
+        var markers = Strip(texts, metrics, texts["sparkline.markerColour"], _style.MarkerHex, value => _style with { MarkerHex = value });
+        var high = Strip(texts, metrics, texts["sparkline.highColour"], _style.HighHex ?? _style.MarkerHex, value => _style with { HighHex = value });
+        var low = Strip(texts, metrics, texts["sparkline.lowColour"], _style.LowHex ?? _style.MarkerHex, value => _style with { LowHex = value });
+        var firstPoint = Strip(texts, metrics, texts["sparkline.firstColour"], _style.FirstHex ?? _style.MarkerHex, value => _style with { FirstHex = value });
+        var lastPoint = Strip(texts, metrics, texts["sparkline.lastColour"], _style.LastHex ?? _style.MarkerHex, value => _style with { LastHex = value });
+        var axis = Strip(texts, metrics, texts["sparkline.axisColour"], _style.AxisHex, value => _style with { AxisHex = value });
 
         var points = new WrapPanel { ItemSpacing = metrics.SpacingMedium, LineSpacing = metrics.SpacingSmall };
         points.Children.Add(Flag(texts["sparkline.point.high"], _style.ShowHighPoint, value => _style with { ShowHighPoint = value }));
@@ -133,21 +148,25 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         _emptyCells = new ComboBox
         {
             ItemsSource = new[] { texts["sparkline.emptyCells.gap"], texts["sparkline.emptyCells.zero"], texts["sparkline.emptyCells.span"] },
-            SelectedIndex = 0,
+            SelectedIndex = (int)initial.EmptyCells,
         };
         AutomationProperties.SetName(_emptyCells, texts["sparkline.emptyCells"]);
         _emptyCells.SelectionChanged += (_, _) => Refresh();
-        _showHidden = new CheckBox { Content = texts["sparkline.showHidden"] };
+        _showHidden = new CheckBox { Content = texts["sparkline.showHidden"], IsChecked = initial.ShowHidden };
         _showHidden.IsCheckedChanged += (_, _) => Refresh();
-        _rightToLeft = new CheckBox { Content = texts["sparkline.rightToLeft"] };
+        _rightToLeft = new CheckBox { Content = texts["sparkline.rightToLeft"], IsChecked = initial.RightToLeft };
         _rightToLeft.IsCheckedChanged += (_, _) => Refresh();
 
-        _sameScale = new CheckBox { Content = texts["sparkline.sameScale"], IsChecked = true };
+        _minimum = new SparklineBoundField(texts["sparkline.minimum"], initial.MinimumAxis, initial.ManualMinimum, texts);
+        _minimum.Changed += (_, _) => Refresh();
+        _maximum = new SparklineBoundField(texts["sparkline.maximum"], initial.MaximumAxis, initial.ManualMaximum, texts);
+        _maximum.Changed += (_, _) => Refresh();
 
         var layout = new TwoPaneDialogLayout(metrics) { Explanation = texts["sparkline.explanation"], Preview = _preview };
         var source = layout.AddSection(texts["sparkline.section.data"]);
         source.Add(texts["sparkline.data"], _data, editorWidth: 240);
         source.Add(texts["sparkline.destination"], _destination, editorWidth: 240);
+        source.Add(texts["sparkline.dates"], _dates, editorWidth: 240);
         var type = layout.AddSection(texts["sparkline.kind"]);
         type.Add(null, _kinds, DialogRowKind.Wide, editorWidth: 360);
         var look = layout.AddSection(texts["sparkline.section.style"]);
@@ -155,7 +174,14 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         look.Add(texts["sparkline.negativeColour"], negative, editorWidth: 260);
         look.Add(texts["sparkline.markerColour"], markers, editorWidth: 260);
         look.Add(null, points, DialogRowKind.Indented, editorWidth: 300);
-        look.Add(null, _sameScale, DialogRowKind.Indented);
+        look.Add(texts["sparkline.highColour"], high, editorWidth: 260);
+        look.Add(texts["sparkline.lowColour"], low, editorWidth: 260);
+        look.Add(texts["sparkline.firstColour"], firstPoint, editorWidth: 260);
+        look.Add(texts["sparkline.lastColour"], lastPoint, editorWidth: 260);
+        look.Add(texts["sparkline.axisColour"], axis, editorWidth: 260);
+        var scale = layout.AddSection(texts["sparkline.section.axis"]);
+        scale.Add(texts["sparkline.minimum"], _minimum, editorWidth: 280);
+        scale.Add(texts["sparkline.maximum"], _maximum, editorWidth: 280);
         var cells = layout.AddSection(texts["sparkline.section.cells"]);
         cells.Add(texts["sparkline.emptyCells"], _emptyCells, editorWidth: 200);
         cells.Add(null, _showHidden, DialogRowKind.Indented);
@@ -178,11 +204,24 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
 
     public RangeFieldControl Destination => _destination;
 
-    public SparklineDialogResult Result => new(_data.Text.Trim(), _destination.Text.Trim(), _kind, _style, _sameScale.IsChecked == true)
+    public RangeFieldControl Dates => _dates;
+
+    public SparklineBoundField Minimum => _minimum;
+
+    public SparklineBoundField Maximum => _maximum;
+
+    public SparklineDialogResult Result => new(
+        _data.Text.Trim(), _destination.Text.Trim(), _kind, _style,
+        _minimum.Bound == SparklineAxisBound.Group && _maximum.Bound == SparklineAxisBound.Group)
     {
         EmptyCells = EmptyCells,
         ShowHidden = _showHidden.IsChecked == true,
         RightToLeft = _rightToLeft.IsChecked == true,
+        MinimumAxis = _minimum.Bound,
+        MaximumAxis = _maximum.Bound,
+        ManualMinimum = _minimum.Manual,
+        ManualMaximum = _maximum.Manual,
+        Dates = _dates.Text.Trim(),
     };
 
     private SparklineEmptyCells EmptyCells => _emptyCells?.SelectedIndex switch
@@ -194,11 +233,13 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
 
     public SparklinePoints Points()
     {
-        if (_read(_data.Text.Trim()) is not { } range) return SparklinePoints.Empty;
+        if (_read(_data.Text.Trim()) is not { } source) return SparklinePoints.Empty;
+        var range = source.Range;
         var first = range.RowCount == 1 || range.ColumnCount == 1
             ? range
             : new CellRange(range.Start, new CellAddress(range.Start.Row, range.End.Column));
-        var line = new Sparkline(range.Start, first);
+        var line = new Sparkline(range.Start, first, source.Sheet);
+        var dates = _dates is { Text.Length: > 0 } ? _read(_dates.Text) : null;
         var group = new SparklineGroup
         {
             Id = "preview",
@@ -208,8 +249,24 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
             EmptyCells = EmptyCells,
             ShowHidden = _showHidden?.IsChecked == true,
             RightToLeft = _rightToLeft?.IsChecked == true,
+            MinimumAxis = _minimum?.Bound == SparklineAxisBound.Custom ? SparklineAxisBound.Custom : SparklineAxisBound.Individual,
+            MaximumAxis = _maximum?.Bound == SparklineAxisBound.Custom ? SparklineAxisBound.Custom : SparklineAxisBound.Individual,
+            ManualMinimum = _minimum?.Manual,
+            ManualMaximum = _maximum?.Manual,
+            DateRange = dates?.Range,
+            DateSheet = dates?.Sheet,
         };
         return _services.Data.Read(_sheet, group, line);
+    }
+
+    private SwatchStrip Strip(ITextCatalog texts, DesignTokens.Metrics metrics, string caption, string selected, Func<string, SparklineStyle> change)
+    {
+        var strip = new SwatchStrip([.. Colours.Select(hex => new Swatch(hex, hex, hex))], texts, metrics, caption, selected);
+        strip.Changed += (_, _) =>
+        {
+            if (strip.Value is { } value) Change(change(value));
+        };
+        return strip;
     }
 
     private CheckBox Flag(string caption, bool value, Func<bool, SparklineStyle> change)

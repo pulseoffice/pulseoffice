@@ -14492,3 +14492,30 @@ Treemap, sunburst, histogram, Pareto, box plot, waterfall and funnel are now wri
   bounds, right to left and the date axis through XLSX `x14:sparklineGroup` and the ODS `calcext` attributes (date
   range as our extension); the insert dialog offers empty cells, hidden data, right to left, markers and axis.
   Log: docs/deep-audit/round-333-chart-labels-sparklines.md.
+
+### Round 334 (2026-11-20): chartex layouts, hierarchies, box groups, chart style parts
+- Chartex layout properties (histogram binning, box plot quartile method and visibility, waterfall subtotals, treemap
+  parent labels) are model data read and written in XLSX (chartex and classic extension), DOCX, PPTX and ODS, and drawn.
+  Treemap and sunburst group category levels into parents; box and whisker draws one box per category per series; the
+  chart style id and style parts survive. Log: docs/deep-audit/round-334-chartex-layouts.md.
+
+### Round 335 (2026-11-20): Ledger sparkline editing and foreign sources
+- Sparklines with a source or date range on another sheet follow row and column edits there, and are dropped (undoably)
+  when that sheet is deleted; local date ranges follow structure edits too. New commands edit a group (dialog filled
+  from the group), group and ungroup; the dialog gains custom minimum and maximum, axis and point colours, a date
+  range and data on another sheet. Rendering tests cover date spacing, right to left, axis and point colours.
+  Log: docs/deep-audit/round-335-sparkline-editing.md.
+
+- **Round 336 (2026-11-20): find leftovers and Deck slide selection.** A shared `TextPatternMatcher` gives Deck find
+  whole words and regular expressions (highlights too); Deck selects the found table cell and notes text and Replace
+  All covers the notes; Ledger searches values as displayed, parses replacements in the spreadsheet locale and keeps
+  the search inside a multi-cell selection; Folio replacing a `^b` at a section block dissolves the section; the Deck
+  filmstrip extends the selection with Shift+Up/Down and drags several selected slides together.
+  Log: docs/deep-audit/round-336-find-and-slide-selection.md.
+
+### Round 337: shortcut editor and keyboard shortcuts (2026-11-20)
+
+- Object nudges are reassignable: the views read the bound gesture per module (`IObjectNudgeBindings`); edits the
+  registry cannot apply are reported in the status bar instead of dropped; Ctrl/Cmd+N creates a blank document of the
+  module in use; Find is Ctrl+F and Replace Ctrl+Shift+H in all three modules. Open items queued with (337).
+  Log: docs/deep-audit/round-337-shortcuts.md.

@@ -33,6 +33,13 @@ public sealed class SlideSelection
         }
     }
 
+    public void ExtendTo(Presentation deck, Slide current, Slide target)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        if (_anchor is null || !_slides.Contains(current)) Collapse(current);
+        Pick(deck, target, SlidePick.Extend);
+    }
+
     public Slide Lead(Presentation deck, Slide picked) =>
         _slides.Contains(picked) ? picked : deck.Slides.FirstOrDefault(_slides.Contains) ?? picked;
 

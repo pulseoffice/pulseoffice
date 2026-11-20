@@ -4,8 +4,8 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- Find (331): a match inside a table selects the whole table, not the cell; matching is literal with match case only
-  (no whole words or regular expressions, unlike the Folio and Ledger targets); notes matches are not highlighted. (331)
+- Find (336): a notes match is selected in the notes box, but the other notes matches have no background
+  highlight; whole words, regular expressions, table cell selection and notes replacement not tried live. (331, 336)
 - The iterated reveal, the pause countdown and the last-slide sound cut extension have not been seen live or opened in
   PowerPoint. (286)
 - An iterated zoom still scales each unit about the element's centre, not the unit's own centre: the reveal works on
@@ -57,15 +57,28 @@ the round that fixes it is joined and the join run is green.
 - Deck (329, 332): keyboard resizing, the master picker and name box, the Insert Slides from File formatting prompt,
   the slide clipboard (sorter and filmstrip, Ctrl and Shift clicks, the selected-slide highlight, Paste Special's
   "Keep source formatting") and the object nudge commands have not been seen in the running app. (329, 332)
-- Deck (332): no paste options button after pasting slides (PowerPoint's floating Ctrl menu); the choice is only in
-  Paste Special. Keyboard extension of the slide selection (Shift+Up/Down in the filmstrip) and drag of several
-  selected slides are missing: dragging moves only the slide under the pointer. (332)
+- Deck (332, 336): no paste options button after pasting slides (PowerPoint's floating Ctrl menu); the choice is only
+  in Paste Special. Needs a shared floating paste-options component wired into the three modules. Shift+Up/Down
+  extension and group drag (336) not tried live. (332, 336)
 - Deck (332): the slide selection is highlighted with the `Pressed` token; not checked in high contrast. (332)
 - Deck (332): PPTX layout names written by other applications for standard layouts are now kept and shown instead of
   the localized standard name; a file whose standard layouts carry an English PowerPoint name shows that English name
   in another interface language, as PowerPoint does. Not verified against PowerPoint itself. (332)
-- Shortcuts (332): the object nudge commands are shown in the shortcut lists but cannot be reassigned; the shortcut
-  editor does not say why a reassignment is refused. (332)
+
+- Shortcuts (337): the shortcut editor has no export or import of customizations to a file (Office offers it for
+  ribbon customizations); medium. (337)
+- Shortcuts (337): Replace is Ctrl+Shift+H in all three modules, while Word, Excel and PowerPoint use Ctrl+H on Windows
+  and Linux and Control+H on macOS (Cmd+H is reserved there); a per-system default needs the host in the module command
+  sets. Minor. (337)
+- Shortcuts (337): Ledger binds Ctrl+Plus and Ctrl+Minus to zoom, where Excel and the reference suite insert and delete
+  cells; Ctrl+Shift+A sorts ascending, which Excel uses for argument names. Minor, needs a user decision on defaults. (337)
+- Shortcuts (337): Office defaults not found among the command defaults (some may live in view key maps; check
+  first): Deck Ctrl+M new slide (Cmd+M is reserved on macOS), Folio Ctrl+Space
+  clear character format, Ctrl+= and Ctrl+Shift+= subscript and superscript, Ctrl+] and Ctrl+[ font size, Ledger Ctrl+5
+  strikethrough, Ctrl+9 hide rows, Alt+= AutoSum, Ctrl+Shift+$ and Ctrl+Shift+% number formats. Minor. (337)
+- Shortcuts (337): a nudge can be reassigned only to a chord with a command modifier, so the factory plain-arrow and
+  Shift+arrow gestures can be restored but not chosen again by key capture. Minor. (337)
+- Shortcuts (337): the rebound object nudges and Ctrl+N have not been tried in the running app. (337)
 
 ## Charts
 - Per-point formats (`c:dPt`, `chart:data-point`) have not been opened in Excel or the reference suite. (318)
@@ -74,15 +87,14 @@ the round that fixes it is joined and the join run is green.
 - Pie of pie split settings (XLSX `c:splitType`/`c:splitPos`/`c:custSplit`/`c:secondPieSize`, ODS our extension
   attributes) and XLSX open-high-low-close tick markers have not been opened in Excel or the reference suite. (327)
 - The native chartex part written for treemap, sunburst, histogram, Pareto, box plot, waterfall and funnel (behind
-  `mc:AlternateContent Requires="cx1"`/`"cx2"`) has not been opened in Excel; the layout properties written are fixed
-  defaults, not model values. (328, 330)
-- Chartex layout properties are not read: histogram binning, box plot quartile method, mean and outlier markers,
-  waterfall subtotals, treemap parent labels. (328) (330: not reached)
-- Treemap and sunburst draw one level: multi-column category levels are not grouped into parents. (328) (330: not reached)
-- Box and whisker draws one box per series; Excel draws one per category per series. (328) (330: not reached)
-- The chart style id (`c:style`) and colour style parts (`cs:colorStyle`) are not kept: a round trip writes the
-  resolved colours. (328) (330: not reached)
-- The categorical Pareto plot has no rendering test. (328) (330: not reached)
+  `mc:AlternateContent Requires="cx1"`/`"cx2"`) has not been opened in Excel. (328, 330, 334)
+- No editor for the statistical layout (binning, quartile method, mean and outlier visibility, subtotals, parent
+  labels): they only come from files. (334)
+- Waterfall subtotal indices do not follow row insertion or deletion in the source. (334)
+- Style parts of a chart read only from a chartex part (Excel file without our classic fallback) are not kept. (334)
+- The chartex category dimension written from inline data carries only the leaf level. (334)
+- Treemap labels do not wrap; the overlapping parent label sits in the middle of the parent. (334)
+- Exclusive quartiles clamp for very small samples; Excel's drawing of such boxes not checked. (334)
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
@@ -156,8 +168,8 @@ the round that fixes it is joined and the join run is green.
 - Folio columns (320, 325): the ODT next-column start writes `fo:break-before="column"` on the section's first paragraph,
   leading table or nested section's first paragraph; not opened in other applications. Page columns marked to balance
   before a section not opened in Word. (320, 325)
-- Folio find and replace (331): replacing a match that crosses a `SectionBlock` boundary deletes the text but keeps the
-  section (the `^b` mark is a boundary, not a removable break); a match inside a comment is marked in the comment
+- Folio find and replace (331, 336): replacing a `^b` at a `SectionBlock` boundary now dissolves the section (336),
+  not compared live with Word; a match inside a comment is marked in the comment
   balloon while the anchor is selected, the comment text itself is still not editable in place. (326, 331)
 - Find panel (326, 331): the panel, Folio, Ledger and Deck highlights, the comment balloon marks and the dialog's
   format expander have not been tried in the running app. (326, 331)
@@ -203,17 +215,14 @@ the round that fixes it is joined and the join run is green.
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
 
 ## Ledger
-- Find and replace (331): searching values matches the stored value (`CellValue.ToString`, invariant numbers), not the
-  displayed formatted text as Excel's "Look in: Values" does; a replacement that parses as a number uses the invariant
-  culture; a multi-cell selection does not restrict the search (Excel searches only the selection); text in drawn
+- Find and replace (331, 336): values found through the displayed text are replaced in the stored text, so a match on
+  formatting characters (thousands separator, currency) replaces nothing; the find highlights ignore the selection
+  restriction (336); text in drawn
   shapes is neither searched nor highlighted; highlights inside frozen panes use the scrolled visible range; the
   format filter cache of the highlights follows cell revisions, not style-only changes. (331)
-- Sparklines: no command to edit an existing group's options (Excel's Edit Group Data, group and ungroup); the insert
-  dialog has no custom minimum and maximum, no axis, high/low/first/last colours and no date range, and its data
-  field cannot take a range on another sheet. (333)
-- Sparklines with a source on another sheet: row and column insertion or deletion and deletion of that source sheet do
-  not update the source (the sparkline keeps its range, or draws nothing once the sheet is gone). (333)
-- Sparkline drawing of date spacing, right to left, axis and per-point colours has no rendering test. (333)
+- Sparklines (335): Edit Group rewrites a group as one block laid out from the bounding ranges of its data and cells; a
+  sparkline whose source sheet or rows are deleted is dropped instead of kept with a `#REF!` source as in Excel (undo
+  restores it); Group and Ungroup are not in the cell context menu. (335)
 - Sparkline options (markers, axis, empty cells, hidden data, custom bounds, date axis, foreign sources) not yet opened
   in Excel or the reference suite; the ODS date range is our own attribute. (333)
 - Conditional formatting paste with Transpose turns relative references by swapping their row and column offsets from

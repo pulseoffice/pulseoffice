@@ -43,6 +43,8 @@ public sealed record DeckTarget(
 
     public Func<bool> SlidePaneFocused { get; init; } = () => false;
 
+    public Action<int, int> SelectNotes { get; init; } = (_, _) => { };
+
     public Func<PulseOffice.UI.Controls.Shapes.ObjectNudge, bool> NudgeObjects { get; init; } = _ => false;
 
     public bool CopiesSlides() => ViewMode() == DeckViewMode.Sorter || (ViewMode() == DeckViewMode.Normal && SlidePaneFocused() && SelectedMany().Count == 0);

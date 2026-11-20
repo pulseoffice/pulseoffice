@@ -49,6 +49,7 @@ public sealed class DeckDocumentFactory(
     PulseOffice.Drawing.Assets.IImageExtents extents,
     IInterfaceCulture culture,
     IDeckLinkTips linkTips,
+    PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges,
     PulseOffice.UI.Controls.Search.ITextFindHighlights findHighlights) : IDeckDocumentFactory, IDocumentViewSource
 {
     public PulseOffice.Foundation.Modules.ModuleKind Module => PulseOffice.Foundation.Modules.ModuleKind.Presentations;
@@ -102,7 +103,7 @@ public sealed class DeckDocumentFactory(
     {
         var actions = new DeckActions(deck, history, slides, texts, readOnly, optionGroups: optionGroups, fitting: fitting, groupEditing: groupEditing);
         var renderer = new SlideRenderer(objectRenderer, texts);
-        var view = new DeckView(deck, actions, renderer, masters, scheduler, texts, contextMenus, deckContext, connectors, drawing, images, contextChooser, autoCorrect, autoCorrectSettings, spelling, autoSpell, userWords, design, forms, editing, formatter, zoomLadder, extents: extents, linkTips: linkTips)
+        var view = new DeckView(deck, actions, renderer, masters, scheduler, texts, contextMenus, deckContext, connectors, drawing, images, contextChooser, autoCorrect, autoCorrectSettings, spelling, autoSpell, userWords, design, forms, editing, formatter, zoomLadder, nudges: nudges, extents: extents, linkTips: linkTips)
         {
             RibbonState = ribbonState,
             ObjectEditing = objectEditing,

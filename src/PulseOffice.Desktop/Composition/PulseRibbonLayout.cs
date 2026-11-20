@@ -484,6 +484,9 @@ public static class PulseRibbonLayout
         ("ledger.chart.doughnut", "insert/charts"),
         ("ledger.chart.edit", "insert/charts"),
         ("ledger.sparkline.insert", "insert/charts"),
+        ("ledger.sparkline.edit", "insert/charts"),
+        ("ledger.sparkline.group", "insert/charts"),
+        ("ledger.sparkline.ungroup", "insert/charts"),
         ("ledger.sparkline.delete", "insert/charts"),
 
         ("ledger.image.raster", "insert/pictures"),

@@ -192,7 +192,9 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
         root.AppendChild(new C.DisplayBlanksAs { Val = C.DisplayBlanksAsValues.Gap });
 
         var space = new C.ChartSpace(new C.EditingLanguage { Val = "en-US" }, root);
-        if (families.Declares(definition.Type)) space.AppendChild(_declared.Extension(definition.Type));
+        if (definition.Style.StyleId is { } style and >= 1 and <= 48)
+            space.InsertAfter(new C.Style { Val = (byte)style }, space.GetFirstChild<C.EditingLanguage>());
+        if (families.Declares(definition.Type)) space.AppendChild(_declared.Extension(definition.Type, definition.Statistical, data.Categories.Count > 0 && !data.OrdinalCategories));
         return space;
     }
 
@@ -310,6 +312,10 @@ internal sealed record ChartSpaceContent(
 
     public ChartPieSplit PieSplit { get; init; } = ChartPieSplit.Automatic;
 
+    public ChartStatisticalLayout Statistical { get; init; } = ChartStatisticalLayout.Automatic;
+
+    public int? StyleId { get; init; }
+
     public ChartDefinition Decorate(ChartDefinition definition) => definition with
     {
         LineSeriesCount = LineSeriesCount,
@@ -328,6 +334,8 @@ internal sealed record ChartSpaceContent(
         SecondaryValueAxis = SecondaryValueAxis,
         SeriesFormats = SeriesFormats,
         PieSplit = PieSplit,
+        Statistical = Statistical,
+        Style = definition.Style with { StyleId = StyleId },
     };
 }
 
@@ -413,11 +421,35 @@ internal sealed class DeclaredChartType
     private const string Uri = "{6D5B6F0C-3C1E-4C4B-9E6A-50A1C3E5F0C1}";
     private const string Namespace = "urn:pulseoffice:chart";
 
-    public C.ChartSpaceExtensionList Extension(ChartType type)
+    private const string LayoutUri = "{8E3B1C77-2D4A-4F0E-9C61-334A0B5E7D21}";
+
+    private readonly ChartExLayoutProperties _properties = new();
+
+    public C.ChartSpaceExtensionList Extension(ChartType type, ChartStatisticalLayout layout, bool categorical)
     {
         var marker = new OpenXmlUnknownElement("pulseoffice", "chartType", Namespace);
         marker.SetAttribute(new OpenXmlAttribute("val", string.Empty, type.ToString()));
-        return new C.ChartSpaceExtensionList(new C.ChartSpaceExtension(marker) { Uri = Uri });
+        var list = new C.ChartSpaceExtensionList(new C.ChartSpaceExtension(marker) { Uri = Uri });
+        if (!layout.IsAutomatic && _properties.Write(type, layout, categorical) is { } properties)
+            list.AppendChild(new C.ChartSpaceExtension { Uri = LayoutUri, InnerXml = properties.ToString(System.Xml.Linq.SaveOptions.DisableFormatting) });
+        return list;
+    }
+
+    public ChartStatisticalLayout Layout(C.ChartSpace space)
+    {
+        var element = space.GetFirstChild<C.ChartSpaceExtensionList>()?.Elements<C.ChartSpaceExtension>()
+            .Where(extension => extension.Uri?.Value == LayoutUri)
+            .SelectMany(extension => extension.ChildElements)
+            .FirstOrDefault(child => child.LocalName == "layoutPr" && child.NamespaceUri == ChartExReader.Namespace);
+        if (element is null) return ChartStatisticalLayout.Automatic;
+        try
+        {
+            return _properties.Read(System.Xml.Linq.XElement.Parse(element.OuterXml));
+        }
+        catch (System.Xml.XmlException)
+        {
+            return ChartStatisticalLayout.Automatic;
+        }
     }
 
     public ChartType? Read(C.ChartSpace space) =>
@@ -492,6 +524,8 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
             SecondaryValueAxis = _scales.Read(secondaryValue, plot),
             SeriesFormats = formats.Any(format => format is { IsPlain: false }) ? [.. formats.Select(format => format is { IsPlain: false } ? format : null)] : null,
             PieSplit = _pieSplits.Read(plot),
+            Statistical = _declared.Layout(space),
+            StyleId = space.GetFirstChild<C.Style>()?.Val?.Value is { } style and >= 1 and <= 48 ? (int?)style : null,
         };
     }
 

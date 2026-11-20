@@ -398,6 +398,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
         TextCaret = () => _text.Editor?.CaretIndex,
         SelectedSlides = () => _state.Slides.Ordered(_deck, _state.Current),
         SlidePaneFocused = () => _filmstrip.HasFocus,
+        SelectNotes = SelectNotesRange,
         NudgeObjects = nudge => _stageKeys.Nudge(nudge),
         MasterLayoutId = () => _state.MasterLayoutId,
         EditedMasterId = () => _state.EditedMasterId,
@@ -414,6 +415,17 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
             if (_state.Current?.Find(id) is TextElement element) _text.BeginEdit(element);
         },
     };
+
+    private void SelectNotesRange(int start, int length)
+    {
+        if (!_options.NotesPane) _options.ToggleNotesPane();
+        var notes = _state.Current?.Notes ?? string.Empty;
+        _notesPane.Text = notes;
+        var end = Math.Min(start + length, notes.Length);
+        _notesPane.Focus();
+        _notesPane.SelectionStart = Math.Min(start, end);
+        _notesPane.SelectionEnd = end;
+    }
 
     private int? LastEditedIndex() =>
         _lastEditedId is { } id && _deck.Slides.FirstOrDefault(slide => slide.Id == id) is { } slide

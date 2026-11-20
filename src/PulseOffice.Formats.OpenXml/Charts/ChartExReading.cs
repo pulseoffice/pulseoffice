@@ -6,9 +6,15 @@ using PulseOffice.Charts;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed record ChartExSeries(string? NameFormula, string? Name, string? Values, string? Categories, IReadOnlyList<string> CachedCategories, IReadOnlyList<double> CachedValues);
+internal sealed record ChartExSeries(string? NameFormula, string? Name, string? Values, string? Categories, IReadOnlyList<string> CachedCategories, IReadOnlyList<double> CachedValues)
+{
+    public IReadOnlyList<IReadOnlyList<string>> CachedLevels { get; init; } = [];
+}
 
-internal sealed record ChartExContent(ChartType Type, string? Title, LegendPosition Legend, IReadOnlyList<ChartExSeries> Series);
+internal sealed record ChartExContent(ChartType Type, string? Title, LegendPosition Legend, IReadOnlyList<ChartExSeries> Series)
+{
+    public ChartStatisticalLayout Statistical { get; init; } = ChartStatisticalLayout.Automatic;
+}
 
 internal sealed class ChartExReader
 {
@@ -18,6 +24,9 @@ internal sealed class ChartExReader
 
     private readonly XNamespace _cx = Namespace;
     private readonly SafeXmlLoader _loader = new();
+    private readonly ChartExLayoutProperties _properties = new();
+    private readonly ChartCategoryGroups _groups = new();
+    private const int MostLevels = 16;
 
     private readonly IReadOnlyDictionary<string, ChartType> _layouts = new Dictionary<string, ChartType>(StringComparer.Ordinal)
     {
@@ -70,7 +79,11 @@ internal sealed class ChartExReader
             .ToList();
         if (series.Count == 0) return null;
 
-        return new ChartExContent(type, Text(chart?.Element(_cx + "title")), Legend(chart?.Element(_cx + "legend")), series);
+        var owner = all.FirstOrDefault(element => (string?)element.Attribute("layoutId") != "paretoLine");
+        return new ChartExContent(type, Text(chart?.Element(_cx + "title")), Legend(chart?.Element(_cx + "legend")), series)
+        {
+            Statistical = _properties.Read(owner?.Element(_cx + "layoutPr")),
+        };
     }
 
     private ChartExSeries? Series(XElement series, IReadOnlyDictionary<string, XElement> data)
@@ -82,6 +95,7 @@ internal sealed class ChartExReader
         var categories = block.Elements(_cx + "strDim").Concat(block.Elements(_cx + "numDim"))
             .FirstOrDefault(dimension => (string?)dimension.Attribute("type") is "cat" or "x");
         var name = series.Element(_cx + "tx")?.Element(_cx + "txData");
+        var levels = categories?.Elements(_cx + "lvl").ToList() ?? [];
 
         return new ChartExSeries(
             Formula(name),
@@ -89,7 +103,21 @@ internal sealed class ChartExReader
             Formula(values),
             Formula(categories),
             [.. Points(categories?.Elements(_cx + "lvl").FirstOrDefault()).Select(point => point.Text)],
-            [.. Points(values.Elements(_cx + "lvl").FirstOrDefault()).Select(point => Number(point.Text))]);
+            [.. Points(values.Elements(_cx + "lvl").FirstOrDefault()).Select(point => Number(point.Text))])
+        {
+            CachedLevels = Levels(levels),
+        };
+    }
+
+    private IReadOnlyList<IReadOnlyList<string>> Levels(IReadOnlyList<XElement> levels)
+    {
+        if (levels.Count < 2) return [];
+        var leaves = Points(levels[0]).Count;
+        var outer = levels.Skip(1).Take(MostLevels).Reverse()
+            .Select(level => Points(level).Select(point => point.Text).Concat(Enumerable.Repeat(string.Empty, leaves)).Take(leaves).ToList())
+            .ToList();
+        var paths = Enumerable.Range(0, leaves).Select(index => (IReadOnlyList<string>)[.. outer.Select(level => level[index])]).ToList();
+        return _groups.Compact(paths, outer.Count);
     }
 
     private string? Formula(XElement? owner) =>

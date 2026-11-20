@@ -11,7 +11,7 @@ public interface IShortcutCustomization
 {
     int ApplySaved();
 
-    void Apply(IReadOnlyDictionary<string, string?> edits);
+    IReadOnlyList<string> Apply(IReadOnlyDictionary<string, string?> edits);
 }
 
 public sealed class ShortcutCustomization(CommandRegistry registry, IShortcutBindingStore store) : IShortcutCustomization
@@ -32,15 +32,18 @@ public sealed class ShortcutCustomization(CommandRegistry registry, IShortcutBin
         return applied;
     }
 
-    public void Apply(IReadOnlyDictionary<string, string?> edits)
+    public IReadOnlyList<string> Apply(IReadOnlyDictionary<string, string?> edits)
     {
         ArgumentNullException.ThrowIfNull(edits);
 
-        foreach (var (id, gesture) in edits) registry.Rebind(new CommandId(id), gesture);
+        var refused = new List<string>();
+        foreach (var (id, gesture) in edits)
+            if ((gesture is not null && _parser.Parse(gesture) is null) || !registry.Rebind(new CommandId(id), gesture))
+                refused.Add(id);
 
         var overrides = new Dictionary<string, string?>(store.Load(), StringComparer.Ordinal);
 
-        foreach (var id in edits.Keys)
+        foreach (var id in edits.Keys.Except(refused, StringComparer.Ordinal))
         {
             var command = registry.Find(new CommandId(id));
             if (command is null) continue;
@@ -51,6 +54,7 @@ public sealed class ShortcutCustomization(CommandRegistry registry, IShortcutBin
 
         store.Save(overrides);
         registry.NotifyBindingsChanged();
+        return refused;
     }
 
     private bool Same(string? first, string? second) =>

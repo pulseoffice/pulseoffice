@@ -11,7 +11,7 @@ public sealed class Round332ObjectNudgeCommandsTests
     public async Task Each_module_gets_move_fine_move_resize_and_fine_resize_commands_routed_by_the_view()
     {
         var applied = new List<ObjectNudge>();
-        var commands = new ObjectNudgeCommands().For(ModuleKind.Presentations, "deck", () => true, nudge => { applied.Add(nudge); return true; });
+        var commands = new ObjectNudgeCommands().For(ModuleKind.Presentations, () => true, nudge => { applied.Add(nudge); return true; });
 
         Assert.Equal(16, commands.Count);
         Assert.Equal(16, commands.Select(command => command.Id.Value).Distinct().Count());

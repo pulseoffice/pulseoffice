@@ -7,7 +7,7 @@ namespace PulseOffice.UI.Commands.Tests;
 public sealed class Round332ViewRoutedGestureTests
 {
     [Fact]
-    public void A_gesture_routed_by_the_view_is_listed_but_never_dispatched_nor_rebound()
+    public void A_gesture_routed_by_the_view_is_listed_and_rebound_but_never_dispatched()
     {
         var registry = new CommandRegistry(new FakeTextCatalog());
         registry.Register(new CommandDefinition
@@ -23,6 +23,8 @@ public sealed class Round332ViewRoutedGestureTests
 
         Assert.Equal("Shift+Right", Assert.Single(new ShortcutCatalog(registry).Entries()).Gesture);
         Assert.Empty(registry.ActiveGestures(context));
-        Assert.False(registry.Rebind(new CommandId("deck.object.nudge.resizeRight"), "Ctrl+K"));
+        Assert.True(registry.Rebind(new CommandId("deck.object.nudge.resizeRight"), "Ctrl+K"));
+        Assert.Equal("Ctrl+K", registry.Find(new CommandId("deck.object.nudge.resizeRight"))!.DefaultGesture);
+        Assert.Empty(registry.ActiveGestures(context));
     }
 }

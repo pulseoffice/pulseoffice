@@ -1,4 +1,8 @@
 using Avalonia.Input;
+using PulseOffice.Foundation.Modules;
+using PulseOffice.UI.Commands;
+using PulseOffice.UI.Commands.Shortcuts;
+using PulseOffice.UI.Controls.Shortcuts;
 
 namespace PulseOffice.UI.Controls.Shapes;
 
@@ -31,28 +35,64 @@ public readonly record struct ObjectNudge(int Across, int Down, ObjectNudgeKind 
 
 public interface IObjectNudgeKeys
 {
-    ObjectNudge? Read(Key key, KeyModifiers modifiers);
+    ObjectNudge? Read(ModuleKind module, Key key, KeyModifiers modifiers);
 }
 
-public sealed class ObjectNudgeKeys : IObjectNudgeKeys
+public interface IObjectNudgeBindings
 {
-    private const KeyModifiers FineModifiers = KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta;
+    string? GestureOf(ModuleKind module, ObjectNudgeCommand command);
+}
 
-    public ObjectNudge? Read(Key key, KeyModifiers modifiers)
+public sealed class FactoryObjectNudgeBindings : IObjectNudgeBindings
+{
+    public string? GestureOf(ModuleKind module, ObjectNudgeCommand command)
     {
-        var held = modifiers & FineModifiers;
-        var fine = held != 0;
-        if (held is not (KeyModifiers.None or KeyModifiers.Control or KeyModifiers.Alt or KeyModifiers.Meta)) return null;
-        var rest = modifiers & ~FineModifiers;
-        if (rest is not (KeyModifiers.None or KeyModifiers.Shift)) return null;
-        var kind = rest == KeyModifiers.Shift ? ObjectNudgeKind.Resize : ObjectNudgeKind.Move;
-        return key switch
-        {
-            Key.Left => new ObjectNudge(-1, 0, kind, fine),
-            Key.Right => new ObjectNudge(1, 0, kind, fine),
-            Key.Up => new ObjectNudge(0, -1, kind, fine),
-            Key.Down => new ObjectNudge(0, 1, kind, fine),
-            _ => null,
-        };
+        ArgumentNullException.ThrowIfNull(command);
+        return command.Gesture;
+    }
+}
+
+public sealed class RegistryObjectNudgeBindings(CommandRegistry registry, IObjectNudgeCommands nudges) : IObjectNudgeBindings
+{
+    public string? GestureOf(ModuleKind module, ObjectNudgeCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return registry.Find(nudges.IdOf(module, command.Name)) is { } registered ? registered.DefaultGesture : command.Gesture;
+    }
+}
+
+public sealed class ObjectNudgeKeys(IObjectNudgeCommands nudges, IObjectNudgeBindings bindings, IShortcutCapture capture) : IObjectNudgeKeys
+{
+    private const ChordModifiers FineAliases = ChordModifiers.Control | ChordModifiers.Alt | ChordModifiers.Super;
+
+    private readonly GestureChordParser _parser = new();
+
+    public ObjectNudgeKeys()
+        : this(new ObjectNudgeCommands(), new FactoryObjectNudgeBindings(), new ShortcutCapture())
+    {
+    }
+
+    public ObjectNudge? Read(ModuleKind module, Key key, KeyModifiers modifiers)
+    {
+        if (capture.Chord(key, modifiers) is not { } chord) return null;
+        return Bound(module, chord) ?? (Alias(chord) is { } alias ? Bound(module, alias) : null);
+    }
+
+    private ObjectNudge? Bound(ModuleKind module, GestureChord chord)
+    {
+        var pressed = chord.Canonical();
+        foreach (var command in nudges.Table)
+            if (_parser.Parse(bindings.GestureOf(module, command)) is { } bound
+                && string.Equals(bound.Canonical(), pressed, StringComparison.OrdinalIgnoreCase))
+                return command.Nudge;
+        return null;
+    }
+
+    private static GestureChord? Alias(GestureChord chord)
+    {
+        var held = chord.Modifiers & FineAliases;
+        if (chord.Modifiers.HasFlag(ChordModifiers.Primary)) return null;
+        if (held is not (ChordModifiers.Control or ChordModifiers.Alt or ChordModifiers.Super)) return null;
+        return chord with { Modifiers = (chord.Modifiers & ~held) | ChordModifiers.Primary };
     }
 }

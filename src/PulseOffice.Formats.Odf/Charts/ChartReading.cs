@@ -16,6 +16,7 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
     private readonly OdfChartSeriesFormats _formats = new();
 
     private readonly OdfPieSplits _pieSplits = new(PulseChart);
+    private readonly OdfStatisticalLayouts _statistical = new(PulseChart);
 
     public ChartDefinition? Read(XElement chart, string id)
     {
@@ -59,6 +60,8 @@ internal abstract class OdfChartDocumentReader(OdfChartVocabulary vocabulary, IO
             SeriesFormats = formats.Any(format => !format.IsPlain) ? [.. formats.Select(format => format.IsPlain ? null : format)] : null,
             PivotSource = PivotOf(chart),
             PieSplit = _pieSplits.Read(chart),
+            Statistical = _statistical.Read(chart),
+            Style = _statistical.Style(chart),
         });
     }
 

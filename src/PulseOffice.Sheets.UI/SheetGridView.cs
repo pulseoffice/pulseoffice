@@ -57,7 +57,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         IAdjustHandleChrome? adjusting = null,
         IObjectFrameChrome? frame = null,
         IGroupChildLinks? groupLinks = null,
-        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null)
+        PulseOffice.UI.Controls.Links.ILinkTips? linkTips = null,
+        IObjectNudgeKeys? nudges = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
@@ -84,7 +85,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
             adjusting ?? new AdjustHandleChrome(),
             frame ?? new ObjectFrameChrome(handles, new FrameStyles().Filled),
             groupLinks ?? new GroupChildLinks(),
-            linkTips ?? new PulseOffice.UI.Controls.Links.LinkTips());
+            linkTips ?? new PulseOffice.UI.Controls.Links.LinkTips(),
+            nudges ?? new ObjectNudgeKeys());
 
         _parts = new SheetGridPartsFactory().Create(dependencies, this, this, _theme, () => Bounds.Size, _chords);
 

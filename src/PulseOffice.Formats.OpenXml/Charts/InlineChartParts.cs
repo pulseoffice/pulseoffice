@@ -9,6 +9,7 @@ public sealed class InlineChartParts
     private readonly ChartSpaceReader _reader;
     private readonly LiteralSeriesSource _literals = new();
     private readonly ChartInlineErrorValues _errors = new();
+    private readonly ChartStyleParts _styleParts = new();
 
     public InlineChartParts()
     {
@@ -22,6 +23,7 @@ public sealed class InlineChartParts
         var chartPart = owner.AddNewPart<ChartPart>();
         chartPart.ChartSpace = _builder.Build(chart, chart.InlineData ?? ChartData.Empty, _literals);
         chartPart.ChartSpace.Save();
+        _styleParts.Write(chartPart, chart.Style);
         return owner.GetIdOfPart(chartPart);
     }
 
@@ -29,7 +31,7 @@ public sealed class InlineChartParts
     {
         if (relationshipId is null || !owner.TryGetPartById(relationshipId, out var part) || part is not ChartPart { ChartSpace: { } space }) return null;
         if (_reader.Read(space) is not { } content) return null;
-        return _errors.Refresh(content.Decorate(new ChartDefinition
+        var read = _errors.Refresh(content.Decorate(new ChartDefinition
         {
             Id = id,
             Type = content.Type,
@@ -37,5 +39,6 @@ public sealed class InlineChartParts
             SourceRange = string.Empty,
             InlineData = _reader.Literals(content.Series),
         }));
+        return read with { Style = _styleParts.Read((ChartPart)part, read.Style) };
     }
 }

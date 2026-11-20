@@ -121,7 +121,7 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
             return;
         }
 
-        if (nudges.Read(e.Key, e.KeyModifiers) is not { } nudge) return;
+        if (nudges.Read(PulseOffice.Foundation.Modules.ModuleKind.Presentations, e.Key, e.KeyModifiers) is not { } nudge) return;
 
         Nudge(ids, nudge);
         e.Handled = true;

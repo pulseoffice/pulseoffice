@@ -211,23 +211,48 @@ internal sealed class SparklinesPart : StructurePart
 {
     public override void Apply(StructureEdit edit)
     {
-        var sparklines = edit.Sheet.Sparklines;
-        var groups = sparklines.Groups
-            .Select(group => group with
-            {
-                Sparklines = [.. group.Sparklines
-                    .Select(sparkline => edit.Shift.Move(sparkline.Cell) is { } cell
-                        && (sparkline.SourceSheet is not null ? sparkline.Source : edit.Shift.Move(sparkline.Source)) is { } source
-                        ? sparkline with { Cell = cell, Source = source }
-                        : null)
-                    .OfType<Sparkline>()],
-            })
-            .Where(group => group.Sparklines.Count > 0)
-            .ToList();
+        foreach (var owner in edit.Engine.Workbook.Sheets)
+        {
+            var host = ReferenceEquals(owner, edit.Sheet);
+            var groups = owner.Sparklines.Groups;
+            var moved = groups.Select(group => Moved(edit, owner, group, host)).OfType<SparklineGroup>().ToList();
+            if (moved.Count == groups.Count && moved.Zip(groups).All(pair => ReferenceEquals(pair.First, pair.Second))) continue;
 
-        sparklines.Clear();
-        sparklines.AddRange(groups);
+            owner.Sparklines.Clear();
+            owner.Sparklines.AddRange(moved);
+        }
     }
+
+    private static SparklineGroup? Moved(StructureEdit edit, Worksheet owner, SparklineGroup group, bool host)
+    {
+        var lines = group.Sparklines
+            .Select(sparkline => Moved(edit, owner, sparkline, host))
+            .OfType<Sparkline>()
+            .ToList();
+        if (lines.Count == 0) return null;
+
+        var dates = group.DateRange is { } range && OnEditedSheet(edit, owner, group.DateSheet)
+            ? edit.Shift.Move(range)
+            : group.DateRange;
+
+        return lines.SequenceEqual(group.Sparklines) && dates == group.DateRange
+            ? group
+            : group with { Sparklines = lines, DateRange = dates, DateSheet = dates is null ? null : group.DateSheet };
+    }
+
+    private static Sparkline? Moved(StructureEdit edit, Worksheet owner, Sparkline sparkline, bool host)
+    {
+        var cell = host ? edit.Shift.Move(sparkline.Cell) : sparkline.Cell;
+        if (cell is not { } placed) return null;
+
+        var source = OnEditedSheet(edit, owner, sparkline.SourceSheet) ? edit.Shift.Move(sparkline.Source) : sparkline.Source;
+        if (source is not { } kept) return null;
+
+        return placed == sparkline.Cell && kept == sparkline.Source ? sparkline : sparkline with { Cell = placed, Source = kept };
+    }
+
+    private static bool OnEditedSheet(StructureEdit edit, Worksheet owner, string? sheet) =>
+        string.Equals(sheet ?? owner.Name, edit.Change.SheetName, StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed class ScenariosPart : StructurePart

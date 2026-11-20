@@ -51,7 +51,7 @@ public class DeepAuditRound27SparklineTests
         });
         var commands = new LedgerSparklineCommands(context, Fake<Engine.Operations.ISheetSnapshots>(),
             Fake<PulseOffice.UI.Controls.Services.IDialogService>(), Fake<PulseOffice.UI.Controls.Services.IStatusBarService>(),
-            Fake<Dialogs.ISheetReferenceSources>(), Fake<Dialogs.ISheetReferenceReader>(), null!,
+            Fake<Dialogs.ISheetReferenceSources>(), Fake<Dialogs.ISheetReferenceReader>(), null!, Fake<Engine.Operations.ISparklineGroups>(),
             new PulseOffice.Localization.TextCatalog(PulseOffice.Localization.UiLanguage.English));
 
         await commands.GetCommands().Single(command => command.Id.Value == "ledger.sparkline.delete")

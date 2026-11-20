@@ -86,6 +86,12 @@ public sealed class DeckActions
     public void MoveSlide(Slide slide, int to) =>
         _slides.MoveSlide(slide, to);
 
+    public void MoveSlides(IReadOnlyList<Slide> slides, Slide target)
+    {
+        using var transaction = _history.BeginTransaction(_texts["deck.action.moveSlide"]);
+        _slides.MoveSlides(slides, target);
+    }
+
     public void MoveSlideIntoSection(Slide slide, EmptySection section) =>
         _slides.MoveSlideIntoSection(slide, section);
 

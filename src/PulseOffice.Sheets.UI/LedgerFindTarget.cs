@@ -14,9 +14,11 @@ public sealed class LedgerFindTarget(
     ISheetEditGuard guard,
     IWorkbookSearch search,
     bool readOnly,
-    IWorkbookMatchOrder? order = null) : IFindReplaceTarget
+    IWorkbookMatchOrder? order = null,
+    ILedgerFindScope? scopes = null) : IFindReplaceTarget
 {
     private readonly IWorkbookMatchOrder _order = order ?? new WorkbookMatchOrder();
+    private readonly ILedgerFindScope _scopes = scopes ?? new LedgerFindScope();
 
     private const string MatchCase = "matchCase";
     private const string WholeCell = "wholeCell";
@@ -58,7 +60,7 @@ public sealed class LedgerFindTarget(
         if (context.Workbook is not { } workbook || (request.Query.Length == 0 && !request.Has(ByFormat)))
             return string.Empty;
 
-        var matches = search.FindAll(workbook, context.SheetIndex, request.Query, OptionsOf(request));
+        var matches = search.FindAll(workbook, context.SheetIndex, request.Query, OptionsOf(request), ScopeOf(request));
         return matches.Count switch
         {
             0 => texts["find.matches.none"],
@@ -76,12 +78,14 @@ public sealed class LedgerFindTarget(
         if (context.Workbook is not { } workbook || (request.Query.Length == 0 && !request.Has(ByFormat)))
             return string.Empty;
 
-        var matches = search.FindAll(workbook, context.SheetIndex, request.Query, OptionsOf(request));
+        var scope = ScopeOf(request);
+        var matches = search.FindAll(workbook, context.SheetIndex, request.Query, OptionsOf(request), scope);
         if (_order.Next(matches, context.SheetIndex, context.Selection.Start, request.Has(ByColumns), backwards) is not { } match)
             return texts["find.matches.none"];
 
         if (match.SheetIndex != context.SheetIndex) context.SelectSheet(match.SheetIndex);
         context.SelectRange(new CellRange(match.Address, match.Address));
+        _scopes.Landed(scope is null ? null : match.Address);
         var place = request.Has(AllSheets) ? match.SheetName + "." + match.Address.ToA1() : match.Address.ToA1();
         return texts.Format("find.foundInCell", place);
     }
@@ -97,7 +101,8 @@ public sealed class LedgerFindTarget(
         }
 
         var options = OptionsOf(request) with { HistoryLabel = texts["find.replaceAll"] };
-        var found = search.FindAll(workbook, context.SheetIndex, request.Query, options);
+        var scope = ScopeOf(request);
+        var found = search.FindAll(workbook, context.SheetIndex, request.Query, options, scope);
         if (options.InComments && found.Any(match => workbook.Sheets[match.SheetIndex].Protection.IsEnabled))
         {
             status.Report(texts["status.protection.objects"], NotificationSeverity.Error, LedgerRemedies.UnprotectSheet);
@@ -115,13 +120,16 @@ public sealed class LedgerFindTarget(
         int replaced;
         using (context.History?.BeginTransaction(texts["find.replaceAll"]))
             replaced = search.ReplaceAll(
-                workbook, context.SheetIndex, request.Query, request.Replacement, options, scope: null, history: context.History);
+                workbook, context.SheetIndex, request.Query, request.Replacement, options, scope, history: context.History);
         context.RequestRefresh();
 
         var message = replaced == 0 ? texts["find.replaced.none"] : texts.Format("find.replaced.many", replaced);
         status.Report(message, replaced == 0 ? NotificationSeverity.Warning : NotificationSeverity.Success);
         return message;
     }
+
+    private CellRange? ScopeOf(FindRequest request) =>
+        _scopes.For(context.Selection, request.Has(AllSheets) || request.Has(InComments));
 
     private SearchOptions OptionsOf(FindRequest request) => new()
     {

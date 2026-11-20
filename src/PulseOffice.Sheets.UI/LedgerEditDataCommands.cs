@@ -32,7 +32,9 @@ public sealed class LedgerEditDataCommands(
     ITextCatalog texts,
     PulseOffice.UI.Controls.ISidePanelHost panel,
     PulseOffice.UI.Controls.Search.IFindPanelPages pages,
-    ILedgerFindHighlights highlights) : LedgerCommandSet(context)
+    ILedgerFindHighlights highlights,
+    ILedgerFindScope findScope,
+    IWorkbookSearch? search = null) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -69,6 +71,7 @@ public sealed class LedgerEditDataCommands(
         Prototype("ledger.data.find") with
         {
             MenuPath = "edit",
+            DefaultGesture = "Ctrl+F",
             Surface = CommandSurface.Advanced,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => formatting.CanFormat,
@@ -86,7 +89,7 @@ public sealed class LedgerEditDataCommands(
         Prototype("ledger.data.findReplace") with
         {
             MenuPath = "edit",
-            DefaultGesture = "Ctrl+F",
+            DefaultGesture = "Ctrl+Shift+H",
             Surface = CommandSurface.Common,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => formatting.CanFormat,
@@ -95,7 +98,7 @@ public sealed class LedgerEditDataCommands(
     ];
 
     private LedgerFindTarget FindTarget() =>
-        new(Context, status, texts, guard, new WorkbookSearch(), workspace.Active?.IsReadOnly == true);
+        new(Context, status, texts, guard, search ?? new WorkbookSearch(), workspace.Active?.IsReadOnly == true, scopes: findScope);
 
     private Task FindDialog(CancellationToken ct) => dialogs.ShowAsync(
         new FindReplaceView(FindTarget(), texts),

@@ -125,9 +125,11 @@ public sealed class ShellInterfaceCommands(
 
         if (edits is null || edits.Count == 0) return;
 
-        shortcutCustomization.Apply(edits);
+        var refused = shortcutCustomization.Apply(edits);
 
-        status.Report(texts.Format("customize.done", edits.Count));
+        status.Report(refused.Count == 0
+            ? texts.Format("customize.done", edits.Count)
+            : texts.Format("customize.refused", edits.Count - refused.Count, refused.Count));
     }
 
     private async Task ToolbarsAsync(CancellationToken ct)

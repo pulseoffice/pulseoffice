@@ -208,6 +208,20 @@ public class ShortcutEditorLogicTests
     }
 
     [Fact]
+    public void Round337_an_edit_that_cannot_be_applied_is_reported_and_not_saved()
+    {
+        var registry = Registry(Command("ledger.bold", "Ctrl+B", ModuleKind.Sheets));
+        var store = new MemoryStore();
+
+        var refused = new ShortcutCustomization(registry, store).Apply(
+            new Dictionary<string, string?> { ["ledger.bold"] = "Ctrl+Alt+B", ["gone"] = "Ctrl+K" });
+
+        Assert.Equal(["gone"], refused);
+        Assert.Equal("Ctrl+Alt+B", store.Saved["ledger.bold"]);
+        Assert.False(store.Saved.ContainsKey("gone"));
+    }
+
+    [Fact]
     public void UnaPersonalizzazioneIllegibileOSconosciutaSiIgnora()
     {
         var registry = Registry(Command("ledger.bold", "Ctrl+B", ModuleKind.Sheets));

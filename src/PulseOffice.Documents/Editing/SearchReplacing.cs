@@ -8,8 +8,12 @@ public interface ISearchReplacing
     DocumentRange Replace(IDocumentEditor editor, TextDocument document, UndoStack history, SearchMatch match, string text, SearchFormat? format);
 }
 
-public sealed class SearchReplacing(IStoryCatalog stories) : ISearchReplacing
+public sealed class SearchReplacing(IStoryCatalog stories, ISectionEditing sections) : ISearchReplacing
 {
+    public SearchReplacing(IStoryCatalog stories) : this(stories, new SectionEditing(stories, new Blocks.BlockTree()))
+    {
+    }
+
     public DocumentRange Replace(IDocumentEditor editor, TextDocument document, UndoStack history, SearchMatch match, string text, SearchFormat? format)
     {
         ArgumentNullException.ThrowIfNull(editor);
@@ -21,6 +25,8 @@ public sealed class SearchReplacing(IStoryCatalog stories) : ISearchReplacing
             return match.Range;
         }
         var start = match.Range.Start;
+        foreach (var boundary in match.Breaks.Where(item => item.Kind == SearchBreak.Section))
+            DissolveSectionAt(document, history, boundary.ParagraphId);
         if (!match.Range.IsCollapsed) editor.Delete(document, history, match.Range);
         foreach (var gone in match.Breaks.Where(item => item.ParagraphId == start.ParagraphId))
             SetBreak(editor, document, history, gone.ParagraphId, gone.Kind, false);
@@ -28,6 +34,18 @@ public sealed class SearchReplacing(IStoryCatalog stories) : ISearchReplacing
         var inserted = new DocumentRange(start, end);
         if (format is { IsEmpty: false } && !inserted.IsCollapsed) Format(editor, document, history, inserted, format);
         return inserted;
+    }
+
+    private void DissolveSectionAt(TextDocument document, UndoStack history, string paragraphId)
+    {
+        var location = stories.Find(document, paragraphId).Location;
+        if (location.Index > 0 && location.Container[location.Index - 1] is Blocks.SectionBlock before)
+        {
+            sections.Unwrap(document, history, before.Id);
+            return;
+        }
+        if (location.Index == 0 && sections.Around(document, paragraphId) is { } around && ReferenceEquals(around.Content, location.Container))
+            sections.Unwrap(document, history, around.Id);
     }
 
     private DocumentPosition Insert(IDocumentEditor editor, TextDocument document, UndoStack history, DocumentPosition at, string text)

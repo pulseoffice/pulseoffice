@@ -2,28 +2,29 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations;
 
-public sealed class DeckTextSearch(ISlideTextSources sources)
+public sealed class DeckTextSearch(ISlideTextSources sources, ITextPatternMatcher matcher)
 {
-    public DeckTextSearch() : this(new SlideTextSources())
+    public DeckTextSearch() : this(new SlideTextSources(), new TextPatternMatcher())
     {
     }
 
-    public int Count(RichText text, string query, bool matchCase)
-    {
-        if (string.IsNullOrEmpty(query)) return 0;
-        var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+    public int Count(RichText text, string query, bool matchCase) => Count(text, new TextPattern(query, matchCase));
 
-        var total = 0;
-        foreach (var paragraph in text.Paragraphs)
-            total += CountIn(paragraph.Runs.Count > 0 ? string.Concat(paragraph.Runs.Select(run => run.Text)) : paragraph.Text, query, comparison);
-        return total;
+    public int Count(RichText text, TextPattern pattern)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (pattern.IsEmpty) return 0;
+        return text.Paragraphs.Sum(paragraph => matcher.Find(pattern, Joined(paragraph)).Count);
     }
 
-    public IReadOnlyList<DeckTextMatch> Matches(IReadOnlyList<Slide> slides, string query, bool matchCase)
+    public IReadOnlyList<DeckTextMatch> Matches(IReadOnlyList<Slide> slides, string query, bool matchCase) =>
+        Matches(slides, new TextPattern(query, matchCase));
+
+    public IReadOnlyList<DeckTextMatch> Matches(IReadOnlyList<Slide> slides, TextPattern pattern)
     {
+        ArgumentNullException.ThrowIfNull(slides);
         var found = new List<DeckTextMatch>();
-        if (string.IsNullOrEmpty(query)) return found;
-        var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        if (pattern.IsEmpty) return found;
 
         for (var slideIndex = 0; slideIndex < slides.Count; slideIndex++)
         {
@@ -31,19 +32,16 @@ public sealed class DeckTextSearch(ISlideTextSources sources)
             foreach (var element in slide.Elements.OrderBy(e => e.ZOrder))
                 foreach (var source in sources.Of(element))
                     for (var paragraph = 0; paragraph < source.Text.Paragraphs.Count; paragraph++)
-                    {
-                        var p = source.Text.Paragraphs[paragraph];
-                        var joined = p.Runs.Count > 0 ? string.Concat(p.Runs.Select(run => run.Text)) : p.Text;
-                        foreach (var offset in Positions(joined, query, comparison))
-                            found.Add(new DeckTextMatch(slideIndex, element.Id, paragraph, offset)
+                        foreach (var hit in matcher.Find(pattern, Joined(source.Text.Paragraphs[paragraph])))
+                            found.Add(new DeckTextMatch(slideIndex, element.Id, paragraph, hit.Start)
                             {
                                 Row = source.Row,
                                 Column = source.Column,
+                                Length = hit.Length,
                             });
-                    }
 
-            foreach (var offset in Positions(slide.Notes ?? string.Empty, query, comparison))
-                found.Add(new DeckTextMatch(slideIndex, null, 0, offset));
+            foreach (var hit in matcher.Find(pattern, slide.Notes ?? string.Empty))
+                found.Add(new DeckTextMatch(slideIndex, null, 0, hit.Start) { Length = hit.Length });
         }
 
         return found;
@@ -63,52 +61,50 @@ public sealed class DeckTextSearch(ISlideTextSources sources)
         return matches.FirstOrDefault(match => match.SlideIndex >= currentSlide) ?? matches[0];
     }
 
-    public bool SlideMatches(Slide slide, string query, bool matchCase) =>
-        slide.Elements.SelectMany(sources.Of).Any(source => Count(source.Text, query, matchCase) > 0)
-        || (!string.IsNullOrEmpty(query)
-            && CountIn(slide.Notes ?? string.Empty, query, matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) > 0);
+    public bool SlideMatches(Slide slide, string query, bool matchCase) => SlideMatches(slide, new TextPattern(query, matchCase));
 
-    public (RichText Text, int Count) Replace(RichText text, string query, string replacement, bool matchCase)
+    public bool SlideMatches(Slide slide, TextPattern pattern)
     {
-        if (string.IsNullOrEmpty(query)) return (text, 0);
-        var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        ArgumentNullException.ThrowIfNull(slide);
+        return slide.Elements.SelectMany(sources.Of).Any(source => Count(source.Text, pattern) > 0)
+            || matcher.Find(pattern, slide.Notes ?? string.Empty).Count > 0;
+    }
+
+    public (RichText Text, int Count) Replace(RichText text, string query, string replacement, bool matchCase) =>
+        Replace(text, new TextPattern(query, matchCase), replacement);
+
+    public (RichText Text, int Count) Replace(RichText text, TextPattern pattern, string replacement)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (pattern.IsEmpty) return (text, 0);
 
         var count = 0;
         var paragraphs = text.Paragraphs.Select(paragraph =>
         {
+            var joined = Joined(paragraph);
+            var hits = matcher.Find(pattern, joined, replacement);
+            if (hits.Count == 0) return paragraph;
+            count += hits.Count;
+
             if (paragraph.Runs.Count > 0)
             {
-                var joined = string.Concat(paragraph.Runs.Select(run => run.Text));
-                var matches = Positions(joined, query, comparison);
-                if (matches.Count == 0) return paragraph;
-                count += matches.Count;
-
                 var runs = paragraph.Runs.ToList();
-                for (var index = matches.Count - 1; index >= 0; index--)
-                    runs = Splice(runs, matches[index], query.Length, replacement);
+                for (var index = hits.Count - 1; index >= 0; index--)
+                    runs = Splice(runs, hits[index].Start, hits[index].Length, hits[index].Replacement);
                 return paragraph.WithRuns([.. runs.Where(run => run.Text.Length > 0)]);
             }
 
-            var occurrences = CountIn(paragraph.Text, query, comparison);
-            if (occurrences == 0) return paragraph;
-            count += occurrences;
-            return paragraph with { Text = paragraph.Text.Replace(query, replacement, comparison) };
+            var rebuilt = joined;
+            for (var index = hits.Count - 1; index >= 0; index--)
+                rebuilt = rebuilt[..hits[index].Start] + hits[index].Replacement + rebuilt[(hits[index].Start + hits[index].Length)..];
+            return paragraph with { Text = rebuilt };
         }).ToList();
 
         return count == 0 ? (text, 0) : (text with { Paragraphs = paragraphs }, count);
     }
 
-    private List<int> Positions(string source, string query, StringComparison comparison)
-    {
-        var found = new List<int>();
-        var index = 0;
-        while ((index = source.IndexOf(query, index, comparison)) >= 0)
-        {
-            found.Add(index);
-            index += query.Length;
-        }
-        return found;
-    }
+    private string Joined(TextParagraph paragraph) =>
+        paragraph.Runs.Count > 0 ? string.Concat(paragraph.Runs.Select(run => run.Text)) : paragraph.Text;
 
     private List<TextRun> Splice(List<TextRun> runs, int start, int length, string replacement)
     {
@@ -138,19 +134,6 @@ public sealed class DeckTextSearch(ISlideTextSources sources)
 
         return result;
     }
-
-    private int CountIn(string source, string query, StringComparison comparison)
-    {
-        if (string.IsNullOrEmpty(source)) return 0;
-        var count = 0;
-        var index = 0;
-        while ((index = source.IndexOf(query, index, comparison)) >= 0)
-        {
-            count++;
-            index += query.Length;
-        }
-        return count;
-    }
 }
 
 public sealed record DeckTextMatch(int SlideIndex, string? ElementId, int Paragraph, int Offset)
@@ -158,6 +141,8 @@ public sealed record DeckTextMatch(int SlideIndex, string? ElementId, int Paragr
     public int Row { get; init; }
 
     public int Column { get; init; } = -1;
+
+    public int Length { get; init; }
 
     public bool InNotes => ElementId is null;
 

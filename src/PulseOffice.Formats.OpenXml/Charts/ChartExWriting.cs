@@ -44,6 +44,7 @@ internal sealed class ChartExSpaceWriter
 
     private readonly XNamespace _cx = ChartExReader.Namespace;
     private readonly ChartExLayouts _layouts;
+    private readonly ChartExLayoutProperties _properties = new();
 
     public ChartExSpaceWriter(ChartExLayouts layouts) => _layouts = layouts;
 
@@ -71,7 +72,7 @@ internal sealed class ChartExSpaceWriter
             var written = new XElement(_cx + "series", new XAttribute("layoutId", layout), new XAttribute("uniqueId", Guid(index)));
             if (Name(element) is { } name) written.Add(name);
             written.Add(new XElement(_cx + "dataId", new XAttribute("val", index)));
-            if (LayoutProperties(definition.Type) is { } properties) written.Add(properties);
+            if (_properties.Write(definition.Type, definition.Statistical, categories is not null) is { } properties) written.Add(properties);
             if (definition.Type is ChartType.Histogram or ChartType.Pareto)
                 written.Add(new XElement(_cx + "axisId", new XAttribute("val", 0)), new XElement(_cx + "axisId", new XAttribute("val", 1)));
             region.Add(written);
@@ -144,17 +145,6 @@ internal sealed class ChartExSpaceWriter
         data.Add(new XElement(_cx + "v", text.Descendants<C.NumericValue>().FirstOrDefault()?.Text ?? string.Empty));
         return new XElement(_cx + "tx", data);
     }
-
-    private XElement? LayoutProperties(ChartType type) => type switch
-    {
-        ChartType.Treemap => new XElement(_cx + "layoutPr", new XElement(_cx + "parentLabelLayout", new XAttribute("val", "overlapping"))),
-        ChartType.BoxPlot => new XElement(_cx + "layoutPr",
-            new XElement(_cx + "visibility", new XAttribute("meanLine", 0), new XAttribute("meanMarker", 1), new XAttribute("nonoutliers", 0), new XAttribute("outliers", 1)),
-            new XElement(_cx + "statistics", new XAttribute("quartileMethod", "exclusive"))),
-        ChartType.Histogram => new XElement(_cx + "layoutPr", new XElement(_cx + "binning", new XAttribute("intervalClosed", "r"))),
-        ChartType.Pareto => new XElement(_cx + "layoutPr", new XElement(_cx + "aggregation")),
-        _ => null,
-    };
 
     private IEnumerable<XElement> Axes(ChartType type)
     {

@@ -79,8 +79,12 @@ public interface ISheetSearch
         Styling.StyleCatalog? styles = null);
 }
 
-public sealed class SheetSearch : ISheetSearch
+public sealed class SheetSearch(ICellSearchText cellText) : ISheetSearch
 {
+    public SheetSearch() : this(new StoredCellSearchText())
+    {
+    }
+
     private readonly TextMatchers _matchers = new();
     private readonly CommentSearch _comments = new();
 
@@ -104,7 +108,7 @@ public sealed class SheetSearch : ISheetSearch
             if (scope is { } range && !range.Contains(address)) continue;
             if (byStyle && !options.Style!.Matches(styles!.Get(sheet.StyleIdAt(address)))) continue;
 
-            var text = TextOf(cell, options);
+            var text = SearchedText(sheet, cell, options);
 
             if (text.Length == 0)
             {
@@ -168,13 +172,13 @@ public sealed class SheetSearch : ISheetSearch
 
         return cell with
         {
-            Value = double.TryParse(updated, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var number)
-                ? CellValue.Number(number)
-                : CellValue.Text(updated),
+            Value = cellText.Parse(updated),
             Formula = null,
         };
     }
+
+    private string SearchedText(Worksheet sheet, Cell cell, SearchOptions options) =>
+        options.SearchFormulas && cell.HasFormula ? cell.Formula! : cellText.Text(sheet, cell);
 
     private string TextOf(Cell cell, SearchOptions options) =>
         options.SearchFormulas && cell.HasFormula ? cell.Formula! : cell.Value.ToString();

@@ -297,6 +297,20 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
             });
     }
 
+    public void MoveSlides(IReadOnlyList<Slide> moved, Slide target)
+    {
+        ArgumentNullException.ThrowIfNull(moved);
+        if (moved.Count == 0 || moved.Contains(target) || deck.IndexOf(target) < 0) return;
+        var after = deck.IndexOf(target) > deck.IndexOf(moved[0]);
+        foreach (var slide in after ? moved.Reverse() : moved)
+        {
+            var at = deck.IndexOf(target);
+            var index = deck.IndexOf(slide);
+            if (index < 0) continue;
+            MoveSlide(slide, after ? (index < at ? at : at + 1) : (index > at ? at : at - 1));
+        }
+    }
+
     public void MoveSlideIntoSection(Slide slide, EmptySection section)
     {
         ArgumentNullException.ThrowIfNull(section);

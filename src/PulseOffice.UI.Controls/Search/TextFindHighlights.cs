@@ -1,10 +1,13 @@
 using System.Runtime.CompilerServices;
+using PulseOffice.Text.Rich;
 using PulseOffice.Text.Spelling;
 
 namespace PulseOffice.UI.Controls.Search;
 
-public sealed record TextFindQuery(string Text, bool MatchCase)
+public sealed record TextFindQuery(string Text, bool MatchCase, bool WholeWords = false, bool Regex = false)
 {
+    public TextPattern Pattern => new(Text, MatchCase, WholeWords, Regex);
+
     public bool IsEmpty => Text.Length == 0;
 }
 
@@ -21,8 +24,12 @@ public interface ITextFindHighlights
     event EventHandler? Changed;
 }
 
-public sealed class TextFindHighlights : ITextFindHighlights
+public sealed class TextFindHighlights(ITextPatternMatcher matcher) : ITextFindHighlights
 {
+    public TextFindHighlights() : this(new TextPatternMatcher())
+    {
+    }
+
     private readonly ConditionalWeakTable<object, TextFindQuery> _queries = new();
 
     public event EventHandler? Changed;
@@ -50,14 +57,6 @@ public sealed class TextFindHighlights : ITextFindHighlights
     {
         ArgumentNullException.ThrowIfNull(query);
         if (query.IsEmpty || string.IsNullOrEmpty(text)) return [];
-        var comparison = query.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-        var spans = new List<WordSpan>();
-        var index = 0;
-        while (index < text.Length && (index = text.IndexOf(query.Text, index, comparison)) >= 0)
-        {
-            spans.Add(new WordSpan(index, query.Text.Length, text.Substring(index, query.Text.Length)));
-            index += query.Text.Length;
-        }
-        return spans;
+        return [.. matcher.Find(query.Pattern, text).Select(hit => new WordSpan(hit.Start, hit.Length, text.Substring(hit.Start, hit.Length)))];
     }
 }

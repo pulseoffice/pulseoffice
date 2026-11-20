@@ -48,7 +48,7 @@ internal sealed class GridKeyboardInput(
             return true;
         }
 
-        if (objects.Count > 0 && nudges.Read(e.Key, e.KeyModifiers) is { } nudge)
+        if (objects.Count > 0 && nudges.Read(PulseOffice.Foundation.Modules.ModuleKind.Sheets, e.Key, e.KeyModifiers) is { } nudge)
         {
             Nudge(nudge);
             e.Handled = true;

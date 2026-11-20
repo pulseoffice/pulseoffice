@@ -121,6 +121,7 @@ public sealed class IconCatalog : IIconCatalog
         ["shell.edit.redo"] = new("M20 10H10a5.5 5.5 0 0 0 0 11h3 M20 10l-4.5-4.5 M20 10l-4.5 4.5"),
 
         ["deck.present"] = new("M8 5v14l11-7z"),
+        ["shell.file.newBlank"] = new("M6 3h8l4 4v14H6z M14 3v4h4 M12 11v6 M9 14h6"),
         ["shell.file.open"] = new("M3 7h6l2 2.5h10V20H3z M3 7v13"),
         ["shell.file.save"] = new("M5 4h11l4 4v12H5z M8 4v6h8V4 M8 20v-6h8v6"),
         ["shell.file.saveAs"] = new("M5 4h10l4 4v5 M8 4v6h7V4 M13 21l6.5-6.5 2.5 2.5L15.5 21z"),
