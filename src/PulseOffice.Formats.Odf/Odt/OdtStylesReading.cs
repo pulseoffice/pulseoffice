@@ -405,6 +405,8 @@ internal sealed class OdtStylesReader(
             Indent = indent,
             Hanging = hanging,
             Follow = Follow(element.Element(Style + "list-level-properties")),
+            Alignment = NumberAlignment((string?)element.Element(Style + "list-level-properties")?.Attribute(Fo + "text-align")),
+            RestartAfter = measure.Integer((string?)element.Attribute(Pt + "restart-after")) is { } after ? Math.Clamp(after, 0, PulseOffice.Documents.Styles.ListStyle.LevelCount) : null,
             CharacterStyleName = characterStyle is { Length: > 0 } character ? context.StyleNames.Resolve(character) : null,
             Picture = picture,
         };
@@ -415,6 +417,13 @@ internal sealed class OdtStylesReader(
         var gaps = element.Elements(Pt + "level-gap").Select(gap => (string?)gap.Attribute(Pt + "separator") ?? ".").ToArray();
         return gaps.Length == 0 ? [] : gaps;
     }
+
+    private static ListNumberAlignment NumberAlignment(string? value) => value switch
+    {
+        "end" or "right" => ListNumberAlignment.Right,
+        "center" => ListNumberAlignment.Center,
+        _ => ListNumberAlignment.Left,
+    };
 
     private ListLabelFollow Follow(XElement? properties) =>
         (string?)properties?.Element(Style + "list-level-label-alignment")?.Attribute(Text + "label-followed-by") switch

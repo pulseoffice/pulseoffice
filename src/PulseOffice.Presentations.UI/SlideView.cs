@@ -69,6 +69,16 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
         }
     }
 
+    public SlideElement? LiveOverlay
+    {
+        get;
+        set
+        {
+            field = value;
+            InvalidateVisual();
+        }
+    }
+
     public SlideElement? LiveText
     {
         get;
@@ -952,7 +962,8 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
                 ? context => DrawGridAndGuides(context, grid, behind: true)
                 : null,
             Quality,
-            LiveText);
+            LiveText,
+            Overlay: LiveOverlay);
     }
 
     private Rect TargetFor(Rect available)

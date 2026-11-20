@@ -324,6 +324,8 @@ public sealed class FolioIcons() : DictionaryIconCatalog(Shapes)
         ("folio.table.properties", "M3 5h18v14H3z M3 10h18 M10 5v14 M17 13a2 2 0 1 0 0 .1 M17 11v-1 M17 17v-1 M19 15h1 M14 15h1"),
         ("folio.insert.field.pageNumber", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
         ("folio.insert.field.pageCount", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
+        ("folio.insert.field.sectionNumber", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
+        ("folio.insert.field.sectionPages", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
         ("folio.insert.field.date", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
         ("folio.insert.field.time", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),
         ("folio.insert.field.title", "M6 4h9l3 3v13H6z M14 4v4h4 M9 12h6 M9 15h6 M9 18h3"),

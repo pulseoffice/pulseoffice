@@ -39,7 +39,24 @@ public enum ListFeatures
     Symbol = 1 << 4,
     Picture = 1 << 5,
     Separator = 1 << 6,
-    All = (1 << 7) - 1,
+    Follow = 1 << 7,
+    Alignment = 1 << 8,
+    Restart = 1 << 9,
+    All = (1 << 10) - 1,
+}
+
+public enum ListLabelSpacing
+{
+    Tab,
+    Space,
+    Nothing,
+}
+
+public enum ListLabelAlignment
+{
+    Left,
+    Center,
+    Right,
 }
 
 public enum ListSampleMode
@@ -67,6 +84,12 @@ public sealed record ListLevelFormat(ListNumbering Numbering)
     public double Hanging { get; init; } = 18;
 
     public ListBulletPicture? Picture { get; init; }
+
+    public ListLabelSpacing Follow { get; init; }
+
+    public ListLabelAlignment Alignment { get; init; }
+
+    public int? RestartAfter { get; init; }
 }
 
 public sealed record ListPreset(string Key, ListLevelFormat Level, string Caption);

@@ -132,9 +132,20 @@ public enum ListLabelFollow
     Nothing,
 }
 
+public enum ListNumberAlignment
+{
+    Left,
+    Center,
+    Right,
+}
+
 public sealed record ListLevel(NumberFormat Format)
 {
     public ListLabelFollow Follow { get; init; }
+
+    public ListNumberAlignment Alignment { get; init; }
+
+    public int? RestartAfter { get; init; }
 
     public string Prefix { get; init; } = string.Empty;
 

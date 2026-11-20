@@ -55,6 +55,9 @@ public sealed class ListLevelsEditor : UserControl
     private readonly TextBox _prefix = new() { Width = 72 };
     private readonly TextBox _suffix = new() { Width = 72 };
     private readonly TextBox _separator = new() { Width = 72 };
+    private readonly ComboBox _follow;
+    private readonly ComboBox _alignment;
+    private readonly ComboBox _restart;
     private readonly NumberBox _start;
     private readonly NumberBox _display;
     private readonly MeasureField _indent;
@@ -129,6 +132,13 @@ public sealed class ListLevelsEditor : UserControl
         _hanging = Measure(texts["textFormat.list.hanging"], metrics, culture);
         _hanging.ValueCommitted += (_, value) => Edit(level => level with { Hanging = value });
 
+        _follow = Choice([.. Enum.GetValues<ListLabelSpacing>().Select(value => texts[$"textFormat.list.follow.{value.ToString().ToLowerInvariant()}"])], texts["textFormat.list.follow"]);
+        _follow.SelectionChanged += (_, _) => Edit(level => level with { Follow = (ListLabelSpacing)Math.Max(0, _follow.SelectedIndex) });
+        _alignment = Choice([.. Enum.GetValues<ListLabelAlignment>().Select(value => texts[$"textFormat.list.alignment.{value.ToString().ToLowerInvariant()}"])], texts["textFormat.list.alignment"]);
+        _alignment.SelectionChanged += (_, _) => Edit(level => level with { Alignment = (ListLabelAlignment)Math.Max(0, _alignment.SelectedIndex) });
+        _restart = Choice([texts["textFormat.list.restart.always"], texts["textFormat.list.restart.never"]], texts["textFormat.list.restart"]);
+        _restart.SelectionChanged += (_, _) => Edit(level => level with { RestartAfter = RestartOf(_restart.SelectedIndex) });
+
         var details = new DialogSection(texts["textFormat.list.section.level"], metrics);
         details.Add(texts["textFormat.list.numbering"], _numbering, editorWidth: 180);
         _bulletRow = details.Add(texts["textFormat.list.bullet"], BulletEditor(texts, metrics), editorWidth: 180);
@@ -145,6 +155,9 @@ public sealed class ListLevelsEditor : UserControl
             AutomationProperties.SetName(_separator, texts["textFormat.list.separator"]);
             _numberRows.Add(details.Add(texts["textFormat.list.separator"], _separator, editorWidth: 120));
         }
+        if (request.Offers(ListFeatures.Alignment)) _numberRows.Add(details.Add(texts["textFormat.list.alignment"], _alignment, editorWidth: 160));
+        if (request.Offers(ListFeatures.Restart)) _numberRows.Add(details.Add(texts["textFormat.list.restart"], _restart, editorWidth: 180));
+        if (request.Offers(ListFeatures.Follow)) details.Add(texts["textFormat.list.follow"], _follow, editorWidth: 160);
         if (request.Offers(ListFeatures.Indents))
         {
             details.Add(texts["textFormat.list.indent"], _indent, editorWidth: 160);
@@ -250,6 +263,36 @@ public sealed class ListLevelsEditor : UserControl
         }
     }
 
+    private static ComboBox Choice(IReadOnlyList<string> items, string name)
+    {
+        var box = new ComboBox { ItemsSource = items, HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = 0 };
+        AutomationProperties.SetName(box, name);
+        return box;
+    }
+
+    private static int? RestartOf(int index) => index switch
+    {
+        <= 0 => null,
+        1 => 0,
+        _ => index - 1,
+    };
+
+    private static int RestartIndex(int? restartAfter) => restartAfter switch
+    {
+        null => 0,
+        0 => 1,
+        { } after => after + 1,
+    };
+
+    private void FillRestart()
+    {
+        var texts = _services.Texts;
+        var items = new List<string> { texts["textFormat.list.restart.always"], texts["textFormat.list.restart.never"] };
+        for (var higher = 1; higher <= _level; higher++) items.Add(texts.Format("textFormat.list.restart.after", higher));
+        _restart.ItemsSource = items;
+        _restart.SelectedIndex = Math.Min(items.Count - 1, RestartIndex(_levels[_level].RestartAfter));
+    }
+
     private MeasureField Measure(string label, DesignTokens.Metrics metrics, CultureInfo culture) =>
         new(new MeasureEntry(new MeasureOptions("pt", 0, 500, 1) { LargeStep = 18 }, _services.Units, culture), 0, _services.Texts, metrics, _services.Icons, label, boxWidth: 64)
         {
@@ -280,6 +323,9 @@ public sealed class ListLevelsEditor : UserControl
         _display.Value = level.DisplayLevels;
         _indent.Value = level.Indent;
         _hanging.Value = level.Hanging;
+        _follow.SelectedIndex = (int)level.Follow;
+        _alignment.SelectedIndex = (int)level.Alignment;
+        FillRestart();
         _loading = false;
         Refresh();
     }

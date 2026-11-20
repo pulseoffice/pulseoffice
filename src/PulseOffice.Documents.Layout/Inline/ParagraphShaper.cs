@@ -12,6 +12,8 @@ public sealed record ListLabelPlacement(string Text, double Position)
     public bool FollowedByTab { get; init; } = true;
 
     public PulseOffice.Text.Rich.ListBulletPicture? Picture { get; init; }
+
+    public PulseOffice.Documents.Styles.ListNumberAlignment Alignment { get; init; }
 }
 
 public interface IParagraphShaper
@@ -145,6 +147,17 @@ public sealed class ParagraphShaper(ITextMeasurer measurer, IRunFonts fonts, IHy
     }
 
     private ShapedLabel Label(ListLabelPlacement placement, FontKey font)
+    {
+        var shaped = Unaligned(placement, font);
+        return placement.Alignment switch
+        {
+            PulseOffice.Documents.Styles.ListNumberAlignment.Right => shaped with { Position = shaped.Position - shaped.Width },
+            PulseOffice.Documents.Styles.ListNumberAlignment.Center => shaped with { Position = shaped.Position - shaped.Width / 2 },
+            _ => shaped,
+        };
+    }
+
+    private ShapedLabel Unaligned(ListLabelPlacement placement, FontKey font)
     {
         if (placement.Picture is { } picture)
         {

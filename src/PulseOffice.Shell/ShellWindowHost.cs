@@ -102,10 +102,18 @@ public sealed class ShellWindowHost : IShellWindowHost
     private readonly IWorkspaceSet _workspaces;
     private readonly IShellWindowFactory _factory;
     private readonly IQuitTarget _quit;
+    private readonly IShellWindowFocus? _focus;
     private readonly List<IShellWindowHandle> _windows = [];
 
     public ShellWindowHost(IShellWindowHandle primary, IWorkspaceSet workspaces, IShellWindowFactory factory, IQuitTarget quit)
+        : this(primary, workspaces, factory, quit, null)
     {
+    }
+
+    public ShellWindowHost(
+        IShellWindowHandle primary, IWorkspaceSet workspaces, IShellWindowFactory factory, IQuitTarget quit, IShellWindowFocus? focus)
+    {
+        _focus = focus;
         ArgumentNullException.ThrowIfNull(primary);
         _workspaces = workspaces ?? throw new ArgumentNullException(nameof(workspaces));
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -148,7 +156,7 @@ public sealed class ShellWindowHost : IShellWindowHost
         target.Workspace.Open(document);
         target.Show(position);
         target.Activate();
-        Focused = target;
+        SetFocused(target);
         return target;
     }
 
@@ -169,7 +177,7 @@ public sealed class ShellWindowHost : IShellWindowHost
         target.Workspace.Open(document);
         if (index >= 0) target.Workspace.Move(document, index);
         target.Activate();
-        Focused = target;
+        SetFocused(target);
         if (source.Workspace.Documents.Count == 0 && !ReferenceEquals(source, Primary)) source.Close();
         return true;
     }
@@ -177,29 +185,50 @@ public sealed class ShellWindowHost : IShellWindowHost
     public bool DropAt(OpenDocument document, PixelPoint screenPoint)
     {
         ArgumentNullException.ThrowIfNull(document);
-        if (WindowAt(screenPoint) is { } target) return MoveTo(document, target, target.TabIndexAt(screenPoint));
+        var source = WindowOf(document);
+        var target = _windows.FirstOrDefault(window => !ReferenceEquals(window, source) && window.Contains(screenPoint));
+        if (target is not null) return MoveTo(document, target, target.TabIndexAt(screenPoint));
         return TearOff(document, screenPoint) is not null;
+    }
+
+    private void SetFocused(IShellWindowHandle window)
+    {
+        Focused = window;
+        if (window is IShellWindowScopeOwner owner) _focus?.Focus(owner.Scope);
     }
 
     private void Track(IShellWindowHandle window)
     {
         _windows.Add(window);
         _workspaces.Add(window.Workspace);
-        window.Activated += (_, _) => Focused = window;
+        if (window is IShellWindowScopeOwner owner) _focus?.Enter(owner.Scope);
+        window.Activated += (_, _) =>
+        {
+            if (_windows.Contains(window)) SetFocused(window);
+        };
         window.Closed += (_, _) => Forget(window);
+        window.Workspace.DocumentClosed += (_, _) => CloseWhenEmptied(window);
+    }
+
+    private void CloseWhenEmptied(IShellWindowHandle window)
+    {
+        if (window.Workspace.Documents.Count > 0 || ReferenceEquals(window, Primary) || !_windows.Contains(window)) return;
+        window.Close();
     }
 
     private void Forget(IShellWindowHandle window)
     {
         if (!_windows.Remove(window)) return;
-        _workspaces.Remove(window.Workspace);
         if (_windows.Count == 0)
         {
             _quit.Quit();
             return;
         }
 
+        foreach (var document in window.Workspace.Documents.ToList()) window.Workspace.Close(document);
+        _workspaces.Remove(window.Workspace);
+        if (window is IShellWindowScopeOwner owner) _focus?.Leave(owner.Scope);
         if (ReferenceEquals(Primary, window)) Primary = _windows[0];
-        if (ReferenceEquals(Focused, window)) Focused = Primary;
+        if (ReferenceEquals(Focused, window)) SetFocused(Primary);
     }
 }

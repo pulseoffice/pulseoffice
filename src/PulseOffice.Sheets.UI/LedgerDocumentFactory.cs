@@ -53,7 +53,8 @@ public sealed class LedgerDocumentFactory(
     IInterfaceCulture culture,
     PulseOffice.Sheets.Engine.Operations.IRangeFilterEvaluator rangeFilters,
     ICellLinkClicking cellLinks,
-    PulseOffice.UI.Controls.Links.ILinkTips linkTips) : ILedgerDocumentFactory, IDocumentViewSource
+    PulseOffice.UI.Controls.Links.ILinkTips linkTips,
+    IValidationAlertPrompt validationAlerts) : ILedgerDocumentFactory, IDocumentViewSource
 {
     public ModuleKind Module => ModuleKind.Sheets;
 
@@ -129,6 +130,7 @@ public sealed class LedgerDocumentFactory(
             Inputs = inputs,
             Links = links,
             CellLinks = cellLinks,
+            ValidationAlerts = validationAlerts,
         };
 
         view.ObjectEditRequested += (_, _) =>

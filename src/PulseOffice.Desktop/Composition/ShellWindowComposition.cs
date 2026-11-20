@@ -77,8 +77,27 @@ internal static class ShellWindowComposition
                 [PulseOffice.Foundation.Modules.ModuleKind.Presentations] = "deck.zoom.set",
             }));
         services.AddSingleton<PulseOffice.UI.Controls.Navigation.IWindowRegionCycle, PulseOffice.UI.Controls.Navigation.WindowRegionCycle>();
-        services.AddSingleton<ShellWindow>();
-        services.AddSingleton<Func<IShellPresenter>>(provider => provider.GetRequiredService<ShellWindow>);
+        services.AddSingleton(provider => new ShellWindowScope(
+            provider.GetRequiredService<DocumentWorkspace>(),
+            provider.GetRequiredService<DialogHost>(),
+            provider.GetRequiredService<DialogHost>()));
+        services.AddSingleton<IShellWindowFocus>(provider => new ShellWindowFocus(provider.GetRequiredService<ShellWindowScope>()));
+        services.AddSingleton<IWorkspaceSet>(provider => new WorkspaceSet(provider.GetRequiredService<DocumentWorkspace>()));
+        services.AddSingleton<ApplicationQuitTarget>();
+        services.AddSingleton<ShellWindowCloseGate>();
+        services.AddSingleton<IShellWindowWiring, ShellWindowWiring>();
+        services.AddSingleton<IShellWindowFactory, ShellWindowFactory>();
+        services.AddSingleton(provider => ActivatorUtilities.CreateInstance<ShellWindow>(
+            provider, provider.GetRequiredService<DocumentWorkspace>()));
+        services.AddSingleton<IShellWindowHost>(provider => new ShellWindowHost(
+            provider.GetRequiredService<ShellWindow>(),
+            provider.GetRequiredService<IWorkspaceSet>(),
+            provider.GetRequiredService<IShellWindowFactory>(),
+            provider.GetRequiredService<ApplicationQuitTarget>(),
+            provider.GetRequiredService<IShellWindowFocus>()));
+        services.AddSingleton<Func<IShellWindowHost>>(provider => provider.GetRequiredService<IShellWindowHost>);
+        services.AddSingleton<Func<IShellPresenter>>(provider =>
+            () => provider.GetRequiredService<IShellWindowHost>().Focused as IShellPresenter ?? provider.GetRequiredService<ShellWindow>());
         services.AddSingleton<Func<PulseOffice.Shell.CommandExecutor>>(
             provider => provider.GetRequiredService<PulseOffice.Shell.CommandExecutor>);
         services.AddSingleton<IShortcutDispatcher, ShortcutDispatcher>();

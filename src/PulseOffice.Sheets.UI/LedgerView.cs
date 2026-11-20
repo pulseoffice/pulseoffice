@@ -121,6 +121,12 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         init => _writer.EditTexts = value;
     }
 
+    public IValidationAlertPrompt? ValidationAlerts
+    {
+        get => _writer.Alerts;
+        set => _writer.Alerts = value;
+    }
+
     public Engine.Operations.ICellInputRecognizer Inputs
     {
         get => _writer.Inputs;
@@ -213,6 +219,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
             _writer, _editing, _objects, shapeParagraphs ?? new Drawing.Shapes.ShapeTextParagraphs());
 
         _writer.SelectionStale += (_, _) => OnSelectionChanged();
+        _writer.RetryRequested += (_, retry) => RetryEntry(retry);
         _editing.SelectionStale += (_, _) => OnSelectionChanged();
         _editing.SheetRequested += (_, index) => SelectSheet(index);
         _operations.SelectionStale += (_, _) => OnSelectionChanged();
@@ -247,8 +254,10 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         _overlay.Children.Add(_editing.CellEditor);
         _overlay.Children.Add(_editing.AnnotatedRange);
         _overlay.Children.Add(_shapeText.Editor);
+        _overlay.Children.Add(_editing.InputNote.Box);
 
         _grid.ZoomChanged += (_, zoom) => ShowZoom(zoom);
+        _grid.ViewportMoved += (_, _) => _editing.AnnounceInputMessage();
         ShowZoom(_grid.Zoom);
 
         Content = new LedgerViewLayout(_metrics).Build(_editing.NameBox, _editing.FormulaBox, _sheetTabs, _grid, _overlay);
@@ -585,6 +594,14 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         PublishSelectionContext();
         _referencePick?.SelectionChanged();
         if (pointing) _editing.TryPoint(_selection.Range);
+    }
+
+    private void RetryEntry(LedgerViewParts.SheetCellRetry retry)
+    {
+        if (retry.Target.SheetIndex >= _workbook.Sheets.Count) return;
+        if (_grid.SheetIndex != retry.Target.SheetIndex) SelectSheet(retry.Target.SheetIndex);
+        _selection.MoveTo(retry.Target.Address);
+        _editing.BeginEdit(retry.Text);
     }
 
     private void OnSelectionChanged()

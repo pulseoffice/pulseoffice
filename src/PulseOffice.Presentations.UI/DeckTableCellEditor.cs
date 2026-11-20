@@ -1,23 +1,43 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Layout;
+using Avalonia.Interactivity;
 using PulseOffice.Document.Embedding;
 using PulseOffice.Document.Tables;
-using PulseOffice.UI.Controls.Theming;
-using PulseOffice.UI.Theming;
+using PulseOffice.Drawing.Shapes;
+using PulseOffice.Foundation.Units;
+using PulseOffice.Text.Rich;
+using PulseOffice.UI.Controls.Shapes;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys keys)
+internal interface IDeckCellTextTarget
 {
+    bool Owns(string id);
+
+    void Refresh();
+
+    void Finish(ShapeTextEdited edited);
+
+    bool Format(Func<RichText, (int Start, int End)?, RichText> transform);
+}
+
+internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys keys, DeckShapeTextEditing shapes, IDeckTableCellShapes cells, IShapeRichText richText) : IDeckCellTextTarget
+{
+    private const string CellSuffix = "#cell";
+
     private readonly TableGeometry _geometry = new();
-    private TextBox? _box;
-    private (Slide Slide, string ElementId, TableCellRange Cell)? _session;
+    private CellSession? _session;
+    private bool _cancelled;
 
-    public bool IsEditing => _box is not null;
+    private sealed record CellSession(Slide Slide, string ElementId, string ShapeId, TableCellRange Cell, TableCellText Original, TableCellShapeLook Look);
 
-    public TextBox? Box => _box;
+    public bool IsEditing => _session is not null && shapes.Editor.IsEditing;
+
+    public void Attach()
+    {
+        shapes.Route(this);
+        shapes.Editor.AddHandler(InputElement.KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
+    }
 
     public bool Begin(Slide slide, ObjectElement element, TableCellRange cell, string? typed)
     {
@@ -26,62 +46,97 @@ internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys ke
         var single = new TableCellRange(cell.Top, cell.Left, cell.Top, cell.Left);
         if (keys.Text(table, single) is not { } current) return false;
 
-        var bounds = state.Canvas.BoundsOf(element);
-        var area = _geometry.Area(table, single);
-        var scale = state.Canvas.Scale * PulseOffice.Foundation.Units.Twip.PerPoint;
-        var look = new TableCellIndex(table).Format(single.Top, single.Left)?.Look;
-        var box = new TextBox
-        {
-            Text = typed ?? current,
-            AcceptsReturn = true,
-            AcceptsTab = false,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            FontSize = Math.Max(6, (look?.FontSize ?? table.Style.FontSize) * scale),
-            Width = Math.Max(8, area.Width * bounds.Width),
-            MinHeight = Math.Max(8, area.Height * scale),
-            Padding = new Thickness(4, 2),
-            VerticalContentAlignment = VerticalAlignment.Center,
-            ContextFlyout = null,
-        }.Themed(TextBox.BackgroundProperty, Palette.Keys.Surface);
-        if (look?.FontFamily is { Length: > 0 } family) box.FontFamily = Avalonia.Media.FontFamily.Parse(family);
-        if (look?.Bold == true) box.FontWeight = Avalonia.Media.FontWeight.Bold;
-        if (look?.Italic == true) box.FontStyle = Avalonia.Media.FontStyle.Italic;
+        var format = new TableCellIndex(table).Format(single.Top, single.Left);
+        var plainLook = single.Top == TableCellFormat.HeaderRow && !table.Style.OwnLook ? TableCellLook.Plain with { Bold = true } : TableCellLook.Plain;
+        var look = new TableCellShapeLook(format?.Look ?? plainLook, format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.FontSize, format?.Margins);
+        var own = table.CellTexts.FirstOrDefault(text => text.Row == single.Top && text.Column == single.Left);
+        var original = cells.CellText(single.Top, single.Left, current, own);
+        var start = typed is null ? original : cells.CellText(single.Top, single.Left, string.Empty, null);
+        var shapeId = element.Id + CellSuffix;
 
-        state.Overlay.Margin = new Thickness(state.Canvas.Target.X, state.Canvas.Target.Y, 0, 0);
-        Canvas.SetLeft(box, bounds.X + area.X * bounds.Width - state.Canvas.Target.X);
-        Canvas.SetTop(box, bounds.Y + area.Y * scale - state.Canvas.Target.Y);
-        state.Overlay.Children.Add(box);
-        _box = box;
-        _session = (slide, element.Id, single);
-
-        box.AddHandler(InputElement.KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        box.LostFocus += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            if (ReferenceEquals(_box, box) && !box.IsFocused) Commit();
-        }, Avalonia.Threading.DispatcherPriority.Input);
-        box.Focus();
-        box.CaretIndex = box.Text?.Length ?? 0;
+        _session = new CellSession(slide, element.Id, shapeId, single, original, look);
+        shapes.BeginCell(new ShapeTextEditStart(shapeId, cells.Shape(shapeId, start, look), Placement(element, table, single), shapes.Surroundings()) { Typed = typed });
         return true;
     }
 
     public void Commit()
     {
-        if (Close() is not { } finished) return;
-        var (slide, elementId, cell, text) = finished;
-        state.Actions.EditTable(slide, elementId, current => keys.Write(current, cell, text));
-        Reselect(slide, elementId);
+        if (_session is not null && shapes.Editor.IsEditing) shapes.Editor.Commit();
     }
 
-    public void Cancel() => Close();
-
-    private (Slide Slide, string ElementId, TableCellRange Cell, string Text)? Close()
+    public void Cancel()
     {
-        if (_box is not { } box || _session is not { } session) return null;
-        _box = null;
+        _cancelled = true;
+        try
+        {
+            Commit();
+        }
+        finally
+        {
+            _cancelled = false;
+        }
+    }
+
+    public bool Owns(string id) => _session is { } session && session.ShapeId == id;
+
+    public void Refresh()
+    {
+        if (_session is not { } session || shapes.Editor.Live is not { } live) return;
+        if (session.Slide.Find(session.ElementId) is not ObjectElement { Content: DataTableObject table } element) return;
+        state.Canvas.LiveText = element with { Content = keys.WriteRich(table, session.Cell, string.Empty, null) };
+        state.Canvas.LiveOverlay = new ObjectElement { Id = session.ShapeId, Bounds = CellBounds(element, table, session.Cell), Content = live };
+        shapes.Editor.Place(Placement(element, table, session.Cell));
+    }
+
+    public void Finish(ShapeTextEdited edited)
+    {
+        ArgumentNullException.ThrowIfNull(edited);
+        state.Canvas.LiveText = null;
+        state.Canvas.LiveOverlay = null;
+        if (_session is not { } session) return;
         _session = null;
-        state.Overlay.Children.Remove(box);
-        state.Canvas.Focus();
-        return (session.Slide, session.ElementId, session.Cell, box.Text ?? string.Empty);
+        if (!_cancelled && edited.Changed)
+        {
+            var text = cells.Cell(edited.Edited, session.Original, session.Look);
+            state.Actions.EditTable(session.Slide, session.ElementId, current => keys.WriteRich(current, session.Cell, text.PlainText, text));
+        }
+        Reselect(session.Slide, session.ElementId);
+    }
+
+    public bool Format(Func<RichText, (int Start, int End)?, RichText> transform)
+    {
+        ArgumentNullException.ThrowIfNull(transform);
+        var editor = shapes.Editor;
+        if (_session is null || !editor.IsEditing || editor.Live is not { } live) return false;
+        if (editor.FormatRange() is not { } range)
+        {
+            editor.Pend((pending, from, to) => richText.FromRich(pending, transform(richText.ToRich(pending), (from, to))));
+            return true;
+        }
+        editor.Reformat(richText.FromRich(live, transform(richText.ToRich(live), range)), shapes.Surroundings());
+        return true;
+    }
+
+    private ShapeTextPlacement Placement(ObjectElement element, DataTableObject table, TableCellRange cell)
+    {
+        var bounds = state.Canvas.BoundsOf(element);
+        var area = _geometry.Area(table, cell);
+        var scale = state.Canvas.Scale * Twip.PerPoint;
+        return new ShapeTextPlacement(
+            new Rect(bounds.X + area.X * bounds.Width - state.Canvas.Target.X, bounds.Y + area.Y * scale - state.Canvas.Target.Y,
+                Math.Max(8, area.Width * bounds.Width), Math.Max(8, area.Height * scale)),
+            scale, element.RotationDegrees);
+    }
+
+    private DocumentRect CellBounds(ObjectElement element, DataTableObject table, TableCellRange cell)
+    {
+        var area = _geometry.Area(table, cell);
+        var box = element.Bounds;
+        return new DocumentRect(
+            new Twip((int)Math.Round(box.Left.Value + area.X * box.Width.Value)),
+            new Twip((int)Math.Round(box.Top.Value + area.Y * Twip.PerPoint)),
+            new Twip((int)Math.Round(area.Width * box.Width.Value)),
+            new Twip((int)Math.Round(area.Height * Twip.PerPoint)));
     }
 
     private void Reselect(Slide slide, string elementId)
@@ -93,15 +148,17 @@ internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys ke
 
     private void OnKey(object? sender, KeyEventArgs e)
     {
-        if (_session is not { } session) return;
+        if (_session is not { } session || !shapes.Editor.IsEditing) return;
         if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
         {
             Cancel();
+            state.Canvas.Focus();
             e.Handled = true;
             return;
         }
         if (e.Key != Key.Tab || e.KeyModifiers is not (KeyModifiers.None or KeyModifiers.Shift)) return;
         Commit();
+        state.Canvas.Focus();
         e.Handled = true;
         if (session.Slide.Find(session.ElementId) is not ObjectElement { Content: DataTableObject table }) return;
         if (keys.Read(table, session.Cell, e.Key, e.KeyModifiers) is not { } outcome) return;

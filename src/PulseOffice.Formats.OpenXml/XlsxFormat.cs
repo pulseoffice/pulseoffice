@@ -337,9 +337,9 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
             losses.Add(Diagnostic.Info("XLSX244", $"{sortedChoices} validation lists show their entries sorted: XLSX has no sort setting, so typed entries are written already sorted and entries taken from cells appear in cell order in Excel. ODS keeps the setting.").With(sortedChoices));
 
         var longChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
-            validation => validation.ListValues.Count > 0 && validation.ListValues.Sum(value => value.Length + 1) - 1 > 255));
+            validation => validation.Kind == ValidationKind.List && validation.ListValues.Count > 0 && validation.ListValues.Sum(value => value.Length + 1 + value.Count(character => character == '"')) - 1 > 255));
         if (longChoices > 0)
-            losses.Add(Diagnostic.Warning("XLSX103", $"{longChoices} validation lists have entries longer than 255 characters in all: Excel refuses longer lists typed in the rule and drops the validation on open; put the entries in cells and refer to them.").With(longChoices));
+            losses.Add(Diagnostic.Warning("XLSX103", $"{longChoices} validation lists have entries longer than 255 characters in all: Excel refuses longer typed lists, so these rules are kept only in a PulseOffice extension that Excel and other applications ignore; put the entries in cells and refer to them.").With(longChoices));
 
         var comments = workbook.Sheets.Sum(sheet => sheet.Comments.Count);
         if (comments > 0)

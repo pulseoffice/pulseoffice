@@ -14352,3 +14352,29 @@ not done and stays queued. Log: docs/deep-audit/round-307-shell-tear-off.md.
   counted error values); paste and fill carry validation with reanchored formulas and cut the rules they cover; XLSX
   multi-area `sqref` reanchors formulas per area; input messages shown on selection. Log:
   docs/deep-audit/round-309-ledger-validation.md.
+
+### Round 310 (2026-11-20): real windows for torn-off tabs
+- A tab dragged off the strip now opens a real second `ShellWindow` built by `ShellWindowFactory` with its own
+  workspace, dialog host, side panel, ribbon, menus and status bar; tabs move between windows by drag. The shared
+  `IDocumentWorkspace` and `IDialogService` route to the focused window (`FocusedDocumentWorkspace`, `FocusedDialogs`,
+  `ShellWindowFocus`) while quit, recovery, autosave and the agent see every window's documents. Closing a window asks
+  only about its own documents; Quit closes the application from any window. Log:
+  docs/deep-audit/round-310-shell-windows.md.
+
+### Round 311: Deck table cell rich editing (2026-11-20)
+- Table cell paragraphs carry their own alignment (`TableCellParagraph.Alignment`), mapped per paragraph to PPTX
+  `a:pPr/@algn` and ODP paragraph styles and drawn per paragraph. Deck table cells are now edited with the shared
+  shape text editor (rich runs, composed frame, caret, selection, character formatting commands) through a transient
+  shape adapter (`DeckTableCellShapes`) and a slide overlay. Log: docs/deep-audit/round-311-deck-table-cell-rich-editing.md.
+
+### Round 312 — Ledger data validation alerts and leftovers (2026-11-20)
+- Invalid entries now ask in a modal titled with the rule's error title (stop Retry/Cancel, warning Yes/No/Cancel,
+  information OK/Cancel); Retry and No reopen the editor with the typed text. Input messages show in a note box beside
+  the cell. XLSX typed lists over 255 characters go to a PulseOffice worksheet extension instead of a `formula1` Excel
+  refuses. Transposed paste of validation turns relative references. Log:
+  docs/deep-audit/round-312-ledger-validation-alerts.md.
+
+### Round 313 (2026-11-20): Folio list leftovers, section fields, columns
+- List levels carry number alignment and restart level across DOCX and ODT; undefined Word levels show no number;
+  the shared level editor edits label follow, alignment and restart; SECTION and SECTIONPAGES insert commands; Word
+  next-column section breaks no longer start a page. Log: docs/deep-audit/round-313-folio-lists-columns.md.

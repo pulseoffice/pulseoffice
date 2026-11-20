@@ -96,7 +96,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
                 if (all[index].Levels[level] is { Format: NumberFormat.Bullet, Picture: { } picture })
                     element.InsertAfter(new W.LevelPictureBulletId { Val = pictures.Add(numbering, part, picture) }, element.GetFirstChild<W.LevelText>());
                 if (ReferenceEquals(all[index], outline) && outlineStyle(level + 1) is { } styleId)
-                    element.InsertAfter(new W.ParagraphStyleIdInLevel { Val = styleId }, element.GetFirstChild<W.NumberingFormat>());
+                    element.InsertAfter(new W.ParagraphStyleIdInLevel { Val = styleId }, (DocumentFormat.OpenXml.OpenXmlElement?)element.GetFirstChild<W.LevelRestart>() ?? element.GetFirstChild<W.NumberingFormat>());
                 abstractNum.Append(element);
             }
             numbering.Append(abstractNum);
@@ -144,7 +144,7 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             var name = definition.GetFirstChild<W.AbstractNumDefinitionName>()?.Val?.Value is { Length: > 0 } stored && map.IdOf(stored) is null
                 ? stored
                 : "WWNum" + values.Text(id);
-            var levels = Enumerable.Range(0, ListStyle.LevelCount).Select(level => new ListLevel(NumberFormat.Arabic)).ToArray();
+            var levels = Enumerable.Range(0, ListStyle.LevelCount).Select(level => Undefined).ToArray();
             foreach (var level in definition.Elements<W.Level>())
             {
                 var index = level.LevelIndex?.Value ?? -1;
@@ -166,6 +166,22 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         }
     }
 
+    private static readonly ListLevel Undefined = new(NumberFormat.None) { Prefix = string.Empty, Suffix = string.Empty, Hanging = 0 };
+
+    private static W.LevelJustificationValues Justification(ListNumberAlignment alignment) => alignment switch
+    {
+        ListNumberAlignment.Right => W.LevelJustificationValues.Right,
+        ListNumberAlignment.Center => W.LevelJustificationValues.Center,
+        _ => W.LevelJustificationValues.Left,
+    };
+
+    private static ListNumberAlignment Alignment(W.LevelJustification? justification)
+    {
+        if (justification?.Val?.Value is not { } value) return ListNumberAlignment.Left;
+        if (value == W.LevelJustificationValues.Right || justification.Val.InnerText == "end") return ListNumberAlignment.Right;
+        return value == W.LevelJustificationValues.Center ? ListNumberAlignment.Center : ListNumberAlignment.Left;
+    }
+
     private W.Level Level(ListLevel level, int index)
     {
         var text = level.Format == NumberFormat.Bullet
@@ -175,14 +191,16 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             new W.StartNumberingValue { Val = level.StartAt },
             Numbering(level.Format),
             new W.LevelText { Val = text },
-            new W.LevelJustification { Val = W.LevelJustificationValues.Left },
+            new W.LevelJustification { Val = Justification(level.Alignment) },
             new W.PreviousParagraphProperties(new W.Indentation
             {
                 Left = values.Twips(level.Indent + level.Hanging),
                 Hanging = values.Twips(level.Hanging),
             }))
         { LevelIndex = index };
-        if (level.Legal && level.Format != NumberFormat.Bullet) element.InsertAfter(new W.IsLegalNumberingStyle(), element.GetFirstChild<W.NumberingFormat>());
+        if (level.RestartAfter is { } after && index > 0)
+            element.InsertAfter(new W.LevelRestart { Val = Math.Clamp(after, 0, index) }, element.GetFirstChild<W.NumberingFormat>());
+        if (level.Legal && level.Format != NumberFormat.Bullet) element.InsertBefore(new W.IsLegalNumberingStyle(), element.GetFirstChild<W.LevelText>());
         if (level.Follow != ListLabelFollow.Tab)
             element.InsertBefore(new W.LevelSuffix { Val = level.Follow == ListLabelFollow.Space ? W.LevelSuffixValues.Space : W.LevelSuffixValues.Nothing }, element.GetFirstChild<W.LevelText>());
         return element;
@@ -255,8 +273,10 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
         var follow = level.LevelSuffix?.Val?.Value is { } suffix
             ? suffix == W.LevelSuffixValues.Space ? ListLabelFollow.Space : suffix == W.LevelSuffixValues.Nothing ? ListLabelFollow.Nothing : ListLabelFollow.Tab
             : ListLabelFollow.Tab;
+        var alignment = Alignment(level.LevelJustification);
+        int? restartAfter = level.LevelRestart?.Val?.Value is { } restart ? values.Bounded(restart, 0, WordLevels) : null;
         if (kind == NumberFormat.Bullet)
-            return new ListLevel(kind) { Bullet = text.Length > 0 ? text : "•", Prefix = string.Empty, Suffix = string.Empty, StartAt = start, Indent = left - hanging, Hanging = hanging, Follow = follow };
+            return new ListLevel(kind) { Bullet = text.Length > 0 ? text : "•", Prefix = string.Empty, Suffix = string.Empty, StartAt = start, Indent = left - hanging, Hanging = hanging, Follow = follow, Alignment = alignment, RestartAfter = restartAfter };
         var first = text.IndexOf('%');
         var last = text.LastIndexOf('%');
         var placeholders = text.Count(character => character == '%');
@@ -273,6 +293,8 @@ public sealed class DocxNumberingCodec(DocxValues values, DocxPictureBullets pic
             Indent = left - hanging,
             Hanging = hanging,
             Follow = follow,
+            Alignment = alignment,
+            RestartAfter = restartAfter,
         };
     }
 }

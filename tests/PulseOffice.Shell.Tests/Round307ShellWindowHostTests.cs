@@ -106,6 +106,34 @@ public sealed class Round307ShellWindowHostTests
     }
 
     [Fact]
+    public void Dropping_inside_the_source_window_off_the_strip_still_tears_off()
+    {
+        var first = Tab("a");
+        var second = Tab("b");
+        _primary.Workspace.Open(first);
+        _primary.Workspace.Open(second);
+
+        Assert.True(_host.DropAt(second, new PixelPoint(10, 10)));
+
+        Assert.Equal(2, _host.Windows.Count);
+        Assert.Equal(new[] { first }, _primary.Workspace.Documents);
+    }
+
+    [Fact]
+    public void Closing_the_last_document_of_a_torn_off_window_closes_that_window()
+    {
+        _primary.Workspace.Open(Tab("a"));
+        _primary.Workspace.Open(Tab("b"));
+        var window = _host.TearOff(_primary.Workspace.Documents[1], new PixelPoint(900, 900))!;
+
+        window.Workspace.Close(window.Workspace.Documents[0]);
+
+        Assert.Single(_host.Windows);
+        Assert.Same(_primary, _host.Focused);
+        Assert.Equal(0, _quit.Count);
+    }
+
+    [Fact]
     public void Closing_the_last_window_quits_and_the_primary_role_passes_on()
     {
         _primary.Workspace.Open(Tab("a"));

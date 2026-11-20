@@ -37,7 +37,7 @@ public sealed record SlideLayer(Rect Bounds, Action<DrawingContext> Paint)
 public readonly record struct SlidePalette(
     Color Placeholder, Color Border, Func<string, IReadOnlyList<PulseOffice.Text.Spelling.WordSpan>>? Proofing = null,
     Action<DrawingContext>? Underlay = null, SlideOutputQuality Quality = SlideOutputQuality.Color, SlideElement? Live = null,
-    PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted = null);
+    PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted = null, SlideElement? Overlay = null);
 
 public enum SlideOutputQuality { Color, Grayscale, BlackAndWhite }
 
@@ -121,6 +121,10 @@ public sealed class SlideRenderer : ISlideRenderer
             layers.Add(new SlideLayer(Bounds(element, target, scale),
                 context => PaintElement(context, element, target, scale, theme, palette, fields, visual, backdrop)) { Element = visual.IsIdentity ? element : null });
         }
+
+        if (palette.Overlay is { } overlay)
+            layers.Add(new SlideLayer(Bounds(overlay, target, scale),
+                context => PaintElement(context, overlay, target, scale, theme, palette, fields, ElementVisual.Shown, backdrop)));
 
         if (!chrome.IsEmpty) layers.Add(new SlideLayer(target, context => _chrome.Paint(context, chrome, target, theme, layoutBackground)));
 

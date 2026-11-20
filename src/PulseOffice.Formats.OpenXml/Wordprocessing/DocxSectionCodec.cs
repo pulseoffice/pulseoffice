@@ -173,7 +173,10 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
     }
 
     public bool Continuous(W.SectionProperties section) =>
-        section.GetFirstChild<W.SectionType>()?.Val?.Value == W.SectionMarkValues.Continuous;
+        section.GetFirstChild<W.SectionType>()?.Val?.Value is { } type && (type == W.SectionMarkValues.Continuous || type == W.SectionMarkValues.NextColumn);
+
+    public bool NextColumn(W.SectionProperties section) =>
+        section.GetFirstChild<W.SectionType>()?.Val?.Value == W.SectionMarkValues.NextColumn;
 
     private int Twips(PulseOffice.Text.Rich.BoxBorders? borders, PulseOffice.Text.Rich.BorderSide side) =>
         borders is null ? 0 : Twip.FromPoints(borders.Inset(side)).Value;

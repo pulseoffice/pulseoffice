@@ -738,7 +738,7 @@ public sealed class LedgerEditorTests : IDisposable
     }, CancellationToken.None);
 
     [Fact]
-    public Task Selecting_a_cell_with_an_input_message_shows_it_in_the_status_bar() => Session.Dispatch(async () =>
+    public Task Selecting_a_cell_with_an_input_message_shows_it_in_a_note_beside_the_cell() => Session.Dispatch(async () =>
     {
         await using var ledger = await Open();
         ledger.Active.Validations.Add(new DataValidation
@@ -750,13 +750,74 @@ public sealed class LedgerEditorTests : IDisposable
             InputTitle = "Quantity",
             InputMessage = "From 1 to 9",
         });
-        var status = ledger.Service<PulseOffice.UI.Controls.Services.IStatusBarService>();
-        var shown = false;
-        status.Changed += (_, _) => shown |= status.Segments.Any(segment => segment.Text == "Quantity: From 1 to 9");
+        var view = (LedgerView)ledger.Service<PulseOffice.Shell.IDocumentWorkspace>().Active!.View;
+        var note = view.GetVisualDescendants().OfType<Avalonia.Controls.Border>().Single(border => border.Name == "ValidationInputMessage");
 
         ledger.Select(1, 0, 1, 0);
 
-        Assert.True(shown);
+        Assert.True(note.IsVisible);
+        Assert.Equal("Quantity: From 1 to 9", Avalonia.Automation.AutomationProperties.GetName(note));
+
+        ledger.Select(2, 0, 2, 0);
+
+        Assert.False(note.IsVisible);
+    }, CancellationToken.None);
+
+    private sealed class AnsweringAlerts(ValidationAlertAnswer answer) : IValidationAlertPrompt
+    {
+        public List<DataValidation> Asked { get; } = [];
+
+        public Task<ValidationAlertAnswer> AskAsync(DataValidation rule, CancellationToken ct)
+        {
+            Asked.Add(rule);
+            return Task.FromResult(answer);
+        }
+    }
+
+    private static DataValidation OneToNine(ValidationAlert alert) => new()
+    {
+        Range = new CellRange(new CellAddress(0, 0), new CellAddress(0, 0)),
+        Kind = ValidationKind.WholeNumber,
+        FirstFormula = "1",
+        SecondFormula = "9",
+        Alert = alert,
+        ErrorTitle = "Quantity",
+    };
+
+    [Theory]
+    [InlineData(ValidationAlert.Warning, ValidationAlertAnswer.Accept, 50.0)]
+    [InlineData(ValidationAlert.Information, ValidationAlertAnswer.Cancel, 0.0)]
+    [InlineData(ValidationAlert.Stop, ValidationAlertAnswer.Cancel, 0.0)]
+    public Task An_invalid_entry_asks_with_the_alert_and_follows_the_answer(ValidationAlert alert, ValidationAlertAnswer answer, double expected) => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        ledger.Active.Validations.Add(OneToNine(alert));
+        var view = (LedgerView)ledger.Service<PulseOffice.Shell.IDocumentWorkspace>().Active!.View;
+        var alerts = new AnsweringAlerts(answer);
+        view.ValidationAlerts = alerts;
+        ledger.Select(0, 0, 0, 0);
+
+        ledger.Type("50");
+
+        Assert.Equal("Quantity", Assert.Single(alerts.Asked).ErrorTitle);
+        Assert.Equal(expected, ledger.Value(0, 0).IsEmpty ? 0.0 : ledger.Value(0, 0).AsNumber());
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task Retry_reopens_the_editor_on_the_refused_cell_with_the_typed_text() => Session.Dispatch(async () =>
+    {
+        await using var ledger = await Open();
+        ledger.Active.Validations.Add(OneToNine(ValidationAlert.Stop));
+        var view = (LedgerView)ledger.Service<PulseOffice.Shell.IDocumentWorkspace>().Active!.View;
+        view.ValidationAlerts = new AnsweringAlerts(ValidationAlertAnswer.Retry);
+        ledger.Select(0, 0, 0, 0);
+
+        ledger.Type("50");
+
+        Assert.True(ledger.Value(0, 0).IsEmpty);
+        Assert.Equal("50", ledger.FormulaBar());
+        ledger.Press(Key.Escape, PhysicalKey.Escape);
+        Assert.True(ledger.Value(0, 0).IsEmpty);
     }, CancellationToken.None);
 
     [Fact]

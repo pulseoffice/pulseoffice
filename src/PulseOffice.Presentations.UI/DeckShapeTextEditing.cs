@@ -27,6 +27,26 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
 
     private Slide? _shapeTextSlide;
 
+    private IDeckCellTextTarget? _cells;
+
+    public void Route(IDeckCellTextTarget cells) => _cells = cells;
+
+    public PulseOffice.UI.Controls.Shapes.ShapeSurroundings Surroundings() => Backdrop();
+
+    public void BeginCell(PulseOffice.UI.Controls.Shapes.ShapeTextEditStart start)
+    {
+        _host.CommitEditor();
+        _shapeText.Commit();
+        _shapeTextSlide = _state.Current;
+        _state.SelectedText = null;
+        _state.Overlay.Margin = new Thickness(_canvas.Target.X, _canvas.Target.Y, 0, 0);
+        _shapeText.SelectionBrush = SelectionBrush();
+        _shapeText.Begin(start);
+        _host.AttachContext();
+    }
+
+    private bool InCell(string? id) => id is not null && _cells?.Owns(id) == true;
+
     public PulseOffice.UI.Controls.Shapes.ShapeTextEditor Editor => _shapeText;
 
     public void Attach()
@@ -61,7 +81,7 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
         _state.Selected = element;
         _state.SelectedText = null;
         _state.Overlay.Margin = new Thickness(_canvas.Target.X, _canvas.Target.Y, 0, 0);
-        _shapeText.SelectionBrush = _host.Accent() is ISolidColorBrush accent ? new SolidColorBrush(accent.Color, 0.3) : new SolidColorBrush(Color.FromArgb(80, 37, 99, 235));
+        _shapeText.SelectionBrush = SelectionBrush();
         _shapeText.Begin(new PulseOffice.UI.Controls.Shapes.ShapeTextEditStart(element.Id, shape, ShapePlacement(element, shape), Backdrop()) { Typed = typed });
         _host.AttachContext();
     }
@@ -80,6 +100,11 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
 
     private void RefreshLiveShape()
     {
+        if (InCell(_shapeText.EditingId))
+        {
+            _cells!.Refresh();
+            return;
+        }
         if (_state.Current is null || _shapeText.EditingId is not { } id || _shapeText.Live is not { } shape) return;
         if (_state.Current.Find(id) is not ObjectElement element) return;
         var live = element with { Content = shape };
@@ -90,6 +115,13 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
 
     private void OnShapeTextCommitted(PulseOffice.UI.Controls.Shapes.ShapeTextEdited edited)
     {
+        if (InCell(edited.Id))
+        {
+            _shapeTextSlide = null;
+            _cells!.Finish(edited);
+            _host.AttachContext();
+            return;
+        }
         _canvas.LiveText = null;
         if (_filmstrip.CurrentThumbnail is { } thumbnail) thumbnail.LiveText = null;
         var slide = _shapeTextSlide ?? _state.Current;
@@ -106,6 +138,7 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
 
     public bool ApplyShapeTextFormat(Func<RichText, (int Start, int End)?, RichText> transform)
     {
+        if (InCell(_shapeText.EditingId)) return _cells!.Format(transform);
         if (_state.Current is not { } slide) return false;
         var id = _shapeText.EditingId ?? (_state.Selected as ObjectElement)?.Id;
         if (id is null || slide.Find(id) is not ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject } element) return false;
@@ -131,4 +164,7 @@ internal sealed class DeckShapeTextEditing(DeckViewState state, IDeckViewHost ho
         _canvas.SelectedElement = _state.Selected;
         return true;
     }
+
+    private IBrush SelectionBrush() =>
+        _host.Accent() is ISolidColorBrush accent ? new SolidColorBrush(accent.Color, 0.3) : new SolidColorBrush(Color.FromArgb(80, 37, 99, 235));
 }

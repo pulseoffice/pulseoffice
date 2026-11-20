@@ -20,8 +20,11 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Shell;
 
-public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRunner
+public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRunner, IShellWindowHandle, IShellWindowScopeOwner
 {
+    private readonly Func<IShellWindowHost> _windowHost;
+    private readonly ApplicationQuitTarget _applicationQuit;
+
     private readonly IWindowChrome _chrome;
     private readonly PulseOffice.UI.Controls.Services.IInterfaceLock _interfaceLock;
     private readonly PulseOffice.UI.Controls.Navigation.IWindowRegionCycle _regionCycle;
@@ -74,8 +77,15 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         PulseOffice.UI.Commands.Shortcuts.IGestureNotation notation,
         IStatusZoomSource statusZoom,
         PulseOffice.UI.Controls.Navigation.IWindowRegionCycle regionCycle,
-        PulseOffice.UI.Controls.Services.IInterfaceLock interfaceLock)
+        PulseOffice.UI.Controls.Services.IInterfaceLock interfaceLock,
+        Func<IShellWindowHost> windowHost,
+        ApplicationQuitTarget applicationQuit)
     {
+        _windowHost = windowHost ?? throw new ArgumentNullException(nameof(windowHost));
+        _applicationQuit = applicationQuit ?? throw new ArgumentNullException(nameof(applicationQuit));
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(dialogHost);
+        Scope = new ShellWindowScope(workspace, dialogHost, dialogHost);
         _interfaceLock = interfaceLock ?? throw new ArgumentNullException(nameof(interfaceLock));
         _regionCycle = regionCycle ?? throw new ArgumentNullException(nameof(regionCycle));
         _statusZoom = statusZoom ?? throw new ArgumentNullException(nameof(statusZoom));
@@ -99,8 +109,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
 
         _chrome = chromeProvider.Current;
         _surfaces = surfaces;
-        _surfaces.Blocked = () => _dialogHost.IsDialogOpen || _interfaceLock.IsLocked;
-        _surfaces.Suspended = () => _dialogHost.IsCollapsed;
+        BindSurfaces();
         _dialogHost.CollapsedChanged += (_, _) => OnPickingChanged();
         _status = status;
         _accent = accent;
@@ -156,6 +165,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
 
         _documentTabs = new DocumentTabsView(workspace, texts);
         _documentTabs.CloseRequested += (_, document) => _ = CloseAsync(_guard(), document);
+        _documentTabs.TearOffRequested += (_, request) => _windowHost().DropAt(request.Document, request.ScreenPoint);
         _ribbon.KeyTipRegions.Add(new PulseOffice.UI.Controls.Ribbon.MenuKeyTipRegion(_titleBar.MenuHost, _ribbon.KeyTipCollector));
         _ribbon.KeyTipRegions.Add(_documentTabs);
         _ribbon.KeyTipRegions.Add(new PulseOffice.UI.Controls.Ribbon.ButtonKeyTipRegion(_statusBar, _ribbon.KeyTipCollector));
@@ -193,14 +203,17 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         layout.Children.Add(_statusBar);
 
         dialogHost.Content = layout;
+        _toasts = new NotificationToastHost(notifications, _icons, _texts, this);
         var surface = new Panel
         {
             Children =
             {
                 dialogHost,
-                new NotificationToastHost(notifications, _icons, _texts, this),
+                _toasts,
             },
         };
+        Activated += (_, _) => OnWindowActivated();
+        Deactivated += (_, _) => _toasts.IsVisible = OnlyWindow();
         PaintSurface(surface);
         Content = surface;
 
@@ -244,10 +257,14 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         {
             if (_workspace.Active is null) ShowWelcome();
         });
-        _workspace.DocumentDetached += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        _workspace.DocumentDetached += (_, document) =>
         {
-            if (_workspace.Active is null) ShowWelcome();
-        });
+            _workspaceHost.Children.Remove(document.View);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (_workspace.Active is null) ShowWelcome();
+            });
+        };
 
         _workspace.ContextChanged += (_, _) => UpdateForContext(_workspace.Context);
         _workspace.ActiveChanged += (_, document) => ShowDocument(document);
@@ -256,6 +273,58 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
             ShowDocumentName(document);
             RefreshRibbon();
         };
+    }
+
+    private readonly NotificationToastHost _toasts;
+
+    public ShellWindowScope Scope { get; }
+
+    public IDocumentWorkspace Workspace => _workspace;
+
+    public void Show(PixelPoint? position)
+    {
+        if (position is { } at)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Position = at;
+        }
+
+        Show();
+    }
+
+    public bool Contains(PixelPoint screenPoint) =>
+        IsVisible && new PixelRect(Position, PixelSize.FromSize(ClientSize, RenderScaling)).Contains(screenPoint);
+
+    public int TabIndexAt(PixelPoint screenPoint)
+    {
+        if (!_documentTabs.IsEffectivelyVisible) return -1;
+        return _documentTabs.TabIndexAt(_documentTabs.PointToClient(screenPoint).X);
+    }
+
+    private bool OnlyWindow()
+    {
+        try
+        {
+            return _windowHost().Windows.Count <= 1;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
+    private void BindSurfaces()
+    {
+        _surfaces.Blocked = () => _dialogHost.IsDialogOpen || _interfaceLock.IsLocked;
+        _surfaces.Suspended = () => _dialogHost.IsCollapsed;
+    }
+
+    private void OnWindowActivated()
+    {
+        _toasts.IsVisible = true;
+        BindSurfaces();
+        if (_workspace.Active is { } active) ShowDocumentName(active);
+        UpdateForContext(_workspace.Context);
     }
 
     private void ShowDocument(OpenDocument document)
@@ -466,7 +535,11 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
     public Task CloseActiveDocumentAsync() =>
         _workspace.Active is { } active ? CloseAsync(_guard(), active) : Task.CompletedTask;
 
-    public void RequestQuit() => Close();
+    public void RequestQuit()
+    {
+        if (OnlyWindow()) Close();
+        else _applicationQuit.Quit();
+    }
 
     public void RefreshSurfaces() => UpdateForContext(_context);
 

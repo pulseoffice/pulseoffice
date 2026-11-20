@@ -88,7 +88,7 @@ internal static class DocumentFormatsComposition
         services.AddSingleton<IExecutableResolver>(s => s.GetRequiredService<PathExecutableLocator>());
         services.AddSingleton<IFileDialogService>(s => new PulseOffice.UI.Controls.Services.ReportingFileDialogService(
             new PulseOffice.UI.Controls.Services.LocalizedFileDialogService(
-                new AvaloniaFileDialogService(() => s.GetRequiredService<ShellWindow>(), s.GetRequiredService<ISaveNameCorrection>(),
+                new AvaloniaFileDialogService(() => s.GetRequiredService<IShellWindowHost>().Focused as ShellWindow ?? s.GetRequiredService<ShellWindow>(), s.GetRequiredService<ISaveNameCorrection>(),
                     () => s.GetRequiredService<IDocumentWorkspace>().Active?.Path is { } path ? System.IO.Path.GetDirectoryName(path) : null),
                 s.GetRequiredService<PulseOffice.UI.Controls.Services.IFileTypeNames>()),
             s.GetRequiredService<PulseOffice.UI.Controls.Services.IStatusBarService>(),

@@ -458,7 +458,15 @@ public sealed class SheetClipboard(PulseOffice.Sheets.Formatting.ISpreadsheetLoc
                 ? Bounded(start.Row + copied.ColumnCount - 1, start.Column + copied.RowCount - 1)
                 : Bounded(start.Row + copied.RowCount - 1, start.Column + copied.ColumnCount - 1);
             var placed = new CellRange(start, end);
-            sheet.Validations.Add(_validationAnchoring.Reanchored(copied.Rule, start, placed));
+            var anchor = copied.Rule.Range.Start;
+            sheet.Validations.Add(transpose
+                ? copied.Rule with
+                {
+                    Range = placed,
+                    FirstFormula = Transposed(copied.Rule.FirstFormula, anchor, start),
+                    SecondFormula = Transposed(copied.Rule.SecondFormula, anchor, start),
+                }
+                : _validationAnchoring.Reanchored(copied.Rule, start, placed));
         }
 
         List<DataValidation> after = [.. sheet.Validations];

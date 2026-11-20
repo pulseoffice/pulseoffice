@@ -122,6 +122,8 @@ public sealed class CompositionTests : IDisposable
             workspace.Documents.Select(document => document.Module).ToHashSet());
 
         window.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.False(window.IsVisible);
     }, CancellationToken.None);
 
     [Fact]

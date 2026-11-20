@@ -98,7 +98,8 @@ public sealed class XlsxWriter
             }),
             new PartSection(_tables.Write),
             new ElementSection((sheet, context) => Extensions(
-                context.Conditionals.Extension(context.TableRules.Rules(sheet)), _sparklines.Extension(sheet), context.TableRules.Extension(sheet))),
+                context.Conditionals.Extension(context.TableRules.Rules(sheet)), _sparklines.Extension(sheet), context.TableRules.Extension(sheet),
+                _metadata.LongListExtension(context.TableRules.Validations(sheet)))),
         ];
     }
 

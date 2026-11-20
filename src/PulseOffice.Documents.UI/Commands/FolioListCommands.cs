@@ -47,7 +47,8 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
 
     private ListFormatRequest OutlineRequest(ListStyle outline) =>
         new([.. outline.Levels.Select(Format)], 0, [.. _all.Where(numbering => numbering != ListNumbering.Bullet)],
-            ListFeatures.Affixes | ListFeatures.Start | ListFeatures.DisplayLevels | ListFeatures.Separator | ListFeatures.Indents, ListSampleMode.Headings);
+            ListFeatures.Affixes | ListFeatures.Start | ListFeatures.DisplayLevels | ListFeatures.Separator | ListFeatures.Indents
+            | ListFeatures.Follow | ListFeatures.Alignment | ListFeatures.Restart, ListSampleMode.Headings);
 
     private ListLevelFormat Format(ListLevel level) => new((ListNumbering)(int)level.Format)
     {
@@ -60,6 +61,9 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
         Indent = level.Indent,
         Hanging = level.Hanging,
         Picture = level.Picture,
+        Follow = (ListLabelSpacing)(int)level.Follow,
+        Alignment = (ListLabelAlignment)(int)level.Alignment,
+        RestartAfter = level.RestartAfter,
     };
 
     private IReadOnlyList<ListLevel> Merge(IReadOnlyList<ListLevel> existing, IReadOnlyList<ListLevelFormat> edited) =>
@@ -76,6 +80,9 @@ public sealed class FolioListForms(IListFormatTabs shared, ITextCatalog texts) :
             Indent = edited[index].Indent,
             Hanging = edited[index].Hanging,
             Picture = edited[index].Picture,
+            Follow = (ListLabelFollow)(int)edited[index].Follow,
+            Alignment = (ListNumberAlignment)(int)edited[index].Alignment,
+            RestartAfter = edited[index].RestartAfter,
         })];
 }
 

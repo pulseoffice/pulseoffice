@@ -294,6 +294,7 @@ internal sealed class OdtStylesWriter(
     private XElement Properties(ListLevel level) =>
         new(Style + "list-level-properties",
             new XAttribute(Text + "list-level-position-and-space-mode", "label-alignment"),
+            level.Alignment == ListNumberAlignment.Left ? null : new XAttribute(Fo + "text-align", level.Alignment == ListNumberAlignment.Right ? "end" : "center"),
             new XElement(Style + "list-level-label-alignment",
                 new XAttribute(Text + "label-followed-by", level.Follow switch { ListLabelFollow.Space => "space", ListLabelFollow.Nothing => "nothing", _ => "listtab" }),
                 new XAttribute(Text + "list-tab-stop-position", measure.Points(level.Indent + level.Hanging)),
@@ -319,6 +320,7 @@ internal sealed class OdtStylesWriter(
             if (level.Separator != ".") element.Add(new XAttribute(Pt + "level-separator", level.Separator));
             foreach (var gap in level.Separators) element.Add(new XElement(Pt + "level-gap", new XAttribute(Pt + "separator", gap)));
         }
+        if (level.RestartAfter is { } after) element.Add(new XAttribute(Pt + "restart-after", after));
         if (bullet && level.Bullet.Length == 0) element.Add(new XAttribute(Pt + "bullet-empty", "true"));
         if (bullet) element.Add(new XAttribute(Pt + "start-value", level.StartAt), new XAttribute(Pt + "display-levels", level.DisplayLevels));
 

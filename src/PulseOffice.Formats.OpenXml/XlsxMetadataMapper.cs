@@ -15,57 +15,69 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
     private readonly ValidationVocabulary _vocabulary = new();
     private readonly PulseOffice.Sheets.Engine.Operations.IValidationChoiceOrder _order = order ?? new PulseOffice.Sheets.Engine.Operations.ValidationChoiceOrder();
     private readonly XlsxValidationExtension _validationExtension = new(new X14Namespaces());
+    private readonly XlsxLongValidationLists _longLists = new();
     private readonly PulseOffice.Sheets.Engine.Operations.IValidationAnchoring _anchoring = anchoring ?? new PulseOffice.Sheets.Engine.Operations.ValidationAnchoring();
 
     public DataValidations? BuildValidations(IReadOnlyList<Rule> validations)
     {
         ArgumentNullException.ThrowIfNull(validations);
 
-        if (validations.Count == 0) return null;
+        var written = validations.Where(validation => !_longLists.IsOverlong(LiteralList(validation))).ToList();
+        if (written.Count == 0) return null;
 
         var container = new DataValidations();
+        foreach (var validation in written) container.AppendChild(Element(validation));
 
-        foreach (var validation in validations)
+        container.Count = (uint)written.Count;
+        return container;
+    }
+
+    public DocumentFormat.OpenXml.Spreadsheet.WorksheetExtension? LongListExtension(IReadOnlyList<Rule> validations)
+    {
+        ArgumentNullException.ThrowIfNull(validations);
+        return _longLists.Extension(validations.Where(validation => _longLists.IsOverlong(LiteralList(validation))).Select(Element).ToList());
+    }
+
+    private string? LiteralList(Rule validation) =>
+        validation.Kind == ValidationKind.List && validation.ListValues.Count > 0
+            ? "\"" + string.Join(',', _order.Arrange(validation.ListValues, validation.SortDropdown)).Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
+            : null;
+
+    private DocumentFormat.OpenXml.Spreadsheet.DataValidation Element(Rule validation)
+    {
+        var element = new DocumentFormat.OpenXml.Spreadsheet.DataValidation
         {
-            var element = new DocumentFormat.OpenXml.Spreadsheet.DataValidation
-            {
-                Type = _vocabulary.Kinds.Sdk(validation.Kind),
-                AllowBlank = validation.AllowBlank,
-                ShowInputMessage = validation.ShowInputMessage && (validation.InputMessage is { Length: > 0 } || validation.InputTitle is { Length: > 0 }),
-                ShowErrorMessage = validation.Kind != ValidationKind.Any && validation.ShowErrorAlert,
-                SequenceOfReferences = new ListValue<StringValue> { InnerText = Reference(validation.Range) },
-                ErrorStyle = _vocabulary.Alerts.Sdk(validation.Alert),
-            };
+            Type = _vocabulary.Kinds.Sdk(validation.Kind),
+            AllowBlank = validation.AllowBlank,
+            ShowInputMessage = validation.ShowInputMessage && (validation.InputMessage is { Length: > 0 } || validation.InputTitle is { Length: > 0 }),
+            ShowErrorMessage = validation.Kind != ValidationKind.Any && validation.ShowErrorAlert,
+            SequenceOfReferences = new ListValue<StringValue> { InnerText = Reference(validation.Range) },
+            ErrorStyle = _vocabulary.Alerts.Sdk(validation.Alert),
+        };
 
-            if (validation.Kind != ValidationKind.List)
-                element.Operator = _vocabulary.Operators.Sdk(validation.Operator);
+        if (validation.Kind != ValidationKind.List)
+            element.Operator = _vocabulary.Operators.Sdk(validation.Operator);
 
-            if (validation.ErrorMessage is { Length: > 0 } message) element.Error = message;
-            if (validation.ErrorTitle is { Length: > 0 } title) element.ErrorTitle = title;
-            if (validation.InputMessage is { Length: > 0 } prompt) element.Prompt = prompt;
-            if (validation.InputTitle is { Length: > 0 } promptTitle) element.PromptTitle = promptTitle;
+        if (validation.ErrorMessage is { Length: > 0 } message) element.Error = message;
+        if (validation.ErrorTitle is { Length: > 0 } title) element.ErrorTitle = title;
+        if (validation.InputMessage is { Length: > 0 } prompt) element.Prompt = prompt;
+        if (validation.InputTitle is { Length: > 0 } promptTitle) element.PromptTitle = promptTitle;
 
-            if (validation.Kind == ValidationKind.List)
-            {
-                if (!validation.ShowDropdown) element.ShowDropDown = true;
-                element.AppendChild(new Formula1(validation.ListValues.Count > 0
-                    ? "\"" + string.Join(',', _order.Arrange(validation.ListValues, validation.SortDropdown)).Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
-                    : ToOpenXml(validation.FirstFormula)));
-            }
-            else
-            {
-                if (validation.FirstFormula is { Length: > 0 } first)
-                    element.AppendChild(new Formula1(ToOpenXml(first)));
+        if (validation.Kind == ValidationKind.List)
+        {
+            if (!validation.ShowDropdown) element.ShowDropDown = true;
+            element.AppendChild(new Formula1(LiteralList(validation) ?? ToOpenXml(validation.FirstFormula)));
+        }
+        else
+        {
+            if (validation.FirstFormula is { Length: > 0 } first)
+                element.AppendChild(new Formula1(ToOpenXml(first)));
 
-                if (validation.SecondFormula is { Length: > 0 } second)
-                    element.AppendChild(new Formula2(ToOpenXml(second)));
-            }
-
-            container.AppendChild(element);
+            if (validation.SecondFormula is { Length: > 0 } second)
+                element.AppendChild(new Formula2(ToOpenXml(second)));
         }
 
-        container.Count = (uint)validations.Count;
-        return container;
+        return element;
     }
 
     public void ReadValidations(DocumentFormat.OpenXml.Spreadsheet.Worksheet worksheet, Sheet sheet)
@@ -74,7 +86,8 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
         ArgumentNullException.ThrowIfNull(sheet);
 
         var elements = worksheet.Elements<DataValidations>().SelectMany(container => container.Elements<DocumentFormat.OpenXml.Spreadsheet.DataValidation>())
-            .Concat(_validationExtension.Read(worksheet.GetFirstChild<WorksheetExtensionList>()));
+            .Concat(_validationExtension.Read(worksheet.GetFirstChild<WorksheetExtensionList>()))
+            .Concat(_longLists.Read(worksheet.GetFirstChild<WorksheetExtensionList>()));
         foreach (var element in elements)
         {
             var references = element.SequenceOfReferences?.InnerText ?? string.Empty;

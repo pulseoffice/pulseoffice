@@ -124,7 +124,7 @@ public sealed class PptxDeckTableMapper
         foreach (var line in lines)
         {
             var paragraph = new D.Paragraph();
-            if (look?.Horizontal is { } horizontal)
+            if ((line.Alignment ?? look?.Horizontal) is { } horizontal)
                 paragraph.Append(new D.ParagraphProperties
                 {
                     Alignment = horizontal switch
@@ -374,18 +374,26 @@ public sealed class PptxDeckTableMapper
             D.Field field => RunOf(field.Text?.Text ?? string.Empty, field.RunProperties),
             D.Break line => RunOf("\n", line.RunProperties),
             _ => null,
-        }).OfType<TableTextRun>())])).ToList() ?? [];
+        }).OfType<TableTextRun>())])
+        {
+            Alignment = AlignmentOf(paragraph.ParagraphProperties?.Alignment?.Value),
+        }).ToList() ?? [];
         var text = new TableCellText(row, column, paragraphs);
         return text.IsPlain ? null : text;
     }
 
+    private CellHorizontalAlign? AlignmentOf(D.TextAlignmentTypeValues? value) =>
+        value == D.TextAlignmentTypeValues.Center ? CellHorizontalAlign.Center
+        : value == D.TextAlignmentTypeValues.Right ? CellHorizontalAlign.Right
+        : null;
+
     private TableCellText? BeyondLook(TableCellText text, IReadOnlyList<TableCellFormat> formats)
     {
         if (formats.FirstOrDefault(format => format.Row == text.Row && format.Column == text.Column)?.Look is not { } look) return text;
-        var stripped = text with
+        var stripped = (text with
         {
-            Paragraphs = [.. text.Paragraphs.Select(paragraph => new TableCellParagraph([.. Merged(paragraph.Runs.Select(run => run.Beyond(look)))]))],
-        };
+            Paragraphs = [.. text.Paragraphs.Select(paragraph => paragraph with { Runs = [.. Merged(paragraph.Runs.Select(run => run.Beyond(look)))] })],
+        }).AlignedBeyond(look);
         return stripped.IsPlain ? null : stripped;
     }
 

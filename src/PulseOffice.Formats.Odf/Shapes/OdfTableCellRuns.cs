@@ -20,9 +20,24 @@ internal sealed class OdfTableCellRuns(IOdfParagraphText paragraphs)
     public IEnumerable<XElement> Write(TableCellText text, string prefix, XElement automaticStyles)
     {
         var index = 0;
+        var aligned = 0;
         foreach (var paragraph in text.Paragraphs)
         {
             var element = new XElement(TextNs + "p");
+            if (paragraph.Alignment is { } alignment)
+            {
+                var paragraphStyle = $"{prefix}_p{aligned++}";
+                automaticStyles.Add(new XElement(Style + "style",
+                    new XAttribute(Style + "name", paragraphStyle),
+                    new XAttribute(Style + "family", "paragraph"),
+                    new XElement(Style + "paragraph-properties", new XAttribute(Fo + "text-align", alignment switch
+                    {
+                        CellHorizontalAlign.Center => "center",
+                        CellHorizontalAlign.Right => "end",
+                        _ => "start",
+                    }))));
+                element.Add(new XAttribute(TextNs + "style-name", paragraphStyle));
+            }
             foreach (var run in paragraph.Runs.Where(run => run.Text.Length > 0))
             {
                 var nodes = paragraphs.Paragraph(run.Text).Nodes().ToList();
@@ -67,11 +82,24 @@ internal sealed class OdfTableCellRuns(IOdfParagraphText paragraphs)
                 if (runs.Count > 0 && runs[^1].SameFormat(run)) runs[^1] = runs[^1] with { Text = runs[^1].Text + piece };
                 else runs.Add(run);
             }
-            result.Add(new TableCellParagraph(runs));
+            result.Add(new TableCellParagraph(runs) { Alignment = Alignment(paragraph, textStyles) });
         }
         var cellText = new TableCellText(row, column, result);
         return cellText.IsPlain ? null : cellText;
     }
+
+    private CellHorizontalAlign? Alignment(XElement paragraph, IReadOnlyDictionary<string, XElement>? styles) =>
+        (string?)paragraph.Attribute(TextNs + "style-name") is { } name
+        && styles?.GetValueOrDefault(name) is { } style
+        && (string?)style.Attribute(Style + "family") == "paragraph"
+            ? (string?)style.Element(Style + "paragraph-properties")?.Attribute(Fo + "text-align") switch
+            {
+                "center" => CellHorizontalAlign.Center,
+                "end" or "right" => CellHorizontalAlign.Right,
+                "start" or "left" => CellHorizontalAlign.Left,
+                _ => null,
+            }
+            : null;
 
     private XElement Properties(TableTextRun run)
     {

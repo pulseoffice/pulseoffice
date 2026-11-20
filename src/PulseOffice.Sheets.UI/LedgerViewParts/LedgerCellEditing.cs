@@ -90,6 +90,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         };
 
         AnnotatedRange = new PulseOffice.UI.Controls.Text.TextRangeHighlight(CellEditor);
+        InputNote = new LedgerInputMessageNote(_metrics);
 
         CellEditor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         CellAssist = new LedgerFormulaAssist(CellEditor, this, _texts, () => IsEditing && !_suggesting, _metrics);
@@ -423,24 +424,22 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         }, () => _grid.Focus());
     }
 
-    public string? InputMessageAt(CellAddress address)
+    public LedgerInputMessageNote InputNote { get; }
+
+    public void AnnounceInputMessage()
+    {
+        if (InputMessageParts(_selection.Active) is { } parts && _grid.ActiveCellBounds() is { Width: > 0 } bounds)
+            InputNote.Show(parts.Title, parts.Message, bounds);
+        else InputNote.Hide();
+    }
+
+    private (string Title, string Message)? InputMessageParts(CellAddress address)
     {
         if (_validator?.RuleAt(_workbook.Sheets[_grid.SheetIndex], address) is not { ShowInputMessage: true } rule) return null;
         var title = rule.InputTitle?.Trim() ?? string.Empty;
         var message = rule.InputMessage?.Trim() ?? string.Empty;
-        if (title.Length == 0 && message.Length == 0) return null;
-        return title.Length == 0 ? message : message.Length == 0 ? title : $"{title}: {message}";
+        return title.Length == 0 && message.Length == 0 ? null : (title, message);
     }
-
-    public void AnnounceInputMessage()
-    {
-        var shown = (_grid.SheetIndex, _selection.Active);
-        if (shown == _inputMessageShownAt) return;
-        _inputMessageShownAt = shown;
-        if (InputMessageAt(_selection.Active) is { } text) _status.Report(text, NotificationSeverity.Info);
-    }
-
-    private (int Sheet, CellAddress Cell)? _inputMessageShownAt;
 
     private DataValidation? ListRuleAt(CellAddress address) =>
         _validator?.RuleAt(_workbook.Sheets[_grid.SheetIndex], address) is { Kind: ValidationKind.List, ShowDropdown: true } rule ? rule : null;
@@ -537,6 +536,12 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
 
             case Key.Enter:
                 CommitEditor();
+                if (IsEditing)
+                {
+                    e.Handled = true;
+                    break;
+                }
+
                 ReturnToEditedCell(edited);
                 _selection.Advance(byRow: true, backwards: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 _grid.EnsureVisible(_selection.Active);
@@ -546,6 +551,12 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
 
             case Key.Tab:
                 CommitEditor();
+                if (IsEditing)
+                {
+                    e.Handled = true;
+                    break;
+                }
+
                 ReturnToEditedCell(edited);
                 _selection.Advance(byRow: false, backwards: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 _grid.EnsureVisible(_selection.Active);
@@ -581,6 +592,12 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
 
             case Key.Enter:
                 CommitFormulaBar();
+                if (IsEditing)
+                {
+                    e.Handled = true;
+                    break;
+                }
+
                 ReturnToEditedCell(edited);
                 _selection.Advance(byRow: true, backwards: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 _grid.EnsureVisible(_selection.Active);

@@ -25,6 +25,8 @@ public interface IDeckTableKeys
     string? Text(DataTableObject table, TableCellRange cell);
 
     DataTableObject Write(DataTableObject table, TableCellRange cell, string text);
+
+    DataTableObject WriteRich(DataTableObject table, TableCellRange cell, string text, TableCellText? rich);
 }
 
 public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
@@ -98,6 +100,19 @@ public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
         var before = TextAt(table, row, column);
         var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
         return before is null || before == normalized ? table : WithText(table, row, column, normalized);
+    }
+
+    public DataTableObject WriteRich(DataTableObject table, TableCellRange cell, string text, TableCellText? rich)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(text);
+        var (row, column) = Anchor(new TableCellIndex(table), cell.FirstRow, cell.FirstColumn);
+        if (TextAt(table, row, column) is null) return table;
+        var written = Write(table, cell, text);
+        var kept = written.CellTexts.Where(existing => existing.Row != row || existing.Column != column);
+        TableCellText[] own = rich is not null && !rich.IsPlain ? [rich with { Row = row, Column = column }] : [];
+        var texts = kept.Concat(own).ToList();
+        return texts.SequenceEqual(written.CellTexts) ? written : written with { CellTexts = texts };
     }
 
     public DataTableObject Erase(DataTableObject table, TableCellRange cell)

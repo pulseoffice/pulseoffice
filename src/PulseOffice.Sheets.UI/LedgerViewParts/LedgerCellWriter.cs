@@ -8,6 +8,8 @@ using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Sheets.UI.LedgerViewParts;
 
+internal sealed record SheetCellRetry(SheetCell Target, string Text);
+
 internal sealed class LedgerCellWriter(
     Workbook workbook,
     CalculationEngine engine,
@@ -22,6 +24,10 @@ internal sealed class LedgerCellWriter(
     ISheetSpelling? spelling)
 {
     public event EventHandler? SelectionStale;
+
+    public event EventHandler<SheetCellRetry>? RetryRequested;
+
+    public IValidationAlertPrompt? Alerts { get; set; }
 
     public Engine.Localization.IFormulaLocalization? Formulas { get; set; }
 
@@ -70,16 +76,71 @@ internal sealed class LedgerCellWriter(
             ? previous with { Formula = Formulas?.ToCanonical(text, FormulaLanguage) ?? text, ImplicitIntersection = false }
             : Entered(previous, text, sheet, address);
 
-        if (!WriteValidated(target, content))
+        var outcome = Check(target, content);
+        if (outcome.Reported && Alerts is { } alerts && outcome.Rule is { } rule)
         {
             SelectionStale?.Invoke(this, EventArgs.Empty);
+            _ = ResolveAsync(alerts, rule, target, content, text);
             return;
         }
 
+        if (outcome.Reported)
+        {
+            Report(outcome);
+            if (outcome.Blocks)
+            {
+                SelectionStale?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+        }
+
+        Commit(target, content);
+    }
+
+    private async Task ResolveAsync(IValidationAlertPrompt alerts, DataValidation rule, SheetCell target, Cell content, string text)
+    {
+        var answer = await alerts.AskAsync(rule, CancellationToken.None).ConfigureAwait(true);
+        if (answer == ValidationAlertAnswer.Accept && target.SheetIndex < workbook.Sheets.Count && workspace.Active?.IsReadOnly != true)
+        {
+            Commit(target, content);
+            SelectionStale?.Invoke(this, EventArgs.Empty);
+        }
+        else if (answer == ValidationAlertAnswer.Retry)
+        {
+            RetryRequested?.Invoke(this, new SheetCellRetry(target, text));
+        }
+    }
+
+    private void Commit(SheetCell target, Cell content)
+    {
+        var previous = workbook.Sheets[target.SheetIndex][target.Address];
+        Restore(engine, target, content);
+        RecordWrite(target, previous, workbook.Sheets[target.SheetIndex][target.Address]);
         grid.Refresh();
 
         var value = engine.GetValue(target);
-        if (value.IsError) status.Report($"{address.ToA1()}: {value.ErrorText}");
+        if (value.IsError) status.Report($"{target.Address.ToA1()}: {value.ErrorText}");
+    }
+
+    private Engine.Operations.ValidationOutcome Check(SheetCell target, Cell content)
+    {
+        if (validator is null) return Engine.Operations.ValidationOutcome.Valid;
+        if (!content.HasFormula) return validator.Validate(engine, target.SheetIndex, target.Address, content.Value);
+
+        var previous = workbook.Sheets[target.SheetIndex][target.Address];
+        Restore(engine, target, content);
+        var value = engine.GetValue(target);
+        Restore(engine, target, previous);
+        return validator.Validate(engine, target.SheetIndex, target.Address, value);
+    }
+
+    private void Report(Engine.Operations.ValidationOutcome outcome)
+    {
+        var message = outcome.Rule?.ErrorMessage is { Length: > 0 } custom
+            ? custom
+            : texts["status.validation.refused"];
+
+        status.Report(message, NotificationSeverity.Error);
     }
 
     public bool CanEdit()
@@ -120,12 +181,7 @@ internal sealed class LedgerCellWriter(
         var outcome = validator.Validate(engine, target.SheetIndex, target.Address, candidate);
         if (!outcome.Reported) return false;
 
-        var message = outcome.Rule?.ErrorMessage is { Length: > 0 } custom
-            ? custom
-            : texts["status.validation.refused"];
-
-        status.Report(message, NotificationSeverity.Error);
-
+        Report(outcome);
         return outcome.Blocks;
     }
 

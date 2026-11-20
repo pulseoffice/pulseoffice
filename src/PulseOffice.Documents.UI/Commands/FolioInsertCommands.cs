@@ -46,6 +46,8 @@ public sealed class FolioInsertCommands(
     [
         ("pageNumber", TextFieldKind.PageNumber),
         ("pageCount", TextFieldKind.PageCount),
+        ("sectionNumber", TextFieldKind.SectionNumber),
+        ("sectionPages", TextFieldKind.SectionPageCount),
         ("date", TextFieldKind.Date),
         ("time", TextFieldKind.Time),
         ("title", TextFieldKind.Title),

@@ -11,7 +11,9 @@ public sealed record ListPlacement(string Label, double ExtraMargin, double Labe
 
     public ListBulletPicture? Picture { get; init; }
 
-    public string Key => Picture is null ? Label : Label + "\uFFFC" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Picture).ToString(CultureInfo.InvariantCulture);
+    public ListNumberAlignment Alignment { get; init; }
+
+    public string Key => (Alignment == ListNumberAlignment.Left ? string.Empty : "\uFFFD" + Alignment) + (Picture is null ? Label : Label + "\uFFFC" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Picture).ToString(CultureInfo.InvariantCulture));
 }
 
 public interface INumberFormatter
@@ -133,7 +135,8 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         }
         var start = definition.StartAt;
         counts[level] = paragraph.ListRestart is { } restart ? restart : counts[level] is { } previous ? previous + 1 : start;
-        for (var deeper = level + 1; deeper < counts.Length; deeper++) counts[deeper] = null;
+        for (var deeper = level + 1; deeper < counts.Length; deeper++)
+            if (Restarts(style.Level(deeper), level)) counts[deeper] = null;
         var label = definition.Format switch
         {
             NumberFormat.None => string.Empty,
@@ -145,8 +148,11 @@ public sealed class ListLabeling(IListLabels flagLabels, IEnumerable<INumberForm
         {
             FollowedByTab = definition.Follow == ListLabelFollow.Tab,
             Picture = definition.Format == NumberFormat.Bullet && definition.Picture is { Data.Length: > 0 } picture ? picture : null,
+            Alignment = definition.Alignment,
         };
     }
+
+    private static bool Restarts(ListLevel deeper, int used) => deeper.RestartAfter is not { } after || used < after;
 
     private ListPlacement Header(ListStyle style, TextParagraph paragraph)
     {

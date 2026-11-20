@@ -283,6 +283,8 @@ public sealed class DocxReader : ITextDocumentReader
 
             if (continuous && current is not null && !deferred)
             {
+                if (_sections.NextColumn(span.Properties) && span.FirstBlock < end && document.Body[span.FirstBlock] is ParagraphBlock opening)
+                    opening.Content = opening.Content with { ColumnBreakBefore = true };
                 var columns = _sections.Columns(span.Properties);
                 if (columns != current.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns));
                 if (_sections.LineNumberRestart(resolved) is { } lineStart) RestartLines(document, span.FirstBlock, end, lineStart);

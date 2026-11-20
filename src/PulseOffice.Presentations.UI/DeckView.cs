@@ -142,9 +142,10 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
         var stillImages = new PulseOffice.UI.Controls.Objects.StillImageProbe();
         var stripLayout = new SlideStripLayout();
         _filmstrip = new DeckFilmstrip(_state, this, renderer, keyNavigation, contextMenus, stillImages, new DeckSectionHeaders(actions, texts, _state.Metrics), stripLayout);
+        var richShapes = shapeRichText ?? new PulseOffice.Drawing.Shapes.ShapeRichText();
         _shapes = new DeckShapeTextEditing(_state, this, _filmstrip,
             new PulseOffice.UI.Controls.Shapes.ShapeTextEditor(shapeTextEditing ?? new PulseOffice.Drawing.Shapes.ShapeTextEditing(), new PulseOffice.Drawing.Shapes.ShapeTextInk(), new PulseOffice.UI.Controls.Shapes.ShapeBrushes(), focus, word),
-            shapeRichText ?? new PulseOffice.Drawing.Shapes.ShapeRichText(), new PulseOffice.Presentations.UI.Rendering.SlideBackdrop());
+            richShapes, new PulseOffice.Presentations.UI.Rendering.SlideBackdrop());
         _rulers = new DeckRulers(new DeckRulerSources(_canvas, () => _state.Target, () => _deck.Grid.ShowRulers && _state.Mode == DeckViewMode.Normal, formatter ?? new RichTextFormatter(), paragraphRuler ?? new PulseOffice.UI.Controls.Rulers.ParagraphRuler()));
         _text = new DeckTextEditing(_state, this, _filmstrip, _shapes, _correction, _rulers, _ancestry,
             composer ?? new PulseOffice.UI.Controls.Text.Rich.TextFrameComposer(new ListLabels()),
@@ -157,9 +158,10 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
             menuKey ?? new PulseOffice.UI.Controls.Services.ContextMenuKey(), drawing);
         _canvasEditing = new DeckCanvasEditing(_state, this, connectors);
         var tableKeys = new DeckTableKeys(new PulseOffice.Document.Embedding.TableStructure(new PulseOffice.Document.Tables.TableSpans(), new PulseOffice.Document.Tables.ColumnWidths()));
+        var cellEditor = new DeckTableCellEditor(_state, tableKeys, _shapes, new DeckTableCellShapes(), richShapes);
         _stageKeys = new DeckStageKeys(_state, this, _text, _shapes, _canvasEditing, drawing, keyNavigation,
             keys ?? new PulseOffice.UI.Controls.Services.DocumentKeyScope(), _chords, nudges ?? new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys(),
-            tableKeys, new DeckTableCellEditor(_state, tableKeys));
+            tableKeys, cellEditor);
         _inspector = new DeckInspector(_state, this, _player, new PulseOffice.Presentations.UI.Motion.DeckElementNames(_state.Texts));
         _modes = new DeckModeViews(_state, this, renderer,
             new DeckMasterViews(_state, this, renderer, handoutLayout ?? new HandoutLayout(), masterSlides ?? new SlideFactory(), new DeckChoiceNames(_state.Texts),
@@ -170,6 +172,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
         AddHandler(KeyDownEvent, _menus.OnMenuKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _text.Attach();
         _shapes.Attach();
+        cellEditor.Attach();
         _canvas.SelectionChanged += OnCanvasSelectionChanged;
         Avalonia.Automation.AutomationProperties.SetName(_rulers.Horizontal, texts["ruler.horizontal"]);
         Avalonia.Automation.AutomationProperties.SetName(_rulers.Vertical, texts["ruler.vertical"]);

@@ -143,7 +143,8 @@ internal static class CommandingComposition
         services.AddSingleton<PulseOffice.Shell.IDocumentOperations, LedgerDocumentOperations>();
         services.AddSingleton<PulseOffice.Shell.IDocumentOperations, PulseOffice.Presentations.UI.DeckDocumentOperations>();
         services.AddSingleton<PulseOffice.Presentations.UI.IDeckPublisher, PulseOffice.Presentations.UI.DeckPublisher>();
-        services.AddSingleton<IDocumentWorkspace, DocumentWorkspace>();
+        services.AddSingleton<DocumentWorkspace>();
+        services.AddSingleton<IDocumentWorkspace, FocusedDocumentWorkspace>();
 
         return services;
     }

@@ -78,26 +78,27 @@ public partial class App : Application
                 () => _services.GetRequiredService<PulseOffice.Shell.IDocumentWorkspace>().Active?.Path);
 
             var window = _services.GetRequiredService<ShellWindow>();
+            var windows = _services.GetRequiredService<IShellWindowHost>();
 
-            recent.CommandsChanged += (_, _) => { if (!_closing) window.RefreshSurfaces(); };
-            registry.BindingsChanged += (_, _) => { if (!_closing) window.RefreshSurfaces(); };
+            void RefreshWindows()
+            {
+                if (_closing) return;
+                foreach (var shown in windows.Windows.OfType<ShellWindow>()) shown.RefreshSurfaces();
+            }
+
+            recent.CommandsChanged += (_, _) => RefreshWindows();
+            registry.BindingsChanged += (_, _) => RefreshWindows();
             _services.GetRequiredService<PulseOffice.Shell.CommandExecutor>().Executed += (_, _) =>
             {
                 if (_closing) return;
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (!_closing) window.RefreshSurfaces();
-                });
+                Avalonia.Threading.Dispatcher.UIThread.Post(RefreshWindows);
             };
 
             _services.GetRequiredService<PulseOffice.Presentations.UI.IActiveDeckContext>().Changed +=
                 (_, _) =>
                 {
                     if (_closing) return;
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        if (!_closing) window.RefreshSurfaces();
-                    });
+                    Avalonia.Threading.Dispatcher.UIThread.Post(RefreshWindows);
                 };
 
             window.UpdateForContext(new CommandContext(
@@ -113,8 +114,7 @@ public partial class App : Application
 
             logger.LogInformation("Registered commands: {Count}", registry.All.Count);
             var arrivals = _services.GetRequiredService<PulseOffice.Shell.IDocumentArrivals>();
-            arrivals.AcceptDrops(window);
-            _services.GetRequiredService<PulseOffice.Shell.IExchangeDragDrop>().AcceptDrops(window);
+            _services.GetRequiredService<IShellWindowWiring>().Attach(window);
             arrivals.ExpectStartup(desktop.Args ?? []);
             if (this.TryGetFeature<IActivatableLifetime>() is { } activation)
                 activation.Activated += async (_, args) =>
@@ -155,10 +155,8 @@ public partial class App : Application
             _services.GetRequiredService<WindowPlacementCoordinator>().Attach(window);
 
             var quit = _services.GetRequiredService<QuitCoordinator>();
-            var closeWindow = new WindowQuitTarget(window);
             var shutDown = new LifetimeQuitTarget(desktop);
 
-            window.Closing += (_, args) => quit.Intercept(args, closeWindow);
             desktop.ShutdownRequested += (_, args) => quit.Intercept(args, shutDown);
 
             desktop.MainWindow = window;

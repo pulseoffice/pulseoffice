@@ -59,18 +59,39 @@ public sealed record TableTextRun(string Text)
 
 public sealed record TableCellParagraph(IReadOnlyList<TableTextRun> Runs)
 {
+    public CellHorizontalAlign? Alignment { get; init; }
+
     public string Text => string.Concat(Runs.Select(run => run.Text));
 
-    public bool Equals(TableCellParagraph? other) => other is not null && Runs.SequenceEqual(other.Runs);
+    public CellHorizontalAlign AlignedOver(TableCellLook look)
+    {
+        ArgumentNullException.ThrowIfNull(look);
+        return Alignment ?? look.Horizontal ?? CellHorizontalAlign.Left;
+    }
 
-    public override int GetHashCode() => Runs.Aggregate(0, (hash, run) => HashCode.Combine(hash, run));
+    public bool Equals(TableCellParagraph? other) => other is not null && Alignment == other.Alignment && Runs.SequenceEqual(other.Runs);
+
+    public override int GetHashCode() => Runs.Aggregate(Alignment.GetHashCode(), (hash, run) => HashCode.Combine(hash, run));
 }
 
 public sealed record TableCellText(int Row, int Column, IReadOnlyList<TableCellParagraph> Paragraphs)
 {
     public string PlainText => string.Join("\n", Paragraphs.Select(paragraph => paragraph.Text));
 
-    public bool IsPlain => Paragraphs.All(paragraph => paragraph.Runs.All(run => run.IsPlain));
+    public bool IsPlain => Paragraphs.All(paragraph => paragraph.Alignment is null && paragraph.Runs.All(run => run.IsPlain));
+
+    public TableCellText AlignedBeyond(TableCellLook look)
+    {
+        ArgumentNullException.ThrowIfNull(look);
+        var cell = look.Horizontal ?? CellHorizontalAlign.Left;
+        return this with
+        {
+            Paragraphs = [.. Paragraphs.Select(paragraph => paragraph with
+            {
+                Alignment = (paragraph.Alignment ?? CellHorizontalAlign.Left) == cell ? null : paragraph.Alignment ?? CellHorizontalAlign.Left,
+            })],
+        };
+    }
 
     public bool Matches(string? value) =>
         string.Equals(PlainText, (value ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal);
@@ -114,7 +135,7 @@ public sealed record TableCellText(int Row, int Column, IReadOnlyList<TableCellP
         {
             if (normalized[i] == '\n')
             {
-                paragraphs.Add(new TableCellParagraph([.. runs]));
+                paragraphs.Add(new TableCellParagraph([.. runs]) { Alignment = AlignmentAt(paragraphs.Count) });
                 runs.Clear();
                 continue;
             }
@@ -124,10 +145,13 @@ public sealed record TableCellText(int Row, int Column, IReadOnlyList<TableCellP
             if (runs.Count > 0 && runs[^1].SameFormat(format)) runs[^1] = runs[^1] with { Text = runs[^1].Text + normalized[i] };
             else runs.Add(format with { Text = normalized[i].ToString() });
         }
-        paragraphs.Add(new TableCellParagraph([.. runs]));
+        paragraphs.Add(new TableCellParagraph([.. runs]) { Alignment = AlignmentAt(paragraphs.Count) });
         var rebased = this with { Paragraphs = paragraphs };
         return rebased.IsPlain ? null : rebased;
     }
+
+    private CellHorizontalAlign? AlignmentAt(int index) =>
+        Paragraphs.Count == 0 ? null : Paragraphs[Math.Min(index, Paragraphs.Count - 1)].Alignment;
 
     public bool Equals(TableCellText? other) =>
         other is not null && Row == other.Row && Column == other.Column && Paragraphs.SequenceEqual(other.Paragraphs);

@@ -56,16 +56,10 @@ internal static class SharedControlsComposition
         services.AddSingleton<PulseOffice.UI.Controls.Notifications.INotificationCenter, PulseOffice.UI.Controls.Notifications.NotificationCenter>();
         services.AddSingleton<PulseOffice.UI.Controls.Notifications.INotificationHistory, PulseOffice.UI.Controls.Notifications.NotificationHistory>();
         services.AddSingleton<IStatusBarService, StatusBarService>();
-        services.AddSingleton(provider =>
-        {
-            var host = new DialogHost();
-            host.Use(
-                provider.GetRequiredService<IIconCatalog>(),
-                provider.GetRequiredService<ITextCatalog>());
-            host.AdmitResultsThrough(provider.GetService<IDialogResultAdmission>);
-            return host;
-        });
-        services.AddSingleton<IDialogService>(s => s.GetRequiredService<DialogHost>());
+        services.AddSingleton<IDialogHostFactory, DialogHostFactory>();
+        services.AddSingleton(provider => provider.GetRequiredService<IDialogHostFactory>().Create());
+        services.AddSingleton<PulseOffice.Shell.FocusedDialogs>();
+        services.AddSingleton<IDialogService>(s => s.GetRequiredService<PulseOffice.Shell.FocusedDialogs>());
         services.AddSingleton<ITabbedForms, TabbedForms>();
         services.AddSingleton<PulseOffice.UI.Controls.Galleries.IGalleryNavigator, PulseOffice.UI.Controls.Galleries.GalleryNavigator>();
         services.AddSingleton<PulseOffice.UI.Controls.Themes.IThemePaletteGallery, PulseOffice.UI.Controls.Themes.ThemePaletteGallery>();
@@ -110,7 +104,7 @@ internal static class SharedControlsComposition
         services.AddSingleton<PulseOffice.UI.Controls.Pages.IPageMarginsEditors, PulseOffice.UI.Controls.Pages.PageMarginsEditors>();
         services.AddSingleton<PulseOffice.UI.Controls.Pages.IColumnLayoutEditors, PulseOffice.UI.Controls.Pages.ColumnLayoutEditors>();
         services.AddSingleton<PulseOffice.UI.Controls.Pages.IPageNumberPositionGalleries, PulseOffice.UI.Controls.Pages.PageNumberPositionGalleries>();
-        services.AddSingleton<PulseOffice.UI.Controls.References.IDialogCollapse>(s => s.GetRequiredService<DialogHost>());
+        services.AddSingleton<PulseOffice.UI.Controls.References.IDialogCollapse>(s => s.GetRequiredService<PulseOffice.Shell.FocusedDialogs>());
         services.AddSingleton<PulseOffice.UI.Controls.References.IReferencePickers, PulseOffice.UI.Controls.References.ReferencePickers>();
 
         return services;

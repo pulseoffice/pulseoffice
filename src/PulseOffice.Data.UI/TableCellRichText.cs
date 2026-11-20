@@ -24,7 +24,7 @@ public sealed class TableCellRichText(ITableCellTextStyles styles) : ITableCellR
             var formatted = new FormattedText(content, culture, FlowDirection.LeftToRight, styles.Typeface(look), size, brush)
             {
                 MaxTextWidth = Math.Max(1, width),
-                TextAlignment = look.Horizontal switch
+                TextAlignment = paragraph.AlignedOver(look) switch
                 {
                     CellHorizontalAlign.Center => TextAlignment.Center,
                     CellHorizontalAlign.Right => TextAlignment.Right,
