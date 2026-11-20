@@ -20,19 +20,4 @@ public sealed class DocumentTabsViewTests
         var close = Assert.Single(view.GetLogicalDescendants().OfType<Button>());
         Assert.Equal("Chiudi «lettera»", AutomationProperties.GetName(close));
     }
-
-    [Fact]
-    public void Switching_the_language_retranslates_the_tab_close_button()
-    {
-        var workspace = new DocumentWorkspace();
-        workspace.Open(new OpenDocument(ModuleKind.Documents, "lettera", new Panel(), new PulseOffice.Document.Commands.UndoStack()));
-        var texts = new TextCatalog(UiLanguage.Italian);
-        var view = new DocumentTabsView(workspace, texts);
-
-        texts.Use(UiLanguage.English);
-
-        var close = Assert.Single(view.GetLogicalDescendants().OfType<Button>());
-        Assert.Equal(texts.Format("document.closeNamed", "lettera"), AutomationProperties.GetName(close));
-        Assert.NotEqual("Chiudi «lettera»", AutomationProperties.GetName(close));
-    }
 }

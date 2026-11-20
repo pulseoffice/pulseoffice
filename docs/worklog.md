@@ -14378,3 +14378,23 @@ not done and stays queued. Log: docs/deep-audit/round-307-shell-tear-off.md.
 - List levels carry number alignment and restart level across DOCX and ODT; undefined Word levels show no number;
   the shared level editor edits label follow, alignment and restart; SECTION and SECTIONPAGES insert commands; Word
   next-column section breaks no longer start a page. Log: docs/deep-audit/round-313-folio-lists-columns.md.
+
+### Round 314 (2026-11-20): Shell multi-window leftovers
+- Side panel commands reach the focused window and every window's panel has every page (`FocusedSidePanelHost`); view
+  context updates go to the view's own window; closed torn-off windows are released from singleton events; torn-off
+  windows are sized from their last placement or the source window and save it; drops on a scrolled strip use the
+  scroll offset; an unfocused window keeps its own status bar. Log: docs/deep-audit/round-314-shell-window-leftovers.md.
+### Round 315 (2026-11-20): Folio columns and lists leftovers
+- Column separator line (style, width, colour, height, vertical alignment) modelled, mapped to ODT `style:column-sep`
+  and drawn; DOCX keeps only on/off (DOCX274). Word `nextColumn` sections are a section start type; right and left
+  page styles insert a blank page; the list sample honours number alignment; DOCX column widths read without
+  `w:equalWidth`. Log: docs/deep-audit/round-315-folio-columns-lists.md.
+### Round 316 (2026-11-20): validation lists, input help note, Deck cell editing
+- Long and comma XLSX validation lists live on a very hidden helper sheet Excel keeps and read back typed (XLSX103 and
+  XLSX034 gone); the input help note is shared (Ledger validation, Folio field titles); shape text gains struck runs
+  and per-paragraph alignment across PPTX, XLSX, ODP and ODS, so Deck cells toggle strike and align one paragraph while
+  editing; turned and stacked cells are edited in their flow. Log: docs/deep-audit/round-316-validation-lists-cell-editing.md.
+### Round 317 (2026-11-20): Ledger chart creation from a selection
+- Inserted charts detect header row, category column and series orientation from the selection as Excel does, take the
+  current region of a single cell, show the legend by series count (always for pie and doughnut), and keep a scatter's
+  numeric first column as X. Log: docs/deep-audit/round-317-ledger-chart-creation.md.

@@ -326,20 +326,10 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
         if (namedPages > 0)
             losses.Add(Diagnostic.Info("XLSX033", $"{namedPages} named page styles: XLSX writes page setup sheet by sheet and the style name is lost.").With(namedPages));
 
-        var commaChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
-            validation => validation.ListValues.Any(value => value.Contains(',', StringComparison.Ordinal))));
-        if (commaChoices > 0)
-            losses.Add(Diagnostic.Warning("XLSX034", $"{commaChoices} validation lists have entries containing a comma: in XLSX the comma separates entries, which split in two.").With(commaChoices));
-
         var sortedChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
             validation => validation.Kind == ValidationKind.List && validation.ShowDropdown && validation.SortDropdown));
         if (sortedChoices > 0)
             losses.Add(Diagnostic.Info("XLSX244", $"{sortedChoices} validation lists show their entries sorted: XLSX has no sort setting, so typed entries are written already sorted and entries taken from cells appear in cell order in Excel. ODS keeps the setting.").With(sortedChoices));
-
-        var longChoices = workbook.Sheets.Sum(sheet => sheet.Validations.Count(
-            validation => validation.Kind == ValidationKind.List && validation.ListValues.Count > 0 && validation.ListValues.Sum(value => value.Length + 1 + value.Count(character => character == '"')) - 1 > 255));
-        if (longChoices > 0)
-            losses.Add(Diagnostic.Warning("XLSX103", $"{longChoices} validation lists have entries longer than 255 characters in all: Excel refuses longer typed lists, so these rules are kept only in a PulseOffice extension that Excel and other applications ignore; put the entries in cells and refer to them.").With(longChoices));
 
         var comments = workbook.Sheets.Sum(sheet => sheet.Comments.Count);
         if (comments > 0)

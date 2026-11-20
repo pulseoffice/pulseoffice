@@ -56,6 +56,9 @@ internal static class CommandingComposition
         services.AddSingleton<IWindowPlacementStore>(provider => new WindowPlacementStore(
             provider.GetRequiredService<ILoggerFactory>().CreateLogger<WindowPlacementStore>(), paths.Configuration("window-pixels.json")));
 
+        services.AddSingleton<ITornOffWindowPlacementStore>(provider => new TornOffWindowPlacementStore(new WindowPlacementStore(
+            provider.GetRequiredService<ILoggerFactory>().CreateLogger<WindowPlacementStore>(), paths.Configuration("window-pixels-torn-off.json"))));
+        services.AddSingleton<ITornOffWindowSizing, TornOffWindowSizing>();
         services.AddSingleton<IPlacementPolicy, PlacementPolicy>();
         services.AddSingleton<IPlacementPixelMapper, PlacementPixelMapper>();
         services.AddSingleton<WindowPlacementCoordinator>();

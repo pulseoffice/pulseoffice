@@ -35,8 +35,10 @@ public sealed class ShapeTextParagraphs(IShapeTextLists lists, IShapeRichText ri
         var changed = Range(current.Count, start, end, shape).Select(index => (Index: index, Paragraph: change(current[index]))).ToList();
         var directions = lists.Directions(shape).ToList();
         foreach (var (index, paragraph) in changed.Where(entry => entry.Index < directions.Count)) directions[index] = paragraph.Direction;
+        var alignments = lists.Alignments(shape).ToList();
+        foreach (var (index, paragraph) in changed.Where(entry => entry.Index < alignments.Count)) alignments[index] = Placement(paragraph.Align);
         var listed = lists.Apply(shape, start, end, item => Regenerated(item, rich.Item(change(rich.Listed(new TextParagraph(string.Empty) { FontSize = size }, item)))));
-        return lists.WithDirections(listed, directions);
+        return lists.WithAlignments(lists.WithDirections(listed, directions), alignments);
     }
 
     private IEnumerable<int> Range(int count, int start, int end, ShapeObject shape)
@@ -51,4 +53,12 @@ public sealed class ShapeTextParagraphs(IShapeTextLists lists, IShapeRichText ri
 
     private ShapeListItem? Regenerated(ShapeListItem? before, ShapeListItem? after) =>
         after is not null && before?.Level != after.Level ? after with { Margin = null, Indent = null } : after;
+
+    private TextHorizontalPlacement Placement(TextAlign align) => align switch
+    {
+        TextAlign.Center => TextHorizontalPlacement.Centre,
+        TextAlign.Right => TextHorizontalPlacement.Right,
+        TextAlign.Justify => TextHorizontalPlacement.Justify,
+        _ => TextHorizontalPlacement.Left,
+    };
 }

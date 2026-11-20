@@ -258,7 +258,7 @@ public sealed class DocxReader : ITextDocumentReader
     private void Sections(TextDocument document, List<DocxSectionSpan> spans, MainDocumentPart main, DocxReadContext context)
     {
         uint? background = _values.Color(main.Document?.DocumentBackground?.Color?.Value);
-        var wraps = new List<(int First, int End, SectionColumns Columns)>();
+        var wraps = new List<(int First, int End, SectionColumns Columns, bool NextColumn)>();
         PageStyle? current = null;
         var converted = 0;
         var inheritance = new DocxSectionInheritance();
@@ -283,10 +283,9 @@ public sealed class DocxReader : ITextDocumentReader
 
             if (continuous && current is not null && !deferred)
             {
-                if (_sections.NextColumn(span.Properties) && span.FirstBlock < end && document.Body[span.FirstBlock] is ParagraphBlock opening)
-                    opening.Content = opening.Content with { ColumnBreakBefore = true };
+                var nextColumn = _sections.NextColumn(span.Properties);
                 var columns = _sections.Columns(span.Properties);
-                if (columns != current.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns));
+                if ((nextColumn || columns != current.Columns) && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, nextColumn));
                 if (_sections.LineNumberRestart(resolved) is { } lineStart) RestartLines(document, span.FirstBlock, end, lineStart);
                 continue;
             }
@@ -312,7 +311,7 @@ public sealed class DocxReader : ITextDocumentReader
             if (deferred)
             {
                 var columns = _sections.Columns(span.Properties);
-                if (columns != previous!.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns));
+                if (columns != previous!.Columns && end > span.FirstBlock) wraps.Add((span.FirstBlock, end, columns, false));
                 Defer(document, span.FirstBlock, end, name, restart, context);
                 continue;
             }
@@ -331,10 +330,10 @@ public sealed class DocxReader : ITextDocumentReader
 
         for (var position = wraps.Count - 1; position >= 0; position--)
         {
-            var (first, end, columns) = wraps[position];
+            var (first, end, columns, nextColumn) = wraps[position];
             var content = document.Body.Blocks.Skip(first).Take(end - first).ToList();
             document.Body.RemoveRange(first, end - first);
-            document.Body.Insert(first, new SectionBlock(document.NextId("s"), "Section" + (position + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), new BlockContainer(content)) { Columns = columns });
+            document.Body.Insert(first, new SectionBlock(document.NextId("s"), "Section" + (position + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), new BlockContainer(content)) { Columns = columns, StartsInNextColumn = nextColumn });
         }
     }
 

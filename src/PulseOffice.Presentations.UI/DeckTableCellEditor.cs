@@ -48,7 +48,7 @@ internal sealed class DeckTableCellEditor(DeckViewState state, IDeckTableKeys ke
 
         var format = new TableCellIndex(table).Format(single.Top, single.Left);
         var plainLook = single.Top == TableCellFormat.HeaderRow && !table.Style.OwnLook ? TableCellLook.Plain with { Bold = true } : TableCellLook.Plain;
-        var look = new TableCellShapeLook(format?.Look ?? plainLook, format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.FontSize, format?.Margins);
+        var look = new TableCellShapeLook(format?.Look ?? plainLook, format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.FontSize, format?.Margins, format?.Direction ?? CellTextDirection.Horizontal);
         var own = table.CellTexts.FirstOrDefault(text => text.Row == single.Top && text.Column == single.Left);
         var original = cells.CellText(single.Top, single.Left, current, own);
         var start = typed is null ? original : cells.CellText(single.Top, single.Left, string.Empty, null);

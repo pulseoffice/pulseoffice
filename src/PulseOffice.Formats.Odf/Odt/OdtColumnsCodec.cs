@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using PulseOffice.Documents.Blocks;
 using PulseOffice.Foundation.Units;
+using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Formats.Odf.Odt;
 
@@ -17,8 +18,7 @@ internal sealed class OdtColumnsCodec(OdtMeasure measure) : OdtXml
                 new XAttribute(Style + "rel-width", Math.Max(1, span.Width.Value).ToString(CultureInfo.InvariantCulture) + "*"),
                 new XAttribute(Fo + "start-indent", measure.Length(index == 0 ? Twip.Zero : new Twip(columns.Spans[index - 1].Gap.Value / 2))),
                 new XAttribute(Fo + "end-indent", measure.Length(index == columns.Spans.Count - 1 ? Twip.Zero : new Twip(span.Gap.Value - span.Gap.Value / 2))))));
-        if (columns.Separator)
-            element.Add(new XElement(Style + "column-sep", new XAttribute(Style + "style", "solid"), new XAttribute(Style + "width", "0.5pt"), new XAttribute(Style + "color", "#000000")));
+        if (columns.Separator) element.Add(Separator(columns.SeparatorLine));
         return element;
     }
 
@@ -35,9 +35,58 @@ internal sealed class OdtColumnsCodec(OdtMeasure measure) : OdtXml
         var columns = new SectionColumns(Math.Max(1, count), gap ?? Twip.Zero)
         {
             Separator = element.Element(Style + "column-sep") is { } sep && (string?)sep.Attribute(Style + "style") != "none",
+            SeparatorLine = Separator(element.Element(Style + "column-sep")),
             Balanced = balanced,
         };
         return Spans(element, columns) is { } spans ? columns with { Spans = spans } : columns;
+    }
+
+    private XElement Separator(ColumnSeparatorLine line)
+    {
+        var element = new XElement(Style + "column-sep",
+            new XAttribute(Style + "style", line.Style switch
+            {
+                BorderLineStyle.Dotted => "dotted",
+                BorderLineStyle.Dashed => "dashed",
+                _ => "solid",
+            }),
+            new XAttribute(Style + "width", measure.Points(line.Width)),
+            new XAttribute(Style + "color", measure.Hex(line.Color)),
+            new XAttribute(Style + "height", Math.Clamp(line.HeightPercent, 0, ColumnSeparatorLine.FullHeight).ToString(CultureInfo.InvariantCulture) + "%"),
+            new XAttribute(Style + "vertical-align", line.Alignment switch
+            {
+                ColumnSeparatorAlignment.Middle => "middle",
+                ColumnSeparatorAlignment.Bottom => "bottom",
+                _ => "top",
+            }));
+        if (line.Style == BorderLineStyle.Double) element.Add(new XAttribute(Pt + "line-style", "double"));
+        return element;
+    }
+
+    private ColumnSeparatorLine Separator(XElement? element)
+    {
+        if (element is null) return ColumnSeparatorLine.Default;
+        var style = (string?)element.Attribute(Pt + "line-style") == "double" ? BorderLineStyle.Double : (string?)element.Attribute(Style + "style") switch
+        {
+            "dotted" => BorderLineStyle.Dotted,
+            "dashed" or "dot-dashed" => BorderLineStyle.Dashed,
+            _ => BorderLineStyle.Solid,
+        };
+        var width = measure.Points((string?)element.Attribute(Style + "width")) is { } points && double.IsFinite(points) && points > 0 ? Math.Min(points, 72) : ColumnSeparatorLine.Default.Width;
+        var height = (string?)element.Attribute(Style + "height") is { Length: > 1 } text && text.EndsWith('%')
+            && double.TryParse(text[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) && double.IsFinite(percent)
+            ? (int)Math.Round(Math.Clamp(percent, 0, ColumnSeparatorLine.FullHeight))
+            : ColumnSeparatorLine.FullHeight;
+        return new ColumnSeparatorLine(style, width, measure.Color((string?)element.Attribute(Style + "color")) ?? ColumnSeparatorLine.Default.Color)
+        {
+            HeightPercent = height,
+            Alignment = (string?)element.Attribute(Style + "vertical-align") switch
+            {
+                "middle" => ColumnSeparatorAlignment.Middle,
+                "bottom" => ColumnSeparatorAlignment.Bottom,
+                _ => ColumnSeparatorAlignment.Top,
+            },
+        };
     }
 
     private List<ColumnSpan>? Spans(XElement element, SectionColumns columns)

@@ -18,24 +18,19 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
     private readonly XlsxLongValidationLists _longLists = new();
     private readonly PulseOffice.Sheets.Engine.Operations.IValidationAnchoring _anchoring = anchoring ?? new PulseOffice.Sheets.Engine.Operations.ValidationAnchoring();
 
-    public DataValidations? BuildValidations(IReadOnlyList<Rule> validations)
+    public DataValidations? BuildValidations(IReadOnlyList<Rule> validations) => BuildValidations(validations, new XlsxValidationListSheet());
+
+    internal DataValidations? BuildValidations(IReadOnlyList<Rule> validations, XlsxValidationListSheet lists)
     {
         ArgumentNullException.ThrowIfNull(validations);
-
-        var written = validations.Where(validation => !_longLists.IsOverlong(LiteralList(validation))).ToList();
-        if (written.Count == 0) return null;
+        ArgumentNullException.ThrowIfNull(lists);
+        if (validations.Count == 0) return null;
 
         var container = new DataValidations();
-        foreach (var validation in written) container.AppendChild(Element(validation));
+        foreach (var validation in validations) container.AppendChild(Element(validation, lists));
 
-        container.Count = (uint)written.Count;
+        container.Count = (uint)validations.Count;
         return container;
-    }
-
-    public DocumentFormat.OpenXml.Spreadsheet.WorksheetExtension? LongListExtension(IReadOnlyList<Rule> validations)
-    {
-        ArgumentNullException.ThrowIfNull(validations);
-        return _longLists.Extension(validations.Where(validation => _longLists.IsOverlong(LiteralList(validation))).Select(Element).ToList());
     }
 
     private string? LiteralList(Rule validation) =>
@@ -43,7 +38,7 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
             ? "\"" + string.Join(',', _order.Arrange(validation.ListValues, validation.SortDropdown)).Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
             : null;
 
-    private DocumentFormat.OpenXml.Spreadsheet.DataValidation Element(Rule validation)
+    private DocumentFormat.OpenXml.Spreadsheet.DataValidation Element(Rule validation, XlsxValidationListSheet lists)
     {
         var element = new DocumentFormat.OpenXml.Spreadsheet.DataValidation
         {
@@ -66,7 +61,7 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
         if (validation.Kind == ValidationKind.List)
         {
             if (!validation.ShowDropdown) element.ShowDropDown = true;
-            element.AppendChild(new Formula1(LiteralList(validation) ?? ToOpenXml(validation.FirstFormula)));
+            element.AppendChild(new Formula1(ListFormula(validation, lists)));
         }
         else
         {
@@ -80,8 +75,18 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
         return element;
     }
 
-    public void ReadValidations(DocumentFormat.OpenXml.Spreadsheet.Worksheet worksheet, Sheet sheet)
+    private string ListFormula(Rule validation, XlsxValidationListSheet lists)
     {
+        if (LiteralList(validation) is not { } literal) return ToOpenXml(validation.FirstFormula);
+        var arranged = _order.Arrange(validation.ListValues, validation.SortDropdown).ToList();
+        return lists.Needs(arranged, literal) ? lists.Place(arranged) : literal;
+    }
+
+    public void ReadValidations(DocumentFormat.OpenXml.Spreadsheet.Worksheet worksheet, Sheet sheet) => ReadValidations(worksheet, sheet, new XlsxValidationListSheet());
+
+    internal void ReadValidations(DocumentFormat.OpenXml.Spreadsheet.Worksheet worksheet, Sheet sheet, XlsxValidationListSheet lists)
+    {
+        ArgumentNullException.ThrowIfNull(lists);
         ArgumentNullException.ThrowIfNull(worksheet);
         ArgumentNullException.ThrowIfNull(sheet);
 
@@ -106,6 +111,7 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
                 var kind = _vocabulary.Kinds.Model(element.Type?.Value);
                 var first = element.GetFirstChild<Formula1>()?.Text;
                 var second = element.GetFirstChild<Formula2>()?.Text;
+                var helperList = kind == ValidationKind.List ? lists.Resolve(first) : null;
 
                 anchored = new Rule
                 {
@@ -113,12 +119,12 @@ public sealed class XlsxMetadataMapper(PulseOffice.Sheets.Engine.Operations.IVal
                     Kind = kind,
                     Operator = _vocabulary.Operators.Model(element.Operator?.Value),
                     AllowBlank = element.AllowBlank?.Value ?? false,
-                    FirstFormula = kind == ValidationKind.List && IsLiteralList(first) ? null : ToInternal(first),
+                    FirstFormula = helperList is not null || kind == ValidationKind.List && IsLiteralList(first) ? null : ToInternal(first),
                     SecondFormula = kind is ValidationKind.List or ValidationKind.Custom
                         || element.Operator?.Value is { } op && op != DataValidationOperatorValues.Between && op != DataValidationOperatorValues.NotBetween
                         ? null
                         : ToInternal(second),
-                    ListValues = kind == ValidationKind.List && IsLiteralList(first) ? Choices(first) : [],
+                    ListValues = helperList ?? (kind == ValidationKind.List && IsLiteralList(first) ? Choices(first) : []),
                     ShowDropdown = element.ShowDropDown?.Value != true,
                     Alert = _vocabulary.Alerts.Model(element.ErrorStyle?.Value),
                     ErrorMessage = element.Error?.Value,

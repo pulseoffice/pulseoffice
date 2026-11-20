@@ -58,6 +58,29 @@ public sealed class ShapeListNumberingTests
     }
 
     [Fact]
+    public void Round316_paragraph_alignment_and_struck_runs_of_a_shape_cross_XLSX_and_ODS()
+    {
+        var workbook = Workbook(new ShapeObject
+        {
+            Id = "Forma",
+            Shape = ShapeKind.Rectangle,
+            Text = "Uno\nDue\nTre",
+            Runs = [new ShapeTextRun("Uno\n"), new ShapeTextRun("Due") { Strikethrough = true }, new ShapeTextRun("\nTre")],
+            Alignments = [TextHorizontalPlacement.Right, null, TextHorizontalPlacement.Left],
+        });
+
+        foreach (var shape in new[] { RoundTripXlsx(workbook), RoundTripOds(workbook), RoundTripXlsx(Workbook(RoundTripOds(workbook))) })
+        {
+            var horizontal = shape.Style.Text.Horizontal;
+            var alignments = new ShapeTextLists().Alignments(shape).Select(alignment => alignment ?? horizontal).ToList();
+            Assert.Equal(TextHorizontalPlacement.Right, alignments[0]);
+            Assert.Equal(TextHorizontalPlacement.Left, alignments[2]);
+            Assert.Contains(shape.Runs!, run => run.Text.TrimEnd('\n') == "Due" && run.Strikethrough);
+            Assert.DoesNotContain(shape.Runs!, run => run.Text.Contains("Uno", StringComparison.Ordinal) && run.Strikethrough);
+        }
+    }
+
+    [Fact]
     public void Lo_schema_XLSX_e_l_inizio_si_leggono_e_si_riscrivono()
     {
         using var stream = new MemoryStream();

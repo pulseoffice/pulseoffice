@@ -77,6 +77,21 @@ public sealed class FocusedDocumentWorkspace : IDocumentWorkspace
 
     public void UpdateContext(Func<CommandContext, CommandContext> update) => Current.UpdateContext(update);
 
+    public void UpdateContext(Avalonia.Controls.Control source, Func<CommandContext, CommandContext> update)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        (WorkspaceShowing(source) ?? Current).UpdateContext(update);
+    }
+
+    private IDocumentWorkspace? WorkspaceShowing(Avalonia.Controls.Control source)
+    {
+        var lineage = Avalonia.VisualTree.VisualExtensions.GetSelfAndVisualAncestors(source).ToList();
+        bool Shows(OpenDocument document) => ReferenceEquals(document.View, source) || lineage.Contains(document.View);
+        var workspaces = _focus.Scopes.Select(scope => scope.Workspace).ToList();
+        return workspaces.FirstOrDefault(workspace => workspace.Active is { } active && Shows(active))
+            ?? workspaces.FirstOrDefault(workspace => workspace.Documents.Any(Shows));
+    }
+
     private void Listen(IDocumentWorkspace workspace)
     {
         if (!_listened.Add(workspace)) return;

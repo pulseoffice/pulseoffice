@@ -70,7 +70,7 @@ public sealed class XlsxReader
             new SheetPartReader((part, sheet, context) =>
             {
                 if (part.Worksheet is not { } content) return;
-                _metadata.ReadValidations(content, sheet);
+                _metadata.ReadValidations(content, sheet, context.ValidationLists);
                 new XlsxTableReferenceRules(context.Workbook).Restore(content.GetFirstChild<WorksheetExtensionList>(), sheet);
                 foreach (var merge in content.Descendants<MergeCell>())
                     if (merge.Reference?.Value is { Length: > 0 } reference && CellRange.TryParseA1(reference, out var region))
@@ -156,10 +156,12 @@ public sealed class XlsxReader
 
             workbook.Calculation = workbook.Calculation with { DateEpoch = _epochs.Read(workbookPart.Workbook.WorkbookProperties?.Date1904?.Value == true) };
             context.Tables.Load(workbookPart);
+            context.ValidationLists.Load(workbookPart, context.Strings);
             var chartSheets = 0;
             var activeXControls = 0;
             foreach (var sheet in workbookPart.Workbook.Sheets.Elements<Sheet>())
             {
+                if (context.ValidationLists.IsHelper(sheet)) continue;
                 var name = sheet.Name?.Value ?? workbook.UniqueSheetName(Workbook.CanonicalSheetPrefix);
                 if (workbook.FindSheet(name) is not null)
                 {

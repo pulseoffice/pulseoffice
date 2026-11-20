@@ -64,19 +64,23 @@ internal sealed class OdfShapeTextRuns(IOdfParagraphText paragraphs, IShapeTextE
 
     public OdfShapeTextRuns(IOdfParagraphText paragraphs) : this(paragraphs, new ShapeTextEditing(), new ShapeTextLists(), new OdfShapeTextLists()) { }
 
-    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape) || lists.Directed(shape);
+    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape) || lists.Directed(shape) || lists.Aligned(shape);
 
     public OdfShapeListSource Lists(IEnumerable<XElement> candidates, Func<string, byte[]?>? readBytes = null) =>
         new(listCodec.Styles(candidates), readBytes);
 
     public IEnumerable<XElement> Build(ShapeObject shape, IOdfTextStyleSink styles)
     {
-        var alignment = Alignment(shape.Style.Text.Horizontal);
         var directions = lists.Directions(shape);
+        var alignments = lists.Alignments(shape);
+        var paragraphIndex = 0;
         XElement Paragraph()
         {
-            var direction = directions.Count > 0 ? directions[0] : null;
-            if (directions.Count > 0) directions = [.. directions.Skip(1)];
+            var direction = paragraphIndex < directions.Count ? directions[paragraphIndex] : null;
+            var alignment = paragraphIndex < alignments.Count && alignments[paragraphIndex] is { } own
+                ? Alignment(own) ?? "start"
+                : Alignment(shape.Style.Text.Horizontal);
+            paragraphIndex++;
             var properties = new XElement(_style + "paragraph-properties");
             if (alignment is not null) properties.Add(new XAttribute(_fo + "text-align", alignment));
             if (direction is { } written) properties.Add(new XAttribute(_style + "writing-mode", written == PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft ? "rl-tb" : "lr-tb"));
@@ -113,18 +117,22 @@ internal sealed class OdfShapeTextRuns(IOdfParagraphText paragraphs, IShapeTextE
         var runs = new List<ShapeTextRun>();
         var items = new List<ShapeListItem?>();
         var directions = new List<PulseOffice.Text.Rich.Bidi.TextDirection?>();
+        var alignments = new List<TextHorizontalPlacement?>();
         var first = true;
         foreach (var paragraph in Paragraphs(node))
         {
             items.Add(source is null ? null : listCodec.Read(paragraph, node, source));
-            directions.Add(Direction((string?)paragraph.Attribute(_text + "style-name") is { } styleName ? style(styleName, "paragraph") : null));
+            var paragraphStyle = (string?)paragraph.Attribute(_text + "style-name") is { } styleName ? style(styleName, "paragraph") : null;
+            directions.Add(Direction(paragraphStyle));
+            alignments.Add(Placement(paragraphStyle));
             if (!first) runs.Add(runs.Count > 0 ? runs[^1] with { Text = "\n" } : new ShapeTextRun("\n"));
             first = false;
             Collect(paragraph, new ShapeTextRun(string.Empty), runs, name => style(name, "text"));
         }
         var read = editing.WithRuns(shape, runs);
-        if (items.Any(item => item is not null) || directions.Any(direction => direction is not null))
-            return lists.WithDirections(lists.WithItems(read.Text is null ? shape : read, items), directions);
+        if (items.Any(item => item is not null) || directions.Any(direction => direction is not null)
+            || alignments.Any(alignment => alignment is { } own && own != shape.Style.Text.Horizontal))
+            return lists.WithAlignments(lists.WithDirections(lists.WithItems(read.Text is null ? shape : read, items), directions), alignments);
         return editing.Formatted(read) || read.Text?.Contains(ShapeTextRun.LineBreak, StringComparison.Ordinal) == true ? read : shape;
     }
 
@@ -133,6 +141,16 @@ internal sealed class OdfShapeTextRuns(IOdfParagraphText paragraphs, IShapeTextE
         {
             "rl-tb" or "rl" => PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft,
             "lr-tb" or "lr" => PulseOffice.Text.Rich.Bidi.TextDirection.LeftToRight,
+            _ => null,
+        };
+
+    private TextHorizontalPlacement? Placement(XElement? style) =>
+        (string?)style?.Element(_style + "paragraph-properties")?.Attribute(_fo + "text-align") switch
+        {
+            "center" => TextHorizontalPlacement.Centre,
+            "end" or "right" => TextHorizontalPlacement.Right,
+            "justify" => TextHorizontalPlacement.Justify,
+            "start" or "left" => TextHorizontalPlacement.Left,
             _ => null,
         };
 
@@ -152,6 +170,8 @@ internal sealed class OdfShapeTextRuns(IOdfParagraphText paragraphs, IShapeTextE
         if (run.Underline)
             properties.Add(new XAttribute(_style + "text-underline-style", "solid"), new XAttribute(_style + "text-underline-width", "auto"),
                 new XAttribute(_style + "text-underline-color", "font-color"));
+        if (run.Strikethrough)
+            properties.Add(new XAttribute(_style + "text-line-through-style", "solid"), new XAttribute(_style + "text-line-through-type", "single"));
         if (run.Size is { } size) properties.Add(new XAttribute(_fo + "font-size", size.ToString("0.##", CultureInfo.InvariantCulture) + "pt"));
         if (run.ColorHex is { } colour) properties.Add(new XAttribute(_fo + "color", colour.ToLowerInvariant()));
         if (run.Family is { } family) properties.Add(new XAttribute(_fo + "font-family", family));
@@ -177,12 +197,14 @@ internal sealed class OdfShapeTextRuns(IOdfParagraphText paragraphs, IShapeTextE
         var weight = (string?)properties.Attribute(_fo + "font-weight");
         var slant = (string?)properties.Attribute(_fo + "font-style");
         var underline = (string?)properties.Attribute(_style + "text-underline-style");
+        var strike = (string?)properties.Attribute(_style + "text-line-through-style");
         var size = (string?)properties.Attribute(_fo + "font-size");
         return format with
         {
             Bold = weight is null ? format.Bold : weight == "bold" || int.TryParse(weight, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric) && numeric >= 600,
             Italic = slant is null ? format.Italic : slant is "italic" or "oblique",
             Underline = underline is null ? format.Underline : underline != "none",
+            Strikethrough = strike is null ? format.Strikethrough : strike != "none",
             Size = size is not null && size.EndsWith("pt", StringComparison.Ordinal)
                    && double.TryParse(size[..^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var points) && points is >= MinimumSize and <= MaximumSize ? points : format.Size,
             ColorHex = (string?)properties.Attribute(_fo + "color") is { Length: 7 } colour ? colour.ToUpperInvariant() : format.ColorHex,

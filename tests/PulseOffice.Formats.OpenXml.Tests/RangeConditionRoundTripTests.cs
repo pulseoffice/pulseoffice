@@ -84,20 +84,44 @@ public sealed class RangeConditionRoundTripTests
     }
 
     [Fact]
-    public void UnElencoDiConvalidaOltre255CaratteriEDichiaratoInXlsx()
+    public void Long_and_comma_validation_lists_go_to_a_hidden_helper_sheet_and_come_back_typed()
     {
         var workbook = new Workbook();
         var sheet = workbook.AddSheet("Elenco");
+        string[] longList = [.. Enumerable.Range(0, 30).Select(index => $"Voce {index:D3}")];
         sheet.Validations.Add(new PulseOffice.Sheets.DataValidation
         {
             Range = new CellRange(new CellAddress(0, 0), new CellAddress(4, 0)),
             Kind = PulseOffice.Sheets.ValidationKind.List,
-            ListValues = [.. Enumerable.Range(0, 30).Select(index => $"Voce {index:D3}")],
+            ListValues = longList,
+        });
+        sheet.Validations.Add(new PulseOffice.Sheets.DataValidation
+        {
+            Range = new CellRange(new CellAddress(0, 1), new CellAddress(0, 1)),
+            Kind = PulseOffice.Sheets.ValidationKind.List,
+            ListValues = ["Rossi, Mario", "Bianchi"],
         });
 
-        Assert.Contains(new XlsxSpreadsheetWriter().CheckFidelity(workbook).Losses, loss => loss.Code == "XLSX103");
-        sheet.Validations[0] = sheet.Validations[0] with { ListValues = ["a", "b"] };
-        Assert.DoesNotContain(new XlsxSpreadsheetWriter().CheckFidelity(workbook).Losses, loss => loss.Code == "XLSX103");
+        Assert.DoesNotContain(new XlsxSpreadsheetWriter().CheckFidelity(workbook).Losses, loss => loss.Code is "XLSX103" or "XLSX034");
+
+        using var stream = new MemoryStream();
+        new XlsxWriter().Write(workbook, stream);
+        stream.Position = 0;
+        using (var package = SpreadsheetDocument.Open(stream, false))
+        {
+            var entries = package.WorkbookPart!.Workbook!.Sheets!.Elements<DocumentFormat.OpenXml.Spreadsheet.Sheet>().ToList();
+            Assert.Equal(SheetStateValues.VeryHidden, entries[^1].State!.Value);
+            var formulas = package.WorkbookPart.WorksheetParts.SelectMany(part => part.Worksheet!.Descendants<Formula1>()).Select(formula => formula.Text).ToList();
+            Assert.Contains("'PulseOffice Lists'!$A$1:$A$30", formulas);
+            Assert.Contains("'PulseOffice Lists'!$B$1:$B$2", formulas);
+        }
+
+        stream.Position = 0;
+        var read = new XlsxReader().Read(stream).Value!;
+        var back = Assert.Single(read.Sheets);
+        Assert.Equal(longList, back.Validations[0].ListValues);
+        Assert.Null(back.Validations[0].FirstFormula);
+        Assert.Equal(["Rossi, Mario", "Bianchi"], back.Validations[1].ListValues);
     }
 
     [Fact]

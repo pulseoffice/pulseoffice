@@ -28,8 +28,9 @@ public sealed class Round313SectionBreakTests
 
         var read = _composer.Reader(DocxFlavour.Document).Read(stream).Value!;
 
-        var second = read.Body.Blocks.OfType<ParagraphBlock>().Single(paragraph => paragraph.Content.Text == "two");
-        Assert.True(second.Content.ColumnBreakBefore);
-        Assert.Null(second.Content.PageStyleName);
+        var section = read.Body.Blocks.OfType<SectionBlock>().Single();
+        Assert.True(section.StartsInNextColumn);
+        Assert.Equal("two", Assert.IsType<ParagraphBlock>(section.Content.Blocks.Single()).Content.Text);
+        Assert.Null(((ParagraphBlock)section.Content.Blocks.Single()).Content.ColumnBreakBefore);
     }
 }

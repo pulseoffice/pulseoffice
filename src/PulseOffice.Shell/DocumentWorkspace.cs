@@ -174,6 +174,8 @@ public interface IDocumentWorkspace
 
     void UpdateContext(Func<CommandContext, CommandContext> update);
 
+    void UpdateContext(Avalonia.Controls.Control source, Func<CommandContext, CommandContext> update) => UpdateContext(update);
+
     event EventHandler? ContextChanged;
     event EventHandler<OpenDocument>? ActiveChanged;
 

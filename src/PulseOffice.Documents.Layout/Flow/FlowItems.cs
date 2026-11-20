@@ -34,6 +34,8 @@ public sealed record ColumnLayout(int Count, double Gap, bool Balanced, bool Sep
 
     public IReadOnlyList<ColumnShare> Shares { get; init; } = [];
 
+    public PulseOffice.Documents.Blocks.ColumnSeparatorLine SeparatorLine { get; init; } = PulseOffice.Documents.Blocks.ColumnSeparatorLine.Default;
+
     private bool Uneven => Count > 1 && Shares.Count == Count && Shares.Sum(share => Math.Max(0, share.Weight)) > 0;
 
     public double Spacing(double total) => Count <= 1 || !double.IsFinite(Gap) ? 0 : Math.Clamp(Gap, 0, Math.Max(0, (total - NarrowestColumn * Count) / (Count - 1)));
@@ -64,7 +66,7 @@ public sealed record ColumnLayout(int Count, double Gap, bool Balanced, bool Sep
     }
 
     public bool Equals(ColumnLayout? other) =>
-        other is not null && Count == other.Count && Gap.Equals(other.Gap) && Balanced == other.Balanced && Separator == other.Separator
+        other is not null && Count == other.Count && Gap.Equals(other.Gap) && Balanced == other.Balanced && Separator == other.Separator && SeparatorLine == other.SeparatorLine
         && Shares.SequenceEqual(other.Shares);
 
     public override int GetHashCode() => HashCode.Combine(Count, Gap, Balanced, Separator, Shares.Count);
@@ -86,7 +88,7 @@ public sealed class SectionStartItem(SectionBlock section, ColumnLayout columns)
 
     public ColumnLayout Columns { get; } = columns;
 
-    public override FlowKey Key => new("section-start:" + Section.Id, [Columns], string.Empty);
+    public override FlowKey Key => new("section-start:" + Section.Id + (Section.StartsInNextColumn ? ":next-column" : string.Empty), [Columns], string.Empty);
 
     public override T Accept<T>(IFlowItemVisitor<T> visitor) => visitor.VisitSectionStart(this);
 }

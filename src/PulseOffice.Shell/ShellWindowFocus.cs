@@ -1,15 +1,19 @@
 using PulseOffice.UI.Controls.References;
+using PulseOffice.UI.Controls;
 using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Shell;
 
-public sealed class ShellWindowScope(IDocumentWorkspace workspace, IDialogService dialogs, IDialogCollapse dialogCollapse)
+public sealed class ShellWindowScope(
+    IDocumentWorkspace workspace, IDialogService dialogs, IDialogCollapse dialogCollapse, ISidePanelHost? sidePanel = null)
 {
     public IDocumentWorkspace Workspace { get; } = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
     public IDialogService Dialogs { get; } = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
 
     public IDialogCollapse DialogCollapse { get; } = dialogCollapse ?? throw new ArgumentNullException(nameof(dialogCollapse));
+
+    public ISidePanelHost? SidePanel { get; } = sidePanel;
 }
 
 public interface IShellWindowScopeOwner

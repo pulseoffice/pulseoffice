@@ -4,16 +4,16 @@ using Avalonia.Media;
 using PulseOffice.UI.Controls.Theming;
 using PulseOffice.UI.Theming;
 
-namespace PulseOffice.Sheets.UI.LedgerViewParts;
+namespace PulseOffice.UI.Controls.Forms;
 
-internal sealed class LedgerInputMessageNote
+public sealed class InputHelpNote
 {
     private const double Gap = 4;
 
     private readonly TextBlock _title;
     private readonly TextBlock _message;
 
-    public LedgerInputMessageNote(DesignTokens.Metrics metrics)
+    public InputHelpNote(DesignTokens.Metrics metrics, string name)
     {
         _title = new TextBlock
         {
@@ -30,7 +30,8 @@ internal sealed class LedgerInputMessageNote
 
         Box = new Border
         {
-            Name = "ValidationInputMessage",
+            Name = name,
+            IsHitTestVisible = false,
             IsVisible = false,
             MaxWidth = 260,
             Padding = new Thickness(metrics.SpacingSmall),

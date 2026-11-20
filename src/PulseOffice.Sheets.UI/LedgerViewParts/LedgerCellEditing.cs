@@ -90,7 +90,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         };
 
         AnnotatedRange = new PulseOffice.UI.Controls.Text.TextRangeHighlight(CellEditor);
-        InputNote = new LedgerInputMessageNote(_metrics);
+        InputNote = new PulseOffice.UI.Controls.Forms.InputHelpNote(_metrics, "ValidationInputMessage");
 
         CellEditor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         CellAssist = new LedgerFormulaAssist(CellEditor, this, _texts, () => IsEditing && !_suggesting, _metrics);
@@ -424,7 +424,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         }, () => _grid.Focus());
     }
 
-    public LedgerInputMessageNote InputNote { get; }
+    public PulseOffice.UI.Controls.Forms.InputHelpNote InputNote { get; }
 
     public void AnnounceInputMessage()
     {

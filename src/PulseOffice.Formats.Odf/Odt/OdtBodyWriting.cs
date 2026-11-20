@@ -804,6 +804,7 @@ internal sealed class OdtSectionWriter(OdtColumnsCodec columns, OdtIndexCodec in
             section.ProtectionKey is { } key ? new XAttribute(Text + "protection-key", Convert.ToBase64String(key)) : null,
             section.ProtectionKey is { Length: 32 } ? new XAttribute(Text + "protection-key-digest-algorithm", "http://www.w3.org/2000/09/xmldsig#sha256") : null,
             section.Condition is { } condition ? new XAttribute(Text + "condition", condition) : null,
+            section.StartsInNextColumn ? new XAttribute(Pt + "starts-in-next-column", "true") : null,
             section.Hidden ? new XAttribute(Text + "display", "none") : section.Condition is not null ? new XAttribute(Text + "display", "condition") : null);
         if (section.LinkedFile is { } linked)
             element.Add(new XElement(Text + "section-source", new XAttribute(Xlink + "href", new LinkedFiles().ToPackageHref(linked)), new XAttribute(Xlink + "type", "simple")));

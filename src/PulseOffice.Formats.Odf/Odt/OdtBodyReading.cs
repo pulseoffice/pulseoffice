@@ -1052,6 +1052,7 @@ internal sealed class OdtSectionReader(OdtColumnsCodec columns, OdtIndexCodec in
             Hidden = display == "none",
             CollectsEndnotes = properties?.Elements(Text + "notes-configuration").Any(configuration => (string?)configuration.Attribute(Text + "note-class") == "endnote") == true,
             Condition = (string?)element.Attribute(Text + "condition"),
+            StartsInNextColumn = (string?)element.Attribute(Pt + "starts-in-next-column") == "true",
             LinkedFile = (string?)element.Element(Text + "section-source")?.Attribute(Xlink + "href") is { } source ? new LinkedFiles().FromPackageHref(source) : null,
         };
     }

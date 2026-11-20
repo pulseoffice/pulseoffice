@@ -4,7 +4,7 @@ using PulseOffice.Foundation.Units;
 
 namespace PulseOffice.Presentations.UI;
 
-public sealed record TableCellShapeLook(TableCellLook Look, CellVerticalAlign Vertical, double FontSize, TableCellMargins? Margins = null);
+public sealed record TableCellShapeLook(TableCellLook Look, CellVerticalAlign Vertical, double FontSize, TableCellMargins? Margins = null, CellTextDirection Direction = CellTextDirection.Horizontal);
 
 public interface IDeckTableCellShapes
 {
@@ -49,6 +49,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
                     Bold = own.Bold,
                     Italic = own.Italic,
                     Underline = own.Underline,
+                    Strikethrough = own.Strikethrough,
                     Size = own.FontSize is { } size && Math.Abs(size - style.Size) > 0.001 ? size : null,
                     ColorHex = own.TextHex is { } ink && !string.Equals(ink, style.ColorHex, StringComparison.OrdinalIgnoreCase) ? ink : null,
                     Family = own.FontFamily is { Length: > 0 } family && family != style.Family ? family : null,
@@ -63,6 +64,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
             Style = new ShapeStyle { Fill = ShapeFill.None, Line = ShapeLine.None, Text = style },
             Text = text,
             Runs = runs.Count > 0 ? runs : null,
+            Alignments = Alignments(cell, look, style.Horizontal),
         };
     }
 
@@ -81,6 +83,7 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
                 Bold = run.Bold || style.Bold,
                 Italic = run.Italic || style.Italic,
                 Underline = run.Underline || style.Underline,
+                Strikethrough = run.Strikethrough,
                 TextHex = run.ColorHex ?? look.Look.TextHex,
                 FontFamily = run.Family ?? look.Look.FontFamily,
                 FontSize = run.Size ?? look.Look.FontSize,
@@ -89,8 +92,6 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
         }
 
         var plain = string.Concat(runs.Select(run => run.Text));
-        var source = original.Rebased(plain.Replace(ShapeTextRun.LineBreak, '\n'));
-        var strikes = Strikes(source);
         var paragraphs = new List<TableCellParagraph>();
         var current = new List<TableTextRun>();
         var position = 0;
@@ -99,33 +100,44 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
             var at = position++;
             if (plain[at] == '\n')
             {
-                paragraphs.Add(Paragraph(current, source ?? original, paragraphs.Count));
+                paragraphs.Add(Paragraph(current, edited, paragraphs.Count));
                 current = [];
                 continue;
             }
-            var piece = format with { Text = character.ToString(), Strikethrough = at < strikes.Count ? strikes[at] : null };
+            var piece = format with { Text = character.ToString() };
             if (current.Count > 0 && current[^1].SameFormat(piece)) current[^1] = current[^1] with { Text = current[^1].Text + character };
             else current.Add(piece);
         }
-        paragraphs.Add(Paragraph(current, source ?? original, paragraphs.Count));
-        return new TableCellText(original.Row, original.Column, paragraphs);
+        paragraphs.Add(Paragraph(current, edited, paragraphs.Count));
+        return new TableCellText(original.Row, original.Column, paragraphs).AlignedBeyond(look.Look);
     }
 
-    private TableCellParagraph Paragraph(List<TableTextRun> runs, TableCellText aligned, int index) =>
-        new([.. runs]) { Alignment = aligned.Paragraphs.Count == 0 ? null : aligned.Paragraphs[Math.Min(index, aligned.Paragraphs.Count - 1)].Alignment };
-
-    private List<bool?> Strikes(TableCellText? source)
+    private TableCellParagraph Paragraph(List<TableTextRun> runs, ShapeObject edited, int index)
     {
-        var strikes = new List<bool?>();
-        if (source is null) return strikes;
-        for (var index = 0; index < source.Paragraphs.Count; index++)
-        {
-            if (index > 0) strikes.Add(null);
-            foreach (var run in source.Paragraphs[index].Runs)
-                for (var i = 0; i < run.Text.Length; i++) strikes.Add(run.Strikethrough);
-        }
-        return strikes;
+        var own = edited.Alignments is { } alignments && index < alignments.Count ? alignments[index] : null;
+        return new([.. runs]) { Alignment = Cell(own ?? edited.Style.Text.Horizontal) };
     }
+
+    private IReadOnlyList<TextHorizontalPlacement?>? Alignments(TableCellText cell, TableCellShapeLook look, TextHorizontalPlacement shape)
+    {
+        var placements = cell.Paragraphs.Select(paragraph => Placement(paragraph.AlignedOver(look.Look))).ToList();
+        if (placements.All(placement => placement == shape)) return null;
+        return [.. placements.Select(placement => placement == shape ? (TextHorizontalPlacement?)null : placement)];
+    }
+
+    private TextHorizontalPlacement Placement(CellHorizontalAlign align) => align switch
+    {
+        CellHorizontalAlign.Center => TextHorizontalPlacement.Centre,
+        CellHorizontalAlign.Right => TextHorizontalPlacement.Right,
+        _ => TextHorizontalPlacement.Left,
+    };
+
+    private CellHorizontalAlign Cell(TextHorizontalPlacement placement) => placement switch
+    {
+        TextHorizontalPlacement.Centre => CellHorizontalAlign.Center,
+        TextHorizontalPlacement.Right => CellHorizontalAlign.Right,
+        _ => CellHorizontalAlign.Left,
+    };
 
     private TableCellLook Effective(TableCellShapeLook look) =>
         look.Look with { FontSize = look.Look.FontSize ?? look.FontSize };
@@ -154,6 +166,13 @@ public sealed class DeckTableCellShapes : IDeckTableCellShapes
                 _ => TextVerticalPlacement.Top,
             },
             Wrap = true,
+            Layout = look.Direction switch
+            {
+                CellTextDirection.Down => new PulseOffice.Text.Rich.TextLayout { Flow = PulseOffice.Text.Rich.TextFlow.Vertical },
+                CellTextDirection.Up => new PulseOffice.Text.Rich.TextLayout { Flow = PulseOffice.Text.Rich.TextFlow.Vertical270 },
+                CellTextDirection.Stacked => new PulseOffice.Text.Rich.TextLayout { Flow = PulseOffice.Text.Rich.TextFlow.Stacked },
+                _ => PulseOffice.Text.Rich.TextLayout.Default,
+            },
             Inset = Twip.FromPoints(look.Margins?.Left ?? DefaultInset),
         };
     }

@@ -39,7 +39,7 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
     public bool Draws(ShapeObject shape)
     {
         ArgumentNullException.ThrowIfNull(shape);
-        return lists.Listed(shape) || lists.Directed(shape) || Composed(shape.Style.Text.Layout);
+        return lists.Listed(shape) || lists.Directed(shape) || lists.Aligned(shape) || shape.Runs?.Any(run => run.Strikethrough) == true || Composed(shape.Style.Text.Layout);
     }
 
     public void Draw(DrawingContext context, ShapeObject shape, Rect bounds, Color ink, string? language = null, double shapeRotation = 0, IPaintedTextLines? painted = null)
@@ -59,18 +59,11 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
     {
         ArgumentNullException.ThrowIfNull(shape);
         var style = shape.Style.Text;
-        var align = style.Horizontal switch
-        {
-            TextHorizontalPlacement.Centre => TextAlign.Center,
-            TextHorizontalPlacement.Right => TextAlign.Right,
-            TextHorizontalPlacement.Justify => TextAlign.Justify,
-            _ => TextAlign.Left,
-        };
         var inset = Math.Max(0, style.Inset.ToPoints());
         var text = rich.ToRich(shape);
         var framed = text with
         {
-            Paragraphs = [.. text.Paragraphs.Select(paragraph => Unseen(paragraph) ? paragraph with { Align = align, Bold = style.Bold, Italic = style.Italic, Color = 0u } : paragraph with { Align = align, Bold = style.Bold, Italic = style.Italic })],
+            Paragraphs = [.. text.Paragraphs.Select(paragraph => Unseen(paragraph) ? paragraph with { Bold = style.Bold, Italic = style.Italic, Color = 0u } : paragraph with { Bold = style.Bold, Italic = style.Italic })],
             Frame = new TextFrame
             {
                 Anchor = style.Vertical switch

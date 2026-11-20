@@ -15,6 +15,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         var runs = new List<ShapeTextRun>();
         var items = new List<ShapeListItem?>();
         var directions = new List<PulseOffice.Text.Rich.Bidi.TextDirection?>();
+        var alignments = new List<TextHorizontalPlacement?>();
         var first = true;
         foreach (var paragraph in body.Elements<D.Paragraph>())
         {
@@ -22,6 +23,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
             directions.Add(paragraph.ParagraphProperties?.RightToLeft?.HasValue == true
                 ? paragraph.ParagraphProperties.RightToLeft.Value ? PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft : PulseOffice.Text.Rich.Bidi.TextDirection.LeftToRight
                 : null);
+            alignments.Add(Placement(paragraph.ParagraphProperties?.Alignment?.Value));
             if (!first) runs.Add(runs.Count > 0 ? runs[^1] with { Text = "\n" } : new ShapeTextRun("\n"));
             first = false;
             foreach (var child in paragraph.ChildElements)
@@ -34,12 +36,13 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
 
         var read = editing.WithRuns(shape, runs);
         var directed = directions.Any(direction => direction is not null);
-        if (items.Any(item => item is not null) || directed)
-            return lists.WithDirections(lists.WithItems(read.Text is null ? shape : read, items), directions);
+        var aligned = alignments.Any(alignment => alignment is { } own && own != shape.Style.Text.Horizontal);
+        if (items.Any(item => item is not null) || directed || aligned)
+            return lists.WithAlignments(lists.WithDirections(lists.WithItems(read.Text is null ? shape : read, items), directions), alignments);
         return editing.Formatted(read) || Multiline(read.Text) ? read : shape;
     }
 
-    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape) || lists.Directed(shape);
+    public bool Formatted(ShapeObject shape) => editing.Formatted(shape) || lists.Listed(shape) || lists.Directed(shape) || lists.Aligned(shape);
 
     public OpenXmlElement Write(OpenXmlElement written, ShapeObject shape, IDrawingRunLinks links)
     {
@@ -55,6 +58,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         var runs = shape.Runs is { Count: > 0 } own ? own : [new ShapeTextRun(text)];
         var items = lists.Items(shape);
         var directions = lists.Directions(shape);
+        var alignments = lists.Alignments(shape);
         var index = 0;
         D.Paragraph Next()
         {
@@ -62,6 +66,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
             properties.RightToLeft = index < directions.Count && directions[index] is { } direction
                 ? direction == PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft
                 : null;
+            if (index < alignments.Count && alignments[index] is { } alignment) properties.Alignment = Alignment(alignment);
             index++;
             return Paragraph(properties);
         }
@@ -84,6 +89,21 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         Close(paragraph, end);
         return written;
     }
+
+    private D.TextAlignmentTypeValues Alignment(TextHorizontalPlacement placement) => placement switch
+    {
+        TextHorizontalPlacement.Centre => D.TextAlignmentTypeValues.Center,
+        TextHorizontalPlacement.Right => D.TextAlignmentTypeValues.Right,
+        TextHorizontalPlacement.Justify => D.TextAlignmentTypeValues.Justified,
+        _ => D.TextAlignmentTypeValues.Left,
+    };
+
+    private TextHorizontalPlacement? Placement(D.TextAlignmentTypeValues? alignment) =>
+        alignment is not { } value ? null
+        : value == D.TextAlignmentTypeValues.Center ? TextHorizontalPlacement.Centre
+        : value == D.TextAlignmentTypeValues.Right ? TextHorizontalPlacement.Right
+        : value == D.TextAlignmentTypeValues.Justified || value == D.TextAlignmentTypeValues.Distributed ? TextHorizontalPlacement.Justify
+        : TextHorizontalPlacement.Left;
 
     private bool Multiline(string? text) =>
         text is not null && text.AsSpan().IndexOfAny('\n', ShapeTextRun.LineBreak) >= 0;
@@ -119,6 +139,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
         if (run.Bold) properties.Bold = true;
         if (run.Italic) properties.Italic = true;
         if (run.Underline) properties.Underline = D.TextUnderlineValues.Single;
+        if (run.Strikethrough) properties.Strike = D.TextStrikeValues.SingleStrike;
         if (run.Size is { } size) properties.FontSize = (int)Math.Round(size * 100);
         if (run.ColorHex is { } colour)
         {
@@ -153,6 +174,7 @@ internal sealed class DrawingShapeTextRuns(IShapeTextEditing editing, IShapeText
             Bold = typed?.Bold?.Value ?? false,
             Italic = typed?.Italic?.Value ?? false,
             Underline = underline is not null && underline != D.TextUnderlineValues.None,
+            Strikethrough = typed?.Strike?.Value is { } strike && strike != D.TextStrikeValues.NoStrike,
             Size = typed?.FontSize?.Value is { } size ? size / 100.0 : null,
             ColorHex = properties?.GetFirstChild<D.SolidFill>()?.GetFirstChild<D.RgbColorModelHex>()?.Val?.Value is { Length: 6 } rgb
                 ? "#" + rgb.ToUpper(CultureInfo.InvariantCulture)

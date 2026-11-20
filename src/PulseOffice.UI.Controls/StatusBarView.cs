@@ -119,8 +119,22 @@ public sealed class StatusBarView : ContentControl
         });
     }
 
+    public bool IsFrozen
+    {
+        get => _frozen;
+        set
+        {
+            if (_frozen == value) return;
+            _frozen = value;
+            if (!value) Refresh();
+        }
+    }
+
+    private bool _frozen;
+
     public void Refresh()
     {
+        if (_frozen) return;
         _left.Children.Clear();
         _right.Children.Clear();
 

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using PulseOffice.UI.Controls.References;
 using PulseOffice.UI.Controls.Services;
 using Xunit;
+using PulseOffice.UI.Commands;
 
 namespace PulseOffice.Shell.Tests;
 
@@ -107,5 +108,21 @@ public sealed class Round310FocusedWorkspaceTests
         Assert.Same(_first, _focus.Current);
         Assert.Single(_focus.Scopes);
         Assert.Empty(_workspace.Documents);
+    }
+
+    [Fact]
+    public void A_view_in_an_unfocused_window_updates_its_own_window_context()
+    {
+        var inner = new Avalonia.Controls.Border();
+        var view = new Avalonia.Controls.Panel { Children = { inner } };
+        var background = new OpenDocument(ModuleKind.Sheets, "b", view, new UndoStack());
+        _second.Workspace.Open(background);
+        _first.Workspace.Open(Tab("a"));
+        var before = _first.Workspace.Context;
+
+        _workspace.UpdateContext(inner, context => context with { Selection = SelectionKind.CellRange });
+
+        Assert.Equal(before, _first.Workspace.Context);
+        Assert.Equal(SelectionKind.CellRange, _second.Workspace.Context.Selection);
     }
 }

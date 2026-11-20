@@ -538,6 +538,11 @@ public sealed class DialogHost : ContentControl, IDialogService, PulseOffice.UI.
         _texts.LanguageChanged += OnLanguageChanged;
     }
 
+    public void Release()
+    {
+        if (_texts is not null) _texts.LanguageChanged -= OnLanguageChanged;
+    }
+
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         if (_texts is null || _dialogs.Count == 0) return;

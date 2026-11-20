@@ -315,7 +315,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
         _grid.ObjectActivated += (_, _) => ObjectEditRequested?.Invoke(this, EventArgs.Empty);
         _grid.ObjectLinkFollowed += (_, link) => Links?.Follow(link, GoToPlace);
 
-        _grid.SelectedObjectChanged += (_, placed) => _workspace.UpdateContext(context => context with
+        _grid.SelectedObjectChanged += (_, placed) => _workspace.UpdateContext(this, context => context with
         {
             State = _objects.ObjectFacts(context.State, placed),
         });
@@ -435,7 +435,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
     {
         var kind = _selection.IsSingleCell ? SelectionKind.Cell : SelectionKind.CellRange;
 
-        _workspace.UpdateContext(context => context with
+        _workspace.UpdateContext(this, context => context with
         {
             Selection = kind,
             State = context.State | DocumentState.HasSelection,

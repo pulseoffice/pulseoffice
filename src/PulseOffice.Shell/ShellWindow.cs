@@ -85,7 +85,8 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         _applicationQuit = applicationQuit ?? throw new ArgumentNullException(nameof(applicationQuit));
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(dialogHost);
-        Scope = new ShellWindowScope(workspace, dialogHost, dialogHost);
+        ArgumentNullException.ThrowIfNull(sidePanel);
+        Scope = new ShellWindowScope(workspace, dialogHost, dialogHost, sidePanel);
         _interfaceLock = interfaceLock ?? throw new ArgumentNullException(nameof(interfaceLock));
         _regionCycle = regionCycle ?? throw new ArgumentNullException(nameof(regionCycle));
         _statusZoom = statusZoom ?? throw new ArgumentNullException(nameof(statusZoom));
@@ -160,8 +161,8 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
             if (_surfaces.FindCommand(invocation.CommandId) is { } command)
                 _surfaces.Execute(command, _context with { Argument = invocation.Argument });
         };
-        ArgumentNullException.ThrowIfNull(ribbonState);
-        ribbonState.StateChanged += (_, _) => RefreshRibbon();
+        _ribbonState = ribbonState ?? throw new ArgumentNullException(nameof(ribbonState));
+        _ribbonState.StateChanged += OnRibbonStateChanged;
 
         _documentTabs = new DocumentTabsView(workspace, texts);
         _documentTabs.CloseRequested += (_, document) => _ = CloseAsync(_guard(), document);
@@ -174,6 +175,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
         _workspaceHost.Themed(Panel.BackgroundProperty, Palette.Keys.Surface);
 
         var workArea = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        _workArea = workArea;
 
         Grid.SetColumn(_workspaceHost, 0);
         Grid.SetColumn(_sidePanel, 1);
@@ -213,13 +215,18 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
             },
         };
         Activated += (_, _) => OnWindowActivated();
-        Deactivated += (_, _) => _toasts.IsVisible = OnlyWindow();
+        Deactivated += (_, _) =>
+        {
+            var only = OnlyWindow();
+            _toasts.IsVisible = only;
+            _statusBar.IsFrozen = !only;
+        };
         PaintSurface(surface);
         Content = surface;
 
         ApplyVisibility();
 
-        settings.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(ApplyVisibility);
+        settings.Changed += OnSettingsChanged;
 
         _accent.SetActiveModule(ModuleKind.Shell);
 
@@ -238,20 +245,10 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
 
         AddHandler(KeyDownEvent, OnPreviewKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(TextInputEvent, (_, e) => e.Handled |= _interfaceLock.IsLocked, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        _interfaceLock.Changed += (_, _) =>
-        {
-            workArea.IsHitTestVisible = !_interfaceLock.IsLocked;
-            _ribbonLayer.IsHitTestVisible = !_interfaceLock.IsLocked;
-            Cursor = _interfaceLock.IsLocked ? new Cursor(StandardCursorType.Wait) : Cursor.Default;
-        };
+        _interfaceLock.Changed += OnInterfaceLockChanged;
         AddHandler(KeyDownEvent, OnKeyDown, Avalonia.Interactivity.RoutingStrategies.Bubble);
 
-        _texts.LanguageChanged += (_, _) =>
-        {
-            _status.DismissTransient();
-            UpdateForContext(_context);
-            if (_workspace.Active is null) ShowWelcome();
-        };
+        _texts.LanguageChanged += OnLanguageChanged;
 
         _workspace.DocumentClosed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
@@ -276,6 +273,49 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
     }
 
     private readonly NotificationToastHost _toasts;
+    private readonly PulseOffice.UI.Controls.Services.IRibbonStateNotifier _ribbonState;
+    private readonly Grid _workArea;
+
+    private void OnRibbonStateChanged(object? sender, EventArgs e) => RefreshRibbon();
+
+    private void OnSettingsChanged(object? sender, SettingChangedEventArgs e) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(ApplyVisibility);
+
+    private void OnInterfaceLockChanged(object? sender, EventArgs e)
+    {
+        _workArea.IsHitTestVisible = !_interfaceLock.IsLocked;
+        _ribbonLayer.IsHitTestVisible = !_interfaceLock.IsLocked;
+        Cursor = _interfaceLock.IsLocked ? new Cursor(StandardCursorType.Wait) : Cursor.Default;
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        _status.DismissTransient();
+        UpdateForContext(_context);
+        if (_workspace.Active is null) ShowWelcome();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        _ribbonState.StateChanged -= OnRibbonStateChanged;
+        _settings.Changed -= OnSettingsChanged;
+        _interfaceLock.Changed -= OnInterfaceLockChanged;
+        _texts.LanguageChanged -= OnLanguageChanged;
+        _dialogHost.Release();
+        RebindSurfacesToFocusedWindow();
+    }
+
+    private void RebindSurfacesToFocusedWindow()
+    {
+        try
+        {
+            if (_windowHost().Focused is ShellWindow focused && !ReferenceEquals(focused, this)) focused.BindSurfaces();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
 
     public ShellWindowScope Scope { get; }
 
@@ -298,7 +338,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
     public int TabIndexAt(PixelPoint screenPoint)
     {
         if (!_documentTabs.IsEffectivelyVisible) return -1;
-        return _documentTabs.TabIndexAt(_documentTabs.PointToClient(screenPoint).X);
+        return _documentTabs.TabIndexAtScreen(screenPoint);
     }
 
     private bool OnlyWindow()
@@ -322,6 +362,7 @@ public sealed class ShellWindow : Window, IShellPresenter, INotificationActionRu
     private void OnWindowActivated()
     {
         _toasts.IsVisible = true;
+        _statusBar.IsFrozen = false;
         BindSurfaces();
         if (_workspace.Active is { } active) ShowDocumentName(active);
         UpdateForContext(_workspace.Context);

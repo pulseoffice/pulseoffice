@@ -398,6 +398,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
             var columns = new ColumnLayout(Math.Clamp(section.Columns.Count, 1, SectionColumns.LargestCount), section.Columns.Gap.ToPoints(), section.Columns.Balanced, section.Columns.Separator)
             {
                 Shares = [.. section.Columns.Spans.Select(span => new ColumnShare(span.Width.ToPoints(), span.Gap.ToPoints()))],
+                SeparatorLine = section.Columns.SeparatorLine,
             };
             var notes = context.Story == StoryKind.Body && context.Document.Body.Blocks.Contains(section)
                 ? context.Notes.InSection(section.Id).SelectMany(id => owner.Notes(id, context with { Lists = new Dictionary<string, ListPlacement?>() }))

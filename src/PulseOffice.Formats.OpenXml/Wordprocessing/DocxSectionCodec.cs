@@ -20,7 +20,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
     public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, MainDocumentPart main, DocxWriteContext context) =>
         Write(style, restart, continuous, !continuous, null, main, context);
 
-    public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, bool headers, int? lineRestart, MainDocumentPart main, DocxWriteContext context, int? lineStart = null)
+    public W.SectionProperties Write(PageStyle style, int? restart, bool continuous, bool headers, int? lineRestart, MainDocumentPart main, DocxWriteContext context, int? lineStart = null, bool nextColumn = false)
     {
         var section = new W.SectionProperties();
         context.WrittenPageStyles.Add(style.Name);
@@ -31,7 +31,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
         }
         var inset = style.Borders ?? new PulseOffice.Text.Rich.BoxBorders();
 
-        if (continuous) section.Append(new W.SectionType { Val = W.SectionMarkValues.Continuous });
+        if (continuous) section.Append(new W.SectionType { Val = nextColumn ? W.SectionMarkValues.NextColumn : W.SectionMarkValues.Continuous });
         else if (Starts.Mark(style, context.Document) is { } mark) section.Append(new W.SectionType { Val = mark });
         section.Append(new W.PageSize
         {
@@ -148,7 +148,7 @@ public sealed class DocxSectionCodec(DocxBlockWriter writer, DocxBlockReader rea
         if (count <= 1) return SectionColumns.Single;
         var gap = new Twip(values.Bounded(values.Integer(columns!.Space?.Value) ?? 720, 0, LargestPage));
         var result = new SectionColumns(count, gap) { Separator = columns.Separator?.Value ?? false };
-        var spans = columns.EqualWidth is { } equal && !equal.Value
+        var spans = (columns.EqualWidth is { } equal ? !equal.Value : columns.Elements<W.Column>().Count() >= count)
             ? columns.Elements<W.Column>().Take(count).Select(column => new ColumnSpan(
                 new Twip(values.Bounded(values.Integer(column.Width?.Value) ?? 0, 0, LargestPage)),
                 new Twip(values.Bounded(values.Integer(column.Space?.Value) ?? 0, 0, LargestPage)))).ToList()

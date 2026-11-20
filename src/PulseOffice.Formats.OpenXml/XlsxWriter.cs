@@ -84,7 +84,7 @@ public sealed class XlsxWriter
             new ElementSection((sheet, context) => _consolidation.Build(context.Workbook, sheet)),
             new MergesSection(),
             new ElementsSection((sheet, context) => context.Conditionals.Build(context.TableRules.Rules(sheet))),
-            new ElementSection((sheet, context) => _metadata.BuildValidations(context.TableRules.Validations(sheet))),
+            new ElementSection((sheet, context) => _metadata.BuildValidations(context.TableRules.Validations(sheet), context.ValidationLists)),
             new HyperlinksSection(),
             new ElementsSection((sheet, context) => _pages.Build(sheet, context.Workbook)),
             new PartSection((part, sheet, context) => _drawings.Write(part, sheet, context.Workbook)),
@@ -98,8 +98,7 @@ public sealed class XlsxWriter
             }),
             new PartSection(_tables.Write),
             new ElementSection((sheet, context) => Extensions(
-                context.Conditionals.Extension(context.TableRules.Rules(sheet)), _sparklines.Extension(sheet), context.TableRules.Extension(sheet),
-                _metadata.LongListExtension(context.TableRules.Validations(sheet)))),
+                context.Conditionals.Extension(context.TableRules.Rules(sheet)), _sparklines.Extension(sheet), context.TableRules.Extension(sheet))),
         ];
     }
 
@@ -126,6 +125,7 @@ public sealed class XlsxWriter
         var context = new XlsxWriteContext(workbook, new XlsxStyleMapper(), new XlsxConditionalMapper(workbook.NumberFormats), new SharedStrings());
         context.Styles.DeclareNamedStyles(workbook.NamedStyles, workbook);
         context.Styles.DeclareDefaultFormat(workbook);
+        context.ValidationLists.NameFor(workbook);
 
         if (workbook.Protection.Structure)
         {
@@ -162,6 +162,8 @@ public sealed class XlsxWriter
             sheets.AppendChild(new Sheet { Id = workbookPart.GetIdOfPart(part), SheetId = sheetId++, Name = sheet.Name,
                 State = sheet.IsHidden ? SheetStateValues.Hidden : null });
         }
+
+        context.ValidationLists.Write(workbookPart, sheets, sheetId++);
 
         var definedNames = _metadata.BuildDefinedNames(workbook).Concat(_queries.DefinedNames(workbook)).Concat(_rangeFilters.DefinedNames(workbook)).ToList();
         DocumentFormat.OpenXml.OpenXmlElement last = sheets;

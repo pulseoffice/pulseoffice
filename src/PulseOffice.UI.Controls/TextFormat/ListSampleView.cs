@@ -10,6 +10,15 @@ namespace PulseOffice.UI.Controls.TextFormat;
 public readonly record struct ListSampleRow(int Level, string Label, double LabelX, double TextX)
 {
     public ListBulletPicture? Picture { get; init; }
+
+    public ListLabelAlignment Alignment { get; init; }
+
+    public double LabelLeft(double labelX, double labelWidth) => Alignment switch
+    {
+        ListLabelAlignment.Center => Math.Max(0, labelX - labelWidth / 2),
+        ListLabelAlignment.Right => Math.Max(0, labelX - labelWidth),
+        _ => labelX,
+    };
 }
 
 public interface IListSampleRows
@@ -41,7 +50,7 @@ public sealed class ListSampleRows(IListLabeler labeler) : IListSampleRows
             var format = levels[level];
             var text = Math.Max(format.Indent, 0);
             var label = Math.Max(0, text - format.Hanging);
-            rows.Add(new ListSampleRow(level, labeler.Label(levels, level, counters, language), label, text) { Picture = format.Numbering == ListNumbering.Bullet ? format.Picture : null });
+            rows.Add(new ListSampleRow(level, labeler.Label(levels, level, counters, language), label, text) { Picture = format.Numbering == ListNumbering.Bullet ? format.Picture : null, Alignment = format.Alignment });
         }
         return rows;
     }
@@ -121,14 +130,16 @@ public sealed class ListSampleView : Control
             {
                 var height = fontSize;
                 var width = height * Math.Clamp(picture.Height > 0 ? picture.Width / picture.Height : 1, 0.25, 4);
-                context.DrawImage(bitmap, new Rect(labelX, y - height / 2, width, height));
-                textX = Math.Max(textX, labelX + width + 3);
+                var left = row.LabelLeft(labelX, width);
+                context.DrawImage(bitmap, new Rect(left, y - height / 2, width, height));
+                textX = Math.Max(textX, left + width + 3);
             }
             else if (row.Label.Length > 0)
             {
                 var label = new FormattedText(row.Label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, fontSize, brush);
-                context.DrawText(label, new Point(labelX, y - label.Height / 2));
-                textX = Math.Max(textX, labelX + label.WidthIncludingTrailingWhitespace + 3);
+                var left = row.LabelLeft(labelX, label.WidthIncludingTrailingWhitespace);
+                context.DrawText(label, new Point(left, y - label.Height / 2));
+                textX = Math.Max(textX, left + label.WidthIncludingTrailingWhitespace + 3);
             }
             var bar = _mode == ListSampleMode.Headings ? Math.Max(30, (Bounds.Width - textX) * (0.5 - row.Level * 0.05)) : Bounds.Width - textX - 8;
             context.FillRectangle(emphasised ? _strong : _bar, new Rect(textX, y - 1.5, Math.Max(6, bar), _mode == ListSampleMode.Headings && row.Level == 0 ? 4 : 3), 1.5f);

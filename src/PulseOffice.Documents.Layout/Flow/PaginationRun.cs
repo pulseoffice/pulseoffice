@@ -230,6 +230,20 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
 
     public bool VisitSectionStart(SectionStartItem section)
     {
+        if (section.Section.StartsInNextColumn)
+        {
+            if (!_columnEmpty)
+            {
+                Advance();
+                return true;
+            }
+            if (section.Columns.Count == _region.Count && section.Columns.Gap.Equals(_region.Gap) && section.Columns.Shares.SequenceEqual(_region.Shares))
+            {
+                _sections.Push(_region);
+                _flowIndex++;
+                return true;
+            }
+        }
         CloseRegion();
         _sections.Push(section.Columns);
         _flowIndex++;
@@ -565,13 +579,28 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
                 if (_region.Separator && c > 0)
                 {
                     var line = x - _region.GapBefore(_geometry.Body.Width, c) / 2;
-                    _decorations.Add(new DecorationBox(DecorationKind.ColumnSeparator, new LayoutRect(line, _regionTop, 0, bottom - _regionTop), null, 0.5));
+                    _decorations.Add(SeparatorBox(line, bottom));
                 }
             }
         }
         _regionTop = bottom;
         _y = bottom;
         _columnBottoms = [];
+    }
+
+    private DecorationBox SeparatorBox(double line, double bottom)
+    {
+        var rule = _region.SeparatorLine;
+        var full = bottom - _regionTop;
+        var height = full * Math.Clamp(rule.HeightPercent, 0, PulseOffice.Documents.Blocks.ColumnSeparatorLine.FullHeight) / PulseOffice.Documents.Blocks.ColumnSeparatorLine.FullHeight;
+        var top = _regionTop + rule.Alignment switch
+        {
+            PulseOffice.Documents.Blocks.ColumnSeparatorAlignment.Middle => (full - height) / 2,
+            PulseOffice.Documents.Blocks.ColumnSeparatorAlignment.Bottom => full - height,
+            _ => 0,
+        };
+        var width = Math.Max(0.25, double.IsFinite(rule.Width) ? rule.Width : 0.5);
+        return new DecorationBox(DecorationKind.ColumnSeparator, new LayoutRect(line - width / 2, top, width, height), rule.Color, width) { LineStyle = rule.Style };
     }
 
     private void Open(string style, IReadOnlyList<PendingNote> pending)
@@ -594,6 +623,13 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         _footnotes.Resume(pending, columns ? 0 : -1, noteLeft, noteWidth);
         OpenRegion(_geometry.Body.Y);
     }
+
+    private bool WrongSide(string style, int number) => _request.Usage(style) switch
+    {
+        PulseOffice.Documents.Styles.PageUsage.Right => number % 2 == 0,
+        PulseOffice.Documents.Styles.PageUsage.Left => number % 2 != 0,
+        _ => false,
+    };
 
     internal void Reopen(string style, int? restart)
     {
@@ -643,6 +679,14 @@ internal sealed class PaginationRun : IFlowItemVisitor<bool>
         _deferred = null;
         var number = restart ?? deferred?.Restart ?? _start.Number + 1;
         var next = style ?? deferred?.Style ?? _geometry.NextStyleName;
+        if (WrongSide(next, number) && _geometry.StyleName != next)
+        {
+            _deferred = null;
+            NewPage(_geometry.StyleName, flowIndex, number);
+            if (_converged) return;
+            number++;
+            flowIndex = null;
+        }
         Close();
         if (flowIndex is { } index) _flowIndex = index;
         var pending = _footnotes.TakePending();

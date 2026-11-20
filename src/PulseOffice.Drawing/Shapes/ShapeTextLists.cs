@@ -19,6 +19,12 @@ public interface IShapeTextLists
     bool Directed(ShapeObject shape);
 
     ShapeObject WithDirections(ShapeObject shape, IEnumerable<PulseOffice.Text.Rich.Bidi.TextDirection?> directions);
+
+    IReadOnlyList<TextHorizontalPlacement?> Alignments(ShapeObject shape);
+
+    bool Aligned(ShapeObject shape);
+
+    ShapeObject WithAlignments(ShapeObject shape, IEnumerable<TextHorizontalPlacement?> alignments);
 }
 
 public sealed class ShapeTextLists(IListNumberFormats numbers) : IShapeTextLists
@@ -70,9 +76,36 @@ public sealed class ShapeTextLists(IListNumberFormats numbers) : IShapeTextLists
     {
         ArgumentNullException.ThrowIfNull(shape);
         var spliced = shape.Lists is { Count: > 0 } lists ? WithItems(shape, Realigned(lists, before, offset, removed, inserted)) : shape;
-        return shape.Directions is { Count: > 0 } directions
+        var directed = shape.Directions is { Count: > 0 } directions
             ? WithDirections(spliced, Realigned(directions, before, offset, removed, inserted))
             : spliced;
+        return shape.Alignments is { Count: > 0 } alignments
+            ? WithAlignments(directed, Realigned(alignments, before, offset, removed, inserted))
+            : directed;
+    }
+
+    public IReadOnlyList<TextHorizontalPlacement?> Alignments(ShapeObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        var count = Paragraphs(Plain(shape));
+        var own = shape.Alignments ?? [];
+        return [.. Enumerable.Range(0, count).Select(index => index < own.Count ? own[index] : null)];
+    }
+
+    public bool Aligned(ShapeObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return shape.Alignments?.Any(alignment => alignment is { } own && own != shape.Style.Text.Horizontal) == true;
+    }
+
+    public ShapeObject WithAlignments(ShapeObject shape, IEnumerable<TextHorizontalPlacement?> alignments)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        ArgumentNullException.ThrowIfNull(alignments);
+        var horizontal = shape.Style.Text.Horizontal;
+        var kept = alignments.Take(Paragraphs(Plain(shape))).Select(alignment => alignment == horizontal ? null : alignment).ToList();
+        while (kept.Count > 0 && kept[^1] is null) kept.RemoveAt(kept.Count - 1);
+        return shape with { Alignments = kept.Count == 0 ? null : kept };
     }
 
     public IReadOnlyList<PulseOffice.Text.Rich.Bidi.TextDirection?> Directions(ShapeObject shape)

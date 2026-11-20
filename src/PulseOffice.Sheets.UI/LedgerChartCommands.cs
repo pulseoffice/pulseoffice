@@ -31,8 +31,10 @@ public sealed class LedgerChartCommands(
     ITextCatalog texts,
     IChartSourceLayout? sourceLayout = null,
     PulseOffice.Sheets.Formatting.ISpreadsheetLocale? locale = null,
-    IChartTableSources? tableSources = null) : LedgerCommandSet(context)
+    IChartTableSources? tableSources = null,
+    IChartSelectionShape? selectionShape = null) : LedgerCommandSet(context)
 {
+    private readonly IChartSelectionShape _selectionShape = selectionShape ?? new ChartSelectionShape();
     private readonly IChartSourceLayout _sourceLayout = sourceLayout ?? new ChartSourceLayout();
     private readonly PulseOffice.Sheets.Formatting.ISpreadsheetLocale _locale = locale ?? new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale();
     private readonly ChartSourceReferences _references = new();
@@ -130,43 +132,39 @@ public sealed class LedgerChartCommands(
         },
     };
 
-    private bool HasHeaderRow(Worksheet sheet, CellRange range)
-    {
-        if (range.RowCount < 2) return false;
-
-        var cells = Enumerable.Range(range.Start.Column, range.ColumnCount)
-            .Select(column => sheet[new CellAddress(range.Start.Row, column)].Value)
-            .ToList();
-        return cells.All(value => value.IsEmpty || value.Kind == ValueKind.Text)
-            && cells.Any(value => value.Kind == ValueKind.Text);
-    }
-
     private void InsertChart(ChartType type, string title)
     {
-        if (Draft(type, null) is { } draft) InsertChart(draft with { ChartTitle = title });
+        if (Draft(type) is { } draft) InsertChart(draft with { ChartTitle = title });
     }
 
-    private ChartDefinition? Draft(ChartType type, bool? firstRowIsHeader)
+    private ChartDefinition? Draft(ChartType type)
     {
         if (Context.Workbook is not { } workbook) return null;
 
         var sheet = workbook.Sheets[Context.SheetIndex];
-        var range = Context.Selection;
+        var layout = _selectionShape.Detect(sheet, Context.Selection).For(type);
 
         return new ChartDefinition
         {
             Id = Guid.NewGuid().ToString("N"),
             Type = type,
             SourceSheet = sheet.Name,
-            SourceRange = range.ToString(),
-            Legend = range.ColumnCount > 2 ? LegendPosition.Right : LegendPosition.None,
-            FirstRowIsHeader = firstRowIsHeader ?? HasHeaderRow(sheet, range),
+            SourceRange = layout.Range.ToString(),
+            Legend = layout.Legend(type),
+            FirstRowIsHeader = layout.FirstRowIsHeader,
+            FirstColumnIsCategory = layout.FirstColumnIsCategory,
+            SeriesInColumns = layout.SeriesInColumns,
         };
     }
 
+    private ChartDefinition Retyped(ChartDefinition draft, ChartDefinition chosen) =>
+        Draft(chosen.Type) is { } retyped
+            ? chosen with { FirstColumnIsCategory = retyped.FirstColumnIsCategory, Legend = chosen.Legend == draft.Legend ? retyped.Legend : chosen.Legend }
+            : chosen;
+
     private void InsertChart(ChartDefinition definition)
     {
-        var range = Context.Selection;
+        var range = CellRange.TryParseA1(definition.SourceRange, out var source) ? source : Context.Selection;
 
         insertion.Insert(new PlacedObject
         {
@@ -181,18 +179,18 @@ public sealed class LedgerChartCommands(
     private async Task InsertFromChartGalleryAsync(CancellationToken ct)
     {
         if (Context.Workbook is not { } workbook) return;
-        if (Draft(ChartType.Column, null) is not { } draft) return;
+        if (Draft(ChartType.Column) is not { } draft) return;
 
         var choice = await charts.ChooseAsync(new PulseOffice.UI.Controls.Charts.ChartPickerRequest
         {
             Settings = chartSettings.From(draft) with { SourceRange = null },
             Culture = _locale.Culture,
-            Data = settings => chartData.Extract(workbook, chartSettings.Apply(draft, settings)),
+            Data = settings => chartData.Extract(workbook, Retyped(draft, chartSettings.Apply(draft, settings))),
         }, ct).ConfigureAwait(true);
 
         if (choice is null) return;
 
-        InsertChart(chartSettings.Apply(draft, choice));
+        InsertChart(Retyped(draft, chartSettings.Apply(draft, choice)));
     }
 
     private async Task EditChartAsync(CancellationToken ct)

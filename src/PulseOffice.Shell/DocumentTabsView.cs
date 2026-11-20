@@ -62,10 +62,17 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         _workspace.DocumentOpened += (_, _) => Refresh();
         _workspace.DocumentMoved += (_, _) => Refresh();
         _workspace.DocumentDetached += (_, _) => Refresh();
-        _texts.LanguageChanged += (_, _) => Refresh();
+        AttachedToVisualTree += (_, _) =>
+        {
+            _texts.LanguageChanged += OnLanguageChanged;
+            Refresh();
+        };
+        DetachedFromVisualTree += (_, _) => _texts.LanguageChanged -= OnLanguageChanged;
 
         Refresh();
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => Refresh();
 
     public event EventHandler<OpenDocument>? CloseRequested;
 
@@ -127,6 +134,9 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         if (target >= 0) _workspace.Move(document, target);
         _workspace.Activate(document);
     }
+
+    public int TabIndexAtScreen(PixelPoint screenPoint) =>
+        TabIndexAt(_geometry.ContentX(_scroller.PointToClient(screenPoint).X, _scroller.Offset.X));
 
     public int TabIndexAt(double x)
     {

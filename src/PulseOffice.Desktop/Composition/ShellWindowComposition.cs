@@ -63,7 +63,7 @@ internal static class ShellWindowComposition
 
         services.AddSingleton<SidePanelView>(provider => new SidePanelView(
             provider.GetRequiredService<ITextCatalog>()));
-        services.AddSingleton<ISidePanelHost>(provider => provider.GetRequiredService<SidePanelView>());
+        services.AddSingleton<ISidePanelHost>(provider => new FocusedSidePanelHost(provider.GetRequiredService<IShellWindowFocus>()));
         services.AddSingleton<IRecentCommands>(provider => new RecentCommands(
             provider.GetRequiredService<ILoggerFactory>().CreateLogger<RecentCommands>(), paths.Configuration("recent-commands.json")));
         services.AddSingleton<ICommandPaletteSource, CommandPaletteSource>();
@@ -80,7 +80,8 @@ internal static class ShellWindowComposition
         services.AddSingleton(provider => new ShellWindowScope(
             provider.GetRequiredService<DocumentWorkspace>(),
             provider.GetRequiredService<DialogHost>(),
-            provider.GetRequiredService<DialogHost>()));
+            provider.GetRequiredService<DialogHost>(),
+            provider.GetRequiredService<SidePanelView>()));
         services.AddSingleton<IShellWindowFocus>(provider => new ShellWindowFocus(provider.GetRequiredService<ShellWindowScope>()));
         services.AddSingleton<IWorkspaceSet>(provider => new WorkspaceSet(provider.GetRequiredService<DocumentWorkspace>()));
         services.AddSingleton<ApplicationQuitTarget>();

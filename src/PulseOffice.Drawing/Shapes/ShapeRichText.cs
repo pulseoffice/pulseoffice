@@ -28,16 +28,19 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
         var current = new List<TextRun>();
         var items = lists.Items(shape);
         var directions = lists.Directions(shape);
+        var alignments = lists.Alignments(shape);
 
         void Close()
         {
             var item = paragraphs.Count < items.Count ? items[paragraphs.Count] : null;
             var direction = paragraphs.Count < directions.Count ? directions[paragraphs.Count] : null;
+            var alignment = (paragraphs.Count < alignments.Count ? alignments[paragraphs.Count] : null) ?? style.Horizontal;
             paragraphs.Add(Listed(new TextParagraph(string.Concat(current.Select(run => run.Text)))
             {
                 FontSize = style.Size,
                 Runs = [.. current.Where(run => run.Text.Length > 0)],
                 Direction = direction,
+                Align = Align(alignment),
             }, item));
             current = [];
         }
@@ -79,10 +82,14 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
             runs.AddRange(own.Select(run => Shape(run, paragraph, style)));
         }
 
+        var placements = text.Paragraphs.Select(paragraph => Placement(paragraph.Align)).ToList();
+        if (placements.Count > 0 && placements.All(placement => placement == placements[0]))
+            style = style with { Horizontal = placements[0] };
         var rebuilt = shape with { Style = shape.Style with { Text = style }, Text = string.Concat(runs.Select(run => run.Text)), Runs = runs };
-        if (rebuilt.Text.Length == 0) return shape with { Text = null, Runs = null, Lists = null, Directions = null };
+        if (rebuilt.Text.Length == 0) return shape with { Text = null, Runs = null, Lists = null, Directions = null, Alignments = null };
         var listed = lists.WithItems(editing.Format(rebuilt, 0, 0, run => run), text.Paragraphs.Select(Item));
-        return lists.WithDirections(listed, text.Paragraphs.Select(paragraph => paragraph.Direction));
+        var directed = lists.WithDirections(listed, text.Paragraphs.Select(paragraph => paragraph.Direction));
+        return lists.WithAlignments(directed, placements.Select(placement => (TextHorizontalPlacement?)placement));
     }
 
     public TextParagraph Listed(TextParagraph paragraph, ShapeListItem? item)
@@ -118,6 +125,7 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
         Bold = run.Bold || style.Bold,
         Italic = run.Italic || style.Italic,
         Underline = run.Underline || style.Underline,
+        Strikethrough = run.Strikethrough,
         FontSize = run.Size ?? style.Size,
         Font = run.Family ?? style.Family,
         Color = Argb(run.ColorHex),
@@ -133,12 +141,29 @@ public sealed class ShapeRichText(IShapeTextEditing editing, IShapeTextLists lis
             Bold = (run.Bold || paragraph.Bold) && !style.Bold,
             Italic = (run.Italic || paragraph.Italic) && !style.Italic,
             Underline = (run.Underline || paragraph.Underline) && !style.Underline,
+            Strikethrough = run.Strikethrough || paragraph.Strikethrough,
             Size = Math.Abs(size - style.Size) < 0.01 ? null : size,
             Family = run.Font is { Length: > 0 } family && family != style.Family ? family : null,
             ColorHex = colour is { } argb ? new ArgbColor(argb).ToHashedHex() : null,
             Link = run.Hyperlink,
         };
     }
+
+    private TextAlign Align(TextHorizontalPlacement placement) => placement switch
+    {
+        TextHorizontalPlacement.Centre => TextAlign.Center,
+        TextHorizontalPlacement.Right => TextAlign.Right,
+        TextHorizontalPlacement.Justify => TextAlign.Justify,
+        _ => TextAlign.Left,
+    };
+
+    private TextHorizontalPlacement Placement(TextAlign align) => align switch
+    {
+        TextAlign.Center => TextHorizontalPlacement.Centre,
+        TextAlign.Right => TextHorizontalPlacement.Right,
+        TextAlign.Justify => TextHorizontalPlacement.Justify,
+        _ => TextHorizontalPlacement.Left,
+    };
 
     private uint? Argb(string? hex)
     {

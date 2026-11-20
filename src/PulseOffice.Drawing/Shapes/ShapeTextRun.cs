@@ -10,6 +10,8 @@ public sealed record ShapeTextRun(string Text)
 
     public bool Underline { get; init; }
 
+    public bool Strikethrough { get; init; }
+
     public double? Size { get; init; }
 
     public string? ColorHex { get; init; }

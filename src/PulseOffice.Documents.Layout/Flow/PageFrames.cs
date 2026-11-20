@@ -67,6 +67,7 @@ public sealed class PageGeometries : IPageGeometries
             Columns = new ColumnLayout(Math.Clamp(columns.Count, 1, SectionColumns.LargestCount), columns.Gap.ToPoints(), false, columns.Separator)
             {
                 Shares = [.. columns.Spans.Select(span => new ColumnShare(span.Width.ToPoints(), span.Gap.ToPoints()))],
+                SeparatorLine = columns.SeparatorLine,
             },
             Decor = new PageDecor(style.Background, borders, frame, style.Watermark),
         };

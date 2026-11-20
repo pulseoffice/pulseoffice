@@ -27,7 +27,9 @@ public sealed class ShellWindowFactory(
     IServiceProvider provider,
     IDialogHostFactory dialogs,
     ITextCatalog texts,
-    IShellWindowWiring wiring) : IShellWindowFactory
+    IShellWindowWiring wiring,
+    WindowPlacementCoordinator placements,
+    Func<IShellWindowHost> host) : IShellWindowFactory
 {
     public IShellWindowHandle Create()
     {
@@ -35,6 +37,7 @@ public sealed class ShellWindowFactory(
         var window = ActivatorUtilities.CreateInstance<ShellWindow>(
             provider, workspace, dialogs.Create(), new SidePanelView(texts));
         wiring.Attach(window);
+        placements.AttachTornOff(window, host().Focused as Avalonia.Controls.Window);
         window.UpdateForContext(workspace.Context);
         return window;
     }

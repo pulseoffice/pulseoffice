@@ -147,6 +147,7 @@ internal sealed class XlsxWriteContext(Book workbook, XlsxStyleMapper styles, Xl
     public SharedStrings Strings => strings;
     public XlsxCellCodec Cells { get; } = new();
     public XlsxTableReferenceRules TableRules { get; } = new(workbook);
+    public XlsxValidationListSheet ValidationLists { get; } = new();
     public OutlineLevels Outlines { get; } = new();
     public XlsxColumnMetrics Columns { get; } = new XlsxColumnMetricsFactory().For(PulseOffice.Sheets.Styling.CellFont.Default);
     public bool UsesDynamicArrays { get; set; }
@@ -490,6 +491,7 @@ internal sealed class XlsxReadContext(Book workbook, IReadOnlyList<string> strin
     public OutlineLevels Outlines { get; } = new();
     public XlsxColumnMetrics Columns { get; } = new XlsxColumnMetricsFactory().For(stylesheet);
     public ConstantFormulas Constants { get; } = new();
+    public XlsxValidationListSheet ValidationLists { get; } = new();
     public XlsxTableCatalog Tables { get; } = new();
     public IReadOnlySet<uint> DynamicArrays { get; init; } = new HashSet<uint>();
 }

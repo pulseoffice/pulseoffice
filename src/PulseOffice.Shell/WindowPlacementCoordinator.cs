@@ -3,8 +3,44 @@ using PulseOffice.Foundation.Windowing;
 
 namespace PulseOffice.Shell;
 
-public sealed class WindowPlacementCoordinator(IWindowPlacementStore store, IPlacementPolicy policy, IPlacementPixelMapper mapper)
+public sealed class WindowPlacementCoordinator(
+    IWindowPlacementStore store,
+    IPlacementPolicy policy,
+    IPlacementPixelMapper mapper,
+    ITornOffWindowPlacementStore tornOff,
+    ITornOffWindowSizing sizing)
 {
+    public void AttachTornOff(Window window, Window? source)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        var scaling = source is not null ? Scaling(source) : Scaling(window);
+        var area = source?.Screens?.ScreenFromWindow(source)?.WorkingArea;
+        var size = sizing.Choose(
+            tornOff.Load(),
+            scaling,
+            source is { Bounds.Width: > 0 } shown ? shown.Bounds.Size : new Avalonia.Size(window.Width, window.Height),
+            new Avalonia.Size(window.MinWidth, window.MinHeight),
+            area is { } pixels ? new Avalonia.Size(pixels.Width / scaling, pixels.Height / scaling) : null);
+        window.Width = size.Width;
+        window.Height = size.Height;
+
+        WindowPlacement? normal = null;
+
+        void Track()
+        {
+            if (window.WindowState == WindowState.Normal && window.IsVisible) normal = Current(window);
+        }
+
+        window.PositionChanged += (_, _) => Track();
+        window.SizeChanged += (_, _) => Track();
+        window.Closing += (_, _) =>
+        {
+            var maximized = window.WindowState is WindowState.Maximized or WindowState.FullScreen;
+            tornOff.Save((maximized ? normal ?? Current(window) : Current(window)) with { Maximized = false });
+        };
+    }
+
     public void Attach(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);

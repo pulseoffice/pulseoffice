@@ -157,6 +157,9 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Info("DOCX271", "Word numbers notes only with 1, a, A, i or I and never restarts endnotes on each page: other note number formats are written as 1, 2, 3 and endnotes restarting on each page are numbered continuously in DOCX. Word has no notice at the top of a continued note: the backward continuation notice is lost in DOCX. Word restarts notes at sections, not chapters: numbering that restarts at each chapter is written to restart at each section. ODT keeps them.")),
         new(document => UsedPageStyles(document).Any(style => style.FootnoteSeparator is { } own && own != document.Notes.FootnoteSeparator),
             Diagnostic.Info("DOCX273", "Word has one footnote separator for the whole document: a separator line set on a single page style is written as the document's line in DOCX. ODT keeps it on each page style.")),
+        new(document => Blocks(document.Body).OfType<SectionBlock>().Select(section => section.Columns).Concat(UsedPageStyles(document).Select(style => style.Columns))
+                .Any(columns => columns.Count > 1 && columns.Separator && columns.SeparatorLine != ColumnSeparatorLine.Default),
+            Diagnostic.Info("DOCX274", "Word's line between columns has no style, width, colour, height or position: a column separator that is not a full-height thin black solid line is written as Word's plain line in DOCX. ODT keeps it.")),
         new(document => !document.Notes.ContinuousEndnotes && document.Notes.OfKind(PulseOffice.Documents.Annotations.NoteKind.Endnote).Any(),
             Diagnostic.Info("DOCX115", "Word places endnotes right after the text: endnotes collected on their own pages are written to continue after the last paragraph in DOCX. ODT keeps the setting.")),
         new(document => document.Changes.All.OfType<PulseOffice.Documents.Annotations.Deletion>()
@@ -481,7 +484,7 @@ public sealed class DocxWriter : ITextDocumentWriter
                     body.Append(inner);
                     var columns = PageStyle(document, state.Style).Clone() as PageStyle;
                     columns!.Columns = section.Columns;
-                    Close(body, _sections.Write(columns, state.Restart, true, opening || deferring is not null, lineRestart, main, context, opening ? state.LineStart : null));
+                    Close(body, _sections.Write(columns, state.Restart, true, opening || deferring is not null, lineRestart, main, context, opening ? state.LineStart : null, section.StartsInNextColumn && !opening && deferring is null));
                     state.Restart = null;
                     state.LineRestart = null;
                     state.LineStart = null;

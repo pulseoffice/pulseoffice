@@ -388,7 +388,10 @@ public sealed class PageRenderer(IBulletPictureObjects bulletPictures) : IPageRe
                     surface.Fill(bounds, fill);
                     if (decoration.Kind == DecorationKind.PageBackground) surface.Backdrop(fill);
                     break;
-                case DecorationKind.FootnoteSeparator or DecorationKind.ColumnSeparator:
+                case DecorationKind.ColumnSeparator when bounds.Height > 0:
+                    Border(decoration);
+                    break;
+                case DecorationKind.FootnoteSeparator:
                     var horizontal = bounds.Width >= bounds.Height;
                     surface.Line(bounds.X, bounds.Y, horizontal ? bounds.Right : bounds.X, horizontal ? bounds.Y : bounds.Bottom,
                         decoration.Color ?? Ink, Math.Max(0.5, decoration.StrokeWidth));

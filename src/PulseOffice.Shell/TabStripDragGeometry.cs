@@ -17,6 +17,8 @@ public sealed class TabStripDragGeometry(double edgeBand = 24, double maximumSte
     public double ScrolledOffset(double offset, double step, double extentWidth, double viewportWidth) =>
         Math.Clamp(offset + step, 0, Math.Max(0, extentWidth - viewportWidth));
 
+    public double ContentX(double viewportX, double scrollOffset) => viewportX + scrollOffset;
+
     public bool IsTornOff(Point pointer, Size strip) =>
         pointer.Y < -tearOffDistance || pointer.Y > strip.Height + tearOffDistance;
 }

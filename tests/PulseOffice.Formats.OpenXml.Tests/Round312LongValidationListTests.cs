@@ -9,7 +9,7 @@ namespace PulseOffice.Formats.OpenXml.Tests;
 public sealed class Round312LongValidationListTests
 {
     [Fact]
-    public void A_typed_list_over_the_formula_limit_stays_out_of_the_standard_rules_and_round_trips()
+    public void A_typed_list_over_the_formula_limit_points_to_the_helper_sheet_and_round_trips()
     {
         var workbook = Book.CreateDefault();
         var entries = Enumerable.Range(0, 40).Select(index => $"Entry {index:D3}").ToList();
@@ -26,8 +26,10 @@ public sealed class Round312LongValidationListTests
 
         using (var package = SpreadsheetDocument.Open(stream, false))
         {
-            var rules = package.WorkbookPart!.WorksheetParts.Single().Worksheet!.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.DataValidations>()!;
-            Assert.Equal(1u, rules.Count!.Value);
+            var first = package.WorkbookPart!.Workbook!.Sheets!.Elements<DocumentFormat.OpenXml.Spreadsheet.Sheet>().First();
+            var rules = ((WorksheetPart)package.WorkbookPart.GetPartById(first.Id!.Value!)).Worksheet!.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.DataValidations>()!;
+            Assert.Equal(2u, rules.Count!.Value);
+            Assert.Contains(rules.Elements<DocumentFormat.OpenXml.Spreadsheet.DataValidation>(), rule => rule.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.Formula1>()!.Text.StartsWith("'PulseOffice Lists'!", StringComparison.Ordinal));
             Assert.All(rules.Elements<DocumentFormat.OpenXml.Spreadsheet.DataValidation>(), rule => Assert.True(rule.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.Formula1>()!.Text.Length <= 257));
         }
 

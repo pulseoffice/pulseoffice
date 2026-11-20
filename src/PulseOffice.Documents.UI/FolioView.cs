@@ -48,6 +48,8 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
     private readonly FolioTarget _target;
     private readonly FolioRulers _rulers;
     private readonly ScrollViewer _scroll;
+    private readonly PulseOffice.UI.Controls.Forms.InputHelpNote _help = new(DesignTokens.For(InterfaceDensity.Compact), "FormFieldHelp");
+    private readonly Avalonia.Controls.Canvas _helpLayer = new() { IsHitTestVisible = false, ClipToBounds = true };
 
     public FolioView(FolioEditor editor, FolioViewServices services)
     {
@@ -81,6 +83,11 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         Children.Add(scroll);
         Children.Add(_rulers.Horizontal);
         Children.Add(_rulers.Vertical);
+        SetRow(_helpLayer, 1);
+        SetColumn(_helpLayer, 1);
+        _helpLayer.Children.Add(_help.Box);
+        Children.Add(_helpLayer);
+        scroll.ScrollChanged += (_, _) => ShowFieldHelp();
         ApplyScrollBars();
         _ime = new InlineImeClient(this);
 
@@ -301,6 +308,17 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         _canvas.EnsureCaretVisible();
         _ime.CaretMoved();
         Announce();
+        ShowFieldHelp();
+    }
+
+    public PulseOffice.UI.Controls.Forms.InputHelpNote FieldHelp => _help;
+
+    private void ShowFieldHelp()
+    {
+        if (_editor.ControlAt(_editor.Caret) is { Control.Title: { Length: > 0 } title } && _canvas.TranslatePoint(default, _helpLayer) is { } origin)
+            _help.Show(title, string.Empty, _canvas.CaretRectangle.Translate(new Vector(origin.X, origin.Y)));
+        else
+            _help.Hide();
     }
 
     private void Announce()
@@ -309,7 +327,7 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         var selected = _editor.HasSelection;
         var table = _editor.InTable ? SelectionKind.Table : SelectionKind.None;
         var item = _editor.SelectedObjectId is { } id ? _editor.Document.Objects.Find(id) : null;
-        _services.Workspace.UpdateContext(context => context with
+        _services.Workspace.UpdateContext(this, context => context with
         {
             Selection = item is not null ? Kind(item) : (selected ? SelectionKind.TextRange : SelectionKind.TextCaret) | table,
             State = selected ? context.State | DocumentState.HasSelection : context.State & ~DocumentState.HasSelection,
