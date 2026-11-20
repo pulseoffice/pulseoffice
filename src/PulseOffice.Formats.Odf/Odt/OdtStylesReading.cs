@@ -73,11 +73,13 @@ internal sealed class OdtStylesReader(
                 sheet.DefaultTabInterval = distance;
         }
 
+        var templateParagraphs = (styles?.Elements(Table + "table-template") ?? []).SelectMany(_templates.OwnParagraphStyles).ToHashSet(StringComparer.Ordinal);
         foreach (var style in styles?.Elements(Style + "style") ?? [])
         {
             var family = (string?)style.Attribute(Style + "family");
             var name = Name(style, context);
             if (name is null) continue;
+            if (family == "paragraph" && templateParagraphs.Contains((string?)style.Attribute(Style + "name") ?? string.Empty)) continue;
 
             switch (family)
             {
@@ -104,9 +106,9 @@ internal sealed class OdtStylesReader(
             if ((string?)template.Attribute(Table + "name") is not { Length: > 0 } encoded) continue;
             var name = context.StyleNames.Resolve(encoded);
             if (sheet.Table.Contains(name)) continue;
-            XElement? CellStyle(string cell) => styles!.Elements(Style + "style")
-                .FirstOrDefault(style => (string?)style.Attribute(Style + "name") == cell && (string?)style.Attribute(Style + "family") == "table-cell");
-            sheet.Table.Add(new PulseOffice.Documents.Styles.TableStyle(name) { Table = _templates.Read(template, CellStyle, context.FontFaces) });
+            XElement? Named(string named, string family) => styles!.Elements(Style + "style")
+                .FirstOrDefault(style => (string?)style.Attribute(Style + "name") == named && (string?)style.Attribute(Style + "family") == family);
+            sheet.Table.Add(new PulseOffice.Documents.Styles.TableStyle(name) { Table = _templates.Read(template, Named, context.FontFaces) });
         }
 
         foreach (var list in (styles?.Elements(Text + "list-style") ?? []).Concat(contentAutomatic?.Elements(Text + "list-style") ?? []).Concat(stylesAutomatic?.Elements(Text + "list-style") ?? []))
@@ -344,9 +346,7 @@ internal sealed class OdtStylesReader(
                 Italic = (string?)child.Attribute(Pt + "italic") is { } italic ? italic == "true" : null,
                 Font = (string?)child.Attribute(Pt + "font"),
                 FontSize = measure.Points((string?)child.Attribute(Pt + "font-size")),
-                Borders = child.Element(Style + "table-cell-properties") is { } cell && borders.Read(cell) is { } lines
-                    ? new BoxBorders { Top = lines.Top, Bottom = lines.Bottom, Left = lines.Left, Right = lines.Right }
-                    : null,
+                Borders = child.Element(Style + "table-cell-properties") is { } cell ? borders.ReadSides(cell) : null,
             });
         }
         return table;

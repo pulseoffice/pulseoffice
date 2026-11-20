@@ -81,7 +81,7 @@ public class XlsxImageRoundTripTests
     }
 
     [Fact]
-    public void Image_tone_survives_xlsx_and_is_declared_lost_in_ods()
+    public void Image_tone_survives_xlsx_and_is_no_longer_declared_lost_in_ods()
     {
         var workbook = ConImmagine();
         workbook.Sheets[0].Objects[0] = workbook.Sheets[0].Objects[0] with
@@ -92,6 +92,6 @@ public class XlsxImageRoundTripTests
         var raster = Assert.IsType<RasterImageObject>(Assert.Single(RoundTrip(workbook).Sheets[0].Objects).Content);
 
         Assert.Equal(new ImageTone(10, 20, 30), raster.Tone);
-        Assert.Contains("ODF022", new PulseOffice.Formats.Odf.OdsSpreadsheetWriter().CheckFidelity(workbook).Losses.Select(loss => loss.Code));
+        Assert.DoesNotContain("ODF022", new PulseOffice.Formats.Odf.OdsSpreadsheetWriter().CheckFidelity(workbook).Losses.Select(loss => loss.Code));
     }
 }

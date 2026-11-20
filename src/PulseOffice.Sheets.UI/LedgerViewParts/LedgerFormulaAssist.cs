@@ -72,6 +72,8 @@ internal sealed class LedgerFormulaAssist
 
     public IFunctionSignatures Signatures { get; set; } = new FunctionSignatures();
 
+    public IFunctionArgumentNames ArgumentNames { get; set; } = new FunctionArgumentNames();
+
     public IChoiceListPopup List { get; set; } = new ChoiceListPopup();
 
     public TextBlock Tip { get; }
@@ -204,7 +206,7 @@ internal sealed class LedgerFormulaAssist
         for (var index = 0; index < slots; index++)
         {
             if (index > 0) inlines.Add(new Run(separator + " "));
-            var label = Signatures.ArgumentName(canonical, index);
+            var label = ArgumentNames.Localize(Signatures.ArgumentName(canonical, index), _texts.Language.ToCode());
             if (label.Length == 0) label = _texts.Format("functions.argument", index + 1);
             if (index >= function.MinArguments) label = "[" + label + "]";
             var run = new Run(label);

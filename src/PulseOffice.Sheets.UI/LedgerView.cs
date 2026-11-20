@@ -206,7 +206,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         _objects = new LedgerObjectEditing(_workbook, _grid, _history, _status, _texts,
             connectors ?? new SheetConnectors(), binding, _writer);
         _operations = new LedgerCellOperations(_workbook, _engine, _grid, _selection, _history, _status, _texts, _writer, new Outline.OutlineGutter());
-        _fillOptions = new LedgerFillOptions(_grid, _operations, _texts);
+        _fillOptions = new LedgerFillOptions(_grid, _operations, _texts, new PulseOffice.UI.Icons.IconCatalog());
         var textEditing = shapeTextEditing ?? new Drawing.Shapes.ShapeTextEditing();
         _shapeText = new LedgerShapeTextSession(_workbook, _grid, _overlay, this, _texts,
             shapeTextStyle ?? new ShapeText.ShapeTextCellStyle(textEditing), textEditing,

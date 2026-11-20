@@ -63,6 +63,8 @@ public sealed record SlideTransition
 
     public bool StopPreviousSound { get; init; }
 
+    public bool SoundPlaysToEnd { get; init; } = true;
+
     public NativeTransition? Native { get; init; }
 
     public NativeTransition? CurrentNative => Native is { } native && native.Describes(this) ? native : null;

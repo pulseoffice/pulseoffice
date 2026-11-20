@@ -31,6 +31,7 @@ public sealed class FolioImageCommands(
         Image("folio.image.replace", operations.ReplaceAsync),
         Image("folio.image.compress", operations.CompressAsync),
         Image("folio.image.color", (image, ct) => operations.ColorAsync(image, "command.folio.image.color.title", ct)),
+        Image("folio.image.tone", (image, ct) => operations.ToneAsync(image, "command.folio.image.tone.title", ct)),
         Image("folio.image.colorReplacer", (image, ct) => operations.RecolorAsync(image, "command.folio.image.colorReplacer.title", ct)),
         Image("folio.image.imageMap", (image, ct) => operations.ImageMapAsync(image, "command.folio.image.imageMap.title", ct)),
         Viewing("folio.image.save") with

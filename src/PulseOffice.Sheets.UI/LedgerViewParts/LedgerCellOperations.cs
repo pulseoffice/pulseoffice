@@ -204,7 +204,7 @@ internal sealed class LedgerCellOperations(
         if (!writer.CanEdit()) return null;
         if (LanesInUse(sheet, request, direction) is not { } lanes) return null;
 
-        var mode = request.Toggled ? Fill.Toggled(sheet, lanes.Source) : request.Mode;
+        var mode = request.Toggled ? Fill.Toggled(sheet, lanes.Source, direction) : request.Mode;
         if (sheet.Protection.IsEnabled && mode == FillMode.FormattingOnly) return null;
         var produced = Fill.Extend(sheet, lanes.Source, lanes.Target, direction, mode);
         if (produced.Count == 0) return null;

@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Evaluation/Functions/FunctionSignatures.txt" LogicalName="PulseOffice.Sheets.Engine.FunctionSignatures.txt" />
+    <EmbeddedResource Include="Evaluation/Functions/FunctionArgumentNames.txt" LogicalName="PulseOffice.Sheets.Engine.FunctionArgumentNames.txt" />
   </ItemGroup>
 
 </Project>

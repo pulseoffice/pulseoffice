@@ -19,7 +19,12 @@ internal sealed class OdtTableTemplates(OdtMeasure measure, OdtBorders borders, 
             }
             var cellName = encodedName + "." + part;
             cells.Add(CellStyle(cellName, format));
-            template.Add(new XElement(Table + part, new XAttribute(Table + "style-name", cellName)));
+            var paragraph = ParagraphStyle(cellName + ".paragraph", format);
+            if (paragraph is not null) cells.Add(paragraph);
+            template.Add(new XElement(Table + part,
+                new XAttribute(Table + "style-name", cellName),
+                paragraph is null ? null : new XAttribute(Table + "paragraph-style-name", cellName + ".paragraph"),
+                paragraph is null ? null : new XAttribute(Pt + "paragraph-style", "true")));
         }
         var firstAxes = table.FirstBandAxes ?? TableBandAxes.Both;
         var secondAxes = table.BandAxes ?? TableBandAxes.Both;
@@ -37,17 +42,28 @@ internal sealed class OdtTableTemplates(OdtMeasure measure, OdtBorders borders, 
         return [.. cells, template];
     }
 
-    public TableProperties Read(XElement template, Func<string, XElement?> cellStyles, IReadOnlyDictionary<string, string> fontFaces)
+    public IEnumerable<string> OwnParagraphStyles(XElement template) =>
+        template.Elements()
+            .Where(part => (string?)part.Attribute(Pt + "paragraph-style") == "true")
+            .Select(part => (string?)part.Attribute(Table + "paragraph-style-name"))
+            .OfType<string>();
+
+    public TableProperties Read(XElement template, Func<string, string, XElement?> styles, IReadOnlyDictionary<string, string> fontFaces)
     {
-        TableRegionFormat? Part(string part) =>
-            (string?)template.Element(Table + part)?.Attribute(Table + "style-name") is { } name && cellStyles(name) is { } style ? Format(style, fontFaces) : null;
+        TableRegionFormat? Part(string part)
+        {
+            var element = template.Element(Table + part);
+            var cell = (string?)element?.Attribute(Table + "style-name") is { } name ? styles(name, "table-cell") : null;
+            var paragraph = (string?)element?.Attribute(Table + "paragraph-style-name") is { } named ? styles(named, "paragraph") : null;
+            return cell is null && paragraph is null ? null : Format(cell, paragraph, fontFaces);
+        }
         var body = Part("body");
         var header = Part("first-row");
         var oddRows = Part("odd-rows");
         var oddColumns = Part("odd-columns");
         var evenRows = Part("even-rows");
         var evenColumns = Part("even-columns");
-        var line = new[] { body?.Borders?.Top, body?.Borders?.Bottom, body?.Borders?.Left, body?.Borders?.Right }.FirstOrDefault(found => found is not null);
+        var line = new[] { body?.Borders?.Top, body?.Borders?.Bottom, body?.Borders?.Left, body?.Borders?.Right }.FirstOrDefault(found => found is { Width: > 0 });
         return new TableProperties
         {
             Background = body?.Background,
@@ -88,17 +104,20 @@ internal sealed class OdtTableTemplates(OdtMeasure measure, OdtBorders borders, 
         return new BoxBorders { Top = line, Bottom = line, Left = line, Right = line };
     }
 
+    private XElement? ParagraphStyle(string name, TableRegionFormat format)
+    {
+        var text = TextProperties(format);
+        return text.HasAttributes
+            ? new XElement(Style + "style", new XAttribute(Style + "name", name), new XAttribute(Style + "family", "paragraph"), text)
+            : null;
+    }
+
     private XElement CellStyle(string name, TableRegionFormat format)
     {
         var cell = new XElement(Style + "table-cell-properties");
         if (format.Background is { } fill) cell.Add(new XAttribute(Fo + "background-color", measure.Fill(fill)));
         if (format.Borders is { } lines) Sides(cell, lines);
-        var text = new XElement(Style + "text-properties");
-        if (format.Font is { } font) text.Add(new XAttribute(Fo + "font-family", font));
-        if (format.FontSize is { } size) text.Add(new XAttribute(Fo + "font-size", measure.Points(size)));
-        if (format.Bold is { } bold) text.Add(new XAttribute(Fo + "font-weight", bold ? "bold" : "normal"));
-        if (format.Italic is { } italic) text.Add(new XAttribute(Fo + "font-style", italic ? "italic" : "normal"));
-        if (format.Ink is { } ink && ink >> 24 != 0) text.Add(new XAttribute(Fo + "color", measure.Hex(ink)));
+        var text = TextProperties(format);
         return new XElement(Style + "style",
             new XAttribute(Style + "name", name),
             new XAttribute(Style + "family", "table-cell"),
@@ -106,22 +125,25 @@ internal sealed class OdtTableTemplates(OdtMeasure measure, OdtBorders borders, 
             text.HasAttributes ? text : null);
     }
 
-    private void Sides(XElement cell, BoxBorders lines)
+    private XElement TextProperties(TableRegionFormat format)
     {
-        var written = new XElement(Style + "table-cell-properties");
-        borders.Write(written, lines with { PaddingTop = 0, PaddingBottom = 0, PaddingLeft = 0, PaddingRight = 0 });
-        foreach (var attribute in written.Attributes())
-        {
-            if (attribute.Name.LocalName.StartsWith("padding", StringComparison.Ordinal) || attribute.Value == "none") continue;
-            cell.Add(new XAttribute(attribute.Name, attribute.Value));
-        }
+        var text = new XElement(Style + "text-properties");
+        if (format.Font is { Length: > 0 } font) text.Add(new XAttribute(Fo + "font-family", font));
+        if (format.FontSize is { } size && size > 0) text.Add(new XAttribute(Fo + "font-size", measure.Points(size)));
+        if (format.Bold is { } bold) text.Add(new XAttribute(Fo + "font-weight", bold ? "bold" : "normal"));
+        if (format.Italic is { } italic) text.Add(new XAttribute(Fo + "font-style", italic ? "italic" : "normal"));
+        if (format.Ink is { } ink && ink >> 24 != 0) text.Add(new XAttribute(Fo + "color", measure.Hex(ink)));
+        return text;
     }
 
-    private TableRegionFormat Format(XElement style, IReadOnlyDictionary<string, string> fontFaces)
+    private void Sides(XElement cell, BoxBorders lines) => borders.WriteSides(cell, lines);
+
+    private TableRegionFormat Format(XElement? style, XElement? paragraph, IReadOnlyDictionary<string, string> fontFaces)
     {
-        var cell = style.Element(Style + "table-cell-properties");
-        var text = characters.Read(style.Element(Style + "text-properties"), fontFaces).Properties;
-        var lines = cell is null ? null : borders.Read(cell);
+        var cell = style?.Element(Style + "table-cell-properties");
+        var own = characters.Read(style?.Element(Style + "text-properties"), fontFaces).Properties;
+        var text = own.Over(characters.Read(paragraph?.Element(Style + "text-properties"), fontFaces).Properties);
+        var lines = cell is null ? null : borders.ReadSides(cell);
         return new TableRegionFormat
         {
             Background = measure.Fill((string?)cell?.Attribute(Fo + "background-color")),
@@ -130,7 +152,7 @@ internal sealed class OdtTableTemplates(OdtMeasure measure, OdtBorders borders, 
             Italic = text.Italic,
             Font = text.Font,
             FontSize = text.FontSize,
-            Borders = lines is null || lines is { Top: null, Bottom: null, Left: null, Right: null } ? null : new BoxBorders { Top = lines.Top, Bottom = lines.Bottom, Left = lines.Left, Right = lines.Right },
+            Borders = lines,
         };
     }
 }

@@ -455,7 +455,7 @@ internal sealed class GridPointerInput(
 
         if (handle is ObjectHandle.None) return false;
 
-        Begin(gestures.ObjectDrag(handle, point, box, rotation), e.Pointer);
+        Begin(gestures.ObjectDrag(handle, point, box, rotation, placed.Content), e.Pointer);
         e.Handled = true;
         return true;
     }

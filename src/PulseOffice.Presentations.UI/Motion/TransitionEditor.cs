@@ -40,6 +40,10 @@ public sealed class TransitionEditor : UserControl
 {
     private static readonly AdvanceMode[] AdvanceModes = [AdvanceMode.OnClick, AdvanceMode.AfterTime, AdvanceMode.OnClickOrAfterTime, AdvanceMode.TriggerOnly];
 
+    private const int StopPreviousIndex = 1;
+
+    private const int FirstSoundIndex = 2;
+
     private static readonly string[] SoundExtensions =["*.wav", "*.mp3", "*.ogg", "*.m4a", "*.aac", "*.flac"];
 
     private readonly TransitionEditorServices _services;
@@ -54,6 +58,7 @@ public sealed class TransitionEditor : UserControl
     private readonly MeasureField _after;
     private readonly ComboBox _sound = new() { MinWidth = 120, HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _loop = new();
+    private readonly CheckBox _cut = new();
     private readonly List<string> _sounds = [];
     private IconChoiceGroup? _directions;
     private IReadOnlyList<TransitionDirection>? _directionChoices;
@@ -93,6 +98,12 @@ public sealed class TransitionEditor : UserControl
             if (!_syncing) Update(_transition with { LoopSoundUntilNext = _loop.IsChecked == true });
         };
 
+        _cut.Content = Texts["deck.transitionDialog.stopAtNext"];
+        _cut.IsCheckedChanged += (_, _) =>
+        {
+            if (!_syncing) Update(_transition with { SoundPlaysToEnd = _cut.IsChecked != true });
+        };
+
         var effect = new DialogSection(Texts["deck.motion.effectOptions"], _metrics);
         _directionRow = effect.Add(Texts["deck.transitionDialog.direction"], _directionHost);
         var timing = new DialogSection(Texts["deck.motion.timing"], _metrics);
@@ -104,6 +115,7 @@ public sealed class TransitionEditor : UserControl
         var sound = new DialogSection(Texts["deck.motion.sound"], _metrics);
         sound.Add(Texts["deck.motion.sound"], SoundRow(), editorWidth: 300);
         sound.Add(null, _loop, DialogRowKind.Indented);
+        sound.Add(null, _cut, DialogRowKind.Indented);
 
         var applyAll = new Button
         {
@@ -164,6 +176,8 @@ public sealed class TransitionEditor : UserControl
 
     public ComboBox Sound => _sound;
 
+    public CheckBox StopAtNextSlide => _cut;
+
     public Button ApplyAllButton { get; }
 
     public Control Settings { get; }
@@ -187,7 +201,11 @@ public sealed class TransitionEditor : UserControl
             Update(_transition with { Direction = direction });
     }
 
-    public void ChooseSound(string? path) => Update(_transition with { SoundPath = string.IsNullOrWhiteSpace(path) ? null : path });
+    public void ChooseSound(string? path) => Update(string.IsNullOrWhiteSpace(path)
+        ? _transition with { SoundPath = null, StopPreviousSound = false }
+        : _transition with { SoundPath = path, StopPreviousSound = false });
+
+    public void ChooseStopPreviousSound() => Update(_transition with { SoundPath = null, StopPreviousSound = true });
 
     private ThumbnailGallery<TransitionKind> Gallery()
     {
@@ -277,7 +295,8 @@ public sealed class TransitionEditor : UserControl
     private void OnSoundChosen()
     {
         if (_syncing || _sound.SelectedIndex < 0) return;
-        ChooseSound(_sound.SelectedIndex == 0 ? null : _sounds[_sound.SelectedIndex - 1]);
+        if (_sound.SelectedIndex == StopPreviousIndex) ChooseStopPreviousSound();
+        else ChooseSound(_sound.SelectedIndex == 0 ? null : _sounds[_sound.SelectedIndex - FirstSoundIndex]);
     }
 
     private Control IconLabel(string icon, string label)
@@ -314,6 +333,8 @@ public sealed class TransitionEditor : UserControl
             SyncSounds();
             _loop.IsChecked = _transition.LoopSoundUntilNext;
             _loop.IsEnabled = _transition.SoundPath is not null;
+            _cut.IsChecked = !_transition.SoundPlaysToEnd;
+            _cut.IsEnabled = _transition.SoundPath is not null && !_transition.LoopSoundUntilNext;
         }
         finally
         {
@@ -352,7 +373,9 @@ public sealed class TransitionEditor : UserControl
         _sounds.Clear();
         _sounds.AddRange(_services.Catalog.SoundsIn(_context.Deck));
         if (_transition.SoundPath is { } current && !_sounds.Contains(current, StringComparer.Ordinal)) _sounds.Add(current);
-        _sound.ItemsSource = new List<string>([Texts["deck.motion.noSound"], .. _sounds.Select(path => Path.GetFileName(path) is { Length: > 0 } name ? name : path)]);
-        _sound.SelectedIndex = _transition.SoundPath is { } chosen ? _sounds.IndexOf(chosen) + 1 : 0;
+        _sound.ItemsSource = new List<string>([Texts["deck.motion.noSound"], Texts["deck.motion.stopPreviousSound"], .. _sounds.Select(path => Path.GetFileName(path) is { Length: > 0 } name ? name : path)]);
+        _sound.SelectedIndex = _transition.SoundPath is { } chosen
+            ? _sounds.IndexOf(chosen) + FirstSoundIndex
+            : _transition.StopPreviousSound ? StopPreviousIndex : 0;
     }
 }

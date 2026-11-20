@@ -201,9 +201,7 @@ public sealed class PresentationWindow : Window
             _ink.Children.Clear();
             _media.Clear();
             _inkSlideIndex = _controller.SlideIndex;
-            if (_controller.Current?.Transition is { SoundPath: { Length: > 0 } sound } arriving)
-                _media.PlaySound(sound, arriving.LoopSoundUntilNext);
-            else if (_controller.Current?.Transition is { StopPreviousSound: true }) _media.StopSound();
+            _media.Arrive(_controller.Current?.Transition);
             _media.StartAutomatic(_controller.Current);
             _announcer.Slide(SlideNumber, SlideTotal);
         }
@@ -367,6 +365,7 @@ public sealed class PresentationWindow : Window
 
     private void Advance()
     {
+        if (_loopClock.SkipPause()) return;
         if (_keypad.Screen == ShowCurtain.End)
         {
             Close();
@@ -397,7 +396,7 @@ public sealed class PresentationWindow : Window
                 PlayTransition(slideBefore, _controller.SlideIndex);
                 break;
             case AdvanceResult.Finished:
-                if (_loop && Playlist.Count > 0) _loopClock.Loop(() => Restart(_controller.SlideIndex));
+                if (_loop && Playlist.Count > 0) _loopClock.Loop(() => { _keypad.Pause(); RefreshScreen(); }, () => { _keypad.Resume(); Restart(_controller.SlideIndex); RefreshScreen(); });
                 else if (_rehearse) Close();
                 else
                 {

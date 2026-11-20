@@ -488,6 +488,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         public bool Toggled { get; init; }
     }
 
+    public event EventHandler? ViewportMoved { add => Viewport.Moved += value; remove => Viewport.Moved -= value; }
+
     public Rect CellBounds(CellAddress address) => Viewport.ToScreen(Viewport.MergedRect(address));
 
     public sealed record ObjectChange(

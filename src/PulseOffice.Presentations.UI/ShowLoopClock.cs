@@ -10,6 +10,7 @@ public sealed class ShowLoopClock
     private readonly int _restartMs;
     private DispatcherTimer? _pause;
     private DispatcherTimer? _idle;
+    private Action? _restartAfterPause;
 
     public ShowLoopClock(bool kiosk, int pauseMs, int restartMs)
     {
@@ -24,8 +25,9 @@ public sealed class ShowLoopClock
 
     public bool Restarts => _kiosk && _restartMs > 0;
 
-    public void Loop(Action restart)
+    public void Loop(Action paused, Action restart)
     {
+        ArgumentNullException.ThrowIfNull(paused);
         ArgumentNullException.ThrowIfNull(restart);
         if (_pauseMs == 0)
         {
@@ -34,13 +36,20 @@ public sealed class ShowLoopClock
         }
 
         Stop(ref _pause);
+        _restartAfterPause = restart;
+        paused();
         _pause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(_pauseMs) };
-        _pause.Tick += (_, _) =>
-        {
-            Stop(ref _pause);
-            restart();
-        };
+        _pause.Tick += (_, _) => SkipPause();
         _pause.Start();
+    }
+
+    public bool SkipPause()
+    {
+        if (_restartAfterPause is not { } restart) return false;
+        _restartAfterPause = null;
+        Stop(ref _pause);
+        restart();
+        return true;
     }
 
     public void Touch(Action restart)
@@ -59,6 +68,7 @@ public sealed class ShowLoopClock
 
     public void Stop()
     {
+        _restartAfterPause = null;
         Stop(ref _pause);
         Stop(ref _idle);
     }

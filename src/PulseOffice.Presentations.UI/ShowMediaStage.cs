@@ -19,12 +19,21 @@ public sealed class ShowMediaStage
     private readonly Func<SlideElement, Rect> _bounds;
     private readonly Dictionary<string, (MediaElement Element, MediaView View)> _playing = new(StringComparer.Ordinal);
     private readonly MediaAutoPlay _autoPlay = new();
+    private readonly ITransitionSoundCues _cues;
+    private SlideTransition? _left;
     private int _generation;
     private int _soundGeneration;
     private MediaSession? _sound;
 
     public ShowMediaStage(ShowMediaOptions? options, Func<SlideElement, Rect> bounds)
+        : this(options, bounds, new TransitionSoundCues())
     {
+    }
+
+    public ShowMediaStage(ShowMediaOptions? options, Func<SlideElement, Rect> bounds, ITransitionSoundCues cues)
+    {
+        ArgumentNullException.ThrowIfNull(cues);
+        _cues = cues;
         ArgumentNullException.ThrowIfNull(bounds);
         _options = options;
         _bounds = bounds;
@@ -81,6 +90,14 @@ public sealed class ShowMediaStage
         StopSound();
         _ = StartSoundAsync(open, path, loop, _soundGeneration);
         return true;
+    }
+
+    public void Arrive(SlideTransition? arriving)
+    {
+        var cue = _cues.Arriving(_left, arriving);
+        _left = arriving;
+        if (cue.Action == TransitionSoundAction.Play) PlaySound(cue.Path, cue.Loop);
+        else if (cue.Action == TransitionSoundAction.Stop) StopSound();
     }
 
     public void StopSound()

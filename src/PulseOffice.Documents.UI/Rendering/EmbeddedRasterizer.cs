@@ -53,10 +53,11 @@ public sealed class EmbeddedRasterizer(IContentPainter painter, IBitmapPixels pi
         for (var index = 0; index < count && index * 4 + 3 < image.Pixels.Length; index++)
         {
             var source = index * 4;
-            rgb[index * 3] = image.Pixels[source + 2];
-            rgb[index * 3 + 1] = image.Pixels[source + 1];
-            rgb[index * 3 + 2] = image.Pixels[source];
-            alpha[index] = image.Pixels[source + 3];
+            var opacity = image.Pixels[source + 3];
+            rgb[index * 3] = Straight(image.Pixels[source + 2], opacity);
+            rgb[index * 3 + 1] = Straight(image.Pixels[source + 1], opacity);
+            rgb[index * 3 + 2] = Straight(image.Pixels[source], opacity);
+            alpha[index] = opacity;
             opaque &= alpha[index] == 255;
         }
         return new PageImage(image.Width, image.Height, rgb)
@@ -65,4 +66,12 @@ public sealed class EmbeddedRasterizer(IContentPainter painter, IBitmapPixels pi
             Source = opaque ? originals.Original(content, transform.RotationDegrees, transform.Flipped) : null,
         };
     }
+
+    private byte Straight(byte premultiplied, byte opacity) =>
+        opacity switch
+        {
+            0 => 255,
+            255 => premultiplied,
+            _ => (byte)Math.Min(255, (premultiplied * 255 + opacity / 2) / opacity),
+        };
 }

@@ -41,9 +41,32 @@ internal sealed class GridViewport
 
     public double Zoom { get; set; } = 1;
 
-    public Vector Scroll { get; set; }
+    private Vector _scroll;
+    private Vector _paneScroll;
 
-    public Vector PaneScroll { get; set; }
+    public event EventHandler? Moved;
+
+    public Vector Scroll
+    {
+        get => _scroll;
+        set
+        {
+            if (_scroll == value) return;
+            _scroll = value;
+            Moved?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public Vector PaneScroll
+    {
+        get => _paneScroll;
+        set
+        {
+            if (_paneScroll == value) return;
+            _paneScroll = value;
+            Moved?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public Worksheet? Sheet => _engine.SheetAtIndex(SheetIndex);
 

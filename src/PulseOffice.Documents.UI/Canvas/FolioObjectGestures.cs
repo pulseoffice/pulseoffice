@@ -82,7 +82,8 @@ internal sealed class FolioObjectGestures(FolioCanvas canvas, FolioEditor editor
         var area = new PulseOffice.Drawing.Shapes.ObjectBox(box.Bounds.X, box.Bounds.Y, box.Bounds.Width, box.Bounds.Height);
         var handle = services.Frame.HandleAt(new PulseOffice.UI.Controls.Shapes.FrameScene(area, item.RotationDegrees, Brushes.Transparent, 1 / canvas.Scale), new Point((point.X - slot.X) / canvas.Scale, (point.Y - slot.Y) / canvas.Scale));
         if (handle == PulseOffice.Drawing.Shapes.ObjectHandle.None) return false;
-        _gesture = new ObjectGesture(services.Manipulator.Begin(handle, area, item.RotationDegrees), point, slot);
+        _gesture = new ObjectGesture(services.Manipulator.Begin(handle, area, item.RotationDegrees,
+            services.Manipulator.KeepsAspect((item.Content as PulseOffice.Documents.Objects.EmbeddedContent)?.Value)), point, slot);
         return true;
     }
 

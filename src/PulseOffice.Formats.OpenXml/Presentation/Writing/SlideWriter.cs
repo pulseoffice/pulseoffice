@@ -139,11 +139,14 @@ internal sealed class PptxSlideWriter(
         part.Slide = new P.Slide(common, new P.ColorMapOverride(new D.MasterColorMapping()));
         if (slide.Hidden) part.Slide.Show = false;
         if (!slide.ShowMasterObjects) part.Slide.ShowMasterShapes = false;
-        transitions.Append(part.Slide, slide.Transition);
-        if (_sounds.Write(slide.Transition.SoundPath, part, session) is { } transitionSound)
+        var cueTransition = string.IsNullOrEmpty(slide.Transition.SoundPath) && CutsSoundOfPrevious(session.Deck, slide)
+            ? slide.Transition with { StopPreviousSound = true }
+            : slide.Transition;
+        transitions.Append(part.Slide, cueTransition);
+        if (_sounds.Write(cueTransition.SoundPath, part, session) is { } transitionSound)
             foreach (var transition in part.Slide.Descendants<P.Transition>())
-                transition.Append(_sounds.Transition(transitionSound, slide.Transition.LoopSoundUntilNext));
-        else if (slide.Transition.StopPreviousSound)
+                transition.Append(_sounds.Transition(transitionSound, cueTransition.LoopSoundUntilNext));
+        else if (cueTransition.StopPreviousSound)
             foreach (var transition in part.Slide.Descendants<P.Transition>())
                 transition.Append(new P.SoundAction(new P.EndSoundAction()));
         if (animations.ToTiming(slide, shapes, path => _sounds.Write(path, part, session)) is { } timing) part.Slide.Append(timing);
@@ -151,6 +154,12 @@ internal sealed class PptxSlideWriter(
         part.AddPart(layout);
         comments.Write(part, session.Part, slide);
         return part;
+    }
+
+    private bool CutsSoundOfPrevious(PulseOffice.Presentations.Presentation deck, Slide slide)
+    {
+        var position = deck.IndexOf(slide);
+        return position > 0 && deck.Slides[position - 1].Transition is { SoundPath.Length: > 0, SoundPlaysToEnd: false, LoopSoundUntilNext: false };
     }
 
     private readonly XlsxShapeStyleMapper _fills = new();

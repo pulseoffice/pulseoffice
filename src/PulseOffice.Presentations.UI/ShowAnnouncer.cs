@@ -39,6 +39,9 @@ public sealed class ShowAnnouncer
             case ShowCurtain.White:
                 Say(Text("deck.present.announce.white"));
                 break;
+            case ShowCurtain.Pause:
+                Say(Text("deck.present.announce.pause"));
+                break;
             case ShowCurtain.End:
                 Say(_endOfShow.Length > 0 ? _endOfShow : Text("deck.presenter.end"));
                 break;

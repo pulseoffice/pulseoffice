@@ -115,7 +115,7 @@ public sealed class OdfImageMapper(SignatureLineImage signatureImages, VectorFal
                     FlipHorizontal = flipHorizontal,
                     FlipVertical = flipVertical,
                 }
-                : new RasterImageObject
+                : _mirrors.Look(frame, content, new RasterImageObject
                 {
                     Id = name,
                     Data = bytes,
@@ -123,7 +123,7 @@ public sealed class OdfImageMapper(SignatureLineImage signatureImages, VectorFal
                     PixelWidth = pixels?.Width ?? 0,
                     PixelHeight = pixels?.Height ?? 0,
                     Map = new OdfImageMapCodec().Read(frame, size),
-                };
+                }, size);
 
             placed.Add(new PlacedObject
             {

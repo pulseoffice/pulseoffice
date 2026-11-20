@@ -89,6 +89,22 @@ public sealed class LedgerImageCommands(
             },
         },
 
+        Prototype("ledger.image.tone") with
+        {
+            MenuPath = "format/image",
+            ContextPaths = ["cell/object"],
+            Surface = CommandSurface.Advanced | CommandSurface.ContextMenu,
+            RequiredState = DocumentState.DocumentOpen | DocumentState.ObjectSelected,
+            ForbiddenState = DocumentState.ReadOnly,
+            EnabledWhen = _ => Context.SelectedObject?.Content is RasterImageObject,
+            Execute = async (_, ct) =>
+            {
+                if (Context.SelectedObject is not { Content: RasterImageObject raster }) return;
+                if (await colorAdjust.ToneAsync(raster, "command.ledger.image.tone.title", ct).ConfigureAwait(true) is { } toned)
+                    ApplyRaster("command.ledger.image.tone.title", _ => toned);
+            },
+        },
+
         Prototype("ledger.image.colorReplacer") with
         {
             MenuPath = "format/image",

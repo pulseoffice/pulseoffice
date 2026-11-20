@@ -48,6 +48,15 @@ public sealed class GrayscaleFilter : PerPixelFilter
     }
 }
 
+public sealed class BlackWhiteFilter : PerPixelFilter
+{
+    protected override (byte Blue, byte Green, byte Red) Transform(byte blue, byte green, byte red)
+    {
+        var level = 0.114 * blue + 0.587 * green + 0.299 * red >= 127.5 ? (byte)255 : (byte)0;
+        return (level, level, level);
+    }
+}
+
 public sealed class DuotoneFilter : PerPixelFilter
 {
     private readonly (double Red, double Green, double Blue) _dark;
@@ -289,6 +298,8 @@ public interface IPixelFilterCatalog
     IPixelFilter Duotone(ImageDuotone duotone);
 
     IPixelFilter Adjust(ColorAdjustment adjustment);
+
+    IPixelFilter BlackWhite();
 }
 
 public sealed class PixelFilterCatalog : IPixelFilterCatalog
@@ -296,6 +307,8 @@ public sealed class PixelFilterCatalog : IPixelFilterCatalog
     public IPixelFilter Duotone(ImageDuotone duotone) => new DuotoneFilter(duotone);
 
     public IPixelFilter Adjust(ColorAdjustment adjustment) => new ColorAdjustmentFilter(adjustment);
+
+    public IPixelFilter BlackWhite() => new BlackWhiteFilter();
 
     private readonly IReadOnlyDictionary<ImageFilter, IPixelFilter> _filters = new Dictionary<ImageFilter, IPixelFilter>
     {

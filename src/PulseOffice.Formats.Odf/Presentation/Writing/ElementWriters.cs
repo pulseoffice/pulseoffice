@@ -254,11 +254,12 @@ internal sealed class ImageObjectWriter(OdfDeckShapeMapper shapes, OdfUnits unit
     private string? GraphicStyle(ObjectElement element, PulseOffice.Drawing.Assets.RasterImageObject image, OdpWriteSession session)
     {
         var grayscale = image.Filter == PulseOffice.Drawing.Assets.ImageFilter.Grayscale;
-        if (!grayscale && image.Crop == default) return null;
+        if (!grayscale && image.Crop == default && image.Tone.IsNeutral) return null;
 
         var properties = new XElement(Style + "graphic-properties");
         if (grayscale) properties.Add(new XAttribute(Draw + "color-mode", "greyscale"));
         if (image.Crop != default) properties.Add(new XAttribute(Fo + "clip", clip.Write(image, new PulseOffice.Foundation.Units.DocumentSize(element.Bounds.Width, element.Bounds.Height))));
+        new OdfImageTone().Write(properties, image.Tone);
 
         var name = session.NextStyle("gr");
         session.AddStyle(new XElement(Style + "style",

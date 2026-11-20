@@ -1178,7 +1178,8 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
     {
         private const double Tolerance = 8;
 
-        private readonly ObjectTransformSession _session = view._manipulator.Begin(handle, start, rotation);
+        private readonly ObjectTransformSession _session = view._manipulator.Begin(handle, start, rotation,
+            group is null && view.SelectedElement is ObjectElement { } picture && view._manipulator.KeepsAspect(picture.Content));
 
         public SlideGroup? Group => group;
 

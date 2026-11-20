@@ -4,11 +4,13 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- Iterated text (by word, by letter, backwards) is revealed as a whole in the show. (274, 278)
-- ODP `presentation:play-full="false"` (cut the sound at the next event) has no model value. (278)
-- The show setup dialog does not edit the loop pause and kiosk restart; the transition editor has no "stop previous
-  sound" choice. (278)
-- The pause between loops keeps the last slide on screen instead of a pause screen. (278)
+- Iterated text in shapes drawn as objects (`ShapeObject` text) is still revealed as a whole. (283)
+- Iterated effects show each unit at once (no per-unit fade or fly), and a reveal longer than the effect is compressed
+  into the effect's duration. (283)
+- Picture bullets of a paragraph not yet revealed by an iterated effect stay visible. (283)
+- The pause screen between loops is plain black, with no countdown. (283)
+- A transition sound cut at the next slide on the last slide has no PPTX carrier. (283)
+- Iterated text, the sound cut, the pause screen and the new dialog fields have not been seen live. (283)
 - Looping repeats, effect sounds, kiosk keys and timings and the hidden start slide have not been seen live. (278)
 - Transition sounds and sound actions in the show, the trigger-only advance, the show type and custom show settings
   have not been seen live or opened in PowerPoint or the reference suite. (274)
@@ -82,9 +84,10 @@ the round that fixes it is joined and the join run is green.
   automatic width with nested percent tables and percent `tcW` not compared with Word. (271)
 - Folio tables (271): the TOC "Add a style" field and the table style editor have not been seen live. (271)
 - Folio tables (279): corner-cell formats go to ODT only as our `pt:table-region` (ODF 1.3 templates have no corner
-  parts); template paragraph styles are not written. (279)
-- Folio tables (279): a region line set to zero width or a cleared font field in a derived style cannot override the
-  parent's value. (279)
+  parts). (279)
+- Folio tables (285): DOCX has no "no font" or "no size" in a conditional format, so a cleared region font or size in a
+  derived style is not written to DOCX and Word shows the parent's value. (285)
+- Folio tables (285): template part paragraph styles not yet opened in another ODF application. (285)
 - Folio tables (279): the native table templates have not been opened in another ODF application; the new editor
   fields (italic, font, size, line) not seen live. (279)
 - Folio tables (275): percent `tcW` without a grid is resolved against a nominal 6.5 in text width; the layout scales
@@ -92,16 +95,15 @@ the round that fixes it is joined and the join run is green.
 - Folio tables (275): the new style editor tabs (total row, columns, corners) and "no colour" in derived styles have
   not been seen live. (275)
 
-- Folio images (281): image tone (brightness, contrast, transparency) is now kept by DOCX, ODT and XLSX, but there is
-  no non-destructive command to set it: the colour correction dialog still bakes pixels; Word's picture corrections
-  and transparency need a tone panel shared by the three modules. (281)
-- Folio images (281): the ODF `mono` colour mode and DOCX `a:biLevel` (black and white) are read as plain colour;
-  the ODF `watermark` mode is read as a washed-out tone but written back as luminance and contrast. (281)
-- Folio images (281): PDF export of a toned image does not use the original bytes any more but transparency is
-  not checked in the PDF path. (281)
-- Folio images (281): compression and resize with aspect lock were not re-audited in round 281. (281)
-- Deck images (281): PPTX and ODP picture codecs do not carry `ImageTone`; a toned Folio image pasted into Deck
-  loses it silently on save, and ODS writes Ledger images without graphic properties (declared as ODF022). (281)
+- Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
+  and reads back as a standard tone with the same look. (282)
+- Deck images (282): slide background images do not carry `ImageTone`. (282)
+- Images (282): the picture corrections panel has not been seen live; Word and PowerPoint have not opened our
+  `a:biLevel` and washout pictures. (282)
+- Images (285): no per-object "lock aspect ratio" flag: pictures always keep proportions on corner drags, shapes never;
+  `a:picLocks/@noChangeAspect` is always written as true and never read; no Size dialog checkbox in any module. (285)
+- Images (285): Compress Pictures offers a maximum edge rather than a resolution relative to the displayed size, and
+  works on one picture only (no "all pictures"). (285)
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
@@ -113,9 +115,8 @@ the round that fixes it is joined and the join run is green.
 - Shape autofit (276): Folio shape stories have no vertical text layout, so vertical text in a Folio shape is not
   resized; the stored size settles only when an editor lays the document out (a headless conversion keeps the saved
   size). (276)
-- Shape text areas (281): the remaining hand-written preset areas (arrows, flowchart shapes, octagon, hexagon and
-  others) are still close approximations of the DrawingML text rectangles rather than evaluated from them, and shapes
-  with an ODF enhanced geometry (`draw:text-areas`) get no inset. (281)
+- Shape text areas (285): the rounded rectangle's text area follows the model's corner ratio, not `roundRect`'s `adj`;
+  only the first of several `draw:text-areas` is used. (285)
 - Shape autofit has not been opened in PowerPoint or the reference suite; ODP writes both `draw:fit-to-size` and
   `style:shrink-to-fit`. (268)
 - Shape text keys (272): Tab, Shift+Tab, Enter and Backspace are walked through the live shared editor in a headless
@@ -151,11 +152,10 @@ the round that fixes it is joined and the join run is green.
   second open workbook with another epoch printed or exported in the background shows its dates in the active one's
   system. Nothing was opened in Excel or the reference suite. (267)
 - Round 270 (date epoch), open: 1904 date filters, dynamic filters and pivot date caches not yet opened in Excel. (270)
-- Round 280 (Ledger formula entry), open: argument names are English in every language (localized names not written);
-  the Ctrl fill toggle treats only a one-cell seed as a single number (a one-row seed dragged down is copied); the fill
-  options button does not follow scrolling or zoom and shows a glyph rather than an icon; arrow-key pointing in the
-  formula bar works only while the entry is carried to another sheet; the AutoComplete list and tip popups were not
-  seen live. (280)
+- Round 280 (Ledger formula entry), open: the AutoComplete list and tip popups were not seen live; their placement
+  near the screen edge is unchecked. (280, 284)
+- Round 284 (Ledger formula entry), open: localized German and French argument names not compared one by one with
+  Excel's. (284)
 - Round 267 (Ledger pivots), open: ODS hidden members and named base items carry item names, so a text item that reads
   as a number or boolean ("5", "TRUE") cannot be told from the number or boolean there (the reference suite conflates
   them too); hidden members named "TRUE" or "5" are read as hiding both. GETPIVOTDATA canonicalises items only for row

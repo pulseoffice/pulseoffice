@@ -33,6 +33,7 @@ public sealed class DeckImageCommands(
         Image("deck.image.save", SaveAsync, edits: false),
         Image("deck.image.externalEdit", ExternalEditAsync),
         Image("deck.image.color", ColorAsync),
+        Image("deck.image.tone", ToneAsync),
         Prototype("deck.image.sizeCheck") with
         {
             Surface = CommandSurface.Advanced,
@@ -54,6 +55,9 @@ public sealed class DeckImageCommands(
 
     private async Task ColorAsync(CancellationToken ct) =>
         await Edit(image => operations.ColorAsync(image, "command.deck.image.color.title", ct), "command.deck.image.color.title").ConfigureAwait(true);
+
+    private async Task ToneAsync(CancellationToken ct) =>
+        await Edit(image => operations.ToneAsync(image, "command.deck.image.tone.title", ct), "command.deck.image.tone.title").ConfigureAwait(true);
 
     private async Task Edit(Func<RasterImageObject, Task<RasterImageObject?>> change, string labelKey)
     {

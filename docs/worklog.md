@@ -14173,3 +14173,30 @@ docs/deep-audit/round-272-shape-autofit-modules.md.
   transparency (`ImageTone`) through DOCX (`a:lum`, `a:alphaModFix`), ODT (`draw:luminance`, `draw:contrast`,
   `draw:image-opacity`) and XLSX, drawn by the shared raster painter. Log:
   docs/deep-audit/round-281-shape-areas-folio-images.md.
+
+### Round 282: image tone across the modules (2026-11-20)
+- `ImageTone` gains colour modes (black and white, washout) mapped to ODF `draw:color-mode` and DrawingML
+  `a:biLevel`/washout `a:lum`; PPTX, ODP and ODS pictures now carry tone (ODF022 narrowed to pixel filters); a shared
+  picture corrections panel sets tone in Folio, Deck and Ledger in one undo step, and colour correction keeps
+  brightness and contrast as tone; Folio PDF un-premultiplies transparent images. Log:
+  docs/deep-audit/round-282-image-tone.md.
+
+### Round 283: Deck show leftovers (2026-11-20)
+- Iterated text is revealed by word or letter (also backwards) in the show, the preview and the video export; ODP
+  `presentation:play-full` maps to `SlideTransition.SoundPlaysToEnd` (PPTX: `p:endSnd` on the next slide); the show
+  setup dialog edits the pause between loops and the kiosk restart; the transition editor offers "stop previous sound"
+  and "stop the sound at the next slide"; the pause between loops shows a pause screen that a click skips. Log:
+  docs/deep-audit/round-283-deck-show-leftovers.md.
+
+### Round 284: Ledger formula entry leftovers (2026-11-20)
+- Function argument names are translated into the four other interface languages (data table over every argument
+  stem), the Ctrl fill toggle fills each lane of a one-row or one-column number seed as a series, the fill options
+  button follows scrolling and zoom and shows an icon, and F2 in the formula bar toggles arrow-key pointing on the
+  edited sheet. Log: docs/deep-audit/round-284-ledger-formula-entry.md.
+
+### Round 285: table region overrides, preset text areas, image compression and aspect lock (2026-11-20)
+- A derived Folio table style can clear an inherited region line, font or size (explicit zero line, empty font, size
+  0), carried by DOCX `nil` sides and ODT `none` sides; native ODT template parts name paragraph styles; every preset
+  shape's text area is the evaluated DrawingML text rectangle and enhanced geometries use `draw:text-areas`; pictures
+  keep their proportions on corner drags in the three modules (Shift frees them); Compress Pictures can delete cropped
+  areas. Log: docs/deep-audit/round-285-table-regions-text-areas-images.md.

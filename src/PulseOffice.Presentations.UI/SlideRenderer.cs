@@ -69,6 +69,7 @@ public sealed class SlideRenderer : ISlideRenderer
         _brushes = brushes;
         _text = new TextElementPainter(texts, new ListLabels());
         _content = new StandardContentPainters(objects, texts);
+        _iteration = new TextIterationReveal();
     }
 
     public void Render(
@@ -126,6 +127,8 @@ public sealed class SlideRenderer : ISlideRenderer
     }
 
     private readonly PulseOffice.Drawing.Assets.ImageHeader _header = new();
+
+    private readonly ITextIterationReveal _iteration;
 
     private void PaintBackground(DrawingContext context, PulseOffice.Drawing.Assets.RasterImageObject image, BackgroundImageLayout layout, Rect target, double scale)
     {
@@ -192,6 +195,7 @@ public sealed class SlideRenderer : ISlideRenderer
         using var animation = visual.IsIdentity ? default : context.PushTransform(placement.Animated(visual));
         using var rotation = element.RotationDegrees == 0 ? default : context.PushTransform(placement.Rotated(element.RotationDegrees));
 
+        if (!visual.Reveal.IsWhole && element is TextElement iterated) element = iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal) };
         element.Accept(new ElementPaintVisitor(
             new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language, Painted = palette.Painted } }, _text, _media, _content));
     }

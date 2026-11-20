@@ -236,8 +236,8 @@ internal sealed class OdtStylesWriter(
     {
         if (lines is null) return null;
         var cell = new XElement(Style + "table-cell-properties");
-        borders.Write(cell, lines);
-        return cell;
+        borders.WriteSides(cell, lines);
+        return cell.HasAttributes ? cell : null;
     }
 
     private XElement Named(DocumentStyle style, string family, string? next, params object?[] content)

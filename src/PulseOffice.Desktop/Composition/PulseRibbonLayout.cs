@@ -206,6 +206,7 @@ public static class PulseRibbonLayout
         ("folio.image.crop", "object/image"),
         ("folio.image.replace", "object/image"),
         ("folio.image.color", "object/image"),
+        ("folio.image.tone", "object/image"),
         ("folio.object.fill", "object/style"),
         ("folio.object.lineColor", "object/style"),
         ("folio.object.area", "object/style"),

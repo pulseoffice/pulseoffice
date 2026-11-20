@@ -30,8 +30,8 @@ internal sealed class GridGestureFactory(
 
     public GridGesture Fill(CellRange source) => new FillGesture(viewport, surface, notifications, source);
 
-    public GridGesture ObjectDrag(ObjectHandle handle, Point origin, ObjectBox start, double rotation) =>
-        new ObjectDragGesture(viewport, surface, notifications, objects, manipulator, snapping, handle, origin, start, rotation);
+    public GridGesture ObjectDrag(ObjectHandle handle, Point origin, ObjectBox start, double rotation, PulseOffice.Document.Embedding.EmbeddedObject? content = null) =>
+        new ObjectDragGesture(viewport, surface, notifications, objects, manipulator, snapping, handle, origin, start, rotation, manipulator.KeepsAspect(content));
 
     public GridGesture ShapeAdjust(PlacedObject placed, AdjustHandleGrip grip) =>
         new ShapeAdjustGesture(viewport, surface, notifications, adjusting, placed, grip);

@@ -18,8 +18,10 @@ public sealed class FunctionWizardView : UserControl, IDialogContent, PulseOffic
 
     public IFunctionSignatures Signatures { get; set; } = new FunctionSignatures();
 
+    public IFunctionArgumentNames ArgumentNames { get; set; } = new FunctionArgumentNames();
+
     private string ArgumentLabel(int index) => Chosen is { } function && Signatures.ArgumentName(function.Name, index) is { Length: > 0 } name
-        ? name
+        ? ArgumentNames.Localize(name, Language)
         : _texts.Format("functions.argument", index + 1);
     private readonly DesignTokens.Metrics _metrics = DesignTokens.For(InterfaceDensity.Compact);
 

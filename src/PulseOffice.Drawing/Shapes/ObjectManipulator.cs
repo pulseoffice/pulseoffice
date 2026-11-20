@@ -44,6 +44,10 @@ public interface IObjectManipulator
     double Rotation(ObjectBox box, double x, double y, bool snap);
 
     ObjectTransformSession Begin(ObjectHandle handle, ObjectBox start, double startRotation);
+
+    ObjectTransformSession Begin(ObjectHandle handle, ObjectBox start, double startRotation, bool keepsAspect);
+
+    bool KeepsAspect(PulseOffice.Document.Embedding.EmbeddedObject? content);
 }
 
 public sealed class ObjectManipulator : IObjectManipulator
@@ -78,6 +82,12 @@ public sealed class ObjectManipulator : IObjectManipulator
 
     public ObjectTransformSession Begin(ObjectHandle handle, ObjectBox start, double startRotation) =>
         new(this, handle, start, startRotation);
+
+    public ObjectTransformSession Begin(ObjectHandle handle, ObjectBox start, double startRotation, bool keepsAspect) =>
+        new(this, handle, start, startRotation) { KeepsAspect = keepsAspect };
+
+    public bool KeepsAspect(PulseOffice.Document.Embedding.EmbeddedObject? content) =>
+        content is PulseOffice.Drawing.Assets.RasterImageObject or PulseOffice.Drawing.Assets.VectorGraphicObject;
 
     public ObjectHandle HandleAt(ObjectBox box, double rotationDegrees, double x, double y, double unit = 1)
     {

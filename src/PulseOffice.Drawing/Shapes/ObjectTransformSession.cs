@@ -18,10 +18,12 @@ public sealed class ObjectTransformSession(IObjectManipulator manipulator, Objec
 
     public bool Moving => handle is ObjectHandle.Body;
 
+    public bool KeepsAspect { get; init; }
+
     public void Track(double deltaX, double deltaY, double x, double y, bool constrain)
     {
         if (Rotating) RotationPreview = manipulator.Rotation(Start, x, y, constrain);
-        else Preview = manipulator.Resize(Start, handle, deltaX, deltaY, constrain);
+        else Preview = manipulator.Resize(Start, handle, deltaX, deltaY, constrain != KeepsAspect);
     }
 
     public void Settle(ObjectBox box) => Preview = box;

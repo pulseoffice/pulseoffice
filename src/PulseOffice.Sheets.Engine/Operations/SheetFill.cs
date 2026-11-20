@@ -23,7 +23,7 @@ public interface ISheetFill
 
     IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(Worksheet sheet, CellRange source, CellRange target, FillDirection direction, FillMode mode);
 
-    FillMode Toggled(Worksheet sheet, CellRange source);
+    FillMode Toggled(Worksheet sheet, CellRange source, FillDirection direction);
 
     FillMergePlan Merges(Worksheet sheet, CellRange source, CellRange target, FillDirection direction);
 
@@ -51,14 +51,23 @@ public sealed class SheetFill : ISheetFill
         _copyRules = [new FormulaFillRule(), new RepeatFillRule()];
     }
 
-    public FillMode Toggled(Worksheet sheet, CellRange source)
+    public FillMode Toggled(Worksheet sheet, CellRange source, FillDirection direction)
     {
         ArgumentNullException.ThrowIfNull(sheet);
-        if (source.IsSingleCell
-            && sheet[source.Start] is { HasFormula: false } cell && cell.Value.Kind == ValueKind.Number
-            && !(sheet.Owner is { } owner && _calendars.NamesDays(owner, sheet.StyleIdAt(source.Start))))
-            return FillMode.Series;
-        return FillMode.Copy;
+        var laneLength = direction is FillDirection.Down or FillDirection.Up ? source.RowCount : source.ColumnCount;
+        if (laneLength != 1) return FillMode.Copy;
+        var numbers = 0;
+        for (var row = source.Start.Row; row <= source.End.Row; row++)
+            for (var column = source.Start.Column; column <= source.End.Column; column++)
+            {
+                var address = new CellAddress(row, column);
+                if (sheet[address] is not { } cell || (!cell.HasFormula && cell.Value.Kind == ValueKind.Empty)) continue;
+                if (cell.HasFormula || cell.Value.Kind != ValueKind.Number
+                    || (sheet.Owner is { } owner && _calendars.NamesDays(owner, sheet.StyleIdAt(address))))
+                    return FillMode.Copy;
+                numbers++;
+            }
+        return numbers > 0 ? FillMode.Series : FillMode.Copy;
     }
 
     public IReadOnlyList<(CellAddress Address, Cell Cell)> Extend(

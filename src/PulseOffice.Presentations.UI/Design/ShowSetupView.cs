@@ -47,6 +47,8 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
     private readonly IconChoiceGroup _kind;
     private readonly ComboBox _customShow = new() { MinWidth = 200, HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _withoutAnimation = new();
+    private readonly MeasureField _loopPause;
+    private readonly MeasureField _kioskRestart;
     private readonly SwatchStrip _pen;
     private readonly ComboBox _screens = new() { MinWidth = 240 };
     private readonly int _initialMonitor;
@@ -86,6 +88,10 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
         AutomationProperties.SetName(_customShow, Texts["deck.setup.customShow"]);
         _loop.Content = Texts["deck.setup.loop"];
         _loop.IsChecked = setup.Loop;
+        _loop.IsCheckedChanged += (_, _) => RefreshLooping();
+        _kind.SelectionChanged += (_, _) => RefreshLooping();
+        _loopPause = Seconds(setup.LoopPauseMs / 1000.0, 3600, Texts["deck.setup.loopPause"], [0, 1, 2, 5, 10, 30, 60]);
+        _kioskRestart = Seconds(setup.KioskRestartMs / 1000.0, 86400, Texts["deck.setup.kioskRestart"], [30, 60, 120, 300, 600]);
         _withoutAnimation.Content = Texts["deck.setup.noAnimation"];
         _withoutAnimation.IsChecked = setup.WithoutAnimation;
 
@@ -109,6 +115,8 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
         var advance = new DialogSection(Texts["deck.setup.advance"], _metrics);
         advance.Add(null, _advance, DialogRowKind.Wide, editorWidth: 320);
         advance.Add(null, _loop, DialogRowKind.Indented);
+        advance.Add(Texts["deck.setup.loopPause"], _loopPause, editorWidth: 200);
+        advance.Add(Texts["deck.setup.kioskRestart"], _kioskRestart, editorWidth: 200);
         advance.Add(null, _withoutAnimation, DialogRowKind.Indented);
         var screen = new DialogSection(Texts["deck.setup.screens"], _metrics);
         screen.Add(Texts["deck.setup.screen"], _screens, editorWidth: 260);
@@ -129,6 +137,7 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
             .WithAction(Texts["deck.motion.apply"], () => Completed?.Invoke(this, Result()), primary: true);
         BuildCards();
         Refresh();
+        RefreshLooping();
     }
 
     public event EventHandler<object?>? Completed;
@@ -144,6 +153,14 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
     public MeasureField To => _to;
 
     public SwatchStrip Pen => _pen;
+
+    public CheckBox Loop => _loop;
+
+    public IconChoiceGroup Kind => _kind;
+
+    public MeasureField LoopPause => _loopPause;
+
+    public MeasureField KioskRestart => _kioskRestart;
 
     public ComboBox Screens => _screens;
 
@@ -184,6 +201,8 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
                 ? _deck.CustomShows[_customShow.SelectedIndex - 1].Name
                 : null,
             WithoutAnimation = _withoutAnimation.IsChecked == true,
+            LoopPauseMs = Milliseconds(_loopPause.Value),
+            KioskRestartMs = Milliseconds(_kioskRestart.Value),
             PenColor = _pen.Value ?? _deck.Setup.PenColor,
         }, Math.Max(0, _screens.SelectedIndex) - 1);
     }
@@ -241,6 +260,22 @@ public sealed class ShowSetupView : UserControl, IDialogContent, IDialogFooterOw
             Child = _services.Pictures.Create(_deck, slide, ThumbnailWidth, ThumbnailWidth * ratio),
         };
     }
+
+    private void RefreshLooping()
+    {
+        var kiosk = _kind.SelectedIndex == (int)ShowKind.Kiosk;
+        _loopPause.IsEnabled = kiosk || _loop.IsChecked == true;
+        _kioskRestart.IsEnabled = kiosk;
+    }
+
+    private int Milliseconds(double seconds) => (int)Math.Round(Math.Max(0, seconds) * 1000);
+
+    private MeasureField Seconds(double initial, double maximum, string name, IReadOnlyList<double> presets) =>
+        new(new MeasureEntry(new MeasureOptions("s", 0, maximum, 1) { LargeStep = 10, Presets = presets }, _services.Units, CultureInfo.CurrentCulture),
+            initial, Texts, _metrics, _services.Icons, name, boxWidth: 64)
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
 
     private MeasureField SlideNumber(int value, int count, string name) =>
         new(new MeasureEntry(new MeasureOptions("#", 1, count, 1) { Integer = true, LargeStep = 5 }, _services.Units, CultureInfo.CurrentCulture),

@@ -33,6 +33,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
     private int _editingSheet;
     private bool _suggesting;
     private bool _crossSheet;
+    private bool _barPointMode;
     private string? _namesLanguage;
     private IReadOnlyList<string> _functionNames = [];
     private Dictionary<string, string> _canonicalNames = new(StringComparer.OrdinalIgnoreCase);
@@ -140,6 +141,8 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
     public LedgerFormulaAssist BarAssist { get; }
 
     public bool IsCarriedAcrossSheets => _crossSheet && _formulaTarget is not null;
+
+    public bool IsFormulaBarPointing => _barPointMode && _formulaTarget is not null;
 
     public char ArgumentSeparator => _writer.Formulas?.Punctuation(_writer.Language).Argument ?? ',';
 
@@ -285,6 +288,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
 
         _formulaTarget = null;
         _crossSheet = false;
+        _barPointMode = false;
 
         FormulaBox.Text = _writer.EditableText(cell, sheet, _selection.Active);
         _shownLanguage = _writer.Language;
@@ -549,6 +553,13 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
         var edited = _formulaTarget ?? new SheetCell(_grid.SheetIndex, _selection.Active);
         switch (e.Key)
         {
+            case Key.F2 when e.KeyModifiers == KeyModifiers.None:
+                _formulaTarget ??= edited;
+                _barPointMode = !_barPointMode;
+                _pointed = null;
+                e.Handled = true;
+                break;
+
             case Key.Enter:
                 CommitFormulaBar();
                 ReturnToEditedCell(edited);
@@ -561,6 +572,7 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
             case Key.Escape:
 
                 _formulaTarget = null;
+                _barPointMode = false;
                 BarAssist.Hide();
                 ReturnToEditedCell(edited);
                 SelectionStale?.Invoke(this, EventArgs.Empty);
@@ -594,13 +606,16 @@ internal sealed class LedgerCellEditing : IFormulaVocabulary
     {
         var target = _formulaTarget ?? new SheetCell(_grid.SheetIndex, _selection.Active);
         _formulaTarget = null;
+        _barPointMode = false;
         BarAssist.Hide();
         _writer.Write(FormulaBox.Text ?? string.Empty, target.Address, target.SheetIndex);
     }
 
     private bool PointAcrossSheetsByKey(KeyEventArgs e)
     {
-        if (!_crossSheet || (e.KeyModifiers & ~KeyModifiers.Shift) != KeyModifiers.None) return false;
+        if ((e.KeyModifiers & ~KeyModifiers.Shift) != KeyModifiers.None) return false;
+        if (!_crossSheet && !(IsFormulaBarPointing
+            && (_pointed is not null || Pointing.AcceptsReference(FormulaBox.Text ?? string.Empty, FormulaBox.CaretIndex)))) return false;
         var (rows, columns) = e.Key switch
         {
             Key.Left => (0, -1),

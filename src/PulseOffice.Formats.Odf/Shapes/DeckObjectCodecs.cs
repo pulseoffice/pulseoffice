@@ -321,6 +321,7 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
 
         var bounds = Bounds(frame);
         var filter = ImageFilter.None;
+        var tone = ImageTone.Neutral;
         string? clipped = null;
 
         var styleName = (string?)frame.Attribute(Draw + "style-name");
@@ -328,6 +329,7 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
             && style.Element(Style + "graphic-properties") is { } graphic)
         {
             if ((string?)graphic.Attribute(Draw + "color-mode") == "greyscale") filter = ImageFilter.Grayscale;
+            tone = new OdfImageTone().Read(graphic);
             clipped = (string?)graphic.Attribute(OdfPackage.Namespaces.Fo + "clip");
         }
 
@@ -345,6 +347,7 @@ internal sealed class DeckImageCodec(OdfImageTypes types, VectorFallback vectors
                 LinkPath = linkPath,
                 NaturalSize = new DocumentSize(bounds.Width, bounds.Height),
                 Filter = filter,
+                Tone = tone,
                 Crop = clip.Read(clipped, unclipped, frameSize),
                 Map = new OdfImageMapCodec().Read(frame, new DocumentSize(bounds.Width, bounds.Height)),
             },

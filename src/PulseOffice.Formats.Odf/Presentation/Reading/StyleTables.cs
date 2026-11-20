@@ -160,6 +160,7 @@ internal sealed class PageTransitionTable(OdfValues values, SmilTransitionMapper
             SoundPath = (string?)sound?.Attribute(OdfPackage.Namespaces.Xlink + "href"),
             LoopSoundUntilNext = sound is not null && (string?)properties.Attribute(transitions.ExtensionNamespace + "loop-sound") == "true",
             StopPreviousSound = sound is null && (string?)properties.Attribute(transitions.ExtensionNamespace + "stop-sound") == "true",
+            SoundPlaysToEnd = sound is null || (string?)sound.Attribute(Presentation + "play-full") != "false",
         };
     }
 }

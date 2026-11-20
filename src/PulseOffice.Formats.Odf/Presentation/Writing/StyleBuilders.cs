@@ -110,7 +110,7 @@ internal sealed class PageStyleBuilder(OdfUnits units, SmilTransitionMapper tran
         if (hasSound)
             properties.Add(new XElement(Presentation + "sound",
                 new XAttribute(Xlink + "href", transition.SoundPath!),
-                new XAttribute(Presentation + "play-full", "true")));
+                new XAttribute(Presentation + "play-full", transition.SoundPlaysToEnd || transition.LoopSoundUntilNext ? "true" : "false")));
     }
 }
 

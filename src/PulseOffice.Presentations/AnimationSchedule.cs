@@ -5,11 +5,11 @@ public readonly record struct ScheduledEffect(AnimationEffect Effect, int StartM
     public bool LoopsAt(int timeMs) => Effect.RepeatsIndefinitely && timeMs >= StartMs && timeMs < LoopUntilMs;
 }
 
-public readonly record struct ElementVisual(double Opacity, double OffsetX, double OffsetY, double Scale)
+public readonly record struct ElementVisual(double Opacity, double OffsetX, double OffsetY, double Scale, TextReveal Reveal = default)
 {
     public static readonly ElementVisual Shown = new(1, 0, 0, 1);
 
-    public bool IsIdentity => Opacity >= 1 && OffsetX == 0 && OffsetY == 0 && Scale == 1;
+    public bool IsIdentity => Opacity >= 1 && OffsetX == 0 && OffsetY == 0 && Scale == 1 && Reveal.IsWhole;
 }
 
 public interface IAnimationScheduler
@@ -40,6 +40,17 @@ public sealed class AnimationScheduler : IAnimationScheduler
     private static readonly ElementVisual Hidden = new(0, 0, 0, 1);
 
     private readonly EffectMotions _motions = new();
+    private readonly ITextIterationReveal _iteration;
+
+    public AnimationScheduler() : this(new TextIterationReveal())
+    {
+    }
+
+    public AnimationScheduler(ITextIterationReveal iteration)
+    {
+        ArgumentNullException.ThrowIfNull(iteration);
+        _iteration = iteration;
+    }
 
     public IReadOnlyList<ScheduledEffect> Schedule(IReadOnlyList<AnimationEffect> effects)
     {
@@ -164,10 +175,27 @@ public sealed class AnimationScheduler : IAnimationScheduler
             }
 
             var progress = scheduled.LoopsAt(timeMs) ? Cycle(scheduled, timeMs + Math.Max(0, loopElapsedMs)) : Progress(scheduled, timeMs);
-            visual = Apply(scheduled.Effect, progress, visual);
+            if (Iterated(scheduled, timeMs) is { } reveal)
+            {
+                visual = visual with { Reveal = reveal with { Progress = progress } };
+                continue;
+            }
+
+            visual = Apply(scheduled.Effect, progress, visual) with { Reveal = default };
         }
 
         return visual;
+    }
+
+    private TextReveal? Iterated(ScheduledEffect scheduled, int timeMs)
+    {
+        var effect = scheduled.Effect;
+        if (effect.Category is not (AnimationCategory.Entrance or AnimationCategory.Exit) || timeMs >= scheduled.EndMs || scheduled.LoopsAt(timeMs)) return null;
+        var unit = _iteration.UnitOf(effect);
+        if (unit == TextIterationUnit.None) return null;
+        var behaviours = effect.Native!.Behaviours!;
+        var interval = (int)Math.Round(Math.Max(0, behaviours.IterateInterval ?? 0) * 1000);
+        return new TextReveal(unit, behaviours.IterateBackwards, effect.Category == AnimationCategory.Exit, timeMs - scheduled.StartMs, interval, 0);
     }
 
     private double Progress(ScheduledEffect scheduled, int timeMs)

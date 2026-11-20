@@ -56,8 +56,8 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
             cell.Background is not null)
         {
             Italic = text.Italic == true,
-            Font = text.Font,
-            FontSize = text.FontSize,
+            Font = string.IsNullOrEmpty(text.Font) ? null : text.Font,
+            FontSize = text.FontSize is > 0 ? text.FontSize : null,
         };
     }
 
@@ -94,12 +94,14 @@ public sealed class TableAppearance(IStyleResolver resolver, ICellBorderConflict
         var regional = Regions(table, style, row, column).Aggregate((BoxBorders?)null, (under, over) => TableRegionFormat.MergeBorders(over.Borders, under));
         return regional is null ? lines : lines with
         {
-            Top = regional.Top ?? lines.Top,
-            Bottom = regional.Bottom ?? lines.Bottom,
-            Left = regional.Left ?? lines.Left,
-            Right = regional.Right ?? lines.Right,
+            Top = Drawn(regional.Top ?? lines.Top),
+            Bottom = Drawn(regional.Bottom ?? lines.Bottom),
+            Left = Drawn(regional.Left ?? lines.Left),
+            Right = Drawn(regional.Right ?? lines.Right),
         };
     }
+
+    private BorderLine? Drawn(BorderLine? line) => line is { Width: > 0 } ? line : null;
 
     private BoxBorders BaseBorders(TableBlock table, TableProperties style, int row, int column)
     {

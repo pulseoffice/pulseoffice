@@ -68,11 +68,11 @@ public sealed class DocxTableStyleCodec(DocxValues values, DocxBorders borders)
     {
         var conditional = new W.TableStyleProperties { Type = kind };
         var run = new W.RunPropertiesBaseStyle();
-        if (format.Font is { } font) run.Append(new W.RunFonts { Ascii = font, HighAnsi = font, ComplexScript = font });
+        if (format.Font is { Length: > 0 } font) run.Append(new W.RunFonts { Ascii = font, HighAnsi = font, ComplexScript = font });
         if (format.Bold is { } bold) run.Append(new W.Bold { Val = OnOffValue.FromBoolean(bold) });
         if (format.Italic is { } italic) run.Append(new W.Italic { Val = OnOffValue.FromBoolean(italic) });
         if (format.Ink is { } ink) run.Append(new W.Color { Val = Ink(ink) });
-        if (format.FontSize is { } size) run.Append(new W.FontSize { Val = ((int)Math.Round(size * 2)).ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        if (format.FontSize is { } size && size > 0) run.Append(new W.FontSize { Val = ((int)Math.Round(size * 2)).ToString(System.Globalization.CultureInfo.InvariantCulture) });
         if (run.HasChildren) conditional.Append(run);
         var cell = new W.TableStyleConditionalFormattingTableCellProperties();
         if (format.Borders is { } lines) cell.Append(Edges(lines));
@@ -84,8 +84,23 @@ public sealed class DocxTableStyleCodec(DocxValues values, DocxBorders borders)
     private W.TableCellBorders Edges(BoxBorders lines)
     {
         var written = borders.Write(new W.TableCellBorders(), lines);
-        foreach (var side in written.Elements<W.BorderType>().Where(side => side.Val?.Value == W.BorderValues.Nil && side.Size is null).ToList()) side.Remove();
+        var sides = written.Elements<W.BorderType>().Zip(new BorderLine?[] { lines.Top, lines.Left, lines.Bottom, lines.Right }).ToList();
+        foreach (var (side, line) in sides)
+            if (line is null && side.Val?.Value == W.BorderValues.Nil && side.Size is null) side.Remove();
         return written;
+    }
+
+    private BoxBorders Cleared(OpenXmlElement edges, BoxBorders lines)
+    {
+        BorderLine? Explicit(BorderLine? line, W.BorderType? side) =>
+            line ?? (side?.Val?.Value is { } value && (value == W.BorderValues.Nil || value == W.BorderValues.None) ? new BorderLine(0, 0xFF000000) : null);
+        return new BoxBorders
+        {
+            Top = Explicit(lines.Top, edges.GetFirstChild<W.TopBorder>()),
+            Left = Explicit(lines.Left, (W.BorderType?)edges.GetFirstChild<W.LeftBorder>() ?? edges.GetFirstChild<W.StartBorder>()),
+            Bottom = Explicit(lines.Bottom, edges.GetFirstChild<W.BottomBorder>()),
+            Right = Explicit(lines.Right, (W.BorderType?)edges.GetFirstChild<W.RightBorder>() ?? edges.GetFirstChild<W.EndBorder>()),
+        };
     }
 
     private TableRegionFormat Format(W.TableStyleProperties conditional)
@@ -94,7 +109,7 @@ public sealed class DocxTableStyleCodec(DocxValues values, DocxBorders borders)
         var cell = conditional.GetFirstChild<W.TableStyleConditionalFormattingTableCellProperties>();
         var fonts = run?.GetFirstChild<W.RunFonts>();
         var size = run?.GetFirstChild<W.FontSize>()?.Val?.Value is { } half && double.TryParse(half, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var halves) ? halves / 2 : (double?)null;
-        var lines = cell?.GetFirstChild<W.TableCellBorders>() is { } edges ? borders.Read(edges) : null;
+        var lines = cell?.GetFirstChild<W.TableCellBorders>() is { } edges ? Cleared(edges, borders.Read(edges)) : null;
         return new TableRegionFormat
         {
             Background = Fill(cell?.GetFirstChild<W.Shading>()?.Fill?.Value),

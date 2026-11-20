@@ -18,6 +18,8 @@ public interface IRasterImageOperations
 
     Task<RasterImageObject?> ColorAsync(RasterImageObject image, string titleKey, CancellationToken ct);
 
+    Task<RasterImageObject?> ToneAsync(RasterImageObject image, string titleKey, CancellationToken ct);
+
     Task<RasterImageObject?> RecolorAsync(RasterImageObject image, string titleKey, CancellationToken ct);
 
     Task<RasterImageObject?> ImageMapAsync(RasterImageObject image, string titleKey, CancellationToken ct);
@@ -78,6 +80,8 @@ public sealed class RasterImageOperations(
     }
 
     public Task<RasterImageObject?> ColorAsync(RasterImageObject image, string titleKey, CancellationToken ct) => colorAdjust.AskAsync(image, titleKey, ct);
+
+    public Task<RasterImageObject?> ToneAsync(RasterImageObject image, string titleKey, CancellationToken ct) => colorAdjust.ToneAsync(image, titleKey, ct);
 
     public async Task<RasterImageObject?> RecolorAsync(RasterImageObject image, string titleKey, CancellationToken ct)
     {

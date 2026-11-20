@@ -120,8 +120,16 @@ public sealed class DeckMotionTests : IDisposable
         Assert.Equal(TransitionDirection.None, editor.Transition.Direction);
 
         editor.ChooseSound("/tmp/applause.wav");
-        Assert.Equal(2, editor.Sound.ItemCount);
-        Assert.Equal(1, editor.Sound.SelectedIndex);
+        Assert.Equal(3, editor.Sound.ItemCount);
+        Assert.Equal(2, editor.Sound.SelectedIndex);
+        Assert.True(editor.StopAtNextSlide.IsEnabled);
+        editor.StopAtNextSlide.IsChecked = true;
+        Assert.False(editor.Transition.SoundPlaysToEnd);
+
+        editor.Sound.SelectedIndex = 1;
+        Assert.True(editor.Transition.StopPreviousSound);
+        Assert.Null(editor.Transition.SoundPath);
+        Assert.False(editor.StopAtNextSlide.IsEnabled);
         window.Close();
     }, CancellationToken.None);
 

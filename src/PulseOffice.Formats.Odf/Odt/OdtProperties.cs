@@ -493,6 +493,27 @@ internal sealed class OdtBorders(OdtMeasure measure) : OdtXml
         }
     }
 
+    public void WriteSides(XElement element, BoxBorders borders)
+    {
+        foreach (var (side, name) in _sides)
+        {
+            if (borders.Line(side) is not { } line) continue;
+            element.Add(new XAttribute(Fo + $"border-{name}", Line(line)));
+            if (line is { Style: BorderLineStyle.Double, Width: > 0 }) element.Add(new XAttribute(Style + $"border-line-width-{name}", DoubleWidths(line)));
+        }
+    }
+
+    public BoxBorders? ReadSides(XElement element)
+    {
+        var all = (string?)element.Attribute(Fo + "border");
+        BorderLine? Side(string name) =>
+            ((string?)element.Attribute(Fo + $"border-{name}") ?? all) is { } value
+                ? Line(value) ?? new BorderLine(0, 0xFF000000)
+                : null;
+        var borders = new BoxBorders { Top = Side("top"), Bottom = Side("bottom"), Left = Side("left"), Right = Side("right") };
+        return borders.HasLines ? borders : null;
+    }
+
     public BoxBorders? Read(XElement element)
     {
         var all = (string?)element.Attribute(Fo + "border");

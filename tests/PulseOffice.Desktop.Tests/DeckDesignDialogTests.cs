@@ -162,7 +162,16 @@ public sealed class DeckDesignDialogTests : IDisposable
         view.Pen.Select("blue");
         view.LoadScreens([new ShowScreen("A", 1920, 1080, true), new ShowScreen("B", 2560, 1440, false)]);
         view.Screens.SelectedIndex = 2;
+        Assert.False(view.LoopPause.IsEnabled);
+        Assert.False(view.KioskRestart.IsEnabled);
+        view.Kind.SelectedIndex = (int)ShowKind.Kiosk;
+        Assert.True(view.LoopPause.IsEnabled);
+        Assert.True(view.KioskRestart.IsEnabled);
+        view.LoopPause.Value = 3;
+        view.KioskRestart.Value = 45;
         var result = view.Result();
+        Assert.Equal(3000, result.Setup.LoopPauseMs);
+        Assert.Equal(45000, result.Setup.KioskRestartMs);
         Assert.Equal(2, result.Setup.FromSlide);
         Assert.Equal(3, result.Setup.ToSlide);
         Assert.Equal("#2563EB", result.Setup.PenColor);

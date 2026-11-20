@@ -15,9 +15,10 @@ internal sealed class ObjectDragGesture(
     ObjectHandle handle,
     Point origin,
     ObjectBox start,
-    double rotation) : GridGesture
+    double rotation,
+    bool keepsAspect = false) : GridGesture
 {
-    private readonly ObjectTransformSession _session = manipulator.Begin(handle, start, rotation);
+    private readonly ObjectTransformSession _session = manipulator.Begin(handle, start, rotation, keepsAspect);
 
     private const double CellSnapTolerance = 8;
 

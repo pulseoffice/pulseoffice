@@ -339,6 +339,7 @@ internal sealed class DeckPictureCodec(OoxmlImageTypes types, DrawingML.DrawingD
     private const string ImageRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 
     private readonly ExternalRelationshipIndex _externals = new();
+    private readonly DrawingML.DrawingImageTone _tones = new();
 
     public override bool Builds(EmbeddedObject content) => content is RasterImageObject;
 
@@ -361,6 +362,7 @@ internal sealed class DeckPictureCodec(OoxmlImageTypes types, DrawingML.DrawingD
         }
         if (image.Filter == ImageFilter.Grayscale) blip.Append(new D.Grayscale());
         duotones.Write(blip, image.Duotone);
+        _tones.Write(blip, image.Tone);
 
         var fill = new P.BlipFill(blip);
         if (image.Crop != default)
@@ -416,6 +418,7 @@ internal sealed class DeckPictureCodec(OoxmlImageTypes types, DrawingML.DrawingD
                 NaturalSize = new DocumentSize(bounds.Width, bounds.Height),
                 Filter = blip.GetFirstChild<D.Grayscale>() is not null ? ImageFilter.Grayscale : ImageFilter.None,
                 Duotone = duotones.Read(blip),
+                Tone = _tones.Read(blip),
                 Crop = crop,
             },
         };

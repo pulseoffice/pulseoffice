@@ -136,7 +136,7 @@ public sealed class DeckRound8AuditTests
         }
         public Task<string?> SaveAsync(RasterImageObject raster, string suggestedName, CancellationToken ct) => Task.FromResult<string?>(null);
         public RasterImageObject Replace(RasterImageObject raster, RasterSource source) => raster;
-        public CompressionResult Compress(RasterImageObject raster, int maximumEdge, int jpegQuality) => new(raster, 0, 0);
+        public CompressionResult Compress(RasterImageObject raster, int maximumEdge, int jpegQuality, bool discardCrop = false) => new(raster, 0, 0);
         public Task<CompressionResult?> CompressAsync(RasterImageObject raster, CancellationToken ct) => Task.FromResult<CompressionResult?>(null);
     }
 

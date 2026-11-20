@@ -180,7 +180,9 @@ public sealed class RasterPainter(IPixelFilterCatalog filters, PulseOffice.UI.Co
 
         var filtered = pixels.Edit(bitmap, image =>
         {
-            if (tone.ChangesColours) filters.Adjust(new ColorAdjustment(tone.Brightness, tone.Contrast)).Apply(image);
+            if (Math.Abs(tone.EffectiveBrightness) > 1e-6 || Math.Abs(tone.EffectiveContrast) > 1e-6)
+                filters.Adjust(new ColorAdjustment(tone.EffectiveBrightness, tone.EffectiveContrast)).Apply(image);
+            if (tone.Mode == ImageColorMode.BlackWhite) filters.BlackWhite().Apply(image);
             if (filter != ImageFilter.None) filters.For(filter).Apply(image);
             if (duotone is not null) filters.Duotone(duotone).Apply(image);
         });

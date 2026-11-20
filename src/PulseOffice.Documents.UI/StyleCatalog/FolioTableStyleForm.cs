@@ -100,12 +100,12 @@ public sealed class FolioTableStyleForm(ITextCatalog texts) : IFolioTableStyleFo
         var width = values.Number(key + ".lineWidth", shownLine?.Width ?? 0);
         var colour = _colors.Argb(values.Text(key + ".lineColor"));
         var lineChanged = Math.Abs(width - (shownLine?.Width ?? 0)) >= 0.001 || colour is not null && !Equal(colour, shownLine?.Color);
-        var line = width > 0 ? new BorderLine(width, colour ?? shownLine?.Color ?? 0xFF000000) : null;
+        var line = width > 0 ? new BorderLine(width, colour ?? shownLine?.Color ?? 0xFF000000) : shownLine is { Width: > 0 } ? new BorderLine(0, shownLine.Color) : null;
         return format with
         {
             Italic = italic == (shown?.Italic == true) ? kept?.Italic : italic,
-            Font = string.Equals(font, shown?.Font ?? string.Empty, StringComparison.Ordinal) ? kept?.Font : string.IsNullOrEmpty(font) ? null : font,
-            FontSize = Math.Abs(size - (shown?.FontSize ?? 0)) < 0.001 ? kept?.FontSize : size > 0 ? size : null,
+            Font = string.Equals(font, shown?.Font ?? string.Empty, StringComparison.Ordinal) ? kept?.Font : string.IsNullOrEmpty(font) ? string.Empty : font,
+            FontSize = Math.Abs(size - (shown?.FontSize ?? 0)) < 0.001 ? kept?.FontSize : size > 0 ? size : 0,
             Borders = !lineChanged ? kept?.Borders : line is null ? null : new BoxBorders { Top = line, Bottom = line, Left = line, Right = line },
         };
     }

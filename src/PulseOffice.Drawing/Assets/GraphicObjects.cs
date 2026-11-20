@@ -26,15 +26,25 @@ public enum ImageFilter { None, Grayscale, Sepia, Invert, Mosaic, Charcoal, PopA
 
 public sealed record ImageDuotone(string DarkHex, string LightHex);
 
-public sealed record ImageTone(double Brightness = 0, double Contrast = 0, double Transparency = 0)
+public enum ImageColorMode { Standard, BlackWhite, Watermark }
+
+public sealed record ImageTone(double Brightness = 0, double Contrast = 0, double Transparency = 0, ImageColorMode Mode = ImageColorMode.Standard)
 {
+    public const double WatermarkBrightness = 70;
+
+    public const double WatermarkContrast = -70;
+
     public static ImageTone Neutral { get; } = new();
 
-    public bool ChangesColours => Math.Abs(Brightness) > 1e-6 || Math.Abs(Contrast) > 1e-6;
+    public bool ChangesColours => Math.Abs(Brightness) > 1e-6 || Math.Abs(Contrast) > 1e-6 || Mode != ImageColorMode.Standard;
 
     public bool IsNeutral => !ChangesColours && Math.Abs(Transparency) <= 1e-6;
 
     public double Opacity => 1 - Math.Clamp(double.IsFinite(Transparency) ? Transparency : 0, 0, 100) / 100;
+
+    public double EffectiveBrightness => Mode == ImageColorMode.Watermark ? Math.Clamp(Brightness + WatermarkBrightness, -100, 100) : Brightness;
+
+    public double EffectiveContrast => Mode == ImageColorMode.Watermark ? Math.Clamp(Contrast + WatermarkContrast, -100, 100) : Contrast;
 }
 
 public sealed record RasterImageObject : EmbeddedObject, IDrawingObject

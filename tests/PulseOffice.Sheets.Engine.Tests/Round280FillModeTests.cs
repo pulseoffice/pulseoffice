@@ -52,8 +52,8 @@ public sealed class Round280FillModeTests
         var sheet = TwoCells(CellValue.Number(7), CellValue.Number(8));
         var single = new CellRange(CellAddress.First, CellAddress.First);
 
-        Assert.Equal(FillMode.Series, Fill.Toggled(sheet, single));
-        Assert.Equal(FillMode.Copy, Fill.Toggled(sheet, Seed));
+        Assert.Equal(FillMode.Series, Fill.Toggled(sheet, single, FillDirection.Right));
+        Assert.Equal(FillMode.Copy, Fill.Toggled(sheet, Seed, FillDirection.Down));
         var series = Fill.Extend(sheet, single, new CellRange(CellAddress.First, new CellAddress(0, 2)), FillDirection.Right, FillMode.Series);
         Assert.Equal([8d, 9d], series.Select(pair => pair.Cell.Value.AsNumber()));
     }

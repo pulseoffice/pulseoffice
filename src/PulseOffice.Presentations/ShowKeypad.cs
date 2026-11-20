@@ -9,6 +9,7 @@ public enum ShowCurtain
     Black,
     White,
     End,
+    Pause,
 }
 
 public sealed class ShowKeypad
@@ -31,6 +32,8 @@ public sealed class ShowKeypad
     public void Resume() => Screen = ShowCurtain.Slide;
 
     public void End() => Screen = ShowCurtain.End;
+
+    public void Pause() => Screen = ShowCurtain.Pause;
 
     public void Type(int digit)
     {

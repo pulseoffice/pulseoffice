@@ -171,10 +171,10 @@ public sealed class OdsSpreadsheetWriter(bool template, SignatureLineImage signa
             .SelectMany(sheet => sheet.Objects)
             .OfType<PlacedObject>()
             .Count(o => o.Content is Drawing.Assets.RasterImageObject img
-                && (img.Filter != Drawing.Assets.ImageFilter.None || img.Crop != default || !img.Tone.IsNeutral));
+                && img.Filter is not (Drawing.Assets.ImageFilter.None or Drawing.Assets.ImageFilter.Grayscale));
 
         if (filteredImages > 0)
-            losses.Add(Diagnostic.Warning("ODF022", $"{filteredImages} images with a filter, crop or tone adjustment: the look is shown on screen but not written to ODF.").With(filteredImages));
+            losses.Add(Diagnostic.Warning("ODF022", $"{filteredImages} images with a filter other than greyscale: ODF has no equivalent, the original image is written and the filter is lost.").With(filteredImages));
 
         var systemDates = workbook.Styles.Styles.Count(style => style.NumberFormatId is
             Sheets.Formatting.NumberFormatCatalog.SystemShortDateId or Sheets.Formatting.NumberFormatCatalog.SystemDateTimeId);

@@ -382,6 +382,7 @@ public sealed class FolioIcons() : DictionaryIconCatalog(Shapes)
         ("folio.image.crop", "M6 2v16h16 M2 6h16v16"),
         ("folio.image.replace", "M4 5h10v8H4z M10 15h10v6H10z M17 9l3 3-3 3 M7 21l-3-3 3-3"),
         ("folio.image.color", "M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2-1-2 0-3 2-3h2a3.5 3.5 0 0 0 3.5-3.5C21 7 17 3 12 3z M7.5 11h.01 M10 7h.01 M15 7h.01"),
+        ("folio.image.tone", "M12 7a5 5 0 1 0 0 10z M12 7a5 5 0 0 1 0 10 M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4"),
         ("folio.object.selectNext", "M4 4h10v10H4z M17 10h3v10H10v-3 M13 19l3-3-3-3"),
         ("folio.object.delete", "M5 7h14 M10 7V4h4v3 M7 7l1 13h8l1-13 M10 11v6 M14 11v6"),
         ("folio.object.originalSize", "M4 4h16v16H4z M8 8h8v8H8z M4 4l4 4 M20 4l-4 4 M4 20l4-4 M20 20l-4-4"),

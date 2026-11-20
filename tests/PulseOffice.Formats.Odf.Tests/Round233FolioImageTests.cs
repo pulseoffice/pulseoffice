@@ -105,10 +105,10 @@ public class Round233FolioImageTests
     }
 
     [Fact]
-    public void A_watermark_colour_mode_reads_as_a_washed_out_tone()
+    public void A_watermark_colour_mode_reads_as_the_watermark_mode()
     {
         var graphic = new System.Xml.Linq.XElement("g", new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Get("urn:oasis:names:tc:opendocument:xmlns:drawing:1.0") + "color-mode", "watermark"));
 
-        Assert.Equal(new ImageTone(70, -70, 0), new OdfImageTone().Read(graphic));
+        Assert.Equal(new ImageTone(Mode: ImageColorMode.Watermark), new OdfImageTone().Read(graphic));
     }
 }

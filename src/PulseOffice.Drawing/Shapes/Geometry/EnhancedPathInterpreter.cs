@@ -23,6 +23,8 @@ public interface IEnhancedPathInterpreter
     ShapeOutline Outline(FormulaGeometry geometry, double logicalWidth, double logicalHeight);
 
     bool Evaluates(FormulaGeometry geometry);
+
+    PresetTextBounds? TextArea(FormulaGeometry geometry);
 }
 
 public sealed class EnhancedPathInterpreter(IEnhancedFormulaParser parser, IReadOnlyDictionary<char, IEnhancedPathCommand> commands) : IEnhancedPathInterpreter
@@ -44,13 +46,39 @@ public sealed class EnhancedPathInterpreter(IEnhancedFormulaParser parser, IRead
         }
     }
 
+    public PresetTextBounds? TextArea(FormulaGeometry geometry)
+    {
+        ArgumentNullException.ThrowIfNull(geometry);
+        if (string.IsNullOrWhiteSpace(geometry.TextAreas) || geometry.ViewWidth <= 0 || geometry.ViewHeight <= 0) return null;
+        try
+        {
+            var scope = Scope(geometry, geometry.ViewWidth, geometry.ViewHeight);
+            var values = Tokens(geometry.TextAreas).Take(4).Select(token => parser.Parse(token).Evaluate(scope)).ToList();
+            if (values.Count < 4 || values.Any(value => !double.IsFinite(value))) return null;
+            var left = Math.Clamp((Math.Min(values[0], values[2]) - geometry.ViewLeft) / geometry.ViewWidth, 0, 1);
+            var right = Math.Clamp((Math.Max(values[0], values[2]) - geometry.ViewLeft) / geometry.ViewWidth, left, 1);
+            var top = Math.Clamp((Math.Min(values[1], values[3]) - geometry.ViewTop) / geometry.ViewHeight, 0, 1);
+            var bottom = Math.Clamp((Math.Max(values[1], values[3]) - geometry.ViewTop) / geometry.ViewHeight, top, 1);
+            return new PresetTextBounds(left, top, right, bottom);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
+    private EnhancedScope Scope(FormulaGeometry geometry, double logicalWidth, double logicalHeight)
+    {
+        var equations = new Dictionary<string, IEnhancedExpression>(StringComparer.Ordinal);
+        foreach (var equation in geometry.Equations) equations[equation.Name] = parser.Parse(equation.Formula);
+        return new EnhancedScope(equations, geometry.Modifiers, geometry.ViewLeft, geometry.ViewTop,
+            geometry.ViewWidth, geometry.ViewHeight, logicalWidth, logicalHeight);
+    }
+
     public ShapeOutline Outline(FormulaGeometry geometry, double logicalWidth, double logicalHeight)
     {
         ArgumentNullException.ThrowIfNull(geometry);
-        var equations = new Dictionary<string, IEnhancedExpression>(StringComparer.Ordinal);
-        foreach (var equation in geometry.Equations) equations[equation.Name] = parser.Parse(equation.Formula);
-        var scope = new EnhancedScope(equations, geometry.Modifiers, geometry.ViewLeft, geometry.ViewTop,
-            geometry.ViewWidth, geometry.ViewHeight, logicalWidth, logicalHeight);
+        var scope = Scope(geometry, logicalWidth, logicalHeight);
         var builder = new GeometryPathBuilder();
         var state = new EnhancedPathState(builder, scope);
         IEnhancedPathCommand? command = null;
