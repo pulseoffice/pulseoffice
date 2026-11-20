@@ -144,6 +144,7 @@ public static class PulseRibbonLayout
         ("folio.list.bulletsNumbering", "home/paragraph"),
         ("folio.style.paragraph", "home/styles"),
         ("folio.styles.panel", "home/styles"),
+        ("folio.edit.find", "home/edit"),
         ("folio.edit.findReplace", "home/edit"),
         ("folio.edit.selectAll", "home/edit"),
         ("folio.insert.pageBreak", "insert/pages"),

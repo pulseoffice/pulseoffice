@@ -32,6 +32,8 @@ internal sealed class DeckViewState(Presentation deck, DeckActions actions, ITex
 
     public string? MasterLayoutId { get; set; }
 
+    public string? EditedMasterId { get; set; }
+
     public DeckTarget? Target { get; set; }
 
     public bool Syncing { get; set; }

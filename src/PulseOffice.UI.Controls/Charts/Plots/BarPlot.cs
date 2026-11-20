@@ -76,8 +76,8 @@ public sealed class BarPlot : ChartPlotBase
 
         foreach (var series in lines)
         {
-            var points = Enumerable.Range(0, categories.Count)
-                .Where(index => IsPlotted(data.Series[series], index))
+            var plotted = Enumerable.Range(0, categories.Count).Where(index => IsPlotted(data.Series[series], index)).ToList();
+            var points = plotted
                 .Select(index => new Point(categories.Centre(index), ScaleOf(frame, series, scale, secondary).Position(Value(data.Series[series], index))))
                 .ToList();
             if (points.Count == 0) continue;
@@ -92,7 +92,8 @@ public sealed class BarPlot : ChartPlotBase
 
             var format = frame.Definition.SeriesFormat(series);
             frame.Context.DrawGeometry(null, _strokes.Pen(Brush(data, series), format, 2.5), geometry);
-            foreach (var point in points) _strokes.Marker(frame.Context, Brush(data, series), format, point, 3);
+            for (var at = 0; at < points.Count; at++)
+                _strokes.Marker(frame.Context, PointBrush(frame.Definition, data, series, plotted[at]), format, points[at], 3);
         }
     }
 

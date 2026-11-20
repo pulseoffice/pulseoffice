@@ -317,12 +317,13 @@ internal sealed class OoxmlSeriesFormats
         var dash = outline?.GetFirstChild<A.PresetDash>()?.Val?.Value;
         var marker = series.GetFirstChild<C.Marker>();
         var symbol = marker?.GetFirstChild<C.Symbol>()?.Val?.Value;
+        var shape = symbol is null || !CarriesMarkers(series) ? MarkerSymbol.Automatic : Symbol(symbol.Value, series);
         var format = new ChartSeriesFormat
         {
             LineWidthPoints = width is { } emu && emu > 0 && emu != DefaultLineWidth ? emu / (double)PulseOffice.Foundation.Units.Emu.PerPoint : null,
             Dash = dash is null ? LineDash.Solid : Dash(dash.Value),
-            Marker = symbol is null || !CarriesMarkers(series) ? MarkerSymbol.Automatic : Symbol(symbol.Value, series),
-            MarkerSize = marker?.GetFirstChild<C.Size>()?.Val?.Value is { } size && size != 7 ? size : null,
+            Marker = shape,
+            MarkerSize = shape != MarkerSymbol.Automatic && marker?.GetFirstChild<C.Size>()?.Val?.Value is { } size && size != 7 ? size : null,
             SecondaryAxis = secondary,
             Trendline = series.GetFirstChild<C.Trendline>() is { } trendline ? Trendline(trendline) : null,
             ErrorBars = series.Elements<C.ErrorBars>().FirstOrDefault(bars => bars.GetFirstChild<C.ErrorDirection>()?.Val?.Value != C.ErrorBarDirectionValues.X) is { } bars ? ErrorBars(bars) : null,
@@ -344,6 +345,7 @@ internal sealed class OoxmlSeriesFormats
     private MarkerSymbol Symbol(C.MarkerStyleValues value, OpenXmlCompositeElement series)
     {
         if (value == C.MarkerStyleValues.None && series.Parent is C.StockChart) return MarkerSymbol.Automatic;
+        if (value == C.MarkerStyleValues.Dash && series.Parent is C.StockChart stock && stock.GetFirstChild<C.UpDownBars>() is null) return MarkerSymbol.Automatic;
         if (value == C.MarkerStyleValues.Circle && series is C.ScatterChartSeries && series.GetFirstChild<C.Marker>()?.GetFirstChild<C.Size>()?.Val?.Value == 7) return MarkerSymbol.Automatic;
         return _markers.Where(pair => pair.Value == value).Select(pair => pair.Symbol).DefaultIfEmpty(MarkerSymbol.Automatic).First();
     }
@@ -385,6 +387,8 @@ internal sealed class OoxmlSeriesFormats
 internal sealed class OoxmlPointFormats
 {
     private readonly ChartPalette _palette = new();
+    private readonly ChartThemeColours _themes = new();
+    private readonly ChartFillColour _fills = new();
 
     public void Apply(OpenXmlCompositeElement series, ChartPointFormats points)
     {
@@ -415,13 +419,13 @@ internal sealed class OoxmlPointFormats
     public ChartPointFormats Read(OpenXmlCompositeElement series)
     {
         var formats = new SortedDictionary<int, ChartPointFormat>();
+        var scheme = _themes.For(series);
         foreach (var element in series.Elements<C.DataPoint>())
         {
             if (element.Index?.Val?.Value is not { } index || index > int.MaxValue) continue;
             var properties = element.GetFirstChild<C.ChartShapeProperties>();
             var fill = properties?.GetFirstChild<A.SolidFill>() ?? properties?.GetFirstChild<A.Outline>()?.GetFirstChild<A.SolidFill>();
-            var hex = fill?.GetFirstChild<A.RgbColorModelHex>()?.Val?.Value;
-            var colour = hex is { Length: 6 } && hex.All(char.IsAsciiHexDigit) ? "#" + hex.ToUpperInvariant() : null;
+            var colour = _fills.Hex(fill, scheme);
             if (colour is not null && series is C.PieChartSeries && _palette.IsAutomatic((int)index, colour)) colour = null;
             var explosion = element.GetFirstChild<C.Explosion>()?.Val?.Value is { } value ? (int)Math.Min(value, (uint)ChartPointFormats.MaximumExplosion) : 0;
             var point = new ChartPointFormat((int)index) { ColorHex = colour, ExplosionPercent = explosion };

@@ -209,7 +209,7 @@ public sealed class CompositionTests : IDisposable
         await using var provider = Register().BuildServiceProvider(ServiceConfiguration.ProviderOptions);
         var registry = new ShellComposition(provider).Compose();
         var modifying = new System.Text.RegularExpressions.Regex(@"\.(insert|format|object|paragraph|slide|table|text|style|data|sheet|fill|border|number|merge|font)\.");
-        var reading = new System.Text.RegularExpressions.Regex(@"(findReplace|numberRecognition|\.select[A-Z][a-z]*|openPackaged|saveBackground|style\.panel|statistics|hyperlink\.open)$");
+        var reading = new System.Text.RegularExpressions.Regex(@"(findReplace|data\.find|numberRecognition|\.select[A-Z][a-z]*|openPackaged|saveBackground|style\.panel|statistics|hyperlink\.open)$");
 
         var open = registry.All
             .Where(command => command.Module is ModuleKind.Sheets or ModuleKind.Presentations or ModuleKind.Documents)

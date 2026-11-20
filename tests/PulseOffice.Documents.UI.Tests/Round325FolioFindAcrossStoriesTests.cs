@@ -12,10 +12,7 @@ namespace PulseOffice.Documents.UI.Tests;
 
 public sealed class Round325FolioFindAcrossStoriesTests
 {
-    private static FolioFindCommands Commands(FolioScene scene) =>
-        new(scene.Services.GetRequiredService<IActiveFolioContext>(), scene.Services.GetRequiredService<IDocumentSearch>(),
-            scene.Services.GetRequiredService<IDocumentStatisticsCounter>(), scene.Services.GetRequiredService<IStatusBarService>(), null!,
-            scene.Services.GetRequiredService<ITextCatalog>());
+    private static FolioFindCommands Commands(FolioScene scene) => new FolioFindCommandsFactory().Create(scene.Services);
 
     private static ParagraphBlock Header(FolioScene scene)
     {

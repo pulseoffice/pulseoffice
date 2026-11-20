@@ -39,6 +39,8 @@ public sealed record ChartSettings
     public ChartErrorBars? ErrorBars { get; init; }
 
     public int SeriesCount { get; init; }
+
+    public ChartPieSplit PieSplit { get; init; } = ChartPieSplit.Automatic;
 }
 
 public interface IChartSettingsMapper
@@ -76,6 +78,7 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
                 : null,
             Trendline = chart.SeriesFormat(0).Trendline,
             ErrorBars = chart.SeriesFormat(0).ErrorBars,
+            PieSplit = chart.PieSplit,
         };
     }
 
@@ -102,6 +105,7 @@ public sealed class ChartSettingsMapper : IChartSettingsMapper
             CategoryAxis = Normalized(settings.CategoryAxisScale),
             SecondaryValueAxis = Normalized(settings.SecondaryValueAxisScale),
             DataLabels = settings.DataLabels.IsValuesOnly ? ChartDataLabelOptions.ValuesOnly : settings.DataLabels,
+            PieSplit = settings.PieSplit.IsAutomatic ? ChartPieSplit.Automatic : settings.PieSplit,
         };
     }
 

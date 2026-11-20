@@ -65,6 +65,23 @@ public sealed class ChartLabelLayout
         };
     }
 
+    public Point BestFit(ChartDataLabel label, Size size, IReadOnlyList<Rect> placed)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        ArgumentNullException.ThrowIfNull(placed);
+        DataLabelPlacement[] candidates = label.Base is null
+            ? [DataLabelPlacement.Automatic, DataLabelPlacement.Above, DataLabelPlacement.Right, DataLabelPlacement.Below, DataLabelPlacement.Left]
+            : [DataLabelPlacement.Automatic, DataLabelPlacement.OutsideEnd, DataLabelPlacement.InsideEnd, DataLabelPlacement.Center, DataLabelPlacement.InsideBase];
+        var first = Origin(label, size, candidates[0]);
+        foreach (var candidate in candidates)
+        {
+            var origin = Origin(label, size, candidate);
+            var area = new Rect(origin, size);
+            if (!placed.Any(other => other.Intersects(area))) return origin;
+        }
+        return first;
+    }
+
     public Point Origin(ChartDataLabel label, Size size) => label.Placement switch
     {
         ChartLabelPlacement.Below => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y + Gap),

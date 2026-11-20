@@ -55,6 +55,33 @@ internal sealed class FolioTextOverlays(FolioEditor editor, FolioCanvasServices 
         }
     }
 
+    public void PaintFound(DrawingContext context, PageBox page, IBrush? accent)
+    {
+        var found = services.Found.Of(editor);
+        if (found.Count == 0) return;
+        var fill = accent is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.16) : SelectionBrush(accent);
+        var frame = new Pen(accent ?? fill, 0.75);
+        foreach (var line in page.AllLines)
+        {
+            if (!found.TryGetValue(line.ParagraphId, out var spans)) continue;
+            var composed = line.Line;
+            foreach (var (start, end) in spans)
+            {
+                var from = Math.Max(start, composed.Start);
+                var to = Math.Min(end, composed.End);
+                if (to <= from) continue;
+                var left = services.Geometry.XOf(line, from);
+                var right = services.Geometry.XOf(line, to);
+                var box = new Rect(Math.Min(left, right), line.Top, Math.Max(1, Math.Abs(right - left)), composed.CaretHeight);
+                using (Turn(context, page, line))
+                {
+                    context.FillRectangle(fill, box);
+                    context.DrawRectangle(null, frame, box);
+                }
+            }
+        }
+    }
+
     public void PaintLayoutText(DrawingContext context, PageBox page, IBrush? accent)
     {
         var texts = editor.LayoutTexts.Where(text => text.Page == page.Index).ToList();

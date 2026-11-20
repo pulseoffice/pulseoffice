@@ -16,7 +16,7 @@ internal sealed class GridKeyboardInput(
     PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords,
     PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges)
 {
-    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PixelSteps = new(1, 10);
+    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PixelSteps = new(5, 1);
 
     public bool KeyDown(KeyEventArgs e)
     {
@@ -104,11 +104,11 @@ internal sealed class GridKeyboardInput(
 
     private void Nudge(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
     {
-        var (dx, dy) = nudge.Distance(PixelSteps);
         notifications.ObjectChanges([.. objects.Items.Select(placed =>
         {
             var bounds = viewport.BoundsOf(placed);
-            return viewport.ChangeOf(placed, new ObjectBox(bounds.X + dx, bounds.Y + dy, bounds.Width, bounds.Height), null);
+            var (x, y, width, height) = nudge.Apply(bounds.X, bounds.Y, bounds.Width, bounds.Height, PixelSteps, 1);
+            return viewport.ChangeOf(placed, new ObjectBox(x, y, width, height), null);
         })]);
     }
 

@@ -30,6 +30,50 @@ public sealed class DeckDesignActions(Presentation deck, ITextCatalog texts, Dec
     public void SetPlaceholderBounds(string layoutId, PlaceholderRole role, DocumentRect bounds) =>
         SwapMaster(new MasterEditing().WithPlaceholderBounds(deck.Master, layoutId, role, bounds));
 
+    public void SetMasterBackground(SlideMaster master, ColorRole background) =>
+        ChangeMaster(master, new MasterEditing().WithBackground(master, background), "deck.action.master");
+
+    public void RenameMaster(SlideMaster master, string name) =>
+        ChangeMaster(master, new MasterEditing().WithName(master, name), "deck.action.renameMaster");
+
+    public void SetPlaceholderBounds(SlideMaster master, string layoutId, int index, DocumentRect bounds)
+    {
+        if (!deck.Masters.Contains(master)) return;
+        if (master.Layouts.FirstOrDefault(layout => string.Equals(layout.Id, layoutId, StringComparison.Ordinal)) is not { } layout) return;
+        if (index < 0 || index >= layout.Placeholders.Count || layout.Placeholders[index].Bounds == bounds) return;
+        var old = layout.Placeholders[index];
+        var occurrence = layout.Placeholders.Take(index).Count(placeholder => placeholder.Role == old.Role);
+        var edited = new MasterEditing().WithPlaceholderBoundsAt(master, layoutId, index, bounds);
+        var followers = deck.Slides
+            .Where(slide => ReferenceEquals(deck.MasterOf(slide), master) && ReferenceEquals(master.Template(slide), layout))
+            .Select(slide => (Slide: slide, Element: slide.Elements.OfType<TextElement>().Where(text => text.Text.Role == old.Role).ElementAtOrDefault(occurrence)))
+            .Where(entry => entry.Element is { } element && element.Bounds == old.Bounds)
+            .Select(entry => (entry.Slide, Before: entry.Element!, After: entry.Element! with { Bounds = bounds }))
+            .ToList();
+
+        Do(texts["deck.action.master"],
+            () =>
+            {
+                deck.ReplaceMaster(edited);
+                foreach (var (slide, _, after) in followers) slide.Replace(after);
+                deck.Raise();
+            },
+            () =>
+            {
+                deck.ReplaceMaster(master);
+                foreach (var (slide, before, _) in followers) slide.Replace(before);
+                deck.Raise();
+            });
+    }
+
+    private void ChangeMaster(SlideMaster before, SlideMaster after, string labelKey)
+    {
+        if (ReferenceEquals(before, after) || before == after || !deck.Masters.Contains(before)) return;
+        Do(texts[labelKey],
+            () => { deck.ReplaceMaster(after); deck.Raise(); },
+            () => { deck.ReplaceMaster(before); deck.Raise(); });
+    }
+
     private void SwapMaster(SlideMaster master)
     {
         var before = deck.Master;

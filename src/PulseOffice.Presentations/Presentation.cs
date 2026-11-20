@@ -63,11 +63,17 @@ public sealed class Presentation : PulseOffice.Security.IMacroSignatureHolder, P
         if (index >= 0) _masters[index] = master;
     }
 
+    public SlideMaster MasterById(string? id) =>
+        id is not null && _masters.FirstOrDefault(master => master.Id == id) is { } found ? found : _masters[0];
+
     public SlideMaster MasterOf(Slide slide)
     {
         ArgumentNullException.ThrowIfNull(slide);
         return slide.MasterId is { } id && _masters.FirstOrDefault(master => master.Id == id) is { } found ? found : _masters[0];
     }
+
+    public Theme ThemeOfMaster(SlideMaster master) =>
+        ReferenceEquals(master, _masters[0]) || master.Id == _masters[0].Id ? Theme : master.Theme;
 
     public Theme ThemeOf(Slide slide) => MasterOf(slide) is var master && ReferenceEquals(master, _masters[0]) ? Theme : master.Theme;
 

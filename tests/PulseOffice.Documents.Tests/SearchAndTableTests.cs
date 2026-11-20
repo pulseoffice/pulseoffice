@@ -17,10 +17,10 @@ public sealed class SearchAndTableTests
         Assert.Equal(4, search.FindAll(paragraphs, new SearchQuery("casa")).Count);
         Assert.Equal(3, search.FindAll(paragraphs, new SearchQuery("casa", WholeWords: true)).Count);
         Assert.Single(search.FindAll(paragraphs, new SearchQuery("CASA", MatchCase: true)));
-        var next = search.FindNext(paragraphs, new SearchQuery("casa", WholeWords: true), new DocumentPosition("a", 1));
-        Assert.Equal(DocumentRange.In("a", 12, 16), next);
-        var wrapped = search.FindNext(paragraphs, new SearchQuery("casa", WholeWords: true), new DocumentPosition("b", 7));
-        Assert.Equal(DocumentRange.In("a", 0, 4), wrapped);
+        SearchStory[] stories = [new SearchStory(paragraphs)];
+        var whole = search.Matches(stories, new SearchQuery("casa", WholeWords: true));
+        Assert.Equal(DocumentRange.In("a", 12, 16), search.Next(whole, stories, new DocumentPosition("a", 1))?.Range);
+        Assert.Equal(DocumentRange.In("a", 0, 4), search.Next(whole, stories, new DocumentPosition("b", 7))?.Range);
     }
 
     [Fact]

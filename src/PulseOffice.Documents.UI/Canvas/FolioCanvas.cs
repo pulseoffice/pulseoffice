@@ -42,7 +42,8 @@ public sealed record FolioCanvasServices(
     Editing.IFolioObjectEditing ObjectEditing,
     PulseOffice.UI.Controls.Shapes.IAdjustHandleChrome Adjusting,
     Editing.IFolioObjectLinks ObjectLinks,
-    Editing.IFolioLinkTips LinkTips)
+    Editing.IFolioLinkTips LinkTips,
+    Editing.IFolioFindHighlights Found)
 {
     public PulseOffice.Documents.Objects.IGroupMemberText GroupText { get; init; } = new PulseOffice.Documents.Objects.GroupMemberText();
 
@@ -306,6 +307,7 @@ public sealed class FolioCanvas : Control
             {
                 if (sheet is not null) _overlays.PaintCommentRanges(context, page, sheet);
                 _overlays.PaintControls(context, page, controls, Accent);
+                _overlays.PaintFound(context, page, Accent);
                 _overlays.PaintSelection(context, page, selection, Accent);
                 _overlays.PaintLayoutText(context, page, Accent);
                 _services.Renderer.Paint(_services.Surfaces.Screen(context, _editor.Document.Language), page, Content, marks);

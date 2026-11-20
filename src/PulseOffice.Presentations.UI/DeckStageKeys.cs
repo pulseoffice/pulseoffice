@@ -17,7 +17,7 @@ namespace PulseOffice.Presentations.UI;
 
 internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, DeckTextEditing text, DeckShapeTextEditing shapes, DeckCanvasEditing canvasEditing, IDeckDrawingState drawing, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IDocumentKeyScope keys, PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords, PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges, IDeckTableKeys tableKeys, DeckTableCellEditor cellEditor)
 {
-    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps TwipSteps = new(60, 300);
+    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps TwipSteps = new(120, 15);
     private readonly DeckViewState _state = state;
     private readonly IDeckViewHost _host = host;
     private readonly Presentation _deck = state.Deck;
@@ -123,8 +123,12 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
 
         if (nudges.Read(e.Key, e.KeyModifiers) is not { } nudge) return;
 
-        var (dx, dy) = nudge.Distance(TwipSteps);
-        _canvasEditing.MoveBy(ids, (int)dx, (int)dy);
+        if (nudge.Resizes) _canvasEditing.ResizeBy(ids, nudge, TwipSteps);
+        else
+        {
+            var (dx, dy) = nudge.Distance(TwipSteps);
+            _canvasEditing.MoveBy(ids, (int)dx, (int)dy);
+        }
         e.Handled = true;
     }
 

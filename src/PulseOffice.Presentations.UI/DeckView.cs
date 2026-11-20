@@ -381,6 +381,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelea
     {
         TextCaret = () => _text.Editor?.CaretIndex,
         MasterLayoutId = () => _state.MasterLayoutId,
+        EditedMasterId = () => _state.EditedMasterId,
         SelectMasterLayout = id =>
         {
             _state.MasterLayoutId = id;

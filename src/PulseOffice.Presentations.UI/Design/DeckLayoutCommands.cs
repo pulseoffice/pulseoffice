@@ -82,29 +82,29 @@ public sealed class DeckLayoutCommands(
             RequiredState = DocumentState.DocumentOpen,
             ForbiddenState = DocumentState.ReadOnly,
             EnabledWhen = _ => Context.Target is { } t && Selected(t) is { } layout
-                && (!custom || !t.Actions.Layouts.Catalog.IsStandard(t.Deck.Master, layout)),
+                && (!custom || !t.Actions.Layouts.Catalog.IsStandard(t.EditedMaster(), layout)),
             Execute = (_, ct) => Context.Target is { } t && Selected(t) is { } layout ? run(t, layout, ct) : Task.CompletedTask,
         };
 
     private SlideLayoutTemplate? Selected(DeckTarget target) =>
         target.ViewMode() == DeckViewMode.Master && target.MasterLayoutId() is { } id
-            ? target.Actions.Layouts.Catalog.Find(target.Deck.Master, id)
+            ? target.Actions.Layouts.Catalog.Find(target.EditedMaster(), id)
             : null;
 
     private async Task RenameAsync(DeckTarget target, SlideLayoutTemplate layout, CancellationToken ct)
     {
-        var master = target.Deck.Master;
+        var master = target.EditedMaster();
         var name = await dialogs.ShowAsync<string>(
             new PulseOffice.UI.Controls.TextPromptView(texts["deck.layouts.renamePrompt"], layouts.Title(master, layout), texts),
             new DialogOptions { TitleKey = "command.deck.layouts.rename.title" }, ct).ConfigureAwait(true);
-        if (string.IsNullOrWhiteSpace(name) || !ReferenceEquals(target.Deck.Master, master)) return;
+        if (string.IsNullOrWhiteSpace(name) || !target.Deck.Masters.Contains(master)) return;
         target.Actions.Layouts.RenameLayout(master, layout.Id, name);
         target.SelectMasterLayout(layout.Id);
     }
 
     private Task DuplicateAsync(DeckTarget target, SlideLayoutTemplate layout, CancellationToken ct)
     {
-        var master = target.Deck.Master;
+        var master = target.EditedMaster();
         if (target.Actions.Layouts.DuplicateLayout(master, layout.Id, texts.Format("deck.layouts.copyName", layouts.Title(master, layout))) is { } copy)
             target.SelectMasterLayout(copy.Id);
         return Task.CompletedTask;
@@ -112,7 +112,7 @@ public sealed class DeckLayoutCommands(
 
     private Task DeleteAsync(DeckTarget target, SlideLayoutTemplate layout, CancellationToken ct)
     {
-        target.Actions.Layouts.DeleteLayout(target.Deck.Master, layout.Id);
+        target.Actions.Layouts.DeleteLayout(target.EditedMaster(), layout.Id);
         target.SelectMasterLayout(null);
         return Task.CompletedTask;
     }

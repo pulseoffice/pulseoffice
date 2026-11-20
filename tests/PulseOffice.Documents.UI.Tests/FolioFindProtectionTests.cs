@@ -18,8 +18,7 @@ public sealed class FolioFindProtectionTests
         scene.Type("alfa beta alfa");
         scene.Document.Protection = new DocumentProtection(DocumentRestriction.Comments, null);
         var services = scene.Services;
-        var commands = new FolioFindCommands(services.GetRequiredService<IActiveFolioContext>(), services.GetRequiredService<IDocumentSearch>(),
-            services.GetRequiredService<IDocumentStatisticsCounter>(), services.GetRequiredService<IStatusBarService>(), null!, services.GetRequiredService<ITextCatalog>());
+        var commands = new FolioFindCommandsFactory().Create(services);
 
         var replaced = commands.ReplaceAll(scene.Editor, new SearchQuery("alfa"), "gamma");
 

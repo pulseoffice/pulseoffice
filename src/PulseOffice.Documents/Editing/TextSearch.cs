@@ -1,34 +1,47 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using PulseOffice.Documents.Blocks;
 
 namespace PulseOffice.Documents.Editing;
-
-public sealed record SearchQuery(string Text, bool MatchCase = false, bool WholeWords = false, bool Regex = false);
 
 public interface IDocumentSearch
 {
     IReadOnlyList<DocumentRange> FindAll(IEnumerable<ParagraphBlock> paragraphs, SearchQuery query);
 
-    DocumentRange? FindNext(IReadOnlyList<ParagraphBlock> paragraphs, SearchQuery query, DocumentPosition after);
+    IReadOnlyList<SearchMatch> Matches(IEnumerable<SearchStory> stories, SearchQuery query);
+
+    SearchMatch? Next(IReadOnlyList<SearchMatch> matches, IReadOnlyList<SearchStory> stories, DocumentPosition from, bool backwards = false);
+
+    string Replacement(SearchMatch match, SearchQuery query, string replacement);
 
     string Replacement(ParagraphBlock paragraph, DocumentRange found, SearchQuery query, string replacement);
 
     bool IsValid(SearchQuery query);
 }
 
-public sealed class DocumentSearch : IDocumentSearch
+public sealed class DocumentSearch(ISearchTextBuilder builder, IWordWildcards wildcards) : IDocumentSearch
 {
     private static readonly TimeSpan MatchTimeout = TimeSpan.FromSeconds(1);
+
+    private const string AnyCharacter = "[^\\n\\f\\u000E\\u001D]";
+
+    public DocumentSearch() : this(new SearchTextBuilder(), new WordWildcards())
+    {
+    }
 
     private readonly IReadOnlyDictionary<char, string> _literals = new Dictionary<char, string>
     {
         ['t'] = "\t",
         ['l'] = "\u2028",
-        ['s'] = "\u00A0",
-        ['~'] = "\u2011",
-        ['-'] = "\u00AD",
+        ['s'] = " ",
+        ['~'] = "‑",
+        ['-'] = "­",
         ['^'] = "\\^",
-        ['?'] = ".",
+        ['p'] = "\\n",
+        ['m'] = "\\f",
+        ['n'] = "\\u000E",
+        ['b'] = "\\u001D",
+        ['?'] = AnyCharacter,
         ['#'] = "[0-9]",
         ['$'] = "\\p{L}",
         ['w'] = "[ \\t\\u00A0]+",
@@ -38,43 +51,63 @@ public sealed class DocumentSearch : IDocumentSearch
     {
         ['t'] = "\t",
         ['l'] = "\u2028",
-        ['s'] = "\u00A0",
-        ['~'] = "\u2011",
-        ['-'] = "\u00AD",
+        ['s'] = " ",
+        ['~'] = "‑",
+        ['-'] = "­",
         ['^'] = "^",
+        ['p'] = "\n",
+        ['m'] = "\f",
+        ['n'] = "\u000E",
     };
 
     public IReadOnlyList<DocumentRange> FindAll(IEnumerable<ParagraphBlock> paragraphs, SearchQuery query)
     {
         ArgumentNullException.ThrowIfNull(paragraphs);
+        return [.. Matches([new SearchStory([.. paragraphs])], query).Select(match => match.Range)];
+    }
+
+    public IReadOnlyList<SearchMatch> Matches(IEnumerable<SearchStory> stories, SearchQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(stories);
         ArgumentNullException.ThrowIfNull(query);
-        if (query.Text.Length == 0) return [];
-        var found = new List<DocumentRange>();
-        if (!query.Regex && !HasWildcards(query.Text))
+        if (query.IsEmpty) return [];
+        Regex? pattern = null;
+        var literal = query.Text.Length > 0 && !query.Regex && !query.Wildcards && !NeedsPattern(query.Text);
+        if (query.Text.Length > 0 && !literal && (pattern = Pattern(query)) is null) return [];
+        var found = new List<SearchMatch>();
+        foreach (var story in stories)
         {
-            var literal = Carets(query.Text, "^&");
-            foreach (var paragraph in paragraphs) found.AddRange(Literally(paragraph, query, literal));
-            return found;
+            var text = builder.Build(story);
+            var spans = query.Text.Length == 0 ? FormatSpans(text, query.Format!)
+                : literal ? Literally(text.Text, query, Carets(query.Text, "^&"))
+                : Patterned(text.Text, pattern!);
+            foreach (var (start, end, match) in spans)
+            {
+                if (end <= start) continue;
+                if (query.WholeWords && !query.Wildcards && !(IsWordEdge(text.Text, start - 1) && IsWordEdge(text.Text, end))) continue;
+                if (query.HasFormat && !Fits(text, start, end, query.Format!)) continue;
+                found.Add(text.Match(start, end, match));
+            }
         }
-        if (Pattern(query) is not { } pattern) return [];
-        foreach (var paragraph in paragraphs) found.AddRange(In(paragraph, query, pattern));
         return found;
     }
 
-    public DocumentRange? FindNext(IReadOnlyList<ParagraphBlock> paragraphs, SearchQuery query, DocumentPosition after)
+    public SearchMatch? Next(IReadOnlyList<SearchMatch> matches, IReadOnlyList<SearchStory> stories, DocumentPosition from, bool backwards = false)
     {
-        ArgumentNullException.ThrowIfNull(paragraphs);
-        var all = FindAll(paragraphs, query);
-        if (all.Count == 0) return null;
+        ArgumentNullException.ThrowIfNull(matches);
+        ArgumentNullException.ThrowIfNull(stories);
+        if (matches.Count == 0) return null;
         var index = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (var position = 0; position < paragraphs.Count; position++) index.TryAdd(paragraphs[position].Id, position);
-        var start = index.GetValueOrDefault(after.ParagraphId, -1);
-        foreach (var range in all)
+        foreach (var paragraph in stories.SelectMany(story => story.Paragraphs)) index.TryAdd(paragraph.Id, index.Count);
+        var at = index.GetValueOrDefault(from.ParagraphId, -1);
+        int Order(DocumentPosition position) => index.GetValueOrDefault(position.ParagraphId, -1);
+        if (backwards)
         {
-            var at = index[range.Start.ParagraphId];
-            if (at > start || at == start && range.Start.Offset >= after.Offset) return range;
+            return matches.LastOrDefault(match => Order(match.Range.Start) < at || Order(match.Range.Start) == at && match.Range.Start.Offset < from.Offset)
+                ?? matches[^1];
         }
-        return all[0];
+        return matches.FirstOrDefault(match => Order(match.Range.Start) > at || Order(match.Range.Start) == at && match.Range.Start.Offset >= from.Offset)
+            ?? matches[0];
     }
 
     public bool IsValid(SearchQuery query)
@@ -83,17 +116,22 @@ public sealed class DocumentSearch : IDocumentSearch
         return query.Text.Length == 0 || Pattern(query) is not null;
     }
 
+    public string Replacement(SearchMatch match, SearchQuery query, string replacement)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(replacement);
+        if (query.Wildcards && match.Pattern is { } wild) return wild.Result(Carets(wildcards.Replacement(replacement), "$0"));
+        if (query.Regex && match.Pattern is { } regex) return regex.Result(Carets(replacement, "$0"));
+        return Carets(replacement, match.Found);
+    }
+
     public string Replacement(ParagraphBlock paragraph, DocumentRange found, SearchQuery query, string replacement)
     {
         ArgumentNullException.ThrowIfNull(paragraph);
-        ArgumentNullException.ThrowIfNull(query);
-        ArgumentNullException.ThrowIfNull(replacement);
-        var text = paragraph.Text;
-        var start = Math.Clamp(found.Start.Offset, 0, text.Length);
-        var end = Math.Clamp(found.End.Offset, start, text.Length);
-        if (query.Regex && Pattern(query) is { } pattern && pattern.Match(text, start) is { Success: true } match && match.Index == start && match.Length == end - start)
-            return match.Result(Carets(replacement, "$0"));
-        return Carets(replacement, text[start..end]);
+        var match = Matches([new SearchStory([paragraph])], query).FirstOrDefault(candidate => candidate.Range == found)
+            ?? new SearchMatch(found, paragraph.Text[Math.Clamp(found.Start.Offset, 0, paragraph.Length)..Math.Clamp(found.End.Offset, 0, paragraph.Length)]);
+        return Replacement(match, query, replacement);
     }
 
     private string Carets(string replacement, string whole)
@@ -116,14 +154,16 @@ public sealed class DocumentSearch : IDocumentSearch
         return built.ToString();
     }
 
-    private System.Text.RegularExpressions.Regex? Pattern(SearchQuery query)
+    private Regex? Pattern(SearchQuery query)
     {
-        var options = System.Text.RegularExpressions.RegexOptions.CultureInvariant
-            | (query.MatchCase ? System.Text.RegularExpressions.RegexOptions.None : System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var source = query.Regex ? query.Text : Plain(query.Text);
+        var source = query.Wildcards ? wildcards.Pattern(query.Text) : query.Regex ? query.Text : Plain(query.Text);
+        if (source is null) return null;
+        var options = RegexOptions.CultureInvariant
+            | (query.Regex && !query.Wildcards ? RegexOptions.Multiline : RegexOptions.None)
+            | (query.MatchCase || query.Wildcards ? RegexOptions.None : RegexOptions.IgnoreCase);
         try
         {
-            return new System.Text.RegularExpressions.Regex(source, options, MatchTimeout);
+            return new Regex(source, options, MatchTimeout);
         }
         catch (ArgumentException)
         {
@@ -142,27 +182,26 @@ public sealed class DocumentSearch : IDocumentSearch
                 i++;
                 continue;
             }
-            built.Append(System.Text.RegularExpressions.Regex.Escape(text[i].ToString()));
+            built.Append(Regex.Escape(text[i].ToString()));
         }
         return built.ToString();
     }
 
-    private bool HasWildcards(string text)
+    private bool NeedsPattern(string text)
     {
         for (var i = 0; i + 1 < text.Length; i++)
         {
             if (text[i] != '^') continue;
-            if (text[i + 1] is '?' or '#' or '$' or 'w') return true;
+            if (text[i + 1] is '?' or '#' or '$' or 'w' or 'p' or 'm' or 'n' or 'b') return true;
             i++;
         }
         return false;
     }
 
-    private IEnumerable<DocumentRange> Literally(ParagraphBlock paragraph, SearchQuery query, string literal)
+    private IEnumerable<(int Start, int End, Match? Match)> Literally(string text, SearchQuery query, string literal)
     {
         var compare = CultureInfo.CurrentCulture.CompareInfo;
         var options = query.MatchCase ? CompareOptions.Ordinal : CompareOptions.IgnoreCase;
-        var text = paragraph.Text;
         var from = 0;
         while (from < text.Length)
         {
@@ -170,31 +209,57 @@ public sealed class DocumentSearch : IDocumentSearch
             if (relative < 0) yield break;
             var at = from + relative;
             var end = at + length;
-            if (length > 0 && (!query.WholeWords || IsWordEdge(text, at - 1) && IsWordEdge(text, end)))
-                yield return DocumentRange.In(paragraph.Id, at, end);
+            if (length > 0 && text.AsSpan(at, length).IndexOfAny(Breaks) < 0) yield return (at, end, null);
             from = Math.Max(end, at + 1);
         }
     }
 
-    private IEnumerable<DocumentRange> In(ParagraphBlock paragraph, SearchQuery query, System.Text.RegularExpressions.Regex pattern)
+    private static readonly System.Buffers.SearchValues<char> Breaks =
+        System.Buffers.SearchValues.Create([SearchMarks.Paragraph, SearchMarks.Page, SearchMarks.Column, SearchMarks.Section]);
+
+    private IEnumerable<(int Start, int End, Match? Match)> Patterned(string text, Regex pattern)
     {
-        var text = paragraph.Text;
-        var matches = new List<DocumentRange>();
+        var found = new List<(int, int, Match?)>();
         try
         {
-            foreach (System.Text.RegularExpressions.Match match in pattern.Matches(text))
+            foreach (Match match in pattern.Matches(text))
             {
-                if (match.Length == 0) continue;
-                var end = match.Index + match.Length;
-                if (!query.WholeWords || IsWordEdge(text, match.Index - 1) && IsWordEdge(text, end))
-                    matches.Add(DocumentRange.In(paragraph.Id, match.Index, end));
+                if (match.Length > 0) found.Add((match.Index, match.Index + match.Length, match));
             }
         }
-        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        catch (RegexMatchTimeoutException)
         {
             return [];
         }
-        return matches;
+        return found;
+    }
+
+    private IEnumerable<(int Start, int End, Match? Match)> FormatSpans(SearchText text, SearchFormat format)
+    {
+        var start = -1;
+        for (var i = 0; i <= text.Text.Length; i++)
+        {
+            var fits = i < text.Text.Length && !text.IsMark(i) && Fits(text, i, i + 1, format);
+            if (fits && start < 0) start = i;
+            if (fits || start < 0) continue;
+            yield return (start, i, null);
+            start = -1;
+        }
+    }
+
+    private bool Fits(SearchText text, int start, int end, SearchFormat format)
+    {
+        for (var i = start; i < end; i++)
+        {
+            if (text.ParagraphAt(i) is not { } paragraph) continue;
+            if (format.ParagraphStyle is { } style && !string.Equals(paragraph.StyleName, style, StringComparison.Ordinal)) return false;
+            var run = text.RunAt(i);
+            if (format.CharacterStyle is { } character && !string.Equals(run?.StyleName, character, StringComparison.Ordinal)) return false;
+            if (format.Bold is { } bold && (run?.Bold ?? paragraph.Content.Bold) != bold) return false;
+            if (format.Italic is { } italic && (run?.Italic ?? paragraph.Content.Italic) != italic) return false;
+            if (format.Underline is { } underline && (run?.Underline ?? paragraph.Content.Underline) != underline) return false;
+        }
+        return true;
     }
 
     private bool IsWordEdge(string text, int index) =>

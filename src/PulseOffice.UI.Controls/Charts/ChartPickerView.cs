@@ -59,6 +59,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
     private readonly ChartAxisScaleEditor _axes;
     private readonly ChartSeriesFormatEditor _seriesFormats;
     private readonly ChartDataLabelEditor _dataLabels;
+    private readonly ChartPieSplitEditor _pieSplit;
     private readonly List<Control> _pages = [];
     private readonly ContentControl _page = new();
 
@@ -110,6 +111,8 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _seriesFormats.Changed += (_, _) => Refresh();
         _dataLabels = new ChartDataLabelEditor(_fields, request.Settings.ShowDataLabels, request.Settings.DataLabels);
         _dataLabels.Changed += (_, _) => Refresh();
+        _pieSplit = new ChartPieSplitEditor(_fields, request.Settings.PieSplit);
+        _pieSplit.Changed += (_, _) => Refresh();
         _sections = BuildSections(services.Recommender.Recommend(_data, request.Culture));
         var editing = request.Mode == ChartPickerMode.Edit;
         _type = editing ? request.Settings.Type : _sections[0].Types[0];
@@ -310,7 +313,9 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
             FieldLabel(Texts["chart.errorBars"]),
             _errorBars,
             FieldLabel(Texts["chart.errorBars.amount"]),
-            _errorAmount));
+            _errorAmount,
+            Caption(Texts["chart.pieSplit"]),
+            _pieSplit));
         _pages.Add(Page(_dataLabels));
         _pages.Add(Page(DataOptions(settings)));
 
@@ -470,6 +475,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         Trendline = ChosenTrendline(),
         ErrorBars = ChosenErrorBars(),
         SeriesCount = _data.Series.Count,
+        PieSplit = _pieSplit.Split,
     };
 
     private DialogChrome Chrome => _chrome ??= new DialogChrome(_services.Icons, _metrics);
@@ -591,6 +597,7 @@ public sealed class ChartPickerView : UserControl, IDialogContent, IDialogFooter
         _valueAxis.IsEnabled = axes;
         _grid.IsEnabled = axes;
         _axes.IsEnabled = _services.Renderer.ScalesValues(_type);
+        _pieSplit.IsEnabled = _type is ChartType.PieOfPie or ChartType.BarOfPie;
         _preview.Show(Definition(), _data);
     }
 

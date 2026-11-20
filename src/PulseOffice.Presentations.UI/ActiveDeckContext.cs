@@ -41,6 +41,10 @@ public sealed record DeckTarget(
 
     public Func<string?> MasterLayoutId { get; init; } = () => null;
 
+    public Func<string?> EditedMasterId { get; init; } = () => null;
+
+    public SlideMaster EditedMaster() => Deck.MasterById(EditedMasterId());
+
     public Action<string?> SelectMasterLayout { get; init; } = _ => { };
 
     public ZoomSubject ZoomSubject => new(Zoom, EffectiveZoom, SetZoom, ZoomLimits.Slides)

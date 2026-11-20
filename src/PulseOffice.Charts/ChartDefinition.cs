@@ -139,6 +139,8 @@ public sealed record ChartDefinition : EmbeddedObject
 
     public bool ThreeDimensional { get; init; }
 
+    public ChartPieSplit PieSplit { get; init; } = ChartPieSplit.Automatic;
+
     public int LineSeriesCount { get; init; } = 1;
 
     public IReadOnlyList<int>? LineSeriesIndices { get; init; }

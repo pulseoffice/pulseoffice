@@ -32,7 +32,7 @@ public sealed class StatisticalPlot : ChartPlotBase
         return frame.Definition.Type switch
         {
             ChartType.Histogram or ChartType.Pareto => PlotScale.Nice(
-                0, _statistics.Histogram(values).DefaultIfEmpty().Max(bin => bin.Count),
+                0, Bars(frame, frame.Definition.Type is ChartType.Pareto).Select(bar => bar.Value).DefaultIfEmpty().Max(),
                 frame.Plot.Bottom, frame.Plot.Y),
 
             ChartType.DensityPlot => PlotScale.Nice(
@@ -107,18 +107,16 @@ public sealed class StatisticalPlot : ChartPlotBase
 
     private void DrawHistogram(ChartFrame frame, bool pareto)
     {
-        var bins = _statistics.Histogram(Values(frame));
-        if (bins.Count == 0) return;
+        var ordered = Bars(frame, pareto);
+        if (ordered.Count == 0) return;
 
-        var ordered = pareto ? bins.OrderByDescending(bin => bin.Count).ToList() : [.. bins];
-
-        var maximum = ordered.Max(bin => bin.Count);
+        var maximum = ordered.Max(bar => bar.Value);
         var scale = PlotScale.Nice(0, maximum, frame.Plot.Bottom, frame.Plot.Y);
         var categories = Across(frame, ordered.Count);
 
         for (var index = 0; index < ordered.Count; index++)
         {
-            var top = scale.Position(ordered[index].Count);
+            var top = scale.Position(ordered[index].Value);
 
             frame.Context.FillRectangle(
                 Brush(frame.Data, 0),
@@ -128,13 +126,13 @@ public sealed class StatisticalPlot : ChartPlotBase
                     categories.Width * 0.8,
                     Math.Max(1, frame.Plot.Bottom - top)));
 
-            Label(frame, ordered[index].Lower.ToString("0.#", frame.Formatting),
+            Label(frame, ordered[index].Label,
                 new Point(categories.Start(index), frame.Plot.Bottom + 2), 8);
         }
 
         if (!pareto) return;
 
-        var totals = _statistics.RunningTotals([.. ordered.Select(bin => (double)bin.Count)]);
+        var totals = _statistics.RunningTotals([.. ordered.Select(bar => bar.Value)]);
         var overall = totals[^1];
 
         var points = totals
@@ -144,6 +142,18 @@ public sealed class StatisticalPlot : ChartPlotBase
             .ToList();
 
         DrawPolyline(frame, points, frame.Marks.Mark(Colors.Crimson));
+    }
+
+    private IReadOnlyList<(string Label, double Value)> Bars(ChartFrame frame, bool pareto)
+    {
+        var categories = frame.Data.Categories;
+        if (pareto && !frame.Data.OrdinalCategories && categories.Count > 0 && frame.Data.Series.FirstOrDefault() is { } series)
+            return [.. categories.Select((label, index) => (Label: label, Value: index < series.Values.Count && double.IsFinite(series.Values[index]) ? Math.Max(0, series.Values[index]) : 0))
+                .OrderByDescending(bar => bar.Value)];
+
+        var bins = _statistics.Histogram(Values(frame));
+        var bars = bins.Select(bin => (Label: bin.Lower.ToString("0.#", frame.Formatting), Value: (double)bin.Count));
+        return pareto ? [.. bars.OrderByDescending(bar => bar.Value)] : [.. bars];
     }
 
     private void DrawBoxes(ChartFrame frame)

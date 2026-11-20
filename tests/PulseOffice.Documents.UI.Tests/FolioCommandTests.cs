@@ -42,7 +42,7 @@ public sealed class FolioCommandTests
             .. new FolioTableCommands(active, services.GetRequiredService<FolioTableEditing>(), null!, null!, services.GetRequiredService<IFolioTableLooks>(), new PulseOffice.Document.Tables.TableStylePresets(), null!, null!, null!).GetCommands(),
             .. new FolioPageCommands(active, new FolioPageStyles(new PulseOffice.Documents.Blocks.BlockTree()), null!, null!, null!).GetCommands(),
             .. new FolioInsertCommands(active, null!, null!, null!, null!, null!, null!, null!, null!, null!, new PulseOffice.Foundation.Identity.SystemUserIdentity()).GetCommands(),
-            .. new FolioFindCommands(active, null!, null!, null!, null!, null!).GetCommands(),
+            .. new FolioFindCommands(active, null!, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioDialogCommands(active, null!, null!, null!, null!, null!).GetCommands(),
             .. new FolioRibbonCommands(active, null!, null!, new NoMemory(), null!, null!, null!, null!, null!).GetCommands(),
             .. services.GetRequiredService<FolioZoomCommands>().GetCommands(),

@@ -164,7 +164,7 @@ internal sealed class ChartStructureRewrite(StructureChange change) : ChartRefer
     private readonly StructureShift _shift = new(change);
 
     protected override ChartDefinition Points(ChartDefinition before, ChartDefinition after) =>
-        new ChartPointShift(change, References).Apply(before, after);
+        new ChartSeriesShift(change).Apply(before, new ChartPointShift(change, References).Apply(before, after));
 
     protected override (string Sheet, string Range) Compact(string sheet, CellRange range)
     {

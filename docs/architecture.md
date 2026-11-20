@@ -476,8 +476,9 @@ legitimate adapters (Strategy over the module's own model: `*FontCollector`, `*D
 - `IParagraphRuler` in `UI.Controls.Rulers`: first-line, indent and tab markers, metric or imperial unit,
   move, add and remove tab (always sorted: previously Deck did not re-sort). `FolioRulers` and `DeckRulers` keep
   only page margins (Folio), text box inner margins (Deck) and application to their own model.
-- `IObjectNudgeKeys` in `UI.Controls.Shapes`: arrow = small step, Shift+arrow = large step, the other modifiers
-  do not move. Per-module steps: Deck 3/15 pt, Folio 1/10 pt, Ledger 1/10 px. Ledger had no arrow keys on objects:
+- `IObjectNudgeKeys` in `UI.Controls.Shapes`, aligned with Office since round 329: arrow = move, Ctrl (or Alt)+arrow =
+  fine move, Shift+arrow = resize (Right/Down grow, Left/Up shrink), Ctrl+Shift+arrow = fine resize; other modifiers do
+  nothing. Per-module steps (normal/fine): Deck 6/0.75 pt, Folio 5/1 pt, Ledger 5/1 px. Ledger had no arrow keys on objects:
   now it has them, also on several selected objects, each as a history step.
 - `IObjectSnapping` in the core (`Drawing.Shapes`, formerly `Presentations.Snapping`): `Snap(session, lines, tolerance)` snaps
   the move (edge, centre or opposite side) or the dragged sides of a resize, never the rotation; `Lattice`

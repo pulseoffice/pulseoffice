@@ -29,7 +29,9 @@ public sealed class LedgerEditDataCommands(
     ISheetEditGuard guard,
     ISheetSortGate sortGate,
     PulseOffice.Shell.IDocumentWorkspace workspace,
-    ITextCatalog texts) : LedgerCommandSet(context)
+    ITextCatalog texts,
+    PulseOffice.UI.Controls.ISidePanelHost panel,
+    PulseOffice.UI.Controls.Search.IFindPanelPages pages) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -63,6 +65,21 @@ public sealed class LedgerEditDataCommands(
         Data("ledger.data.sortDescending", null,
             () => Sort(ascending: false)),
 
+        Prototype("ledger.data.find") with
+        {
+            MenuPath = "edit",
+            Surface = CommandSurface.Advanced,
+            RequiredState = DocumentState.DocumentOpen,
+            EnabledWhen = _ => formatting.CanFormat,
+            Execute = (_, _) =>
+            {
+                pages.Show(panel, () => new PulseOffice.UI.Controls.Search.TargetFindPanelSource(
+                    () => Context.Workbook is null ? null : FindTarget(),
+                    _ => FindDialog(CancellationToken.None)));
+                return Task.CompletedTask;
+            },
+        },
+
         Prototype("ledger.data.findReplace") with
         {
             MenuPath = "edit",
@@ -70,19 +87,22 @@ public sealed class LedgerEditDataCommands(
             Surface = CommandSurface.Common,
             RequiredState = DocumentState.DocumentOpen,
             EnabledWhen = _ => formatting.CanFormat,
-            Execute = async (_, ct) => await dialogs.ShowAsync(
-                new FindReplaceView(
-                    new LedgerFindTarget(Context, status, texts, guard, new WorkbookSearch(), workspace.Active?.IsReadOnly == true),
-                    texts),
-                new DialogOptions
-                {
-                    TitleKey = "dialog.findReplace.title",
-                    PreferredWidth = 480,
-                    AccessibleDescription = texts["dialog.findReplace.description"],
-                },
-                ct),
+            Execute = (_, ct) => FindDialog(ct),
         },
     ];
+
+    private LedgerFindTarget FindTarget() =>
+        new(Context, status, texts, guard, new WorkbookSearch(), workspace.Active?.IsReadOnly == true);
+
+    private Task FindDialog(CancellationToken ct) => dialogs.ShowAsync(
+        new FindReplaceView(FindTarget(), texts),
+        new DialogOptions
+        {
+            TitleKey = "dialog.findReplace.title",
+            PreferredWidth = 480,
+            AccessibleDescription = texts["dialog.findReplace.description"],
+        },
+        ct);
 
     private void Sort(bool ascending)
     {

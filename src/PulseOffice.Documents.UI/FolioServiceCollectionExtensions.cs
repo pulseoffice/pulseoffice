@@ -244,6 +244,8 @@ public static class FolioServiceCollectionExtensions
         services.AddSingleton<FolioRibbonCommands>();
         services.AddSingleton<FolioInsertCommands>();
         services.AddSingleton<FolioPageCommands>();
+        services.AddSingleton<Editing.IFolioFindHighlights, Editing.FolioFindHighlights>();
+        services.AddSingleton<FolioFindServices>();
         services.AddSingleton<FolioFindCommands>();
         services.AddSingleton<FolioTableCommands>();
         services.AddSingleton<IFolioTableLooks, FolioTableLooks>();

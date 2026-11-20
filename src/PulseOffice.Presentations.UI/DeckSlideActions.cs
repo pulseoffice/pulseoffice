@@ -109,6 +109,73 @@ public sealed class DeckSlideActions(Presentation deck, ITextCatalog texts, Deck
             () => { foreach (var clone in clones) deck.Remove(clone); });
     }
 
+    public void PasteSlides(int afterIndex, Presentation source, IReadOnlyList<Slide> sources)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!ReferenceEquals(source, deck))
+        {
+            ImportSlides(afterIndex, sources);
+            return;
+        }
+        if (sources.Count == 0 || IsReadOnly) return;
+        var clones = sources.Select(original =>
+        {
+            var clone = slides.Clone(original, deck.NextId());
+            clone.MasterId = deck.Masters.Any(master => master.Id == original.MasterId) ? original.MasterId : null;
+            return clone;
+        }).ToList();
+
+        Do(texts["deck.action.paste"],
+            () =>
+            {
+                for (var i = 0; i < clones.Count; i++)
+                    deck.InsertExisting(Math.Clamp(afterIndex + 1 + i, 0, deck.Slides.Count), clones[i]);
+                Focus(clones[^1]);
+            },
+            () => { foreach (var clone in clones) deck.Remove(clone); });
+    }
+
+    public void ImportSlidesKeepingFormatting(int afterIndex, Presentation source, IReadOnlyList<Slide> sources)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (sources.Count == 0 || IsReadOnly) return;
+        var adopted = new Dictionary<string, SlideMaster>(StringComparer.Ordinal);
+        var taken = deck.Masters.Select(master => master.Id).ToHashSet(StringComparer.Ordinal);
+        var number = deck.Masters.Count + 1;
+        SlideMaster Adopt(SlideMaster master)
+        {
+            if (adopted.TryGetValue(master.Id, out var known)) return known;
+            while (!taken.Add($"master{number}")) number++;
+            var copy = master with { Id = $"master{number}", Theme = source.ThemeOfMaster(master) };
+            adopted[master.Id] = copy;
+            return copy;
+        }
+
+        var clones = sources.Select(original =>
+        {
+            var clone = slides.Clone(original, deck.NextId());
+            clone.MasterId = Adopt(source.MasterOf(original)).Id;
+            return clone;
+        }).ToList();
+        var masters = adopted.Values.ToList();
+
+        Do(texts["deck.action.importSlides"],
+            () =>
+            {
+                foreach (var master in masters) deck.AddMaster(master);
+                for (var i = 0; i < clones.Count; i++)
+                    deck.InsertExisting(Math.Clamp(afterIndex + 1 + i, 0, deck.Slides.Count), clones[i]);
+                deck.Raise();
+                Focus(clones[^1]);
+            },
+            () =>
+            {
+                foreach (var clone in clones) deck.Remove(clone);
+                foreach (var master in masters) deck.RemoveMaster(master.Id);
+                deck.Raise();
+            });
+    }
+
     public IReadOnlyList<Slide> InsertOutlineSlides(int afterIndex, IReadOnlyList<OutlineSlide> outline, string labelKey)
     {
         if (outline.Count == 0 || IsReadOnly) return [];

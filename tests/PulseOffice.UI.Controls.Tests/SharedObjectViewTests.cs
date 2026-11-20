@@ -41,13 +41,20 @@ public sealed class SharedObjectViewTests
     }
 
     [Fact]
-    public void LeFrecceSpostanoAPassoPiccoloOGrande()
+    public void ArrowsMoveCtrlArrowsMoveFinelyAndShiftArrowsResizeAsInOffice()
     {
-        var steps = new NudgeSteps(1, 10);
+        var steps = new NudgeSteps(5, 1);
 
-        Assert.Equal((-1.0, 0.0), _nudges.Read(Key.Left, KeyModifiers.None)!.Value.Distance(steps));
-        Assert.Equal((0.0, 10.0), _nudges.Read(Key.Down, KeyModifiers.Shift)!.Value.Distance(steps));
-        Assert.Null(_nudges.Read(Key.Left, KeyModifiers.Control));
+        var move = _nudges.Read(Key.Left, KeyModifiers.None)!.Value;
+        Assert.Equal((-5.0, 0.0), move.Distance(steps));
+        Assert.False(move.Resizes);
+        Assert.Equal((0.0, 1.0), _nudges.Read(Key.Down, KeyModifiers.Control)!.Value.Distance(steps));
+        var grow = _nudges.Read(Key.Right, KeyModifiers.Shift)!.Value;
+        Assert.True(grow.Resizes);
+        Assert.Equal((10.0, 20.0, 35.0, 40.0), grow.Apply(10, 20, 30, 40, steps, 1));
+        Assert.Equal((10.0, 20.0, 30.0, 39.0), _nudges.Read(Key.Up, KeyModifiers.Shift | KeyModifiers.Control)!.Value.Apply(10, 20, 30, 40, steps, 1));
+        Assert.Equal((0.0, 0.0, 1.0, 2.0), _nudges.Read(Key.Left, KeyModifiers.Shift)!.Value.Apply(0, 0, 2, 2, steps, 1));
+        Assert.Null(_nudges.Read(Key.Left, KeyModifiers.Meta));
         Assert.Null(_nudges.Read(Key.A, KeyModifiers.None));
     }
 

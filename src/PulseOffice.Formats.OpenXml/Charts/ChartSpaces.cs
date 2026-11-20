@@ -132,6 +132,7 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
 
     private readonly OoxmlAxisScales _scales = new();
     private readonly OoxmlDataLabels _labels = new();
+    private readonly OoxmlPieSplits _pieSplits = new();
     private readonly OoxmlSeriesFormats _formats = new();
 
     public C.ChartSpace Build(ChartDefinition definition, ChartData data, ISeriesSource source)
@@ -166,6 +167,7 @@ internal sealed class ChartSpaceBuilder(ChartFamilies families)
             }
 
             family.Close(chart, type, solid);
+            _pieSplits.Write(chart, definition.PieSplit);
             if (family.HasAxes)
             {
                 chart.AppendChild(new C.AxisId { Val = secondary ? SecondaryCategoryAxis : CategoryAxis });
@@ -306,6 +308,8 @@ internal sealed record ChartSpaceContent(
 
     public IReadOnlyList<ChartSeriesFormat?>? SeriesFormats { get; init; }
 
+    public ChartPieSplit PieSplit { get; init; } = ChartPieSplit.Automatic;
+
     public ChartDefinition Decorate(ChartDefinition definition) => definition with
     {
         LineSeriesCount = LineSeriesCount,
@@ -323,6 +327,7 @@ internal sealed record ChartSpaceContent(
         ValueAxis = ValueAxis,
         SecondaryValueAxis = SecondaryValueAxis,
         SeriesFormats = SeriesFormats,
+        PieSplit = PieSplit,
     };
 }
 
@@ -334,24 +339,50 @@ internal sealed class ModelSeriesSlots
 
 internal sealed class ExplicitSeriesColours
 {
+    private readonly ChartThemeColours _themes = new();
+    private readonly ChartFillColour _fills = new();
+    private readonly ChartStyleColours _styles = new();
+
     public IReadOnlyList<string?>? Explicit(IReadOnlyList<OpenXmlCompositeElement?> slots)
     {
         if (slots.Any(element => element is C.PieChartSeries)) return null;
-        var colours = slots.Select(Colour).ToList();
+        var first = slots.FirstOrDefault(element => element is not null);
+        if (first is null) return null;
+        var scheme = _themes.For(first);
+        var style = _styles.Style(first.Ancestors<C.ChartSpace>().FirstOrDefault());
+        var count = slots.Count(element => element is not null);
+        var colours = slots.Select((series, slot) => series is null ? null
+            : Colour(series, scheme) ?? (Unfilled(series) ? _styles.Automatic(Order(series, slots, slot), count, style, scheme) : null)).ToList();
         return colours.Any(colour => colour is not null) ? colours : null;
     }
 
-    private string? Colour(OpenXmlCompositeElement? series)
+    private int Order(OpenXmlCompositeElement series, IReadOnlyList<OpenXmlCompositeElement?> slots, int slot) =>
+        series.GetFirstChild<C.Index>()?.Val?.Value is { } index && index < int.MaxValue
+            ? (int)index
+            : slots.Take(slot).Count(element => element is not null);
+
+    private bool Lined(OpenXmlCompositeElement series) =>
+        series is C.LineChartSeries or C.ScatterChartSeries
+        || series is C.RadarChartSeries && (series.Parent as C.RadarChart)?.GetFirstChild<C.RadarStyle>()?.Val?.Value != C.RadarStyleValues.Filled;
+
+    private bool Unfilled(OpenXmlCompositeElement series)
     {
-        var properties = series?.GetFirstChild<C.ChartShapeProperties>();
+        var properties = series.GetFirstChild<C.ChartShapeProperties>();
+        if (properties is null) return true;
+        var owner = Lined(series) ? (OpenXmlElement?)properties.GetFirstChild<A.Outline>() : properties;
+        return owner is null || !owner.ChildElements.Any(child => child.LocalName is "solidFill" or "noFill" or "gradFill" or "pattFill" or "blipFill" or "grpFill");
+    }
+
+    private string? Colour(OpenXmlCompositeElement series, ChartColourScheme scheme)
+    {
+        var properties = series.GetFirstChild<C.ChartShapeProperties>();
         if (properties is null) return null;
-        var line = series is C.LineChartSeries or C.ScatterChartSeries
-            || series is C.RadarChartSeries && (series.Parent as C.RadarChart)?.GetFirstChild<C.RadarStyle>()?.Val?.Value != C.RadarStyleValues.Filled;
-        var fill = line
-            ? properties.GetFirstChild<A.Outline>()?.GetFirstChild<A.SolidFill>()
-                ?? series?.GetFirstChild<C.Marker>()?.GetFirstChild<C.ChartShapeProperties>()?.GetFirstChild<A.SolidFill>()
-            : properties.GetFirstChild<A.SolidFill>();
-        return fill?.GetFirstChild<A.RgbColorModelHex>()?.Val?.Value is { Length: 6 } hex ? "#" + hex.ToUpperInvariant() : null;
+        var owner = Lined(series) ? (OpenXmlCompositeElement?)properties.GetFirstChild<A.Outline>() : properties;
+        var fill = (OpenXmlElement?)owner?.GetFirstChild<A.SolidFill>()
+            ?? owner?.GetFirstChild<A.GradientFill>()?.Descendants<A.GradientStop>().FirstOrDefault();
+        if (fill is null && Lined(series))
+            fill = series.GetFirstChild<C.Marker>()?.GetFirstChild<C.ChartShapeProperties>()?.GetFirstChild<A.SolidFill>();
+        return _fills.Hex(fill, scheme);
     }
 }
 
@@ -408,6 +439,7 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
     private readonly ModelSeriesSlots _slots = new();
     private readonly OoxmlAxisScales _scales = new();
     private readonly OoxmlDataLabels _labels = new();
+    private readonly OoxmlPieSplits _pieSplits = new();
     private readonly OoxmlSeriesFormats _formats = new();
 
     private const uint MaximumPoints = 100_000;
@@ -459,6 +491,7 @@ internal sealed class ChartSpaceReader(ChartFamilies families, PulseOffice.Forma
             ValueAxis = _scales.Read(valueAxis, plot),
             SecondaryValueAxis = _scales.Read(secondaryValue, plot),
             SeriesFormats = formats.Any(format => format is { IsPlain: false }) ? [.. formats.Select(format => format is { IsPlain: false } ? format : null)] : null,
+            PieSplit = _pieSplits.Read(plot),
         };
     }
 

@@ -273,6 +273,7 @@ public sealed class FolioIcons() : DictionaryIconCatalog(Shapes)
         ("folio.page.columns", "M4 5h7 M4 9h7 M4 13h7 M4 17h7 M13 5h7 M13 9h7 M13 13h7 M13 17h5"),
         ("folio.page.setup", "M6 3h9l3 3v15H6z M14 3v4h4 M9 11h6 M9 14h6 M9 17h4"),
         ("folio.edit.findReplace", "M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12z M14.5 14.5L20 20"),
+        ("folio.edit.find", "M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12z M14.5 14.5L20 20 M7 10h6"),
         ("folio.edit.findNext", "M9 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10z M12.5 12.5L16 16 M17 18h4 M19 16l2 2-2 2"),
         ("folio.tools.wordCount", "M4 6h4 M4 10h7 M4 14h5 M4 18h6 M15 6h5v12h-5z M15 10h5 M15 14h5"),
         ("folio.table.rowAbove", "M3 12h18 M3 16h18 M3 20h18 M12 2v7 M9 5l3-3 3 3"),

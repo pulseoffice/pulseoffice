@@ -32,6 +32,7 @@ public sealed class XlsxChartMapper
     private readonly XlsxPivotChartLink _pivotLink = new();
     private readonly ChartTableSources _tables = new();
     private readonly XlsxChartTableSources _tableSources = new();
+    private readonly ChartExReader _chartEx = new();
 
     public XlsxChartMapper()
     {
@@ -76,6 +77,12 @@ public sealed class XlsxChartMapper
 
         foreach (var anchor in drawings.WorksheetDrawing.ChildElements.OfType<OpenXmlCompositeElement>())
         {
+            if (anchor.LocalName == "AlternateContent")
+            {
+                if (ChartEx(drawings, anchor, ++ordinal) is { } extended) placed.Add(anchors.Place(extended.Anchor, extended.Placed, new DocumentSize(Twip.FromCentimeters(12), Twip.FromCentimeters(7))));
+                continue;
+            }
+
             var frame = anchor.GetFirstChild<Xdr.GraphicFrame>();
             var reference = frame?.Descendants<C.ChartReference>().FirstOrDefault();
             if (reference?.Id?.Value is not { } id) continue;
@@ -114,6 +121,60 @@ public sealed class XlsxChartMapper
         }
 
         return placed;
+    }
+
+    private (OpenXmlCompositeElement Anchor, PlacedObject Placed)? ChartEx(DrawingsPart drawings, OpenXmlElement alternate, int ordinal)
+    {
+        if (_chartEx.ChoiceAnchor(alternate) is not { } anchor || _chartEx.ChartId(anchor) is not { } id) return null;
+        if (!drawings.TryGetPartById(id, out var part) || _chartEx.Read(part) is not { } content) return null;
+
+        var definition = ChartExDefinition(content, $"grafico{ordinal}");
+        var name = anchor.Descendants<Xdr.NonVisualDrawingProperties>().FirstOrDefault()?.Name?.Value;
+        return (anchor, new PlacedObject { Id = string.IsNullOrEmpty(name) ? definition.Id : name, Content = definition, Anchor = new CellAddress(0, 0) });
+    }
+
+    private ChartDefinition ChartExDefinition(ChartExContent content, string id)
+    {
+        var literalNames = content.Series.Any(series => series.NameFormula is null && !string.IsNullOrEmpty(series.Name))
+            ? content.Series.Select(series => series.NameFormula is null ? series.Name ?? string.Empty : string.Empty).ToList()
+            : null;
+        var formulas = content.Series.SelectMany(series => new[] { series.NameFormula, series.Values, series.Categories })
+            .OfType<string>().SelectMany(_rangeFormulas.Parts).Where(text => text.Contains('!')).ToList();
+
+        if (content.Series.All(series => series.Values is null) || formulas.Count == 0)
+        {
+            var categories = content.Series[0].CachedCategories.Count > 0
+                ? content.Series[0].CachedCategories
+                : [.. Enumerable.Range(1, content.Series.Max(series => series.CachedValues.Count)).Select(index => index.ToString(System.Globalization.CultureInfo.InvariantCulture))];
+            var data = new ChartData(categories, [.. content.Series.Select((series, index) => new ChartSeries(series.Name ?? $"Serie {index + 1}", series.CachedValues))])
+            {
+                OrdinalCategories = content.Series[0].CachedCategories.Count == 0,
+            };
+            return new ChartDefinition
+            {
+                Id = id, Type = content.Type, SourceSheet = string.Empty, SourceRange = string.Empty,
+                InlineData = data, ChartTitle = content.Title, Legend = content.Legend,
+            };
+        }
+
+        var sheet = SheetOf(formulas[0]);
+        var first = content.Series[0];
+        var compact = _orientation.Infer(first.NameFormula is not null, first.Categories is not null, first.Values, new ChartDefinition
+        {
+            Id = id,
+            Type = content.Type,
+            SourceSheet = sheet,
+            SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sheet, StringComparison.CurrentCultureIgnoreCase))]),
+        });
+        var sources = content.Series
+            .Select(series => new ChartSeriesSource(_rangeFormulas.Model(series.NameFormula), _rangeFormulas.Model(series.Values), _rangeFormulas.Model(series.Categories)))
+            .ToList();
+        return _layout.Settle(compact, sources.Any(source => source.Values is not null) ? sources : []) with
+        {
+            ChartTitle = content.Title,
+            Legend = content.Legend,
+            SeriesNames = literalNames,
+        };
     }
 
     private static bool IsStatic(ChartDefinition definition) =>

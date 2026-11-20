@@ -5,6 +5,8 @@ namespace PulseOffice.Sheets.Engine.Operations;
 
 internal sealed class ChartPointShift(StructureChange change, IChartSourceReferences references)
 {
+    private readonly ChartStructureOffsets _offsets = new(change);
+
     public ChartDefinition Apply(ChartDefinition before, ChartDefinition after)
     {
         if (before.SeriesFormats is not { } formats || formats.All(format => format is null || format.Points.IsEmpty)) return after;
@@ -17,7 +19,7 @@ internal sealed class ChartPointShift(StructureChange change, IChartSourceRefere
             var (origin, offset) = start;
             var points = new List<ChartPointFormat>();
             foreach (var point in format.Points.Items)
-                if (Moved(origin, origin + offset + point.Index) is { } position && position - offset >= 0) points.Add(point with { Index = position - offset });
+                if (_offsets.Moved(origin, origin + offset + point.Index) is { } position && position - offset >= 0) points.Add(point with { Index = position - offset });
             var moved = points.Count == 0 ? ChartPointFormats.None : new ChartPointFormats([.. points.OrderBy(point => point.Index)]);
             if (moved.Equals(format.Points)) continue;
             shifted[series] = format with { Points = moved };
@@ -34,37 +36,16 @@ internal sealed class ChartPointShift(StructureChange change, IChartSourceRefere
         {
             if (series >= chart.SeriesSources!.Count) return null;
             var areas = references.Areas(chart.SeriesSources[series].Values);
-            if (areas.Count != 1 || !Affects(areas[0].Sheet, areas[0].Range)) return null;
+            if (areas.Count != 1 || !_offsets.Affects(areas[0].Sheet, areas[0].Range)) return null;
             var range = areas[0].Range;
             var down = range.RowCount > 1 || range.ColumnCount == 1;
-            return (change.Axis == StructureAxis.Rows) == down ? (Position(range.Start), 0) : null;
+            return (_offsets.Axis == StructureAxis.Rows) == down ? (_offsets.Position(range.Start), 0) : null;
         }
 
-        if (!CellRange.TryParseA1(chart.SourceRange, out var compact) || !Affects(chart.SourceSheet, compact)) return null;
+        if (!CellRange.TryParseA1(chart.SourceRange, out var compact) || !_offsets.Affects(chart.SourceSheet, compact)) return null;
         var alongRows = chart.SeriesInColumns;
-        if ((change.Axis == StructureAxis.Rows) != alongRows) return null;
+        if ((_offsets.Axis == StructureAxis.Rows) != alongRows) return null;
         var skip = alongRows ? chart.FirstRowIsHeader : chart.FirstColumnIsCategory;
-        return (Position(compact.Start), skip ? 1 : 0);
-    }
-
-    private bool Affects(string sheet, CellRange range) =>
-        string.Equals(sheet, change.SheetName, StringComparison.CurrentCultureIgnoreCase) && change.InBand(range.Start) && change.InBand(range.End);
-
-    private int Position(CellAddress address) => change.Axis == StructureAxis.Rows ? address.Row : address.Column;
-
-    private int? Moved(int start, int position)
-    {
-        if (change.IsInsertion)
-        {
-            var newStart = start >= change.Index ? start + change.Count : start;
-            var newPosition = position >= change.Index ? position + change.Count : position;
-            return newPosition - newStart;
-        }
-
-        var last = change.Index + change.Count - 1;
-        if (position >= change.Index && position <= last) return null;
-        var shiftedStart = start > last ? start - change.Count : Math.Min(start, change.Index);
-        var shiftedPosition = position > last ? position - change.Count : position;
-        return shiftedPosition - shiftedStart;
+        return (_offsets.Position(compact.Start), skip ? 1 : 0);
     }
 }

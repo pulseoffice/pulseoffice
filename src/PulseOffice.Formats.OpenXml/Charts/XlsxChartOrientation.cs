@@ -14,7 +14,12 @@ internal sealed class XlsxChartOrientation
         var first = series[0];
         var named = first.GetFirstChild<C.SeriesText>()?.GetFirstChild<C.StringReference>() is not null;
         var categorised = first.GetFirstChild<C.CategoryAxisData>()?.Descendants<C.Formula>().Any() == true;
-        var values = Range(first.GetFirstChild<C.Values>()?.Descendants<C.Formula>().FirstOrDefault()?.Text);
+        return Infer(named, categorised, first.GetFirstChild<C.Values>()?.Descendants<C.Formula>().FirstOrDefault()?.Text, definition);
+    }
+
+    public ChartDefinition Infer(bool named, bool categorised, string? valuesFormula, ChartDefinition definition)
+    {
+        var values = Range(valuesFormula);
         var inRows = values is { RowCount: 1, ColumnCount: > 1 };
 
         return definition with

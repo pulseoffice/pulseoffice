@@ -20,6 +20,8 @@ internal sealed class OdfMasterPages
 
     private readonly OdfPrintMasters _print = new();
 
+    private readonly OdpLayoutCatalogXml _catalog = new();
+
     private readonly OdfDeckShapeMapper _shapes = new();
     private readonly OdpVectorFrame _vectors = new(new OdfDeckShapeMapper());
 
@@ -39,7 +41,7 @@ internal sealed class OdfMasterPages
 
     public IEnumerable<XElement> NotesStyles(PulseOffice.Presentations.Presentation deck) =>
         _print.NotesStyles(deck.Masters.Select(master => master.Name)
-            .Concat(deck.Masters.SelectMany(master => master.Layouts.Where(HasOwnPage).Select(layout => LayoutDisplayName(master, layout.Kind))))
+            .Concat(deck.Masters.SelectMany(master => master.Layouts.DistinctBy(layout => layout.Kind).Where(HasOwnPage).Select(layout => LayoutDisplayName(master, layout.Kind))))
             .Distinct(StringComparer.Ordinal), deck.NotesMaster);
 
     private string BaseName(PulseOffice.Presentations.Presentation deck, SlideMaster master) =>
@@ -105,6 +107,7 @@ internal sealed class OdfMasterPages
             if (master.Elements.SlideNumber) page.Add(Frame("page-number", 24.0, 17.4));
             Decorate(page, master.Objects, automaticStyles, session);
             page.Add(_print.Notes(deck.NotesMaster));
+            _catalog.Write(page, master);
             styles.Add(page);
         }
         for (var index = 0; index < deck.Masters.Count; index++)
@@ -112,7 +115,7 @@ internal sealed class OdfMasterPages
             var master = deck.Masters[index];
             var theme = index == 0 ? deck.Theme : master.Theme;
             var baseName = index == 0 ? PrimaryName : master.Id;
-            foreach (var layout in master.Layouts.Where(HasOwnPage))
+            foreach (var layout in master.Layouts.DistinctBy(layout => layout.Kind).Where(HasOwnPage))
             {
                 var styleName = $"Mdp{index + 1}{layout.Kind}";
                 automaticStyles.Add(new XElement(Style + "style",
@@ -404,6 +407,11 @@ internal sealed class OdfMasterPages
             deck.ReplaceMaster(updated);
         }
 
+        deck.Master = _catalog.Read(pages[0], deck.Master);
+        foreach (var page in pages.Skip(1))
+            if ((string?)page.Attribute(Style + "name") is { } name && deck.Masters.FirstOrDefault(master => master.Id == name) is { } secondary)
+                deck.ReplaceMaster(_catalog.Read(page, secondary));
+
         var drawPages = body?.Elements(Draw + "page").ToList() ?? [];
         for (var index = 0; index < drawPages.Count && index < deck.Slides.Count; index++)
         {
@@ -411,6 +419,11 @@ internal sealed class OdfMasterPages
             if (name is not null && bases.TryGetValue(name, out var baseName)) name = baseName;
             if (name is not null && name != primaryName && deck.Masters.Any(master => master.Id == name))
                 deck.Slides[index].MasterId = name;
+            var slide = deck.Slides[index];
+            if (_catalog.SlideLayoutId(drawPages[index]) is { } layoutId
+                && deck.MasterOf(slide).Layouts.FirstOrDefault(layout => string.Equals(layout.Id, layoutId, StringComparison.Ordinal)) is { } layout
+                && layout.Kind == slide.Layout)
+                slide.LayoutId = layoutId;
         }
     }
 

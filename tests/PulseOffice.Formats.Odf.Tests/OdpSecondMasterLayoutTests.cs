@@ -54,4 +54,37 @@ public sealed class OdpSecondMasterLayoutTests
         Assert.Contains(new OdpWriter().CheckFidelity(deck).Losses, issue => issue.Code == "ODP107");
         Assert.DoesNotContain(new OdpWriter().CheckFidelity(new Presentation { Theme = theme, Master = master }).Losses, issue => issue.Code == "ODP107");
     }
+
+    [Fact]
+    public void Further_layouts_of_the_same_type_keep_name_geometry_background_and_their_slides()
+    {
+        var theme = _themes.Find("Light")!;
+        var master = _masters.CreateStandard(theme);
+        var moved = new DocumentRect(new Twip(700), new Twip(800), new Twip(9000), new Twip(1200));
+        var basis = master.Template(SlideLayout.TitleOnly);
+        var custom = basis with
+        {
+            Id = "layout.custom.21",
+            Name = "Banner",
+            Background = ColorRole.Accent2,
+            Placeholders = [.. basis.Placeholders.Select(placeholder => placeholder with { Bounds = moved })],
+        };
+        var deck = new Presentation { Theme = theme, Master = master with { Layouts = [.. master.Layouts, custom] } };
+        deck.AddExisting(_slides.Create(deck.NextId(), custom));
+        deck.AddExisting(_slides.Create(deck.NextId(), basis));
+
+        using var buffer = new MemoryStream();
+        Assert.True(new OdpWriter().Write(deck, buffer).Succeeded);
+        buffer.Position = 0;
+        var back = new OdpReader(_themes, _masters).Read(buffer).Value!;
+
+        var banner = Assert.Single(back.Master.Layouts, layout => layout.Id == "layout.custom.21");
+        Assert.Equal("Banner", banner.Name);
+        Assert.Equal(ColorRole.Accent2, banner.Background);
+        Assert.Equal(moved, banner.Placeholders[0].Bounds);
+        Assert.Equal(master.Layouts.Count + 1, back.Master.Layouts.Count);
+        Assert.Equal("layout.custom.21", back.Slides[0].LayoutId);
+        Assert.Same(banner, back.Master.Template(back.Slides[0]));
+        Assert.Equal(basis.Id, back.Master.Template(back.Slides[1]).Id);
+    }
 }

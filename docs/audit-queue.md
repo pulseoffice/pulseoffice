@@ -52,21 +52,31 @@ the round that fixes it is joined and the join run is green.
   this has been opened in PowerPoint or the reference suite here. (229, 231)
 - "Number slides from" 0 is written to ODP as our extension attribute and as `text:page-adjust="-1"` on every slide
   number field (also read back alone); not opened in another application. (231, 234)
+- Deck (329): the slide clipboard copies only the current slide in the sorter (no multi-slide selection, no copy from
+  the normal view's filmstrip, no "keep source formatting" paste mode). (329)
+- Deck (329): PPTX standard layouts read from PowerPoint take our standard names and are written with type names, so
+  a PowerPoint layout name is not kept. (329)
+- Deck (329): in ODP the decoration of a further layout of a type comes back as that of the first layout (ODP107). (329)
+- Deck (329): keyboard resizing, the master picker and name box, the Insert Slides from File formatting prompt and the
+  sorter slide clipboard have not been seen in the running app; the arrow keys on objects (Ledger, Deck, Folio) are not
+  commands and appear in no in-app shortcut list. (329)
+
 ## Charts
 - Per-point formats (`c:dPt`, `chart:data-point`) have not been opened in Excel or the reference suite. (318)
-- Inserting or deleting columns inside a compact chart range with series in columns adds or removes a series, but
-  series names, colours and formats keep their index (the same holds for rows with series in rows). (323)
-- Pie of pie and bar of pie always put the last third of the points in the second plot; the split type, split
-  position and second plot size (`c:splitType`, `c:splitPos`, `c:secondPieSize`) are not in the model. (323)
-- Best fit data labels draw at the automatic position (no overlap avoidance); ODS writes them as
-  `chart:label-position="avoid-overlap"`, not opened in another application. (323)
-- The line series of a column and line combination draws its markers in the series colour, not the point colours. (323)
-- Not yet audited: chart styles and colour palettes against Excel's style gallery, and stock, statistical, hierarchy
-  and meter plots beyond label and axis consistency. (317, 319, 324)
-- Keyboard resizing of objects: the shared `ObjectNudgeKeys` makes Shift+arrow a large nudge; Office resizes with
-  Shift+arrow. Changing it touches Ledger, Deck and Folio. (324)
-- ODF legend positions `top-start`, `top-end`, `bottom-start`, `bottom-end` read back as Right. (324)
-- XLSX OHLC stock charts are written without up-down bars; an Excel OHLC chart reads back as Candlestick. (324)
+- Best fit data labels avoid labels already drawn with a greedy pass, not the plot marks; ODS writes them as
+  `chart:label-position="avoid-overlap"`, not opened in another application. (323, 327)
+- Pie of pie split settings (XLSX `c:splitType`/`c:splitPos`/`c:custSplit`/`c:secondPieSize`, ODS our extension
+  attributes) and XLSX open-high-low-close tick markers have not been opened in Excel or the reference suite. (327)
+- XLSX writes treemap, sunburst, histogram, Pareto, box plot, waterfall and funnel as column charts (XLSX087); the
+  native chartex part (`cx:chartSpace` behind `mc:AlternateContent Requires="cx1"`) is researched but not written, and
+  must be opened in Excel once written. (328)
+- Chartex layout properties are not read: histogram binning, box plot quartile method, mean and outlier markers,
+  waterfall subtotals, treemap parent labels. (328)
+- Treemap and sunburst draw one level: multi-column category levels are not grouped into parents. (328)
+- Box and whisker draws one box per series; Excel draws one per category per series. (328)
+- The chart style id (`c:style`) and colour style parts (`cs:colorStyle`) are not kept: a round trip writes the
+  resolved colours. (328)
+- The categorical Pareto plot has no rendering test. (328)
 - Pivot chart links (XLSX `c:pivotSource` with the `[]` name form and multi-area `multiLvlStrRef` formulas; ODS
   the vendor extension attribute `data-pilot-source`) have not been opened in other applications; ODS pivot charts carry only leaf category
   labels for other readers. (182, 190, 195)
@@ -140,9 +150,11 @@ the round that fixes it is joined and the join run is green.
 - Folio columns (320, 325): the ODT next-column start writes `fo:break-before="column"` on the section's first paragraph,
   leading table or nested section's first paragraph; not opened in other applications. Page columns marked to balance
   before a section not opened in Word. (320, 325)
-- Folio find and replace (325): no `^p` paragraph marks or breaks; no format or style search and replace; no find bar
-  or match highlighting; comments not searched, while headers of unused page styles are; tracked deleted and hidden
-  text matched; Word wildcard syntax not translated (the regex option is .NET syntax); no replace with formatting. (325)
+- Folio find and replace (326): format matching reads direct run and paragraph properties and style names, not
+  formatting inherited from styles; `SectionBlock` boundaries are not `^b` matches and `^b` cannot be inserted; matches
+  in comments are walked through their anchor, not selected inside the comment. (326)
+- Find panel (326): Ledger and Deck reuse the panel without match highlighting; the panel, Folio highlights and the
+  dialog's format expander have not been tried in the running app. (326)
 - Folio pages (320): the blank page before a right or left page style keeps the previous style (Word places it at the
   end of the previous section, the reference suite likewise); not compared live in Word. (315, 320)
 
@@ -160,8 +172,8 @@ the round that fixes it is joined and the join run is green.
 - Shell (314): the notification history is application-wide by decision. (314)
 - Shell (322): the per-window module contexts are covered by headless two-window tests; the switch between windows has
   not been tried in the running app on the three systems. (322)
-- Shell (322): two windows of the same Ledger document in one window (tabs) still share that window's single context
-  slot, the last attached view wins, as before. (322)
+- Shell (329): module context slots are now per tab (window and view); the tab switch was covered headless only, not
+  tried in the running app. (329)
 - Shell (321): activating a window re-claims the module context and keeps a torn-off window's maximized state, but the
   multi-window context switch has not been tried in the running app. (321)
 - Shell (310): multi-window behaviour (tab drops on a scrolled strip, side panel, status, placement) not yet tried in

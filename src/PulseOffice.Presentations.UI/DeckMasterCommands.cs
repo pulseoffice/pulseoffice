@@ -70,7 +70,7 @@ public sealed class DeckMasterCommands(
                 [new Design.MasterGalleryAction("delete", texts["deck.master.deleteAction"], Primary: true)], t.Deck.Size), gallery),
             new DialogOptions { TitleKey = "command.deck.master.delete.title", PreferredWidth = 720 }, ct).ConfigureAwait(true);
         if (result is null || result.Index < 0 || result.Index >= candidates.Count || !t.Deck.Masters.Contains(candidates[result.Index])) return;
-        t.Actions.DeleteMaster(candidates[result.Index]);
+        t.Actions.Layouts.DeleteMaster(candidates[result.Index]);
     }
 
     private async Task ChangeAsync(CancellationToken ct)
@@ -90,7 +90,7 @@ public sealed class DeckMasterCommands(
         if (result is null || result.Index < 0 || result.Index >= available.Count || !t.Deck.Masters.Contains(available[result.Index])) return;
         if (result.Action != "all" && !Holds(t, slide)) return;
         IReadOnlyList<Slide> targets = result.Action == "all" ? [.. t.Deck.Slides] : [slide];
-        t.Actions.AssignMaster(targets, available[result.Index]);
+        t.Actions.Layouts.ChangeMaster(targets, available[result.Index]);
     }
 
     private async Task ElementsAsync(CancellationToken ct)

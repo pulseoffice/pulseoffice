@@ -110,5 +110,7 @@ internal sealed class OdfChartVocabulary
     public LegendPosition LegendOf(string? name) =>
         name is null ? LegendPosition.None
         : _legends.FirstOrDefault(entry => entry.Name == name) is { Name: not null } found ? found.Position
+        : name.StartsWith("top-", StringComparison.Ordinal) ? LegendPosition.Top
+        : name.StartsWith("bottom-", StringComparison.Ordinal) ? LegendPosition.Bottom
         : LegendPosition.Right;
 }

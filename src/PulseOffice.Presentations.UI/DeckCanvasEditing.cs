@@ -128,4 +128,24 @@ internal sealed class DeckCanvasEditing(DeckViewState state, IDeckViewHost host,
         if (placements.Count == 0) return;
         _actions.AlignElements(_state.Current, placements);
     }
+
+    public void ResizeBy(IReadOnlyList<string> ids, PulseOffice.UI.Controls.Shapes.ObjectNudge nudge, PulseOffice.UI.Controls.Shapes.NudgeSteps steps)
+    {
+        if (_state.Current is null) return;
+
+        var placements = new List<(string Id, PulseOffice.Foundation.Units.DocumentRect Bounds)>();
+        foreach (var id in ids)
+        {
+            if (_state.Current.Find(id) is not { } target) continue;
+            var b = target.Bounds;
+            var (_, _, width, height) = nudge.Apply(b.Left.Value, b.Top.Value, b.Width.Value, b.Height.Value, steps, steps.Fine);
+            placements.Add((id, new PulseOffice.Foundation.Units.DocumentRect(
+                b.Left, b.Top,
+                new PulseOffice.Foundation.Units.Twip((int)width),
+                new PulseOffice.Foundation.Units.Twip((int)height))));
+        }
+
+        if (placements.Count == 0) return;
+        _actions.AlignElements(_state.Current, placements);
+    }
 }

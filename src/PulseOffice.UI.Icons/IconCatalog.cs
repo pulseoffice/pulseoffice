@@ -132,6 +132,8 @@ public sealed class IconCatalog : IIconCatalog
         ["ledger.data.sortAscending"] = new("M6 20V5 M3 8l3-3 3 3 M11 6h9 M11 12h6 M11 18h3"),
         ["ledger.data.sortDescending"] = new("M6 5v15 M3 17l3 3 3-3 M11 6h3 M11 12h6 M11 18h9"),
         ["ledger.data.filterClear"] = new("M3 5h18l-7 8v7l-4-2v-5z M16 17l5 5 M21 17l-5 5"),
+        ["ledger.data.find"] = new("M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M16.2 16.2L21 21 M8 11h6"),
+        ["deck.edit.find"] = new("M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M16.2 16.2L21 21 M8 11h6"),
         ["ledger.data.findReplace"] = new("M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M16.2 16.2L21 21"),
 
         ["ledger.chart.column"] = new("M4 20h16 M7 20V11 M12 20V5 M17 20v-6"),

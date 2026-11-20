@@ -128,6 +128,6 @@ public sealed class DeckThemeCommands(
             Name = names.Display(theme),
         };
         if (existing is null) t.Actions.AddMaster(master);
-        t.Actions.AssignMaster([slide], master);
+        t.Actions.Layouts.ChangeMaster([slide], master);
     }
 }

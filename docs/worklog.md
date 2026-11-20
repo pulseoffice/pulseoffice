@@ -14440,3 +14440,31 @@ docs/deep-audit/round-322-window-module-contexts.md.
   section); the ODT next-column start writes a native column break on a leading table or nested section; justified
   plain Deck table cells justify. Folio find and replace searches every story, gains regular expressions, caret codes
   for special characters, match counts and a single Replace. Log: docs/deep-audit/round-325-folio-find-replace.md.
+
+### Round 326 (2026-11-20): Folio find and replace leftovers
+- Search runs over whole stories with paragraph, page, column and section marks (`^p ^m ^n ^b` found and, except
+  `^b`, inserted), Word wildcards, format and style search and replace, comments searched last, hidden text and the
+  headers of unused page styles skipped; a shared non-modal find panel (Folio highlights all matches; Ledger and Deck
+  reuse it). Log: docs/deep-audit/round-326-folio-find-replace.md.
+
+### Round 327 (2026-11-20): Ledger chart leftovers
+- Series names, colours, formats and line series follow column (or row) insertion and deletion inside a compact
+  chart range; pie of pie and bar of pie gain the split type, split value, custom points and second plot size (XLSX
+  `c:splitType`/`c:splitPos`/`c:custSplit`/`c:secondPieSize`, ODS our extension attributes, chart editor, drawing);
+  best fit labels avoid labels already drawn; combination line markers take point colours; ODF corner legend
+  positions read back on their edge; XLSX open-high-low-close charts carry open and close tick markers.
+  Log: docs/deep-audit/round-327-ledger-chart-leftovers.md.
+
+### Round 328 (2026-11-20): Ledger chart styles and special plots
+- XLSX reads Excel's chartex charts (treemap, sunburst, histogram, Pareto, box and whisker, waterfall, funnel) instead
+  of dropping them; chart series and point fills resolve theme scheme colours with luminance modifiers, and unfilled
+  series take the `c:style`/`c14:style` accents; a Pareto of text categories sorts the categories instead of binning
+  values. Log: docs/deep-audit/round-328-chart-styles-special-plots.md.
+
+### Round 329 (2026-11-20): keyboard resizing, per-tab contexts, Deck masters and layouts
+- Shift+arrow resizes and Ctrl+arrow nudges finely in Ledger, Deck and Folio, as in Office; module context slots are
+  per tab, so a background view of the same document no longer takes the active tab's context. The Deck master view
+  edits every master (picker, rename, background), moves one placeholder at a time and carries the slides that follow
+  the layout; changing or deleting a master relayouts its slides; ODP keeps custom layouts and each slide's layout;
+  Insert Slides from File can keep the source formatting; the slide sorter copies and pastes slides.
+  Log: docs/deep-audit/round-329-deck-masters-keyboard-resize.md.

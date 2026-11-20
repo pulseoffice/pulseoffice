@@ -98,7 +98,8 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
             new XAttribute(PulseChart + "type", definition.Type.ToString()),
             new XAttribute(Svg + "width", units.Cm(size.Width)),
             new XAttribute(Svg + "height", units.Cm(size.Height)),
-            PivotAttributes(definition.PivotSource));
+            PivotAttributes(definition.PivotSource),
+            _pieSplits.Attributes(definition));
 
         if (definition.ChartTitle is { Length: > 0 } title)
             chart.Add(new XElement(Chart + "title", paragraphs.Paragraphs(title)));
@@ -127,6 +128,8 @@ internal abstract class OdfChartDocumentBuilder(OdfChartVocabulary vocabulary, O
                 Enumerable.Range(0, data.Series.Count).Select(index => SeriesStyle(index, definition, circular ? null : definition.SeriesColor(index), extraStyles)).ToList(), extraStyles),
             new XElement(Office + "body", new XElement(Office + "chart", chart))));
     }
+
+    private readonly OdfPieSplits _pieSplits = new(PulseChart);
 
     protected abstract IEnumerable<XAttribute> PlotAttributes(ChartDefinition definition);
 

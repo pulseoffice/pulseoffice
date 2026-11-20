@@ -113,7 +113,11 @@ public static class DocumentsServiceCollectionExtensions
         services.TryAddSingleton<PulseOffice.Document.Versions.IVersionTextDiff, PulseOffice.Document.Versions.VersionTextDiff>();
         services.TryAddSingleton<PulseOffice.Document.Versions.IVersionSequenceComparer, PulseOffice.Document.Versions.VersionSequenceComparer>();
         services.AddSingleton<Revisions.IDocumentComparison, Revisions.DocumentComparison>();
+        services.AddSingleton<ISearchTextBuilder, SearchTextBuilder>();
+        services.AddSingleton<IWordWildcards, WordWildcards>();
         services.AddSingleton<IDocumentSearch, DocumentSearch>();
+        services.AddSingleton<ISearchStories, SearchStories>();
+        services.AddSingleton<ISearchReplacing, SearchReplacing>();
         services.AddSingleton<ITableEditing, TableEditing>();
         services.TryAddSingleton<ITableSpans, TableSpans>();
         services.TryAddSingleton<IColumnWidths, ColumnWidths>();

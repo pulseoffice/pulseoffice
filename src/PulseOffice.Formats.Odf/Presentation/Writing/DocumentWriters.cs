@@ -25,6 +25,8 @@ internal sealed class OdpPageWriter(
 
     private readonly OdpSectionXml _sections = new();
 
+    private readonly OdpLayoutCatalogXml _layoutCatalog = new();
+
     private readonly OdpElementVisibility _visibility = new();
 
     public XElement Write(Slide slide, int number, OdpWriteSession session)
@@ -37,6 +39,7 @@ internal sealed class OdpPageWriter(
             new XAttribute(Draw + "master-page-name", new OdfMasterPages().NameOf(session.Deck, slide)),
             new XAttribute(Presentation + "presentation-page-layout-name", layouts.OdfName(slide.Layout)));
         if (session.Deck.HeaderFooter.Any) _headerFooter.Use(page, session.Deck.HeaderFooter);
+        _layoutCatalog.WriteSlide(page, session.Deck.MasterOf(slide), slide);
         _sections.Write(page, slide, session.Deck);
 
         var nodes = new SlideGroupNodes<XElement>();
@@ -277,7 +280,7 @@ internal sealed class OdpFidelityRules
     [
         new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.Masters.Any(master => master.Layouts.GroupBy(layout => layout.Kind).Any(group => group.Count() > 1)),
-            Diagnostic.Info("ODP107", "ODF has one page layout per layout type: further layouts of the same type, such as custom layouts read from PowerPoint files, are written as the first layout of their type, and their slides re-read with it.")),
+            Diagnostic.Info("ODP107", "ODF has one page layout per layout type: other applications show further layouts of the same type, such as custom layouts read from PowerPoint files, as the first layout of their type. PulseOffice keeps their names, placeholders and backgrounds in an extension; their own decoration comes back as that of the first layout of their type.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(
             deck => deck.Slides.Any(slide => slide.Transition.Kind is TransitionKind.Cut or TransitionKind.Zoom or TransitionKind.Morph),
             Diagnostic.Info("ODP021", "Cut, zoom and morph transitions have no ODF equivalent; other applications show them as a crossfade, while PulseOffice reads the kind back from an extension attribute.")),
@@ -321,7 +324,7 @@ internal sealed class OdpFidelityRules
         new FidelityRule<PulseOffice.Presentations.Presentation>(CommaInCustomShow,
             Diagnostic.Info("ODF286", "ODF lists the slides of a custom show separated by commas: a slide whose name contains a comma is kept in its show by a PulseOffice extension, other applications leave it out of the show.")),
         new FidelityRule<PulseOffice.Presentations.Presentation>(CustomizedLayouts,
-            Diagnostic.Info("ODP022", "Layouts with their own background or with moved placeholders have no ODF equivalent: they return as the standard layouts in ODP, slides keep their own placeholders. PPTX keeps them.")),
+            Diagnostic.Info("ODP022", "Layout backgrounds are written as layout master pages and moved placeholders as page layouts: other applications may show them only partly, PulseOffice reads them back.")),
     ]);
 
     private bool CommaInCustomShow(PulseOffice.Presentations.Presentation deck)

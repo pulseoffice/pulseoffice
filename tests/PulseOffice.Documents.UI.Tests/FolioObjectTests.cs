@@ -52,6 +52,19 @@ public sealed class FolioObjectTests
     }, CancellationToken.None);
 
     [Fact]
+    public Task ShiftArrowResizesTheSelectedObjectAsInOffice() => FolioScene.Session.Dispatch(() =>
+    {
+        var scene = Scene(_ => new PageAnchor(1));
+        var before = Item(scene).Placement;
+
+        scene.Press(Key.Right, Avalonia.Input.RawInputModifiers.Shift);
+
+        Assert.Equal(Size.Width.ToPoints() + 5, Item(scene).Size.Width.ToPoints(), 2);
+        Assert.Equal(Size.Height, Item(scene).Size.Height);
+        Assert.Equal(before, Item(scene).Placement);
+    }, CancellationToken.None);
+
+    [Fact]
     public Task SpostareUnOggettoDiPaginaAggiornaLaPosizioneInUnSoloAnnullamento() => FolioScene.Session.Dispatch(() =>
     {
         var scene = Scene(_ => new PageAnchor(1));
@@ -96,15 +109,15 @@ public sealed class FolioObjectTests
     }, CancellationToken.None);
 
     [Fact]
-    public Task LeFrecceSpostanoDiUnPunto() => FolioScene.Session.Dispatch(() =>
+    public Task LeFrecceSpostanoDiCinquePuntiEConCtrlDiUnPunto() => FolioScene.Session.Dispatch(() =>
     {
         var scene = Scene(_ => new PageAnchor(1));
 
         scene.Press(Key.Right);
-        scene.Press(Key.Down, RawInputModifiers.Shift);
+        scene.Press(Key.Down, RawInputModifiers.Control);
 
-        Assert.Equal(1, Item(scene).Placement.X.ToPoints(), 1);
-        Assert.Equal(10, Item(scene).Placement.Y.ToPoints(), 1);
+        Assert.Equal(5, Item(scene).Placement.X.ToPoints(), 1);
+        Assert.Equal(1, Item(scene).Placement.Y.ToPoints(), 1);
     }, CancellationToken.None);
 
     [Fact]

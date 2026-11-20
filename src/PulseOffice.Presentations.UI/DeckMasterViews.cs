@@ -30,9 +30,15 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
 
     private readonly Design.ILayoutChoices _layouts = layouts;
 
-    private SlideLayoutTemplate MasterTemplate()
+    private SlideMaster EditedMaster()
     {
-        var master = _deck.Master;
+        var master = _deck.MasterById(_state.EditedMasterId);
+        _state.EditedMasterId = master.Id;
+        return master;
+    }
+
+    private SlideLayoutTemplate MasterTemplate(SlideMaster master)
+    {
         if (_state.MasterLayoutId is { } id && master.Layouts.FirstOrDefault(layout => string.Equals(layout.Id, id, StringComparison.Ordinal)) is { } chosen)
             return chosen;
         var fallback = master.Template(SlideLayout.TitleAndContent);
@@ -42,20 +48,51 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
 
     public Control BuildMaster()
     {
-        var template = MasterTemplate();
+        var master = EditedMaster();
+        var template = MasterTemplate(master);
         var canvas = new SlideView(_renderer)
         {
-            Size = _deck.Size, DeckTheme = _deck.Theme, Master = _deck.Master,
+            Size = _deck.Size, DeckTheme = _deck.ThemeOfMaster(master), Master = master,
             Padding = _metrics.SpacingLarge, Editable = true,
         };
-        canvas.Show(_masterSlides.Create("__master__", template));
+        var shown = _masterSlides.Create("__master__", template);
+        canvas.Show(shown);
         canvas.ElementChangeRequested += (_, change) =>
         {
-            if (change.Element is TextElement text)
-                _actions.SetPlaceholderBounds(template.Id, text.Text.Role, change.Bounds);
+            if (change.Element is not TextElement) return;
+            var index = shown.Elements.OfType<TextElement>().Select(element => element.Id).ToList().IndexOf(change.Element.Id);
+            if (index >= 0) _actions.SetPlaceholderBounds(master, template.Id, index, change.Bounds);
         };
 
-        var layouts = _deck.Master.Layouts.Select(layout => new DeckNamedChoice<SlideLayoutTemplate>(layout, _layouts.Title(_deck.Master, layout))).ToList();
+        var masters = _deck.Masters.Select(each => new DeckNamedChoice<SlideMaster>(each, each.Name)).ToList();
+        var masterPicker = new ComboBox { ItemsSource = masters, MinWidth = 140, SelectedItem = masters.FirstOrDefault(choice => ReferenceEquals(choice.Value, master)) };
+        AutomationProperties.SetName(masterPicker, _texts["deck.master.master"]);
+        masterPicker.SelectionChanged += (_, _) =>
+        {
+            if (masterPicker.SelectedItem is DeckNamedChoice<SlideMaster> { Value: var chosen } && !ReferenceEquals(chosen, master))
+            {
+                _state.EditedMasterId = chosen.Id;
+                _state.MasterLayoutId = null;
+                _host.RefreshMode();
+            }
+        };
+
+        var masterName = new TextBox { Text = master.Name, MinWidth = 120, IsEnabled = !_actions.IsReadOnly };
+        AutomationProperties.SetName(masterName, _texts["deck.master.masterName"]);
+        void CommitMasterName()
+        {
+            if (!masterName.IsEnabled || string.IsNullOrWhiteSpace(masterName.Text) || masterName.Text.Trim() == master.Name) return;
+            _actions.RenameMaster(master, masterName.Text);
+        }
+        masterName.LostFocus += (_, _) => CommitMasterName();
+        masterName.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            CommitMasterName();
+            e.Handled = true;
+        };
+
+        var layouts = master.Layouts.Select(layout => new DeckNamedChoice<SlideLayoutTemplate>(layout, _layouts.Title(master, layout))).ToList();
         var layoutPicker = new ComboBox { ItemsSource = layouts, MinWidth = 200, SelectedItem = layouts.FirstOrDefault(choice => ReferenceEquals(choice.Value, template)) };
         AutomationProperties.SetName(layoutPicker, _texts["deck.master.layout"]);
         layoutPicker.SelectionChanged += (_, _) =>
@@ -67,13 +104,13 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
             }
         };
 
-        var custom = !_actions.Layouts.Catalog.IsStandard(_deck.Master, template);
-        var nameBox = new TextBox { Text = _layouts.Title(_deck.Master, template), MinWidth = 160, IsEnabled = custom && !_actions.IsReadOnly };
+        var custom = !_actions.Layouts.Catalog.IsStandard(master, template);
+        var nameBox = new TextBox { Text = _layouts.Title(master, template), MinWidth = 160, IsEnabled = custom && !_actions.IsReadOnly };
         AutomationProperties.SetName(nameBox, _texts["deck.layouts.name"]);
         void CommitName()
         {
             if (!nameBox.IsEnabled || string.IsNullOrWhiteSpace(nameBox.Text)) return;
-            _actions.Layouts.RenameLayout(_deck.Master, template.Id, nameBox.Text);
+            _actions.Layouts.RenameLayout(master, template.Id, nameBox.Text);
         }
         nameBox.LostFocus += (_, _) => CommitName();
         nameBox.KeyDown += (_, e) =>
@@ -85,7 +122,7 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
 
         var duplicate = ToolButton("deck.layouts.duplicateAction", !_actions.IsReadOnly, () =>
         {
-            if (_actions.Layouts.DuplicateLayout(_deck.Master, template.Id, _texts.Format("deck.layouts.copyName", _layouts.Title(_deck.Master, template))) is { } copy)
+            if (_actions.Layouts.DuplicateLayout(master, template.Id, _texts.Format("deck.layouts.copyName", _layouts.Title(master, template))) is { } copy)
             {
                 _state.MasterLayoutId = copy.Id;
                 _host.RefreshMode();
@@ -93,17 +130,17 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
         });
         var delete = ToolButton("deck.layouts.deleteAction", custom && !_actions.IsReadOnly, () =>
         {
-            _actions.Layouts.DeleteLayout(_deck.Master, template.Id);
+            _actions.Layouts.DeleteLayout(master, template.Id);
             _state.MasterLayoutId = null;
             _host.RefreshMode();
         });
 
         var roles = names.ColorRoles();
-        var backgroundPicker = new ComboBox { ItemsSource = roles, SelectedItem = roles.FirstOrDefault(choice => choice.Value == _deck.Master.Background) };
+        var backgroundPicker = new ComboBox { ItemsSource = roles, SelectedItem = roles.FirstOrDefault(choice => choice.Value == master.Background) };
         backgroundPicker.SelectionChanged += (_, _) =>
         {
-            if (backgroundPicker.SelectedItem is DeckNamedChoice<ColorRole> { Value: var role } && role != _deck.Master.Background)
-                _actions.SetMasterBackground(role);
+            if (backgroundPicker.SelectedItem is DeckNamedChoice<ColorRole> { Value: var role } && role != master.Background)
+                _actions.SetMasterBackground(master, role);
         };
 
         var toolbar = new StackPanel
@@ -113,7 +150,11 @@ internal sealed class DeckMasterViews(DeckViewState state, IDeckViewHost host, I
             Margin = new Thickness(_metrics.SpacingLarge, _metrics.SpacingMedium),
             Children =
             {
-                new TextBlock { Text = _texts["deck.master.layout"], VerticalAlignment = VerticalAlignment.Center }
+                new TextBlock { Text = _texts["deck.master.master"], VerticalAlignment = VerticalAlignment.Center }
+                    .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary),
+                masterPicker,
+                masterName,
+                new TextBlock { Text = _texts["deck.master.layout"], VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(_metrics.SpacingMedium, 0, 0, 0) }
                     .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary),
                 layoutPicker,
                 new TextBlock { Text = _texts["deck.layouts.name"], VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(_metrics.SpacingMedium, 0, 0, 0) }

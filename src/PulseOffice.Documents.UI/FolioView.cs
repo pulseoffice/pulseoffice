@@ -39,7 +39,7 @@ public sealed record FolioViewServices(
 public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, IDocumentFocusTarget, ITextEditingTarget, IInlineImeSurface, IActiveContextClaim
 {
     private readonly FolioEditor _editor;
-    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PointSteps = new(1, 10);
+    private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PointSteps = new(5, 1);
 
     private readonly FolioViewServices _services;
     private readonly FolioCanvas _canvas;
@@ -276,7 +276,8 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         if (_editor.SelectedObjectId is { } nudged && _services.Nudges.Read(e.Key, e.KeyModifiers) is { } nudge)
         {
             var (dx, dy) = nudge.Distance(PointSteps);
-            _services.Canvas.Mover.Nudge(_editor, nudged, dx, dy);
+            if (nudge.Resizes) _services.Canvas.Mover.Resize(_editor, nudged, dx, dy);
+            else _services.Canvas.Mover.Nudge(_editor, nudged, dx, dy);
             e.Handled = true;
             return;
         }

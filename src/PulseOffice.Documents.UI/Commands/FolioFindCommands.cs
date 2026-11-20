@@ -1,4 +1,5 @@
 using System.Globalization;
+using PulseOffice.Documents.Commenting;
 using PulseOffice.Documents.Editing;
 using PulseOffice.Documents.UI.Editing;
 using PulseOffice.Localization;
@@ -10,19 +11,30 @@ using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Documents.UI.Commands;
 
+public sealed record FolioFindServices(
+    ISearchStories Stories,
+    ISearchReplacing Replacing,
+    IFolioFindHighlights Highlights,
+    ISidePanelHost Panel,
+    IFindPanelPages Pages,
+    ICommentAnchors Anchors);
+
 public sealed class FolioFindCommands(
     IActiveFolioContext context,
     IDocumentSearch search,
     IDocumentStatisticsCounter statistics,
     IStatusBarService status,
     IDialogService dialogs,
-    ITextCatalog texts) : FolioCommandSet(context)
+    ITextCatalog texts,
+    FolioFindServices find) : FolioCommandSet(context)
 {
     private SearchQuery? _last;
+    private (SearchMatch Match, DocumentRange Shown)? _shownComment;
 
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
-        Viewing("folio.edit.findReplace") with { DefaultGesture = "Ctrl+F", Execute = (_, ct) => FindAsync(ct) },
+        Viewing("folio.edit.find") with { DefaultGesture = "Ctrl+F", Execute = (_, _) => ShowPanel() },
+        Viewing("folio.edit.findReplace") with { DefaultGesture = "Ctrl+Shift+H", Execute = (_, ct) => FindAsync(null, ct) },
         Viewing("folio.edit.findNext") with
         {
             DefaultGesture = "F3",
@@ -37,62 +49,71 @@ public sealed class FolioFindCommands(
         Viewing("folio.tools.wordCount") with { Execute = (_, ct) => CountAsync(ct) },
     ];
 
-    private Task FindAsync(CancellationToken ct)
+    private Task ShowPanel()
+    {
+        find.Pages.Show(find.Panel, () => new FolioFindPanelSource(this));
+        return Task.CompletedTask;
+    }
+
+    public FolioFindTarget? Target(string initial = "", bool withFormats = true) =>
+        Editor is { } editor ? new FolioFindTarget(editor, this, texts, initial, _last, withFormats) : null;
+
+    public void Highlight(SearchQuery? query)
+    {
+        if (Editor is not { } editor) return;
+        if (query is null || query.IsEmpty || !search.IsValid(query)) find.Highlights.Clear(editor);
+        else find.Highlights.Show(editor, query);
+    }
+
+    public Task FindAsync(string? query, CancellationToken ct)
     {
         if (Editor is not { } editor) return Task.CompletedTask;
-        var initial = _last?.Text ?? (editor.HasSelection ? editor.SelectedText().Split('\n')[0] : string.Empty);
+        var initial = query ?? _last?.Text ?? (editor.HasSelection ? editor.SelectedText().Split('\n')[0] : string.Empty);
         var target = new FolioFindTarget(editor, this, texts, initial, _last);
         return dialogs.ShowAsync<object>(
             new FindReplaceView(target, texts),
-            new DialogOptions { TitleKey = "command.folio.edit.findReplace.title", PreferredWidth = 480 },
+            new DialogOptions { TitleKey = "command.folio.edit.findReplace.title", PreferredWidth = 520 },
             ct);
     }
 
-    public int ReplaceAll(FolioEditor editor, SearchQuery query, string replacement)
+    private IReadOnlyList<SearchStory> Stories(FolioEditor editor) => find.Stories.From(editor.Document, editor.Caret.ParagraphId);
+
+    public int ReplaceAll(FolioEditor editor, SearchQuery query, string replacement, SearchFormat? format = null)
     {
         if (editor.ReadOnly()) return 0;
         _last = query;
-        var paragraphs = editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId);
-        var byId = paragraphs.GroupBy(paragraph => paragraph.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        List<(DocumentRange Range, string Text)> found = [.. search.FindAll(paragraphs, query)
-            .Where(range => Editable(editor, range))
-            .Select(range => (range, search.Replacement(byId[range.Start.ParagraphId], range, query, replacement)))];
+        List<(SearchMatch Match, string Text)> found = [.. search.Matches(Stories(editor), query)
+            .Where(match => Editable(editor, match.Range))
+            .Select(match => (match, search.Replacement(match, query, replacement)))];
         if (found.Count == 0) return 0;
         using (editor.History.BeginTransaction("replace-all"))
         {
-            foreach (var (range, text) in Enumerable.Reverse(found))
-            {
-                editor.Services.Editor.Delete(editor.Document, editor.History, range);
-                if (text.Length > 0) editor.Services.Editor.InsertText(editor.Document, editor.History, range.Start, text);
-            }
+            foreach (var (match, text) in Enumerable.Reverse(found))
+                find.Replacing.Replace(editor.Services.Editor, editor.Document, editor.History, match, text, format);
         }
         editor.Normalize();
         editor.Select(editor.Caret, editor.Caret);
         return found.Count;
     }
 
-    public bool Replace(FolioEditor editor, SearchQuery query, string replacement)
+    public bool Replace(FolioEditor editor, SearchQuery query, string replacement, SearchFormat? format = null)
     {
         _last = query;
-        if (!editor.ReadOnly() && editor.HasSelection && editor.Selection is { } selected && selected.Start.ParagraphId == selected.End.ParagraphId
-            && editor.Services.Order.SearchOrder(editor.Document, selected.Start.ParagraphId).FirstOrDefault(paragraph => paragraph.Id == selected.Start.ParagraphId) is { } paragraph
-            && search.FindAll([paragraph], query).Contains(selected) && Editable(editor, selected))
+        if (!editor.ReadOnly() && editor.HasSelection && editor.Selection is { } selected
+            && search.Matches(Stories(editor), query).FirstOrDefault(match => match.Range == selected && match.CommentId is null) is { } match
+            && Editable(editor, selected))
         {
-            var text = search.Replacement(paragraph, selected, query, replacement);
+            var text = search.Replacement(match, query, replacement);
+            DocumentRange inserted;
             using (editor.History.BeginTransaction("replace"))
-            {
-                editor.Services.Editor.Delete(editor.Document, editor.History, selected);
-                if (text.Length > 0) editor.Services.Editor.InsertText(editor.Document, editor.History, selected.Start, text);
-            }
+                inserted = find.Replacing.Replace(editor.Services.Editor, editor.Document, editor.History, match, text, format);
             editor.Normalize();
-            var after = selected.Start with { Offset = selected.Start.Offset + text.Length };
-            editor.Select(after, after);
+            editor.Select(inserted.End, inserted.End);
         }
         return Next(editor, query);
     }
 
-    public int Count(FolioEditor editor, SearchQuery query) =>
-        search.FindAll(editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId), query).Count;
+    public int Count(FolioEditor editor, SearchQuery query) => search.Matches(Stories(editor), query).Count;
 
     public bool IsValid(SearchQuery query) => search.IsValid(query);
 
@@ -101,18 +122,31 @@ public sealed class FolioFindCommands(
         && editor.Services.Order.Between(editor.Document, range.Start, range.End)
             .All(paragraph => editor.Services.Guard.Check(editor.Document, paragraph.Id) == PulseOffice.Documents.Protection.EditVerdict.Allowed);
 
-    public bool Next(FolioEditor editor, SearchQuery query)
+    public bool Next(FolioEditor editor, SearchQuery query, bool backwards = false)
     {
         _last = query;
-        var paragraphs = editor.Services.Order.SearchOrder(editor.Document, editor.Caret.ParagraphId);
-        var after = editor.HasSelection ? editor.Selection.End : editor.Caret;
-        if (search.FindNext(paragraphs, query, after) is { } range)
+        var stories = Stories(editor);
+        var matches = search.Matches(stories, query)
+            .Where(match => match.CommentId is null || find.Anchors.Find(editor.Document, match.CommentId) is not null).ToList();
+        var from = backwards ? (editor.HasSelection ? editor.Selection.Start : editor.Caret) : editor.HasSelection ? editor.Selection.End : editor.Caret;
+        if (_shownComment is { } shown && editor.HasSelection && editor.Selection == shown.Shown)
+            from = backwards ? shown.Match.Range.Start : shown.Match.Range.End;
+        _shownComment = null;
+        if (search.Next(matches, stories, from, backwards) is not { } found)
         {
-            editor.Select(range.Start, range.End);
+            status.Report(texts.Format("folio.find.notFound", query.Text), NotificationSeverity.Warning);
+            return false;
+        }
+        if (found.CommentId is { } commentId && find.Anchors.Find(editor.Document, commentId) is { } anchor)
+        {
+            var shownRange = new DocumentRange(anchor.Start, anchor.End);
+            editor.Select(anchor.Start, anchor.End);
+            _shownComment = (found, shownRange);
+            status.Report(texts.Format("folio.find.inComment", anchor.Comment.Author), NotificationSeverity.Info);
             return true;
         }
-        status.Report(texts.Format("folio.find.notFound", query.Text), NotificationSeverity.Warning);
-        return false;
+        editor.Select(found.Range.Start, found.Range.End);
+        return true;
     }
 
     private async Task CountAsync(CancellationToken ct)

@@ -61,6 +61,12 @@ public sealed class DeckActions
     public void ImportSlides(int afterIndex, IReadOnlyList<Slide> sources) =>
         _slides.ImportSlides(afterIndex, sources);
 
+    public void PasteSlides(int afterIndex, Presentation source, IReadOnlyList<Slide> sources) =>
+        _slides.PasteSlides(afterIndex, source, sources);
+
+    public void ImportSlidesKeepingFormatting(int afterIndex, Presentation source, IReadOnlyList<Slide> sources) =>
+        _slides.ImportSlidesKeepingFormatting(afterIndex, source, sources);
+
     public IReadOnlyList<Slide> InsertOutlineSlides(int afterIndex, IReadOnlyList<OutlineSlide> outline, string labelKey) =>
         _slides.InsertOutlineSlides(afterIndex, outline, labelKey);
 
@@ -84,6 +90,15 @@ public sealed class DeckActions
 
     public void SetMasterBackground(ColorRole background) =>
         _design.SetMasterBackground(background);
+
+    public void SetMasterBackground(SlideMaster master, ColorRole background) =>
+        _design.SetMasterBackground(master, background);
+
+    public void RenameMaster(SlideMaster master, string name) =>
+        _design.RenameMaster(master, name);
+
+    public void SetPlaceholderBounds(SlideMaster master, string layoutId, int index, DocumentRect bounds) =>
+        _design.SetPlaceholderBounds(master, layoutId, index, bounds);
 
     public void SetPlaceholderBounds(string layoutId, PlaceholderRole role, DocumentRect bounds) =>
         _design.SetPlaceholderBounds(layoutId, role, bounds);

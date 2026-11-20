@@ -21,6 +21,8 @@ public interface IFolioObjectMover
     bool Reanchor(FolioEditor editor, string objectId, ObjectAnchorKind kind);
 
     bool Nudge(FolioEditor editor, string objectId, double dx, double dy);
+
+    bool Resize(FolioEditor editor, string objectId, double dWidth, double dHeight);
 }
 
 public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjectHits hits) : IFolioObjectMover
@@ -114,6 +116,15 @@ public sealed class FolioObjectMover(IObjectArrangement arrangement, IFolioObjec
         if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { Anchor: not AsCharacterAnchor } item || editor.Objects.Locked(item)) return false;
         var bounds = hits.Find(editor.Layout, objectId, out _)?.Bounds;
         Change(editor, objectId, target => target.Placement = Nudged(target.Placement, bounds, dx, dy), null);
+        return true;
+    }
+
+    public bool Resize(FolioEditor editor, string objectId, double dWidth, double dHeight)
+    {
+        if (editor.ReadOnly() || editor.Document.Objects.Find(objectId) is not { } item || editor.Objects.Locked(item)) return false;
+        var width = Math.Max(1, item.Size.Width.ToPoints() + dWidth);
+        var height = Math.Max(1, item.Size.Height.ToPoints() + dHeight);
+        Change(editor, objectId, target => target.Size = new DocumentSize(Points(width), Points(height)), null);
         return true;
     }
 

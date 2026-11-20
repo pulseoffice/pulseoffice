@@ -4,8 +4,10 @@ using PulseOffice.Charts;
 
 namespace PulseOffice.UI.Controls.Charts.Plots;
 
-public sealed class PiePlot : ChartPlotBase
+public sealed class PiePlot(IPieSplitter splitter) : ChartPlotBase
 {
+    public PiePlot() : this(new PieSplitter()) { }
+
     public override bool Handles(ChartType type) => type is
         ChartType.Pie or ChartType.Doughnut or ChartType.ExplodedPie
         or ChartType.PieOfPie or ChartType.BarOfPie;
@@ -51,8 +53,6 @@ public sealed class PiePlot : ChartPlotBase
     private double Explosion(ChartDefinition definition, int index) =>
         definition.PointFormat(0, index).ExplosionPercent / 100.0;
 
-    public int SecondPlotCount(int points) => points < 2 ? 0 : Math.Clamp((points + 2) / 3, 1, points - 1);
-
     public IReadOnlyList<PieSlice> Slices(ChartFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
@@ -61,8 +61,11 @@ public sealed class PiePlot : ChartPlotBase
         var plotted = Enumerable.Range(0, series.Values.Count).Where(index => double.IsFinite(series.Values[index]) && series.Values[index] != 0).ToList();
         var total = plotted.Sum(index => Math.Abs(series.Values[index]));
         if (total <= 0) return [];
-        return frame.Definition.Type is ChartType.PieOfPie or ChartType.BarOfPie && SecondPlotCount(plotted.Count) > 0
-            ? Composite(frame, series, plotted, total)
+        var second = frame.Definition.Type is ChartType.PieOfPie or ChartType.BarOfPie
+            ? splitter.SecondPlot(frame.Definition.PieSplit, plotted, series.Values)
+            : [];
+        return second.Count > 0
+            ? Composite(frame, series, plotted, second, total)
             : Single(frame, series, plotted, total);
     }
 
@@ -85,10 +88,10 @@ public sealed class PiePlot : ChartPlotBase
         return slices;
     }
 
-    private List<PieSlice> Composite(ChartFrame frame, ChartSeries series, List<int> plotted, double total)
+    private List<PieSlice> Composite(ChartFrame frame, ChartSeries series, List<int> plotted, IReadOnlyList<int> second, double total)
     {
-        var second = plotted.Skip(plotted.Count - SecondPlotCount(plotted.Count)).ToList();
-        var first = plotted.Take(plotted.Count - second.Count).ToList();
+        var first = plotted.Where(index => !second.Contains(index)).ToList();
+        var size = Math.Clamp(frame.Definition.PieSplit.SecondPlotSize, ChartPieSplit.MinimumSecondPlotSize, ChartPieSplit.MaximumSecondPlotSize) / 100.0;
         var secondTotal = second.Sum(index => Math.Abs(series.Values[index]));
         var plot = frame.Plot;
         var radius = Math.Max(4, Math.Min(plot.Width * 0.27, plot.Height / 2 - 4));
@@ -104,10 +107,10 @@ public sealed class PiePlot : ChartPlotBase
         }
 
         var secondCentre = new Point(plot.X + plot.Width * 0.78, plot.Center.Y);
-        var secondRadius = radius * 0.6;
+        var secondRadius = Math.Max(2, Math.Min(radius * size * 0.8, Math.Min(plot.Width * 0.21, plot.Height / 2 - 2)));
         if (frame.Definition.Type is ChartType.BarOfPie)
         {
-            var height = radius * 1.6;
+            var height = Math.Max(4, Math.Min(radius * 2.1 * size, plot.Height - 4));
             var width = Math.Max(4, radius * 0.45);
             var top = secondCentre.Y - height / 2;
             foreach (var index in second)

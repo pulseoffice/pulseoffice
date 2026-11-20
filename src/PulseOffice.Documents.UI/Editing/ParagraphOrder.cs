@@ -11,8 +11,6 @@ public interface IParagraphOrder
 
     IReadOnlyList<ParagraphBlock> StoryOf(TextDocument document, string paragraphId);
 
-    IReadOnlyList<ParagraphBlock> SearchOrder(TextDocument document, string paragraphId);
-
     bool Contains(TextDocument document, string paragraphId);
 
     int IndexOf(TextDocument document, string paragraphId);
@@ -39,16 +37,6 @@ public sealed class ParagraphOrder(IStoryCatalog stories, IBlockTree tree) : IPa
 
     public IReadOnlyList<ParagraphBlock> StoryOf(TextDocument document, string paragraphId) =>
         [.. tree.Paragraphs(stories.Find(document, paragraphId).Story)];
-
-    public IReadOnlyList<ParagraphBlock> SearchOrder(TextDocument document, string paragraphId)
-    {
-        var current = stories.Find(document, paragraphId).Story;
-        var comments = document.Comments.All.Select(comment => comment.Content).ToList();
-        var others = stories.Stories(document)
-            .Where(story => !ReferenceEquals(story, current) && !comments.Any(content => ReferenceEquals(content, story)))
-            .Distinct<BlockContainer>(ReferenceEqualityComparer.Instance);
-        return [.. tree.Paragraphs(current), .. others.SelectMany(tree.Paragraphs)];
-    }
 
     public bool Contains(TextDocument document, string paragraphId) =>
         stories.Paragraphs(document).Any(paragraph => paragraph.Id == paragraphId);

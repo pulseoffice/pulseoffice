@@ -42,6 +42,35 @@ public sealed class DeckLayoutActions(
         slideActions.Relayout(slide, template);
     }
 
+    public void ChangeMaster(IReadOnlyList<Slide> targets, SlideMaster master)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        ArgumentNullException.ThrowIfNull(master);
+        if (recorder.IsReadOnly || !deck.Masters.Contains(master)) return;
+        var moving = targets
+            .Where(slide => deck.IndexOf(slide) >= 0 && !ReferenceEquals(deck.MasterOf(slide), master))
+            .Select(slide => (Slide: slide, Template: Counterpart(master, deck.MasterOf(slide).Template(slide))))
+            .ToList();
+        if (moving.Count == 0) return;
+
+        using var transaction = history.BeginTransaction(texts["deck.action.assignMaster"]);
+        design.AssignMaster([.. moving.Select(entry => entry.Slide)], master);
+        foreach (var (slide, template) in moving) slideActions.Relayout(slide, template);
+    }
+
+    public void DeleteMaster(SlideMaster master)
+    {
+        ArgumentNullException.ThrowIfNull(master);
+        if (recorder.IsReadOnly || deck.Masters.ToList().IndexOf(master) <= 0) return;
+        using var transaction = history.BeginTransaction(texts["deck.action.deleteMaster"]);
+        ChangeMaster([.. deck.Slides.Where(slide => ReferenceEquals(deck.MasterOf(slide), master))], deck.Master);
+        design.DeleteMaster(master);
+    }
+
+    private SlideLayoutTemplate Counterpart(SlideMaster master, SlideLayoutTemplate current) =>
+        master.Layouts.FirstOrDefault(layout => layout.Kind == current.Kind && string.Equals(layout.Name, current.Name, StringComparison.Ordinal))
+            ?? master.Template(current.Kind);
+
     public void RenameLayout(SlideMaster master, string layoutId, string name)
     {
         var renamed = catalog.Rename(master, layoutId, name);

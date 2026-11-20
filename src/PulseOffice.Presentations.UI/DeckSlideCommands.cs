@@ -193,6 +193,21 @@ public sealed class DeckSlideCommands(
             return;
         }
 
-        target.Actions.ImportSlides(target.CurrentIndex(), imported.Slides.ToList());
+        var keep = await dialogs.ShowAsync<object>(
+            new PulseOffice.UI.Controls.ChoicePromptView(
+                texts["deck.slide.insertFromFile.formatting"],
+                texts["deck.slide.insertFromFile.formattingExplanation"],
+                [
+                    new PulseOffice.UI.Controls.PromptChoice(texts["deck.slide.insertFromFile.useDestination"], false, IsDefault: true),
+                    new PulseOffice.UI.Controls.PromptChoice(texts["deck.slide.insertFromFile.keepSource"], true),
+                    new PulseOffice.UI.Controls.PromptChoice(texts["prompt.cancel"], "cancel", IsCancel: true),
+                ],
+                texts),
+            new PulseOffice.UI.Controls.Services.DialogOptions { TitleKey = "command.deck.slide.insertFromFile.title" },
+            ct).ConfigureAwait(true);
+        if (keep is not bool keepSource || Context.Target is not { } still || !ReferenceEquals(still.Deck, target.Deck)) return;
+
+        if (keepSource) target.Actions.ImportSlidesKeepingFormatting(target.CurrentIndex(), imported, imported.Slides.ToList());
+        else target.Actions.ImportSlides(target.CurrentIndex(), imported.Slides.ToList());
     }
 }

@@ -70,7 +70,9 @@ public class Round323ChartPointShiftTests(EngineFixture fixture) : IClassFixture
 
         new SheetStructure().InsertColumns(engine, 0, 1, 1);
 
-        Assert.Equal("#445566", Chart(data).PointFormat(0, 3).ColorHex);
+        Assert.Equal("#445566", Chart(data).PointFormat(1, 3).ColorHex);
+        Assert.Equal("#112233", Chart(data).PointFormat(1, 1).ColorHex);
+        Assert.True(Chart(data).SeriesFormat(0).IsPlain);
     }
 
     [Fact]

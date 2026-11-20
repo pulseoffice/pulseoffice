@@ -156,6 +156,7 @@ public static class PulseMenuLayout
         ("deck.clipboard.", "edit/clipboard"),
         ("deck.edit.duplicate", "edit/clipboard"),
         ("deck.edit.selectAll", "edit/select"),
+        ("deck.edit.find", "edit/find"),
         ("deck.edit.findReplace", "edit/find"),
         ("deck.spelling.check", "tools/language"),
         ("deck.spelling.automatic", "tools/language"),
@@ -280,6 +281,7 @@ public static class PulseMenuLayout
         ("ledger.clipboard.", "edit/clipboard"),
         ("ledger.format.paintbrush", "edit/clipboard"),
 
+        ("ledger.data.find", "edit/find"),
         ("ledger.data.findReplace", "edit/find"),
 
         ("ledger.select.row", "edit/select/range"),
@@ -586,6 +588,7 @@ public static class PulseMenuLayout
         ("folio.clipboard.", "edit/clipboard"),
         ("folio.edit.selectAll", "edit/select"),
         ("folio.object.selectNext", "edit/select"),
+        ("folio.edit.find", "edit/find"),
         ("folio.edit.findReplace", "edit/find"),
         ("folio.edit.findNext", "edit/find"),
         ("folio.zoom.in", "view/zoom/steps"),

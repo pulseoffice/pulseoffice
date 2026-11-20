@@ -405,8 +405,20 @@ internal sealed class StockFamily : ChartFamily
     public override void Close(OpenXmlCompositeElement chart, ChartType type, bool threeDimensional)
     {
         chart.AppendChild(new C.HighLowLines());
-        if (type == ChartType.Candlestick && chart.Elements<C.LineChartSeries>().Count() >= 4)
+        var series = chart.Elements<C.LineChartSeries>().ToList();
+        if (type == ChartType.Candlestick && series.Count >= 4)
             chart.AppendChild(new C.UpDownBars(new C.GapWidth { Val = 150 }, new C.UpBars(), new C.DownBars()));
+        if (type == ChartType.StockOpenHighLowClose && series.Count >= 4)
+            foreach (var tick in new[] { series[0], series[^1] })
+                Ticked(tick);
+    }
+
+    private void Ticked(C.LineChartSeries series)
+    {
+        if (series.GetFirstChild<C.Marker>() is not { } marker || marker.GetFirstChild<C.Symbol>() is not { } symbol
+            || symbol.Val?.Value != C.MarkerStyleValues.None) return;
+        symbol.Val = C.MarkerStyleValues.Dash;
+        symbol.InsertAfterSelf(new C.Size { Val = 6 });
     }
 
     public override ChartFamilyRead? Read(C.PlotArea plot)

@@ -25,6 +25,15 @@ public sealed class MasterEditing
             Placeholders = [.. template.Placeholders.Select(p => p.Role == role ? p with { Bounds = bounds } : p)],
         });
 
+    public SlideMaster WithPlaceholderBoundsAt(SlideMaster master, string layoutId, int index, DocumentRect bounds) =>
+        ReplaceLayout(master, layoutId, template => template with
+        {
+            Placeholders = [.. template.Placeholders.Select((p, at) => at == index ? p with { Bounds = bounds } : p)],
+        });
+
+    public SlideMaster WithName(SlideMaster master, string name) =>
+        string.IsNullOrWhiteSpace(name) ? master : master with { Name = name.Trim() };
+
     public SlideMaster WithPlaceholderSeed(
         SlideMaster master, SlideLayout kind, PlaceholderRole role, TextParagraph seed) =>
         ReplaceLayout(master, master.Template(kind).Id, template => template with
