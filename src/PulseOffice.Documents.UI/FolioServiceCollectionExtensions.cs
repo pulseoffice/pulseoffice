@@ -119,6 +119,7 @@ public static class FolioServiceCollectionExtensions
                 new Fields.VariableSetFieldOptions(),
                 new Fields.UserFieldOptions(),
                 new Fields.ConditionFieldOptions(),
+                new Fields.NumeralFieldOptions(provider.GetRequiredService<PulseOffice.Documents.Fields.ISequenceNumerals>()),
                 new Fields.PlainFieldOptions(),
             ],
             provider.GetRequiredService<PulseOffice.Documents.Fields.IFieldUpdater>(),

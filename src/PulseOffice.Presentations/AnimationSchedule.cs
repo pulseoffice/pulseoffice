@@ -230,7 +230,15 @@ public sealed class AnimationScheduler : IAnimationScheduler
         var elapsed = Math.Max(0, timeMs - scheduled.StartMs) % span;
         var motion = _motions.For(effect);
         Func<double, double>? opacity = motion is StillMotion ? null : progress => motion.Visual(progress, ElementVisual.Shown).Opacity;
-        return new TextReveal(unit, behaviours.IterateBackwards, effect.Category == AnimationCategory.Exit, elapsed, Interval(effect), Math.Max(1, effect.DurationMs), opacity);
+        Func<double, ElementVisual>? moving = Moves(motion) ? progress => motion.Visual(progress, ElementVisual.Shown) : null;
+        return new TextReveal(unit, behaviours.IterateBackwards, effect.Category == AnimationCategory.Exit, elapsed, Interval(effect), Math.Max(1, effect.DurationMs), opacity, moving);
+    }
+
+    private bool Moves(EffectMotion motion)
+    {
+        if (motion is StillMotion) return false;
+        return new[] { 0.0, 0.5, 1.0 }.Select(progress => motion.Visual(progress, ElementVisual.Shown))
+            .Any(visual => visual.OffsetX != 0 || visual.OffsetY != 0 || visual.Scale != 1);
     }
 
     private double Progress(ScheduledEffect scheduled, int timeMs)

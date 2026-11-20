@@ -4,12 +4,15 @@ Open items reported by audit rounds, waiting for the next cycle (user rule, 2026
 the round that fixes it is joined and the join run is green.
 
 ## Deck
-- Each unit of an iterated fly or zoom fades in place; the per-unit offset and scale are not drawn. (286)
-- The editor's animation timeline shows an iterated effect with its single-unit duration. (286)
-- Number labels of unrevealed numbered list paragraphs in drawn shapes stay visible during an iterated reveal. (286)
-- A fading unit of shape text without its own colour uses the shape's text colour, not the automatic contrast ink. (286)
 - The iterated reveal, the pause countdown and the last-slide sound cut extension have not been seen live or opened in
   PowerPoint. (286)
+- An iterated zoom scales each unit about the element's centre, not about the unit's own centre; a unit's layer
+  also carries its paragraph's list label. (292)
+- The automatic ink of a fading or moving unit of shape text ignores the average colour of a picture fill (the
+  renderer's bitmap mix is not shared with the reveal). (292)
+- The unsized `IShapeGeometry.Outline(shape)` (ODF enhanced path, shape styling previews) still draws a model rounded
+  rectangle with elliptic corners; only the sized outline and the text area use the short side. (292)
+- Per-unit fly and zoom of iterated text have not been seen live. (292)
 - Iterated text, the sound cut, the pause screen and the new dialog fields have not been seen live. (283)
 - Looping repeats, effect sounds, kiosk keys and timings and the hidden start slide have not been seen live. (278)
 - Transition sounds and sound actions in the show, the trigger-only advance, the show type and custom show settings
@@ -95,14 +98,16 @@ the round that fixes it is joined and the join run is green.
 - Folio tables (275): the new style editor tabs (total row, columns, corners) and "no colour" in derived styles have
   not been seen live. (275)
 
-- Folio mail merge (289): the wizard offers a record range only, no recipient list with excluded records or a filter;
-  body paragraphs of a merged record that switch to a page style with merge fields keep the template style; the merge
-  source is still declared lost in DOCX (DOCX028), `w:mailMerge` with `w:query` not attempted; `MERGEFIELD` case
-  switches and `\#` pictures are dropped. (289)
-- Folio fields (289): a page field's own numerals apply only on pages numbered in Arabic; `REF \n`/`\w` and ODF
-  `number-no-context`/`number-all-superior` collapse to one number format; chapter fields keep level 1 only; date
-  pictures write `/` and `:` as literal ODF text and do not read era, quarter or week parts; no dialog control to
-  choose sequence or page field numerals; none of the round 289 changes opened in Word or the reference suite. (289)
+- Folio mail merge (291): the recipient filter holds one condition, records cannot be sorted, and the excluded records
+  and filter are not saved with the document; merge fields have no `\@` date pictures; the DOCX `w:mailMerge` source
+  (ODBC `DSN=` connect string, `w:query`, connection id in a reserved document variable) has not been opened in Word;
+  the new wizard step has not been seen live. (291)
+- Folio fields (291): page fields with their own numerals in body text (not headers or footers) on pages not numbered
+  in Arabic still see the rendered page number; the page field dialog cannot force Arabic numerals on a roman page
+  (Arabic means "as the page style"); a full-context reference number shows the paragraph's list label as rendered,
+  not composed from its parents when the list shows one level; ODF date styles with quarter or week-of-year parts are
+  not read (the .NET pictures used by the model have no such parts); `STYLEREF` of a non-heading style becomes a
+  level 1 chapter field; none of the round 289 and 291 changes opened in Word or the reference suite. (289, 291)
 
 - Images (282): a watermark tone with extra brightness or contrast is written to DrawingML as one combined `a:lum`
   and reads back as a standard tone with the same look. (282)
@@ -115,12 +120,12 @@ the round that fixes it is joined and the join run is green.
 
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
-- Shell (288): unpinned recent entries with a missing file are dropped silently at startup; opening a missing recent
-  entry forgets it without a message. (288)
-- Shell (288): no pin glyph on welcome page rows; File › Recent has no pin action. (288)
-- Shell (288), not audited yet: settings dialog (search, reset, every setting applied, persistence across restarts and
-  instances), open/save dialogs and format choice, unsaved-changes prompts on close and quit, read-only and locked
-  files, live switching of the five languages, document tabs and windows, recovery dialog in depth. (288)
+- Shell (290): the unsaved-changes prompt for several documents offers save all / discard all / cancel; Word asks
+  document by document. (290)
+- Shell (290): a lock file left by the same user on the same machine is treated as ours, so a document open in another
+  office program opens without a read-only warning. (290)
+- Shell (290): missing recent entries are not marked on the welcome page before they are clicked. (290)
+- Shell (290): separate windows of the same document were not walked headlessly. (290)
 - Tagged PDF: no PDF/UA identifier is written; the output has not been run through a PDF/UA checker, which is the
   condition for writing it. (239, 243)
 - Tagged PDF: Deck text boxes and shape text (columns and rotated shapes included since 268) are tagged by the painted
@@ -129,9 +134,6 @@ the round that fixes it is joined and the join run is green.
 - Shape autofit (276): Folio shape stories have no vertical text layout, so vertical text in a Folio shape is not
   resized; the stored size settles only when an editor lays the document out (a headless conversion keeps the saved
   size). (276)
-- Shape text areas (287): a model rounded rectangle without preset adjust values draws elliptic corners at
-  `CornerRatio` of each side, and its text area follows them, while `roundRect` and the ODF round rectangle use
-  circular corners on the short side; `IShapeGeometry.Outline` would need the box's aspect. (285, 287)
 - Shape autofit has not been opened in PowerPoint or the reference suite; ODP writes both `draw:fit-to-size` and
   `style:shrink-to-fit`. (268)
 - Shape text keys (272): Tab, Shift+Tab, Enter and Backspace are walked through the live shared editor in a headless
@@ -141,6 +143,9 @@ the round that fixes it is joined and the join run is green.
   appearance after the user types new characters may lack them. Not opened in an external viewer. (254)
 
 ## Ledger
+- Conditional formatting XLSX `dxf`: number format (`numFmt`) not written nor read; theme and indexed colours ignored on read (293).
+- Conditional formatting not yet audited: ODS codecs (`calcext:conditional-format`, `style:map`, date-is), x14 data bar and icon set extensions, manage rules dialog and editor, ranges following insert/delete/move/copy-paste (293).
+- Top/bottom percent rule: rank count rounding (ceiling) to compare with Excel (293).
 - Sorted validation lists: XLSX has no sort setting; typed entries are written sorted, entries from cells keep cell
   order in Excel (declared XLSX244). Not opened in Excel or the reference suite. (253)
 - Remove duplicates now compares shown text, so the text "1" and the number 1 shown as "1" are duplicates; Excel's

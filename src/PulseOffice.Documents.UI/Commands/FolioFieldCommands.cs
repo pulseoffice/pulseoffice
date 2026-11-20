@@ -64,6 +64,7 @@ public sealed class FolioFieldCatalog
         new("conditionalText", TextFieldKind.ConditionalText) { Category = FunctionsCategory },
         new("hiddenText", TextFieldKind.HiddenText) { Category = FunctionsCategory },
         new("hiddenParagraph", TextFieldKind.HiddenParagraph) { Category = FunctionsCategory },
+        new("sequence", TextFieldKind.Sequence) { Category = VariablesCategory },
         new("variableSet", TextFieldKind.VariableSet) { Category = VariablesCategory },
         new("variableGet", TextFieldKind.Variable) { Category = VariablesCategory },
         new("userField", TextFieldKind.Variable, "user") { Category = VariablesCategory },

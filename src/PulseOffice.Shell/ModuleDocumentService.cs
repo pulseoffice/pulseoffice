@@ -120,7 +120,6 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
         if (!File.Exists(path))
         {
             context.Status.Report(context.Texts.Format("status.recent.missing", Path.GetFileName(path)), NotificationSeverity.Warning);
-            context.Recent.Forget(path);
             return;
         }
 
@@ -182,7 +181,12 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
 
         await using (file.ConfigureAwait(true))
         {
-            if ((formats.WriterFor(file.Path) ?? formats.NativeWriter) is not { } writer) return false;
+            var writer = formats.WriterFor(file.Path) ?? (Path.HasExtension(file.Path) ? null : formats.NativeWriter);
+            if (writer is null)
+            {
+                context.Status.Report(context.Texts.Format("status.save.unknownFormat", file.Name), NotificationSeverity.Error);
+                return false;
+            }
             if (!await context.SignedSave.ConfirmOverwriteAsync(file.Path, ct).ConfigureAwait(true)) return false;
 
             return await GuardedAsync(() => WriteAndReportAsync(writer, model, buffer => context.Files.WriteAsync(file, buffer, ct), document, file.Path, file.Name, adopt)).ConfigureAwait(true);
@@ -323,7 +327,12 @@ public abstract class ModuleDocumentService<TModel>(IModuleFormats<TModel> forma
         }
 
         var protectedAsAsked = await context.Passwords.CommitAsync(buffer, document.Protection, commit).ConfigureAwait(true);
-        if (adopt) document.MarkSaved(path, fileName, point);
+        if (adopt)
+        {
+            var moved = !string.Equals(document.Path, path, StringComparison.Ordinal);
+            document.MarkSaved(path, fileName, point);
+            if (moved) document.IsReadOnly = false;
+        }
         context.Recent.Remember(path, fileName);
         if (!protectedAsAsked)
         {

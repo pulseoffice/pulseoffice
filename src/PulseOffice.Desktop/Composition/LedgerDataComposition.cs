@@ -147,6 +147,8 @@ internal static class LedgerDataComposition
         services.AddSingleton<IFormControlNaming, FormControlNaming>();
         services.AddSingleton<IFormDesignMode, FormDesignMode>();
         services.AddSingleton<PulseOffice.Shell.FormDesignModeOnOpen>();
+        services.AddSingleton<PulseOffice.Shell.IFileWriteAccess, PulseOffice.Shell.FileWriteAccess>();
+        services.AddSingleton<PulseOffice.Shell.ReadOnlyOnOpen>();
         services.AddSingleton<PulseOffice.Document.Forms.IFormControlInteraction, PulseOffice.Document.Forms.FormControlInteraction>();
         services.AddSingleton<PulseOffice.Document.Forms.IOptionGroups, PulseOffice.Document.Forms.OptionGroups>();
         services.AddSingleton<PulseOffice.Sheets.UI.INameBoxResolver, PulseOffice.Sheets.UI.NameBoxResolver>();

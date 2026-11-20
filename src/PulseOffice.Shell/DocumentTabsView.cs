@@ -43,6 +43,7 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
         _workspace.ActiveUpdated += (_, _) => Refresh();
         _workspace.DocumentClosed += (_, _) => Refresh();
         _workspace.DocumentOpened += (_, _) => Refresh();
+        _texts.LanguageChanged += (_, _) => Refresh();
 
         Refresh();
     }

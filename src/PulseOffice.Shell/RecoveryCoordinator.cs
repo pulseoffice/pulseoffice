@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PulseOffice.Localization;
 using PulseOffice.UI.Controls;
+using PulseOffice.UI.Controls.Notifications;
 using PulseOffice.UI.Controls.Services;
 
 namespace PulseOffice.Shell;
@@ -51,28 +52,43 @@ public sealed class RecoveryCoordinator : IDisposable
             CanCancelWithEscape = false,
         }, ct).ConfigureAwait(true);
 
-        if (answer is not bool restore)
-        {
-            _logger.LogInformation("Recovery decision deferred: snapshots kept");
-            return;
-        }
+        await ApplyAsync(answer, pending, ct).ConfigureAwait(true);
+    }
 
-        if (!restore)
+    public async Task ApplyAsync(object? answer, IReadOnlyList<RecoverySnapshot> pending, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pending);
+
+        if (answer is false)
         {
             _logger.LogInformation("Recovery snapshots discarded by the user");
             _recovery.DiscardAll();
             return;
         }
 
+        if (answer is not RecoveryPromptView.Selection selection)
+        {
+            _logger.LogInformation("Recovery decision deferred: snapshots kept");
+            return;
+        }
+
         var restored = 0;
+        var failed = new List<string>();
 
         foreach (var snapshot in pending.ToList())
         {
+            if (!selection.Restore.Contains(snapshot.Id))
+            {
+                _recovery.Discard(snapshot.Id);
+                continue;
+            }
+
             var document = await _recovery.RestoreAsync(snapshot, ct).ConfigureAwait(true);
 
             if (document is null)
             {
                 _logger.LogWarning("Recovery snapshot could not be restored: {Id}", snapshot.Id);
+                failed.Add(snapshot.Title);
                 continue;
             }
 
@@ -80,8 +96,11 @@ public sealed class RecoveryCoordinator : IDisposable
             restored++;
         }
 
-        _logger.LogInformation("Recovered documents: {Count}", restored);
-        _status.Report(_texts.Format("status.recovery.restored", restored));
+        _logger.LogInformation("Recovered documents: {Count}, failed: {Failed}", restored, failed.Count);
+        if (failed.Count > 0)
+            _status.Report(_texts.Format("status.recovery.failed", restored, string.Join(", ", failed)), NotificationSeverity.Warning);
+        else
+            _status.Report(_texts.Format("status.recovery.restored", restored));
     }
 
     private void OnDocumentOpened(object? sender, OpenDocument document) =>

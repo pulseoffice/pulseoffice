@@ -127,7 +127,7 @@ public sealed class FieldUpdater(IEnumerable<IFieldValueSource> sources, IDocume
         foreach (var paragraph in paragraphs)
         {
             context.Paragraph = paragraph;
-            if (body.Contains(paragraph.Id) && outline.LevelOf(document, paragraph) == 1) context.Chapter = new OutlineEntry(paragraph, 1);
+            if (body.Contains(paragraph.Id) && outline.LevelOf(document, paragraph) is { } level) context.Enter(new OutlineEntry(paragraph, level));
             var runs = paragraph.Content.Runs;
             if (!runs.Any(run => run.Field != TextFieldKind.None)) continue;
             var rewritten = new List<TextRun>(runs.Count);
@@ -158,7 +158,7 @@ public sealed class FieldUpdater(IEnumerable<IFieldValueSource> sources, IDocume
         foreach (var paragraph in paragraphs)
         {
             context.Paragraph = paragraph;
-            if (body.Contains(paragraph.Id) && outline.LevelOf(document, paragraph) == 1) context.Chapter = new OutlineEntry(paragraph, 1);
+            if (body.Contains(paragraph.Id) && outline.LevelOf(document, paragraph) is { } level) context.Enter(new OutlineEntry(paragraph, level));
             var offset = 0;
             var here = paragraph.Id == at.ParagraphId;
             foreach (var existing in paragraph.Content.Runs)

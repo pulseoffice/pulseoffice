@@ -139,7 +139,8 @@ public sealed class ModuleDocumentServiceTests : IDisposable
 
         public bool CanRead(string path) => path.EndsWith(".ods", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ots", StringComparison.OrdinalIgnoreCase);
 
-        public IModuleWriter<Probe>? WriterFor(string path) => CanRead(path) ? this : null;
+        public IModuleWriter<Probe>? WriterFor(string path) =>
+            CanRead(path) || path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) ? this : null;
 
         public IModuleWriter<Probe>? NativeWriter => this;
 
@@ -331,6 +332,33 @@ public sealed class ModuleDocumentServiceTests : IDisposable
         await Service().SaveAsAsync(document, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.Contains(_history.Entries, entry => entry.Notification.Message.EndsWith("La pivot si perde; Il commento non porta la data.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Save_as_with_an_extension_no_writer_knows_writes_nothing_and_says_so()
+    {
+        _dialogs.Target = Path.Combine(_folder, "conti.txt");
+        var document = Untitled("conti");
+
+        await Service().SaveAsAsync(document, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.False(File.Exists(_dialogs.Target));
+        Assert.Null(document.Path);
+        Assert.Contains(_history.Entries, entry => entry.Notification.Severity == NotificationSeverity.Error);
+    }
+
+    [Fact]
+    public async Task Save_as_to_a_new_path_lifts_read_only()
+    {
+        _dialogs.Target = Path.Combine(_folder, "copia-libera.ods");
+        var document = Untitled("conti");
+        document.RestoreLocation(Path.Combine(_folder, "bloccato.ods"));
+        document.IsReadOnly = true;
+
+        await Service().SaveAsAsync(document, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.Equal(_dialogs.Target, document.Path);
+        Assert.False(document.IsReadOnly);
     }
 
     private sealed class Edit : PulseOffice.Document.Commands.IUndoableAction

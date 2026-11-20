@@ -17,6 +17,7 @@ namespace PulseOffice.Shell;
 public sealed class StartView : UserControl
 {
     private const int RecentShown = 8;
+    private const string PinnedIconKey = "shell.file.recent.pinCurrent";
 
     private readonly IRecentDocuments _recent;
     private readonly ITextCatalog _texts;
@@ -420,8 +421,25 @@ public sealed class StartView : UserControl
             FontSize = _metrics.FontSizeSmall,
             VerticalAlignment = VerticalAlignment.Center,
         }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary);
-        Grid.SetColumn(opened, 2);
-        row.Children.Add(opened);
+        var trailing = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = _metrics.SpacingSmall,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        if (document.Pinned && _icons.Find(PinnedIconKey) is { } pinGlyph)
+        {
+            var pinned = new IconView(pinGlyph, _metrics.IconSize)
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                Name = "startRecentPinned",
+            }.Themed(IconView.ForegroundProperty, Palette.Keys.TextSecondary);
+            ToolTip.SetTip(pinned, _texts["start.pinnedRecent"]);
+            trailing.Children.Add(pinned);
+        }
+        trailing.Children.Add(opened);
+        Grid.SetColumn(trailing, 2);
+        row.Children.Add(trailing);
 
         var button = new Button
         {

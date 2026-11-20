@@ -375,6 +375,8 @@ public sealed class DocxReader : ITextDocumentReader
 
     private readonly DocxNoteSettingsCodec _noteSettings = new();
 
+    private readonly DocxMailMergeCodec _mailMerge = new();
+
     private void Settings(W.Settings? settings, TextDocument document)
     {
         document.Styles.TabsRelativeToIndent = false;
@@ -394,8 +396,14 @@ public sealed class DocxReader : ITextDocumentReader
                 BlankEvenPages(style.Header, document, DefaultStyleNames.Header);
                 BlankEvenPages(style.Footer, document, DefaultStyleNames.Footer);
             }
+        string? connection = null;
         foreach (var variable in settings.GetFirstChild<W.DocumentVariables>()?.Elements<W.DocumentVariable>() ?? [])
-            if (variable.Name?.Value is { } name) document.Variables[name] = variable.Val?.Value ?? string.Empty;
+        {
+            if (variable.Name?.Value is not { } name) continue;
+            if (name == DocxMailMergeCodec.ConnectionVariable) connection = variable.Val?.Value;
+            else document.Variables[name] = variable.Val?.Value ?? string.Empty;
+        }
+        _mailMerge.Read(settings.GetFirstChild<W.MailMerge>(), connection, document);
     }
 
     private void BlankEvenPages(HeaderFooterContent content, TextDocument document, string styleName)

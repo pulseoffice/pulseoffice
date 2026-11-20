@@ -115,6 +115,7 @@ internal static class LedgerToolsComposition
         services.AddSingleton<LedgerZoomCommands>();
         services.AddSingleton<PulseOffice.Shell.IDocumentSaver, PulseOffice.Shell.ModuleDocumentSaver>();
         services.AddSingleton<PulseOffice.Shell.IUnsavedChangesGuard, PulseOffice.Shell.UnsavedChangesGuard>();
+        services.AddSingleton<PulseOffice.Shell.IMissingRecentPrompt, PulseOffice.Shell.MissingRecentPrompt>();
         services.AddSingleton<PulseOffice.Shell.ISignedSaveGuard, PulseOffice.Shell.SignedSaveGuard>();
         services.AddSingleton<PulseOffice.Formats.Packaging.Legacy.ILegacyOdfUpgrader, PulseOffice.Formats.Packaging.Legacy.LegacyOdfUpgrader>();
         services.AddSingleton<PulseOffice.Formats.Packaging.Encryption.OpenPgp.IOpenPgp, PulseOffice.Formats.Packaging.Encryption.OpenPgp.BouncyCastleOpenPgp>();

@@ -45,11 +45,44 @@ public sealed class StartViewTests(HeadlessDesktopSession headless)
         window.UpdateLayout();
 
         var folder = view.GetVisualDescendants().OfType<TextBlock>().Single(block => ToolTip.GetTip(block) as string == path);
-        var date = view.GetVisualDescendants().OfType<TextBlock>().Single(block => Grid.GetColumn(block) == 2 && block.Parent is Grid { ColumnDefinitions.Count: 3 });
+        var date = view.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Parent is StackPanel { Parent: Grid { ColumnDefinitions.Count: 3 } } trailing && Grid.GetColumn(trailing) == 2);
         var windowRight = window.Bounds.Width;
         Assert.True(Avalonia.VisualExtensions.TranslatePoint(folder, new Avalonia.Point(folder.Bounds.Width, 0), window)!.Value.X <= windowRight);
         Assert.True(Avalonia.VisualExtensions.TranslatePoint(date, new Avalonia.Point(date.Bounds.Width, 0), window)!.Value.X <= windowRight);
         Assert.True(date.Bounds.Width > 0);
+        window.Close();
+    }, CancellationToken.None);
+
+    private sealed class PinnedRecent(bool pinned) : IRecentDocuments
+    {
+        public IReadOnlyList<RecentDocument> Items { get; } = [new RecentDocument("/tmp/conti.ods", "conti.ods", DateTimeOffset.Now, pinned)];
+
+        public void Remember(string path, string name)
+        {
+        }
+
+        public void Forget(string path)
+        {
+        }
+
+        public void Clear()
+        {
+        }
+
+        public event EventHandler? Changed { add { } remove { } }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task A_pinned_row_shows_the_pin_glyph(bool pinned) => Session.Dispatch(() =>
+    {
+        var view = new StartView(new PinnedRecent(pinned), new TextCatalog(UiLanguage.English), new ViewIcons());
+        var window = new Window { Width = 800, Height = 600, Content = view };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(pinned, view.GetVisualDescendants().OfType<PulseOffice.UI.Controls.IconView>().Any(icon => icon.Name == "startRecentPinned"));
         window.Close();
     }, CancellationToken.None);
 }

@@ -162,7 +162,12 @@ public sealed class FolioMailMergeCommands(
         }
         if (await wizard.AskAsync(editor.Document, data, records.Current(editor.Document), ct).ConfigureAwait(true) is not { } plan) return;
         var target = plan.Target;
-        var rows = Enumerable.Range(plan.From, plan.To - plan.From + 1).Where(row => row >= 0 && row < data.Rows.Count).ToList();
+        var rows = plan.Rows.Where(row => row >= 0 && row < data.Rows.Count).ToList();
+        if (rows.Count == 0)
+        {
+            status.Report(texts["folio.mailMerge.noRecipients"], NotificationSeverity.Warning);
+            return;
+        }
         var nameColumn = plan.NameColumn;
         var template = editor.Document;
         var stem = string.IsNullOrWhiteSpace(template.FileName) ? texts["document.defaultName"] : Path.GetFileNameWithoutExtension(template.FileName);

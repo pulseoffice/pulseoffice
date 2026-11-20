@@ -13,6 +13,12 @@ public sealed class RecoveryPromptView : UserControl, IDialogContent, IDialogFoo
 {
     public sealed record Entry(string Id, string Title, DateTimeOffset SavedAt, string? OriginalPath);
 
+    public sealed record Selection(IReadOnlySet<string> Restore);
+
+    private readonly Dictionary<string, CheckBox> _choices = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, CheckBox> Choices => _choices;
+
     public event EventHandler<object?>? Completed;
 
     public Control? Footer { get; }
@@ -38,18 +44,25 @@ public sealed class RecoveryPromptView : UserControl, IDialogContent, IDialogFoo
         {
             var row = new StackPanel { Spacing = 2 };
 
-            row.Children.Add(new TextBlock
+            var choice = new CheckBox
             {
-                Text = entry.Title,
-                FontSize = metrics.FontSize,
-                FontWeight = FontWeight.SemiBold,
-            }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary));
+                IsChecked = true,
+                Content = new TextBlock
+                {
+                    Text = entry.Title,
+                    FontSize = metrics.FontSize,
+                    FontWeight = FontWeight.SemiBold,
+                }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextPrimary),
+            };
+            Avalonia.Automation.AutomationProperties.SetName(choice, entry.Title);
+            _choices[entry.Id] = choice;
+            row.Children.Add(choice);
 
             row.Children.Add(new TextBlock
             {
                 Text = entry.OriginalPath is { } path
-                    ? texts.Format("recovery.item.from", entry.SavedAt.ToString("g"), path)
-                    : texts.Format("recovery.item.unsaved", entry.SavedAt.ToString("g")),
+                    ? texts.Format("recovery.item.from", entry.SavedAt.ToLocalTime().ToString("g"), path)
+                    : texts.Format("recovery.item.unsaved", entry.SavedAt.ToLocalTime().ToString("g")),
                 FontSize = metrics.FontSizeSmall,
                 TextWrapping = TextWrapping.Wrap,
             }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary));
@@ -62,10 +75,20 @@ public sealed class RecoveryPromptView : UserControl, IDialogContent, IDialogFoo
             }.Themed(Border.BackgroundProperty, Palette.Keys.SurfaceSunken));
         }
 
+        layout.Children.Add(new TextBlock
+        {
+            Text = texts["recovery.selectHint"],
+            FontSize = metrics.FontSizeSmall,
+            TextWrapping = TextWrapping.Wrap,
+        }.Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary));
+
         Content = new ScrollViewer { Content = layout, MaxHeight = 420 };
 
         Footer = new DialogFooter(density)
             .WithCancel(texts["recovery.discard"], () => Completed?.Invoke(this, false))
-            .WithAction(texts["recovery.restore"], () => Completed?.Invoke(this, true), primary: true);
+            .WithAction(texts["recovery.restore"], () => Completed?.Invoke(this, Selected()), primary: true);
     }
+
+    public Selection Selected() =>
+        new(_choices.Where(pair => pair.Value.IsChecked == true).Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal));
 }

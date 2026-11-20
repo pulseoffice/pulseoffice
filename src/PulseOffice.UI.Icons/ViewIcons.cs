@@ -6,6 +6,7 @@ public sealed class ViewIcons() : DictionaryIconCatalog(Shapes)
     [
         ("ledger.view.normal", "M3 5h18v14H3z M3 9h18 M8 9v10"),
         ("ledger.view.pageBreaks", "M5 3h14v7H5z M5 14h14v7H5z M2 12h4 M9 12h6 M18 12h4"),
+        ("shell.file.recent.pinCurrent", "M12 17v5 M9 4h6 M10 4v6l-3 4v3h10v-3l-3-4V4"),
         ("shell.view.fullScreen", "M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5"),
         ("ledger.view.formulaBar", "M3 4h18v6H3z M6 7h3 M11 7h7 M3 13h18v7H3z"),
         ("shell.view.statusBar", "M3 4h18v12H3z M3 18h18v3H3z"),

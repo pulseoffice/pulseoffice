@@ -14224,3 +14224,29 @@ docs/deep-audit/round-288-shell-recent-pinning.md.
   its own page styles when headers or footers hold merge fields; sequence and page number fields keep their numerals
   through DOCX and ODT; date and time field formats cross ODF as native data styles; `MERGEFIELD \b`/`\f` text is kept
   and applied. Log: docs/deep-audit/round-289-folio-fields-merge.md.
+
+### Round 290: Shell — recent documents, recovery, read-only files, settings reset, Save As (2026-11-20)
+- Files held by another user or not writable open read-only with a warning; Save As to a new path lifts it. Missing
+  recent entries are kept and opening one asks before removing it; pin glyph on welcome rows and File › Recent › Pin
+  Current Document; the recent list survives two instances. Recovery chooses documents one by one and names the ones
+  it cannot restore; Reset all needs a second click; Save As refuses unknown extensions; tabs follow a language switch.
+  Log: docs/deep-audit/round-290-shell.md.
+
+### Round 291: Folio mail merge and fields leftovers (2026-11-20)
+- The merge wizard gains a recipients step (list with excluded records, one-column filter, select all and clear all);
+  merged record paragraphs that switch to a page style with merge fields move onto that record's clone; the merge
+  source crosses DOCX as `w:mailMerge` (DOCX028 retired); `MERGEFIELD \*` case switches and `\#` pictures are kept and
+  applied; page fields show their own numerals on roman or letter pages; `REF \n`/`\w` and ODF `number-no-context` /
+  `number-all-superior` keep their own formats; chapter fields keep their outline level; date field data styles write
+  separators in the document language and carry era parts; the field dialog chooses sequence and page numerals and
+  chapter levels. Log: docs/deep-audit/round-291-folio-merge-fields.md.
+
+### Round 292: Deck iterated motion and rounded corners (2026-11-20)
+- Iterated fly and zoom move each unit in its own layer; the animation timeline shows the whole iterated span; unseen
+  numbered paragraphs in shapes hide their labels; fading shape text takes the resolved automatic ink; model rounded
+  rectangles draw circular corners on the short side. Log: docs/deep-audit/round-292-iterated-motion.md.
+
+### Round 293: Ledger conditional formatting (2026-11-20)
+- XLSX conditional formats keep underline, strikethrough and borders; several matching style rules merge their
+  formats as in Excel. Partial pass: ODS codecs, x14 extensions, dialog and range following are queued.
+  Log: docs/deep-audit/round-293-ledger-conditional-formatting.md.

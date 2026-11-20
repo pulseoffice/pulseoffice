@@ -7,19 +7,19 @@ namespace PulseOffice.Documents.Fields;
 
 public interface IMergePageStyles
 {
-    string? Adopt(TextDocument combined, TextDocument template, TextDocument record, MergeData data, string? start, int ordinal);
+    IReadOnlyDictionary<string, string> Adopt(TextDocument combined, TextDocument template, TextDocument record, MergeData data, int ordinal);
 }
 
 public sealed class MergePageStyles(IBlockTree tree, IMergeVariables merged) : IMergePageStyles
 {
-    public string? Adopt(TextDocument combined, TextDocument template, TextDocument record, MergeData data, string? start, int ordinal)
+    public IReadOnlyDictionary<string, string> Adopt(TextDocument combined, TextDocument template, TextDocument record, MergeData data, int ordinal)
     {
         ArgumentNullException.ThrowIfNull(combined);
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(record);
         ArgumentNullException.ThrowIfNull(data);
         var personal = Personal(template, data);
-        if (personal.Count == 0) return null;
+        if (personal.Count == 0) return new Dictionary<string, string>(StringComparer.Ordinal);
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var name in personal)
         {
@@ -35,7 +35,7 @@ public sealed class MergePageStyles(IBlockTree tree, IMergeVariables merged) : I
             if (clone.NextStyleName is { } next && names.TryGetValue(next, out var following)) clone.NextStyleName = following;
             combined.Styles.Page.Add(clone);
         }
-        return names.GetValueOrDefault(start ?? record.InitialPageStyle);
+        return names;
     }
 
     private HashSet<string> Personal(TextDocument template, MergeData data)

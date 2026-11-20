@@ -21,6 +21,9 @@ public interface IRecentDocuments
     {
     }
 
+    RecentDocument? Find(string path) =>
+        Items.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.Ordinal));
+
     event EventHandler? Changed;
 }
 
@@ -68,6 +71,7 @@ public sealed class RecentDocuments : IRecentDocuments
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         path = Canonical(path);
+        Refresh();
 
         lock (_gate)
         {
@@ -85,6 +89,7 @@ public sealed class RecentDocuments : IRecentDocuments
     public void Forget(string path)
     {
         path = Canonical(path);
+        Refresh();
         lock (_gate)
             if (_items.RemoveAll(item =>
                     string.Equals(item.Path, path, _pathComparison)) == 0)
@@ -95,6 +100,7 @@ public sealed class RecentDocuments : IRecentDocuments
 
     public void Clear()
     {
+        Refresh();
         lock (_gate)
             if (_items.RemoveAll(item => !item.Pinned) == 0)
                 return;
@@ -105,6 +111,7 @@ public sealed class RecentDocuments : IRecentDocuments
     public void SetPinned(string path, bool pinned)
     {
         path = Canonical(path);
+        Refresh();
         lock (_gate)
         {
             var index = _items.FindIndex(item => string.Equals(item.Path, path, _pathComparison));
@@ -116,6 +123,13 @@ public sealed class RecentDocuments : IRecentDocuments
         Save();
     }
 
+    public RecentDocument? Find(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        path = Canonical(path);
+        return Items.FirstOrDefault(item => string.Equals(item.Path, path, _pathComparison));
+    }
+
     private void TrimUnpinned()
     {
         var unpinned = 0;
@@ -124,25 +138,44 @@ public sealed class RecentDocuments : IRecentDocuments
 
     private void Load()
     {
+        if (Stored() is not { } stored) return;
+        lock (_gate)
+        {
+            _items.AddRange(stored);
+            TrimUnpinned();
+        }
+    }
+
+    private void Refresh()
+    {
+        if (Stored() is not { } stored) return;
+        lock (_gate)
+        {
+            _items.Clear();
+            _items.AddRange(stored);
+        }
+    }
+
+    private List<RecentDocument>? Stored()
+    {
         try
         {
-            if (!File.Exists(_path)) return;
+            if (!File.Exists(_path)) return null;
 
             var stored = JsonSerializer.Deserialize<List<RecentDocument>>(File.ReadAllText(_path));
-            if (stored is null) return;
+            if (stored is null) return null;
 
             var seen = new HashSet<string>(StringComparer.FromComparison(_pathComparison));
-            lock (_gate)
-                _items.AddRange(stored
-                    .Where(item => item is not null && !string.IsNullOrEmpty(item.Path))
-                    .Select(item => item with { Path = Canonical(item.Path) })
-                    .Where(item => seen.Add(item.Path) && (item.Pinned || File.Exists(item.Path)))
-                    .Select(item => item with { Name = item.Name ?? Path.GetFileName(item.Path) }));
-            lock (_gate) TrimUnpinned();
+            return [.. stored
+                .Where(item => item is not null && !string.IsNullOrEmpty(item.Path))
+                .Select(item => item with { Path = Canonical(item.Path) })
+                .Where(item => seen.Add(item.Path))
+                .Select(item => item with { Name = item.Name ?? Path.GetFileName(item.Path) })];
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning(ex, "Unreadable recent documents list: starting empty");
+            _logger.LogWarning(ex, "Unreadable recent documents list: keeping the list in memory");
+            return null;
         }
     }
 

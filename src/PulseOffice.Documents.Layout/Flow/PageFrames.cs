@@ -96,7 +96,7 @@ public interface IPageFrames
 public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBlockTree tree, IPageFieldText fields, IPageNumberText numbers, IContinuousLayout continuous) : IPageFrames
 {
     private readonly Dictionary<(string Style, bool First, bool Even, string Number, string Count, bool Mirrored), PageGeometry> _geometries = [];
-    private readonly Dictionary<(BlockContainer Container, string Number, string Count, double Width), (FlowKey Key, ComposedStory Story)> _stories = [];
+    private readonly Dictionary<(BlockContainer Container, string Number, int Value, string Count, double Width), (FlowKey Key, ComposedStory Story)> _stories = [];
 
     public void Clear()
     {
@@ -174,14 +174,14 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
         AreaBox? footer = null;
         if (style.Header.Enabled)
         {
-            var story = Story(document, Choose(style, style.Header, side), number, count, content.Width);
+            var story = Story(document, Choose(style, style.Header, side), number, page.Number, count, content.Width);
             var height = Math.Max(style.Header.MinimumHeight.ToPoints(), story.Height);
             header = new AreaBox(AreaKind.Header, new LayoutRect(content.X, content.Y, content.Width, height),
                 stories.Emit(story, 0, story.Atoms.Count, content.X, content.Y + (story.Atoms.Count > 0 ? story.Atoms[0].Top : 0), content.Width, StoryKind.Header, page.StyleName));
         }
         if (style.Footer.Enabled)
         {
-            var story = Story(document, Choose(style, style.Footer, side), number, count, content.Width);
+            var story = Story(document, Choose(style, style.Footer, side), number, page.Number, count, content.Width);
             var height = Math.Max(style.Footer.MinimumHeight.ToPoints(), story.Height);
             var top = content.Bottom - height;
             footer = new AreaBox(AreaKind.Footer, new LayoutRect(content.X, top, content.Width, height),
@@ -207,21 +207,21 @@ public sealed class PageFrames(IFlowBuilder builder, IStoryComposer stories, IBl
     private double Height(TextDocument document, PageStyle style, HeaderFooterContent content, PageSide side, string number, string count, double width)
     {
         if (!content.Enabled) return 0;
-        var story = Story(document, Choose(style, content, side), number, count, width);
+        var story = Story(document, Choose(style, content, side), number, side.Number, count, width);
         return Math.Max(content.MinimumHeight.ToPoints(), story.Height) + content.Spacing.ToPoints();
     }
 
-    private ComposedStory Story(TextDocument document, BlockContainer container, string number, string count, double width)
+    private ComposedStory Story(TextDocument document, BlockContainer container, string number, int value, string count, double width)
     {
         var parts = tree.Paragraphs(container).Select(paragraph => (object)paragraph.Content).ToList();
         var key = new FlowKey("story", parts, string.Empty);
-        if (_stories.TryGetValue((container, number, count, width), out var cached) && cached.Key.Matches(key)) return cached.Story;
+        if (_stories.TryGetValue((container, number, value, count, width), out var cached) && cached.Key.Matches(key)) return cached.Story;
         var context = new FlowContext(document, StoryKind.Header, null, false, builder.Lists(document, container), NoteNumbers.None)
         {
-            Fields = paragraph => fields.Resolve(paragraph, number, count),
+            Fields = paragraph => fields.Resolve(paragraph, number, count, value),
         };
         var story = stories.Compose(builder.Build(container, context), width);
-        _stories[(container, number, count, width)] = (key, story);
+        _stories[(container, number, value, count, width)] = (key, story);
         return story;
     }
 }

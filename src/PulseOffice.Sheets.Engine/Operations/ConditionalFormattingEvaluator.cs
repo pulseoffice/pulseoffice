@@ -9,6 +9,7 @@ public sealed class ConditionalFormattingEvaluator
 {
     private readonly ConditionalRendition _fallback;
     private readonly IReadOnlyDictionary<ConditionalVisual, ConditionalRendition> _renditions;
+    private readonly ConditionalStyleMerge _merge = new();
 
     public ConditionalFormattingEvaluator(Evaluation.Evaluator evaluator)
         : this(evaluator, new Evaluation.Functions.Numerics.SystemClock(), new Evaluation.Functions.Numerics.StandardDateSystem())
@@ -63,7 +64,7 @@ public sealed class ConditionalFormattingEvaluator
 
             result = new ConditionalAppearance
             {
-                Style = result.Style ?? appearance.Style,
+                Style = _merge.Under(result.Style, appearance.Style),
                 ScaleColorHex = result.ScaleColorHex ?? appearance.ScaleColorHex,
                 BarFraction = result.BarFraction ?? appearance.BarFraction,
                 BarColorHex = result.BarColorHex ?? appearance.BarColorHex,
@@ -105,6 +106,43 @@ public sealed class ConditionalFormattingPass
         _seen[address] = appearance;
         return appearance;
     }
+}
+
+public sealed class ConditionalStyleMerge
+{
+    public Styling.CellStyle? Under(Styling.CellStyle? winner, Styling.CellStyle? lower)
+    {
+        if (winner is null) return lower;
+        if (lower is null) return winner;
+
+        var font = winner.Font;
+        var below = lower.Font;
+        var plain = Styling.CellFont.Default;
+        var borders = winner.Borders;
+        return winner with
+        {
+            BackgroundHex = winner.BackgroundHex ?? lower.BackgroundHex,
+            Font = font with
+            {
+                Bold = font.Bold || below.Bold,
+                Italic = font.Italic || below.Italic,
+                Underline = font.Underline || (below.Underline && !font.DoubleUnderline),
+                DoubleUnderline = font.DoubleUnderline || (below.DoubleUnderline && !font.Underline),
+                Strikethrough = font.Strikethrough || below.Strikethrough,
+                ColorHex = font.ColorHex != plain.ColorHex ? font.ColorHex : below.ColorHex,
+            },
+            Borders = new Styling.CellBorders(
+                Edge(borders.Left, lower.Borders.Left), Edge(borders.Top, lower.Borders.Top),
+                Edge(borders.Right, lower.Borders.Right), Edge(borders.Bottom, lower.Borders.Bottom))
+            {
+                DiagonalUp = Edge(borders.DiagonalUp, lower.Borders.DiagonalUp),
+                DiagonalDown = Edge(borders.DiagonalDown, lower.Borders.DiagonalDown),
+            },
+            NumberFormatId = winner.NumberFormatId != 0 ? winner.NumberFormatId : lower.NumberFormatId,
+        };
+    }
+
+    private Styling.BorderEdge Edge(Styling.BorderEdge winner, Styling.BorderEdge lower) => winner.IsVisible ? winner : lower;
 }
 
 internal sealed record ConditionalCell(Worksheet Sheet, CellAddress Address, CellValue Value, Evaluation.IEvaluationContext? Context);

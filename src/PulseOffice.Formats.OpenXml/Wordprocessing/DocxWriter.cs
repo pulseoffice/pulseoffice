@@ -77,8 +77,6 @@ public sealed class DocxFidelityRules(DocxDrawingCodec drawings, DocxBibliograph
             Diagnostic.Info("DOCX044", "Word keeps the placeholder text of a filled content control in its glossary: it is not written to DOCX, and an emptied control shows the standard placeholder. ODT keeps it.")),
         new(document => document.IsMaster,
             Diagnostic.Warning("DOCX029", "Word has no master documents: the document is written as an ordinary one and its sub-documents keep their current text without the link. ODT and ODM keep them.")),
-        new(document => document.MergeSource is not null,
-            Diagnostic.Warning("DOCX028", "The mail merge data source is not written to DOCX: the merge fields stay as MERGEFIELD, and in Word the source has to be chosen again. ODT keeps it.")),
         new(document => document.Protection.Key is { IsWord: false } || document.Changes.ProtectionKey is not null,
             Diagnostic.Warning("DOCX026", "The password of document or tracked-change protection is not written to DOCX: the protection is kept, Word removes it without a password.")),
         new(document => document.Macros.All.Any(),
@@ -531,6 +529,8 @@ public sealed class DocxWriter : ITextDocumentWriter
 
     private readonly DocxNoteSettingsCodec _noteSettings = new();
 
+    private readonly DocxMailMergeCodec _mailMerge = new();
+
     private W.Settings Settings(TextDocument document)
     {
         var settings = new W.Settings();
@@ -539,6 +539,7 @@ public sealed class DocxWriter : ITextDocumentWriter
         if (_pageUsage.MirroredMargins(document)) settings.Append(new W.MirrorMargins());
         if (_pageUsage.GutterAtTop(document)) settings.Append(new W.GutterAtTop());
         if (document.FormSettings.OpenInDesignMode) settings.Append(new W.FormsDesign());
+        if (_mailMerge.Write(document) is { } merge) settings.Append(merge);
         if (!document.Changes.ShowChanges) settings.Append(new W.RevisionView { Markup = false, DisplayRevision = false, Formatting = false });
         if (document.Changes.IsRecording) settings.Append(new W.TrackRevisions());
         if (new DocxProtectionCodec().Write(document) is { } protection) settings.Append(protection);
@@ -551,8 +552,9 @@ public sealed class DocxWriter : ITextDocumentWriter
             Uri = "http://schemas.microsoft.com/office/word",
             Val = "15",
         }));
-        if (document.Variables.Count > 0)
-            settings.Append(new W.DocumentVariables(document.Variables.Select(pair => new W.DocumentVariable { Name = pair.Key, Val = pair.Value })));
+        var variables = document.Variables.Where(pair => pair.Key != DocxMailMergeCodec.ConnectionVariable).Select(pair => new W.DocumentVariable { Name = pair.Key, Val = pair.Value }).ToList();
+        if (document.MergeSource?.ConnectionId is { Length: > 0 } connection) variables.Add(new W.DocumentVariable { Name = DocxMailMergeCodec.ConnectionVariable, Val = connection });
+        if (variables.Count > 0) settings.Append(new W.DocumentVariables(variables));
         return settings;
     }
 }

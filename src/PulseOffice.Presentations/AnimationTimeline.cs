@@ -12,6 +12,8 @@ public sealed record AnimationTimelineView(IReadOnlyList<AnimationTimelineRow> R
 public interface IAnimationTimeline
 {
     AnimationTimelineView Build(IReadOnlyList<AnimationEffect> effects);
+
+    AnimationTimelineView Build(Slide slide);
 }
 
 public sealed class AnimationTimeline(IAnimationScheduler scheduler) : IAnimationTimeline
@@ -19,10 +21,20 @@ public sealed class AnimationTimeline(IAnimationScheduler scheduler) : IAnimatio
     public AnimationTimelineView Build(IReadOnlyList<AnimationEffect> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
-        var main = scheduler.Schedule(effects);
+        return Rows(effects, scheduler.Schedule(effects), trigger => scheduler.ScheduleTriggered(effects, trigger));
+    }
+
+    public AnimationTimelineView Build(Slide slide)
+    {
+        ArgumentNullException.ThrowIfNull(slide);
+        return Rows(slide.Animations, scheduler.Schedule(slide), trigger => scheduler.ScheduleTriggered(slide, trigger));
+    }
+
+    private AnimationTimelineView Rows(IReadOnlyList<AnimationEffect> effects, IReadOnlyList<ScheduledEffect> main, Func<string, IReadOnlyList<ScheduledEffect>> triggered)
+    {
         var timed = new Dictionary<AnimationEffect, ScheduledEffect>(ReferenceEqualityComparer.Instance);
         foreach (var scheduled in main.Concat(effects.Where(effect => effect.IsTriggered).Select(effect => effect.TriggerShapeId!).Distinct(StringComparer.Ordinal)
-            .SelectMany(trigger => scheduler.ScheduleTriggered(effects, trigger))))
+            .SelectMany(triggered)))
             timed.TryAdd(scheduled.Effect, scheduled);
         var rows = new List<AnimationTimelineRow>(effects.Count);
         var clicks = 0;

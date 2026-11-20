@@ -70,7 +70,7 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
         var text = rich.ToRich(shape);
         var framed = text with
         {
-            Paragraphs = [.. text.Paragraphs.Select(paragraph => paragraph with { Align = align, Bold = style.Bold, Italic = style.Italic })],
+            Paragraphs = [.. text.Paragraphs.Select(paragraph => Unseen(paragraph) ? paragraph with { Align = align, Bold = style.Bold, Italic = style.Italic, Color = 0u } : paragraph with { Align = align, Bold = style.Bold, Italic = style.Italic })],
             Frame = new TextFrame
             {
                 Anchor = style.Vertical switch
@@ -88,6 +88,9 @@ public sealed class ShapeListText(IShapeTextLists lists, IShapeRichText rich, IR
         };
         return framed;
     }
+
+    private bool Unseen(TextParagraph paragraph) =>
+        paragraph.Runs.Count > 0 && paragraph.Runs.All(run => run.Color is { } colour && colour >> 24 == 0);
 
     private bool Composed(TextLayout layout) =>
         _flow.Composes(layout);

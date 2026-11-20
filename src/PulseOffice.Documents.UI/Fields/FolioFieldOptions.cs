@@ -252,3 +252,51 @@ public sealed class PlainFieldOptions : FolioFieldOptions
 {
     public override bool Handles(FolioFieldChoice choice) => true;
 }
+
+public sealed class NumeralFieldOptions(ISequenceNumerals numerals) : FolioFieldOptions
+{
+    public override bool Handles(FolioFieldChoice choice) => choice.Kind is TextFieldKind.PageNumber or TextFieldKind.Sequence or TextFieldKind.Chapter;
+
+    public override string ExplanationKey(FolioFieldChoice choice) => choice.Kind switch
+    {
+        TextFieldKind.Sequence => "folio.field.sequence.explanation",
+        TextFieldKind.Chapter => "folio.field.chapter.explanation",
+        _ => "folio.field.numerals.explanation",
+    };
+
+    public override IReadOnlyList<FormField> Fields(FolioFieldChoice choice, TextRun current, FieldOptionsContext context)
+    {
+        var detail = DetailOf(current);
+        var texts = context.Texts;
+        if (choice.Kind == TextFieldKind.Chapter)
+        {
+            var levels = Enumerable.Range(1, ChapterLevels.Deepest).Select(level => level.ToString(CultureInfo.CurrentCulture)).ToList();
+            var level = int.TryParse(detail.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var stored) ? Math.Clamp(stored, 1, ChapterLevels.Deepest) : 1;
+            return [new ChoiceField("level", texts["folio.field.chapterLevel"], levels, level - 1)];
+        }
+        var shapes = SequenceFormats.All.Select(Example).ToList();
+        var index = Math.Max(0, SequenceFormats.All.ToList().IndexOf(detail.Value ?? SequenceFormats.Arabic));
+        var numbering = new ChoiceField("numerals", texts["folio.field.numerals"], shapes, index);
+        return choice.Kind == TextFieldKind.Sequence
+            ? [new TextField("name", texts["folio.field.name"], current.FieldArgument ?? string.Empty, texts["folio.field.sequence.placeholder"]), numbering]
+            : [numbering];
+    }
+
+    public override TextRun? Compose(FolioFieldChoice choice, TextRun current, IReadOnlyDictionary<string, object> values, FieldOptionsContext context)
+    {
+        var detail = DetailOf(current);
+        if (choice.Kind == TextFieldKind.Chapter)
+        {
+            var level = values.Choice("level", ChapterLevels.Deepest) + 1;
+            return current with { FieldDetail = Trimmed(detail with { Value = level == 1 ? null : level.ToString(CultureInfo.InvariantCulture) }) };
+        }
+        var shape = SequenceFormats.All[values.Choice("numerals", SequenceFormats.All.Count)];
+        var updated = current with { FieldDetail = Trimmed(detail with { Value = shape == SequenceFormats.Arabic ? null : shape }) };
+        if (choice.Kind != TextFieldKind.Sequence) return updated;
+        return values.Text("name").Trim() is { Length: > 0 } name ? updated with { FieldArgument = name } : null;
+    }
+
+    private string Example(string format) => string.Join(", ", Enumerable.Range(1, 3).Select(value => numerals.Format(value, format)));
+
+    private FieldDetail? Trimmed(FieldDetail detail) => detail == new FieldDetail() ? null : detail;
+}

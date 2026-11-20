@@ -8,7 +8,7 @@ using Color = DocumentFormat.OpenXml.Spreadsheet.Color;
 
 namespace PulseOffice.Formats.OpenXml;
 
-internal sealed class DifferentialFormatTable(SpreadsheetColours colours)
+internal sealed class DifferentialFormatTable(SpreadsheetColours colours, BorderCodec borders)
 {
     private readonly DifferentialFormats _formats = new();
     private readonly Dictionary<string, uint> _index = new(StringComparer.Ordinal);
@@ -27,17 +27,21 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours)
 
     public uint Intern(CellStyle style)
     {
-        var key = $"{style.BackgroundHex}|{style.Font.ColorHex}|{style.Font.Bold}|{style.Font.Italic}";
+        var font = style.Font;
+        var key = $"{style.BackgroundHex}|{font.ColorHex}|{font.Bold}|{font.Italic}|{font.Underline}|{font.DoubleUnderline}|{font.Strikethrough}|{borders.Key(style.Borders)}";
         if (_index.TryGetValue(key, out var existing)) return existing;
 
         var format = new DifferentialFormat();
-        if (style.Font.Bold || style.Font.Italic || style.Font.ColorHex != CellFont.Default.ColorHex)
+        if (font.Bold || font.Italic || font.Underline || font.DoubleUnderline || font.Strikethrough || font.ColorHex != CellFont.Default.ColorHex)
         {
-            var font = new Font();
-            if (style.Font.Bold) font.AppendChild(new Bold());
-            if (style.Font.Italic) font.AppendChild(new Italic());
-            if (style.Font.ColorHex != CellFont.Default.ColorHex) font.AppendChild(new Color { Rgb = colours.ToArgb(style.Font.ColorHex) });
-            format.AppendChild(font);
+            var element = new Font();
+            if (font.Bold) element.AppendChild(new Bold());
+            if (font.Italic) element.AppendChild(new Italic());
+            if (font.Strikethrough) element.AppendChild(new Strike());
+            if (font.ColorHex != CellFont.Default.ColorHex) element.AppendChild(new Color { Rgb = colours.ToArgb(font.ColorHex) });
+            if (font.DoubleUnderline) element.AppendChild(new Underline { Val = UnderlineValues.Double });
+            else if (font.Underline) element.AppendChild(new Underline());
+            format.AppendChild(element);
         }
 
         if (style.BackgroundHex is { } background)
@@ -46,6 +50,8 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours)
                 PatternType = PatternValues.Solid,
                 BackgroundColor = new BackgroundColor { Rgb = colours.ToArgb(background) },
             }));
+
+        if (!style.Borders.IsEmpty) format.AppendChild(borders.Build(style.Borders));
 
         var id = _count++;
         _formats.AppendChild(format);
@@ -74,15 +80,23 @@ internal sealed class DifferentialFormatTable(SpreadsheetColours colours)
 
         var format = formats[(int)value];
         var font = format.Font;
+        var pattern = format.Fill?.PatternFill;
+        var underline = font?.Underline;
+        var doubled = underline?.Val is { } kind && (kind.Value == UnderlineValues.Double || kind.Value == UnderlineValues.DoubleAccounting);
+        var single = underline is not null && !doubled && (underline.Val is null || underline.Val.Value != UnderlineValues.None);
         return new CellStyle
         {
-            BackgroundHex = colours.Parse(format.Fill?.PatternFill?.BackgroundColor?.Rgb?.Value),
+            BackgroundHex = colours.Parse(pattern?.BackgroundColor?.Rgb?.Value) ?? colours.Parse(pattern?.ForegroundColor?.Rgb?.Value),
             Font = CellFont.Default with
             {
-                Bold = font?.Bold is not null,
-                Italic = font?.Italic is not null,
+                Bold = font?.Bold is not null && font.Bold.Val?.Value != false,
+                Italic = font?.Italic is not null && font.Italic.Val?.Value != false,
+                Underline = single,
+                DoubleUnderline = doubled,
+                Strikethrough = font?.Strike is not null && font.Strike.Val?.Value != false,
                 ColorHex = colours.Parse(font?.Color?.Rgb?.Value) ?? CellFont.Default.ColorHex,
             },
+            Borders = borders.Read(format.Border),
         };
     }
 }

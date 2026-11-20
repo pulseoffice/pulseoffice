@@ -56,7 +56,7 @@ public sealed class ShapeTextArea(IPresetGeometryEngine presets, IShapePresets n
 
     private ShapeTextMargins Rounded(double width, double height, double corner)
     {
-        var inset = corner * RoundedCornerInset;
-        return new ShapeTextMargins(width * inset, height * inset, width * inset, height * inset);
+        var inset = corner * RoundedCornerInset * Math.Min(width, height);
+        return new ShapeTextMargins(inset, inset, inset, inset);
     }
 }

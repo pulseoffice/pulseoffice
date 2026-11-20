@@ -59,13 +59,16 @@ public sealed class MergeParityTests
     }
 
     [Fact]
-    public void LOrigineDeiDatiRestaInOdtESiDichiaraPersaInDocx()
+    public void LOrigineDeiDatiAttraversaOdtEDocx()
     {
         var odt = Through(Letter(), new OdtWriter(), new OdtReader());
+        var docx = Through(Letter(), _composer.Writer(DocxFlavour.Document), _composer.Reader(DocxFlavour.Document));
         var report = _composer.Writer(DocxFlavour.Document).CheckFidelity(Letter());
 
         Assert.Equal(new MailMergeSource("Clienti", "Anagrafica", MergeCommandType.Table) { ConnectionId = "c-1" }, odt.MergeSource);
-        Assert.Contains(report.Losses, loss => loss.Code == "DOCX028");
+        Assert.Equal(odt.MergeSource, docx.MergeSource);
+        Assert.Empty(docx.Variables);
+        Assert.DoesNotContain(report.Losses, loss => loss.Code == "DOCX028");
         Assert.DoesNotContain(new OdtWriter().CheckFidelity(Letter()).Losses, loss => loss.Code.Contains("028", StringComparison.Ordinal));
     }
 }

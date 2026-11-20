@@ -12,7 +12,8 @@ public enum TextIterationUnit
 }
 
 public readonly record struct TextReveal(
-    TextIterationUnit Unit, bool Backwards, bool Exiting, int ElapsedMs, int IntervalMs, int UnitMs = 0, Func<double, double>? Opacity = null)
+    TextIterationUnit Unit, bool Backwards, bool Exiting, int ElapsedMs, int IntervalMs, int UnitMs = 0, Func<double, double>? Opacity = null,
+    Func<double, ElementVisual>? Motion = null, IReadOnlySet<int>? Layer = null)
 {
     public bool IsWhole => Unit == TextIterationUnit.None;
 }
@@ -29,8 +30,14 @@ public interface ITextIterationReveal
 
     RichText Reveal(RichText text, TextReveal reveal, ITextTheme theme);
 
-    ShapeObject Reveal(ShapeObject shape, TextReveal reveal);
+    ShapeObject Reveal(ShapeObject shape, TextReveal reveal, string? inkHex = null);
+
+    IReadOnlyList<RevealLayer> Layers(SlideElement element, TextReveal reveal);
+
+    SlideElement Layered(SlideElement element, TextReveal layer, ITextTheme theme, string? inkHex = null);
 }
+
+public sealed record RevealLayer(ElementVisual Visual, TextReveal Reveal);
 
 public sealed class TextIterationReveal : ITextIterationReveal
 {
@@ -51,15 +58,65 @@ public sealed class TextIterationReveal : ITextIterationReveal
     {
         ArgumentNullException.ThrowIfNull(element);
         if (unit == TextIterationUnit.None) return 1;
-        var text = element switch
-        {
-            TextElement own => string.Join("\n", own.Text.Paragraphs.Select(paragraph => string.Concat(paragraph.EffectiveRuns().Select(run => run.Text)))),
-            ObjectElement { Content: ShapeObject shape } => ShapeContent(shape),
-            _ => string.Empty,
-        };
-        var units = Units(text, unit);
+        var units = Units(Content(element), unit);
         return units.Length == 0 ? 1 : Math.Max(1, units.Max() + 1);
     }
+
+    public IReadOnlyList<RevealLayer> Layers(SlideElement element, TextReveal reveal)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        if (reveal.IsWhole || reveal.Motion is not { } motion || reveal.Layer is not null || reveal.UnitMs <= 0) return [];
+        var units = Units(Content(element), reveal.Unit);
+        var count = units.Length == 0 ? 0 : units.Max() + 1;
+        var moving = new SortedDictionary<long, HashSet<int>>();
+        for (var unit = 0; unit < count; unit++)
+        {
+            var since = SinceStart(reveal, reveal.Backwards ? count - 1 - unit : unit);
+            if (!InFlight(reveal, since)) continue;
+            if (!moving.TryGetValue(since, out var set)) moving[since] = set = [];
+            set.Add(unit);
+        }
+
+        return [.. moving.Select(entry => new RevealLayer(motion((double)entry.Key / reveal.UnitMs), reveal with { Layer = entry.Value }))];
+    }
+
+    public SlideElement Layered(SlideElement element, TextReveal layer, ITextTheme theme, string? inkHex = null)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(theme);
+        return element switch
+        {
+            TextElement text => text with { Text = Reveal(text.Text, layer, theme), Backdrop = null },
+            ObjectElement { Content: ShapeObject shape } drawn => drawn with { Content = TextOnly(Reveal(shape, layer, inkHex), inkHex) },
+            _ => element,
+        };
+    }
+
+    private ShapeObject TextOnly(ShapeObject shape, string? inkHex) => shape with
+    {
+        Style = shape.Style with
+        {
+            Fill = ShapeFill.None,
+            Line = ShapeLine.None,
+            Shadow = ShapeShadow.Default,
+            Glow = ShapeGlow.Default,
+            Bevel = ShapeBevel.Default,
+            Extrusion = ShapeExtrusion.None,
+            SoftEdge = PulseOffice.Foundation.Units.Twip.Zero,
+            Text = shape.Style.Text with { ColorHex = inkHex ?? shape.Style.Text.ColorHex, AutomaticColor = false },
+        },
+    };
+
+    private string Content(SlideElement element) => element switch
+    {
+        TextElement own => string.Join("\n", own.Text.Paragraphs.Select(paragraph => string.Concat(paragraph.EffectiveRuns().Select(run => run.Text)))),
+        ObjectElement { Content: ShapeObject shape } => ShapeContent(shape),
+        _ => string.Empty,
+    };
+
+    private long SinceStart(TextReveal reveal, int order) => Math.Max(0, reveal.ElapsedMs) - (long)order * Math.Max(0, reveal.IntervalMs);
+
+    private bool InFlight(TextReveal reveal, long since) => reveal.Motion is not null && reveal.UnitMs > 0 && since >= 0 && since < reveal.UnitMs;
 
     public IReadOnlyList<double> Opacities(string text, TextReveal reveal)
     {
@@ -73,18 +130,22 @@ public sealed class TextIterationReveal : ITextIterationReveal
         }
 
         var count = units.Max() + 1;
-        var interval = Math.Max(0, reveal.IntervalMs);
-        var elapsed = Math.Max(0, reveal.ElapsedMs);
         for (var index = 0; index < text.Length; index++)
         {
+            if (reveal.Layer is { } layer)
+            {
+                opacities[index] = units[index] >= 0 && layer.Contains(units[index]) ? 1 : 0;
+                continue;
+            }
+
             if (units[index] < 0)
             {
                 opacities[index] = reveal.Exiting ? 1 : 0;
                 continue;
             }
 
-            var order = reveal.Backwards ? count - 1 - units[index] : units[index];
-            opacities[index] = UnitOpacity(reveal, elapsed - (long)order * interval);
+            var since = SinceStart(reveal, reveal.Backwards ? count - 1 - units[index] : units[index]);
+            opacities[index] = InFlight(reveal, since) ? 0 : UnitOpacity(reveal, since);
         }
 
         return opacities;
@@ -144,7 +205,7 @@ public sealed class TextIterationReveal : ITextIterationReveal
         return text with { Paragraphs = paragraphs };
     }
 
-    public ShapeObject Reveal(ShapeObject shape, TextReveal reveal)
+    public ShapeObject Reveal(ShapeObject shape, TextReveal reveal, string? inkHex = null)
     {
         ArgumentNullException.ThrowIfNull(shape);
         var content = ShapeContent(shape);
@@ -159,7 +220,7 @@ public sealed class TextIterationReveal : ITextIterationReveal
             for (var position = 1; position <= run.Text.Length; position++)
             {
                 if (position < run.Text.Length && Alpha(opacities[offset + position]) == Alpha(opacities[offset + start])) continue;
-                runs.Add(Faded(run with { Text = run.Text[start..position] }, shape.Style.Text.ColorHex, opacities[offset + start]));
+                runs.Add(Faded(run with { Text = run.Text[start..position] }, inkHex ?? shape.Style.Text.ColorHex, opacities[offset + start]));
                 start = position;
             }
 

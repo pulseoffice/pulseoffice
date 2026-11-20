@@ -16,7 +16,7 @@ public sealed class XlsxConditionalMapper
     public XlsxConditionalMapper()
     {
         var colours = new SpreadsheetColours();
-        _formats = new DifferentialFormatTable(colours);
+        _formats = new DifferentialFormatTable(colours, new BorderCodec(colours, new SpreadsheetVocabulary(), new PulseOffice.Sheets.Styling.BorderPresets()));
         var formulas = new XlsxFormulaSyntax();
         var names = new X14Namespaces();
         var x14Thresholds = new X14Thresholds(names, formulas, new X14ThresholdVocabulary().Kinds);

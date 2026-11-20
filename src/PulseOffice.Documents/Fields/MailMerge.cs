@@ -101,7 +101,7 @@ public sealed class GuillemetPlaceholder : IMergePlaceholder
     public string For(string column) => "«" + column + "»";
 }
 
-public sealed class MergeFieldSource(IMergeRecords records, IMergePlaceholder placeholder) : IFieldValueSource
+public sealed class MergeFieldSource(IMergeRecords records, IMergePlaceholder placeholder, IMergeValueFormat shown, ITextCultures cultures) : IFieldValueSource
 {
     public IReadOnlyCollection<TextFieldKind> Kinds { get; } = [TextFieldKind.Database];
 
@@ -112,12 +112,9 @@ public sealed class MergeFieldSource(IMergeRecords records, IMergePlaceholder pl
         if (run.FieldArgument is not { Length: > 0 } column) return null;
         var document = context.Document;
         if (records.Previewing(document) && records.Data(document) is { } data && data.Value(records.Current(document), column) is { } value)
-            return new FieldValue(Around(value, run.FieldDetail));
+            return new FieldValue(shown.Shown(value, run.FieldDetail, cultures.For(run.Language, document.Language)));
         return new FieldValue(placeholder.For(column));
     }
-
-    private string Around(string? value, FieldDetail? detail) =>
-        string.IsNullOrEmpty(value) ? string.Empty : (detail?.WhenTrue ?? string.Empty) + value + (detail?.WhenFalse ?? string.Empty);
 }
 
 public interface IMergeVariables
@@ -177,7 +174,9 @@ public sealed class MailMergeEngine(
     IFragmentPaster paster,
     IFieldCondition conditions,
     IMergeVariables merged,
-    IMergePageStyles pages) : IMailMergeEngine
+    IMergePageStyles pages,
+    IMergeValueFormat shown,
+    ITextCultures cultures) : IMailMergeEngine
 {
     public IReadOnlyList<string> Fields(TextDocument template)
     {
@@ -213,7 +212,7 @@ public sealed class MailMergeEngine(
     private TextRun Resolved(TextRun run, TextDocument template, MergeData data, int row, IReadOnlyDictionary<string, string> variables)
     {
         if (run.Field == TextFieldKind.Database)
-            return Plain(run, Around(data.Value(row, run.FieldArgument ?? string.Empty), run.FieldDetail));
+            return Plain(run, shown.Shown(data.Value(row, run.FieldArgument ?? string.Empty), run.FieldDetail, cultures.For(run.Language, template.Language)));
         if (!Conditional(run, template, data)) return run;
         var holds = conditions.Holds(run.FieldArgument, variables);
         return run.Field switch
@@ -223,9 +222,6 @@ public sealed class MailMergeEngine(
             _ => run with { FieldArgument = holds ? "1" : "0", Hidden = holds },
         };
     }
-
-    private string Around(string? value, FieldDetail? detail) =>
-        string.IsNullOrEmpty(value) ? string.Empty : (detail?.WhenTrue ?? string.Empty) + value + (detail?.WhenFalse ?? string.Empty);
 
     private TextRun Plain(TextRun run, string text) => run with { Text = text, Field = TextFieldKind.None, FieldArgument = null, FieldDetail = null };
 
@@ -247,12 +243,23 @@ public sealed class MailMergeEngine(
             var last = (ParagraphBlock)record.Body.Blocks[^1];
             var fragment = extractor.Copy(record, new DocumentRange(new DocumentPosition(first.Id, 0), new DocumentPosition(last.Id, last.Length)));
             var ordinal = row + 1;
-            var style = pages.Adopt(combined, template, record, data, first.Content.PageStyleName, ordinal);
+            var renamed = pages.Adopt(combined, template, record, data, ordinal);
+            var style = renamed.GetValueOrDefault(first.Content.PageStyleName ?? record.InitialPageStyle);
             var opener = new ParagraphBlock(combined.NextId("p"), Emptied(first.Content) with { PageBreakBefore = true, PageStyleName = style ?? first.Content.PageStyleName });
             combined.Body.Replace([.. combined.Body.Blocks, opener]);
+            var start = combined.Body.Blocks.Count - 1;
             paster.Paste(combined, history, new DocumentPosition(opener.Id, 0), fragment);
+            Rename(combined.Body.Blocks.Skip(start), renamed);
         }
         return combined;
+    }
+
+    private void Rename(IEnumerable<Block> blocks, IReadOnlyDictionary<string, string> renamed)
+    {
+        if (renamed.Count == 0) return;
+        foreach (var paragraph in blocks.OfType<ParagraphBlock>())
+            if (paragraph.Content.PageStyleName is { } name && renamed.TryGetValue(name, out var clone))
+                paragraph.State = paragraph.State with { Content = paragraph.Content with { PageStyleName = clone } };
     }
 
     private TextParagraph Emptied(TextParagraph content) => content with { Text = string.Empty, Runs = [] };

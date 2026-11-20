@@ -10,12 +10,12 @@ public interface IPageFieldText
 
     bool HasCount(TextParagraph paragraph);
 
-    TextParagraph Resolve(TextParagraph paragraph, string? number, string? count);
+    TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null);
 }
 
 public sealed class PageFieldText(PulseOffice.Documents.Fields.ISequenceNumerals numerals) : IPageFieldText
 {
-    private readonly ConditionalWeakTable<TextParagraph, Dictionary<(string? Number, string? Count), TextParagraph>> _resolved = new();
+    private readonly ConditionalWeakTable<TextParagraph, Dictionary<(string? Number, string? Count, int? Value), TextParagraph>> _resolved = new();
 
     public bool HasNumber(TextParagraph paragraph) => Has(paragraph, TextFieldKind.PageNumber);
 
@@ -31,28 +31,32 @@ public sealed class PageFieldText(PulseOffice.Documents.Fields.ISequenceNumerals
         return false;
     }
 
-    public TextParagraph Resolve(TextParagraph paragraph, string? number, string? count)
+    public TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null)
     {
         if (!HasNumber(paragraph) && !HasCount(paragraph)) return paragraph;
         var variants = _resolved.GetValue(paragraph, _ => []);
         lock (variants)
         {
-            if (variants.TryGetValue((number, count), out var cached)) return cached;
+            if (variants.TryGetValue((number, count, value), out var cached)) return cached;
             cached = paragraph.WithRuns([.. paragraph.Runs.Select(run => run.Field switch
             {
-                TextFieldKind.PageNumber when number is not null => run with { Text = Shaped(number, run.FieldDetail?.Value) },
+                TextFieldKind.PageNumber when number is not null => run with { Text = Shaped(number, value, run.FieldDetail?.Value) },
                 TextFieldKind.PageCount when count is not null => run with { Text = count },
                 _ => run,
             })]);
-            variants[(number, count)] = cached;
+            variants[(number, count, value)] = cached;
             return cached;
         }
     }
 
-    private string Shaped(string number, string? format) =>
-        format is { Length: > 0 } && int.TryParse(number, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
-            ? numerals.Format(value, format)
+    private string Shaped(string number, int? value, string? format)
+    {
+        if (format is not { Length: > 0 }) return number;
+        if (value is { } known) return numerals.Format(known, format);
+        return int.TryParse(number, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? numerals.Format(parsed, format)
             : number;
+    }
 }
 
 public interface IPageCountFields

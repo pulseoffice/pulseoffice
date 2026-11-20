@@ -59,6 +59,8 @@ public static class DocumentsServiceCollectionExtensions
         services.AddSingleton<Fields.IMergePlaceholder, Fields.GuillemetPlaceholder>();
         services.AddSingleton<Fields.IFieldValueSource, Fields.MergeFieldSource>();
         services.AddSingleton<Fields.IMailMergeEngine, Fields.MailMergeEngine>();
+        services.TryAddSingleton<Fields.IMergeValueFormat, Fields.MergeValueFormat>();
+        services.TryAddSingleton<Fields.IMergeRecipients, Fields.MergeRecipients>();
         services.AddSingleton<Fields.IFieldUpdater, Fields.FieldUpdater>();
         services.AddSingleton<Fields.IFieldEditing, Fields.FieldEditing>();
         services.AddSingleton<Fields.IReferenceTargets, Fields.ReferenceTargets>();

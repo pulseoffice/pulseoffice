@@ -178,7 +178,7 @@ public sealed class ChapterFieldSource : IFieldValueSource
 
     public FieldValue Evaluate(TextRun run, FieldContext context)
     {
-        if (context.Chapter is not { } chapter) return new FieldValue(string.Empty);
+        if (context.ChapterAt(Level(run)) is not { } chapter) return new FieldValue(string.Empty);
         var label = context.Facts.ListLabel(chapter.Paragraph.Id)?.Trim() ?? string.Empty;
         return new FieldValue(run.FieldArgument switch
         {
@@ -187,6 +187,9 @@ public sealed class ChapterFieldSource : IFieldValueSource
             _ => chapter.Text,
         });
     }
+
+    private int Level(TextRun run) =>
+        int.TryParse(run.FieldDetail?.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var level) && level is >= 1 and <= ChapterLevels.Deepest ? level : 1;
 }
 
 public sealed class ReferenceFieldSource(IBookmarkCatalog bookmarks, IStoryCatalog stories, IDocumentOutline outline, IFieldWords words) : IFieldValueSource
@@ -201,7 +204,8 @@ public sealed class ReferenceFieldSource(IBookmarkCatalog bookmarks, IStoryCatal
         return new FieldValue((run.FieldDetail?.Format ?? ReferenceFormats.Text) switch
         {
             ReferenceFormats.Page => context.Facts.PageOf(bookmark.ParagraphId) ?? run.Text,
-            ReferenceFormats.Number => Number(target, context) ?? run.Text,
+            ReferenceFormats.Number or ReferenceFormats.NumberFullContext => Number(target, context) ?? run.Text,
+            ReferenceFormats.NumberNoContext => Innermost(Number(target, context)) ?? run.Text,
             ReferenceFormats.Direction => context.OrderOf(bookmark.ParagraphId) < context.CurrentOrder
                 || context.OrderOf(bookmark.ParagraphId) == context.CurrentOrder && bookmark.Offset < context.Offset ? words.Above : words.Below,
             ReferenceFormats.Chapter => Chapter(context, target) ?? run.Text,
@@ -213,6 +217,13 @@ public sealed class ReferenceFieldSource(IBookmarkCatalog bookmarks, IStoryCatal
 
     private string? Number(ParagraphBlock target, FieldContext context) =>
         context.Facts.ListLabel(target.Id)?.Trim() is { Length: > 0 } label ? label : Caption(target, true);
+
+    private string? Innermost(string? label)
+    {
+        if (label is null) return null;
+        var parts = label.Split(['.', ')', '-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length == 0 ? label : parts[^1];
+    }
 
     private string? Chapter(FieldContext context, ParagraphBlock target)
     {

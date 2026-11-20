@@ -60,6 +60,7 @@ public sealed class FolioFieldsModel
         _formats =
         [
             Format("text", ReferenceFormats.Text), Format("page", ReferenceFormats.Page), Format("number", ReferenceFormats.Number),
+            Format("numberNoContext", ReferenceFormats.NumberNoContext), Format("numberFullContext", ReferenceFormats.NumberFullContext),
             Format("direction", ReferenceFormats.Direction), Format("chapter", ReferenceFormats.Chapter), Format("caption", ReferenceFormats.Caption),
             Format("category", ReferenceFormats.Category), Format("value", ReferenceFormats.Value),
         ];

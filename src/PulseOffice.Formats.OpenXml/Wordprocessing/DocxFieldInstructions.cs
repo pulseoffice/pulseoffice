@@ -31,7 +31,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
 
     private readonly System.Xml.Linq.XNamespace OdfText = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
-    private const string ChapterStyle = "Heading 1";
+    private const string ChapterStylePrefix = "Heading ";
 
     private readonly IReadOnlyList<(TextFieldKind Kind, string Keyword)> _simple =
     [
@@ -73,6 +73,8 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             {
                 "page" => $" PAGEREF {argument} \\h ",
                 "number" => $" REF {argument} \\r \\h ",
+                "number-no-context" => $" REF {argument} \\n \\h ",
+                "number-all-superior" => $" REF {argument} \\w \\h ",
                 "direction" => $" REF {argument} \\p \\h ",
                 _ => $" REF {argument} \\h ",
             },
@@ -85,9 +87,11 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             TextFieldKind.CustomProperty => $" DOCPROPERTY {Quote(argument!)} ",
             TextFieldKind.Database => (argument!.Contains(' ', StringComparison.Ordinal) ? $" MERGEFIELD {Quote(argument)} " : $" MERGEFIELD {argument} ")
                 + (detail?.WhenTrue is { Length: > 0 } before ? $"\\b {Quote(before)} " : string.Empty)
-                + (detail?.WhenFalse is { Length: > 0 } after ? $"\\f {Quote(after)} " : string.Empty),
+                + (detail?.WhenFalse is { Length: > 0 } after ? $"\\f {Quote(after)} " : string.Empty)
+                + (detail?.Value is { Length: > 0 } picture ? $"\\# {Quote(picture)} " : string.Empty)
+                + (MergeCase(detail?.Format) is { } casing ? $"\\* {casing} " : string.Empty),
             TextFieldKind.Citation => $" CITATION {argument} ",
-            TextFieldKind.Chapter => argument == "number" ? $" STYLEREF {Quote(ChapterStyle)} \\n " : $" STYLEREF {Quote(ChapterStyle)} ",
+            TextFieldKind.Chapter => argument == "number" ? $" STYLEREF {Quote(ChapterStyle(detail))} \\n " : $" STYLEREF {Quote(ChapterStyle(detail))} ",
             _ => null,
         };
     }
@@ -120,10 +124,23 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             "DOCPROPERTY" when argument is not null => new DocxField(TextFieldKind.CustomProperty, argument),
             "MERGEFIELD" when argument is not null => new DocxField(TextFieldKind.Database, argument, Affixes(words)),
             "CITATION" when argument is not null => new DocxField(TextFieldKind.Citation, argument),
-            "STYLEREF" => new DocxField(TextFieldKind.Chapter, switches.Contains("\\n") ? "number" : null),
+            "STYLEREF" => new DocxField(TextFieldKind.Chapter, switches.Contains("\\n") ? "number" : null, ChapterLevel(argument)),
             _ when _structural.Contains(keyword) => null,
             _ => new DocxField(TextFieldKind.Preserved, instruction),
         };
+    }
+
+    private string ChapterStyle(FieldDetail? detail) => ChapterStylePrefix + (detail?.Value is { Length: > 0 } level ? level : "1");
+
+    private FieldDetail? ChapterLevel(string? style)
+    {
+        var digits = style is null ? null
+            : style.StartsWith(ChapterStylePrefix, StringComparison.OrdinalIgnoreCase) ? style[ChapterStylePrefix.Length..].Trim()
+            : style.Trim();
+        return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var level)
+            && level is > 1 and <= PulseOffice.Documents.Fields.ChapterLevels.Deepest
+            ? new FieldDetail { Value = level.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+            : null;
     }
 
     private readonly IReadOnlyList<(string Word, string Ours)> _sequenceShapes =
@@ -145,11 +162,26 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
             ? new FieldDetail { Value = value }
             : null;
 
+    private readonly IReadOnlyList<(string Word, string Ours)> _mergeCases =
+    [
+        ("Upper", PulseOffice.Documents.Fields.MergeCases.Upper),
+        ("Lower", PulseOffice.Documents.Fields.MergeCases.Lower),
+        ("Caps", PulseOffice.Documents.Fields.MergeCases.Caps),
+        ("FirstCap", PulseOffice.Documents.Fields.MergeCases.FirstCap),
+    ];
+
+    private string? MergeCase(string? ours) => _mergeCases.FirstOrDefault(known => known.Ours == ours).Word;
+
     private FieldDetail? Affixes(IReadOnlyList<(string Text, bool Quoted)> words)
     {
         var before = Switch(words, "\\b");
         var after = Switch(words, "\\f");
-        return string.IsNullOrEmpty(before) && string.IsNullOrEmpty(after) ? null : new FieldDetail { WhenTrue = before, WhenFalse = after };
+        var picture = Switch(words, "\\#");
+        var casing = Shapes(words).Select(shape => _mergeCases.FirstOrDefault(known => known.Word.Equals(shape, StringComparison.OrdinalIgnoreCase)).Ours)
+            .FirstOrDefault(ours => ours is not null);
+        return string.IsNullOrEmpty(before) && string.IsNullOrEmpty(after) && string.IsNullOrEmpty(picture) && casing is null
+            ? null
+            : new FieldDetail { WhenTrue = before, WhenFalse = after, Value = string.IsNullOrEmpty(picture) ? null : picture, Format = casing };
     }
 
     private bool PlainSequence(IReadOnlyList<(string Text, bool Quoted)> words, IReadOnlyList<string> switches) =>
@@ -273,7 +305,9 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
 
     private FieldDetail? Reference(IReadOnlyList<string> switches) =>
         switches.Contains("\\p") ? new FieldDetail { Format = "direction" }
-        : switches.Contains("\\r") || switches.Contains("\\n") || switches.Contains("\\w") ? new FieldDetail { Format = "number" }
+        : switches.Contains("\\w") ? new FieldDetail { Format = "number-all-superior" }
+        : switches.Contains("\\n") ? new FieldDetail { Format = "number-no-context" }
+        : switches.Contains("\\r") ? new FieldDetail { Format = "number" }
         : null;
 
     private DocxField Conditional(IReadOnlyList<(string Text, bool Quoted)> words)

@@ -40,6 +40,7 @@ public sealed class SettingsView : UserControl, IDialogContent, IDialogFooterOwn
     private readonly Dictionary<string, SettingRow> _rows = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Control> _anchors = new(StringComparer.Ordinal);
     private readonly Button _resetAll;
+    private readonly TwoStepConfirmation _resetConfirmation = new();
     private readonly Button _done;
 
     private IReadOnlyList<SettingsPage> _pages = [];
@@ -167,7 +168,7 @@ public sealed class SettingsView : UserControl, IDialogContent, IDialogFooterOwn
         Avalonia.Automation.AutomationProperties.SetName(_search, Texts["settings.search"]);
         Avalonia.Automation.AutomationProperties.SetName(_advanced, Texts["settings.advanced"]);
         _advancedLabel.Text = Texts["settings.advanced"];
-        _resetAll.Content = Texts["settings.resetAll"];
+        _resetAll.Content = Texts[_resetConfirmation.IsArmed ? "settings.resetAll.confirm" : "settings.resetAll"];
         _done.Content = Texts["settings.done"];
         ToolTip.SetTip(_resetAll, Texts["settings.resetAll.description"]);
     }
@@ -186,6 +187,12 @@ public sealed class SettingsView : UserControl, IDialogContent, IDialogFooterOwn
 
     private void Rebuild()
     {
+        if (_resetConfirmation.IsArmed)
+        {
+            _resetConfirmation.Disarm();
+            Translate();
+        }
+
         _pages = _services.Navigator.Pages(new SettingsQuery(_search.Text ?? string.Empty, _advanced.IsOn));
 
         if (_pageId is null || _pages.All(page => page.Id != _pageId))
@@ -399,7 +406,14 @@ public sealed class SettingsView : UserControl, IDialogContent, IDialogFooterOwn
 
     private void ResetAll()
     {
+        if (!_resetConfirmation.Press())
+        {
+            Translate();
+            return;
+        }
+
         _services.States.ResetAll(_services.Settings.Definitions);
+        Translate();
         Rebuild();
     }
 }

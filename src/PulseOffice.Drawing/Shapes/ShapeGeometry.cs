@@ -34,7 +34,9 @@ public sealed class ShapeGeometry : IShapeGeometry
         if (shape.Dimension is { } dimension) return _dimensions.Outline(dimension, width, height);
         return (shape.Computed ?? _implicit.Shaded(shape, width, height)) is { } computed && _computed.Outline(computed, width, height) is { Figures.Count: > 0 } outline
             ? outline
-            : Outline(shape);
+            : shape is { Computed: null, Shape: ShapeKind.RoundedRectangle } && width > 0 && height > 0 && double.IsFinite(width) && double.IsFinite(height)
+                ? RoundedRectangle(Corner(shape.CornerRatio), width, height)
+                : Outline(shape);
     }
 
     public ShapeOutline Outline(ShapeObject shape)
@@ -146,6 +148,31 @@ public sealed class ShapeGeometry : IShapeGeometry
         }
 
         return Polygon(vertices);
+    }
+
+    private double Corner(double ratio) => Math.Clamp(double.IsFinite(ratio) ? ratio : 0.18, 0, 0.5);
+
+    private static ShapeOutline RoundedRectangle(double corner, double width, double height)
+    {
+        var radius = corner * Math.Min(width, height);
+        var rx = radius / width;
+        var ry = radius / height;
+
+        var segments = new List<ShapeSegment>
+        {
+            new MoveSegment(new ShapePoint(rx, 0)),
+            new LineSegment(new ShapePoint(1 - rx, 0)),
+            new ArcSegment(new ShapePoint(1, ry), rx, ry, Clockwise: true),
+            new LineSegment(new ShapePoint(1, 1 - ry)),
+            new ArcSegment(new ShapePoint(1 - rx, 1), rx, ry, Clockwise: true),
+            new LineSegment(new ShapePoint(rx, 1)),
+            new ArcSegment(new ShapePoint(0, 1 - ry), rx, ry, Clockwise: true),
+            new LineSegment(new ShapePoint(0, ry)),
+            new ArcSegment(new ShapePoint(rx, 0), rx, ry, Clockwise: true),
+            CloseSegment.Instance,
+        };
+
+        return new ShapeOutline([new ShapeFigure(segments)]);
     }
 
     private static ShapeOutline RoundedRectangle(double corner)

@@ -70,6 +70,7 @@ public sealed class SlideRenderer : ISlideRenderer
         _text = new TextElementPainter(texts, new ListLabels());
         _content = new StandardContentPainters(objects, texts);
         _iteration = new TextIterationReveal();
+        _ink = new PulseOffice.Drawing.Shapes.ShapeTextInk();
     }
 
     public void Render(
@@ -129,6 +130,8 @@ public sealed class SlideRenderer : ISlideRenderer
     private readonly PulseOffice.Drawing.Assets.ImageHeader _header = new();
 
     private readonly ITextIterationReveal _iteration;
+
+    private readonly PulseOffice.Drawing.Shapes.IShapeTextInk _ink;
 
     private void PaintBackground(DrawingContext context, PulseOffice.Drawing.Assets.RasterImageObject image, BackgroundImageLayout layout, Rect target, double scale)
     {
@@ -195,15 +198,28 @@ public sealed class SlideRenderer : ISlideRenderer
         using var animation = visual.IsIdentity ? default : context.PushTransform(placement.Animated(visual));
         using var rotation = element.RotationDegrees == 0 ? default : context.PushTransform(placement.Rotated(element.RotationDegrees));
 
-        if (!visual.Reveal.IsWhole)
-            element = element switch
-            {
-                TextElement iterated => iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal, theme) },
-                ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject shape } drawn => drawn with { Content = _iteration.Reveal(shape, visual.Reveal) },
-                _ => element,
-            };
-        element.Accept(new ElementPaintVisitor(
-            new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language, Painted = palette.Painted } }, _text, _media, _content));
+        var scene = new SlideScene(context, bounds, scale, theme, palette, fields) { Backdrop = backdrop with { Language = fields.Language, Painted = palette.Painted } };
+        if (visual.Reveal.IsWhole)
+        {
+            element.Accept(new ElementPaintVisitor(scene, _text, _media, _content));
+            return;
+        }
+
+        var ink = element is ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject inked } ? _ink.Resolve(inked.Style, backdrop.Hex) : null;
+        var revealed = element switch
+        {
+            TextElement iterated => iterated with { Text = _iteration.Reveal(iterated.Text, visual.Reveal, theme) },
+            ObjectElement { Content: PulseOffice.Drawing.Shapes.ShapeObject shape } drawn => drawn with { Content = _iteration.Reveal(shape, visual.Reveal, ink) },
+            _ => element,
+        };
+        revealed.Accept(new ElementPaintVisitor(scene, _text, _media, _content));
+        foreach (var layer in _iteration.Layers(element, visual.Reveal))
+        {
+            if (layer.Visual.Opacity <= 0.001) continue;
+            using var unitOpacity = context.PushOpacity(layer.Visual.Opacity);
+            using var unitMotion = context.PushTransform(placement.Animated(layer.Visual));
+            _iteration.Layered(element, layer.Reveal, theme, ink).Accept(new ElementPaintVisitor(scene, _text, _media, _content));
+        }
     }
 
     private readonly record struct ElementPlacement(Rect Bounds, double Scale)

@@ -58,6 +58,7 @@ public partial class App : Application
             var registry = new ShellComposition(_services).Compose();
             _services.GetRequiredService<PulseOffice.Shell.SignatureStatusIndicator>().Start();
             _services.GetRequiredService<PulseOffice.Shell.FormDesignModeOnOpen>().Start();
+            _services.GetRequiredService<PulseOffice.Shell.ReadOnlyOnOpen>().Start();
             _ = _services.GetRequiredService<DocumentFontRegistrar>();
             _services.GetRequiredService<PulseOffice.Sheets.UI.ExternalData.ExternalLinkAutoRefresh>().Start();
             _ = _services.GetRequiredService<PulseOffice.UI.Controls.Fonts.IFontActivation>().WarmUpAsync();
@@ -71,7 +72,10 @@ public partial class App : Application
             var recent = new RecentDocumentsCoordinator(
                 _services.GetRequiredService<IRecentDocuments>(),
                 registry,
-                path => _services.GetRequiredService<PulseOffice.Shell.IDocumentOpenRouter>().OpenAsync(path));
+                path => _services.GetRequiredService<PulseOffice.Shell.IDocumentOpenRouter>().OpenAsync(path),
+                _services.GetRequiredService<PulseOffice.Shell.IMissingRecentPrompt>(),
+                new PulseOffice.Shell.RecentFileProbe(),
+                () => _services.GetRequiredService<PulseOffice.Shell.IDocumentWorkspace>().Active?.Path);
 
             var window = _services.GetRequiredService<ShellWindow>();
 

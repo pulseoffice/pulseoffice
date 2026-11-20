@@ -20,14 +20,16 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Documents.UI.Shell;
 
-public sealed record FolioMergePlan(MergeTarget Target, int From, int To, string? NameColumn);
+public sealed record FolioMergePlan(MergeTarget Target, IReadOnlyList<int> Rows, string? NameColumn);
+
+public sealed record FolioMergeRecipient(int Row, string Summary);
 
 public interface IFolioMergeLetters
 {
     IReadOnlyList<string> Lines(TextDocument document, MergeData data, int row, int maximum);
 }
 
-public sealed class FolioMergeLetters(IBlockTree tree) : IFolioMergeLetters
+public sealed class FolioMergeLetters(IBlockTree tree, IMergeValueFormat shown, ITextCultures cultures) : IFolioMergeLetters
 {
     public IReadOnlyList<string> Lines(TextDocument document, MergeData data, int row, int maximum)
     {
@@ -39,7 +41,9 @@ public sealed class FolioMergeLetters(IBlockTree tree) : IFolioMergeLetters
             if (lines.Count >= maximum) break;
             var text = new StringBuilder();
             foreach (var run in paragraph.Content.Runs)
-                text.Append(run.Field == TextFieldKind.Database && run.FieldArgument is { } column ? data.Value(row, column) ?? string.Empty : run.Text);
+                text.Append(run.Field == TextFieldKind.Database && run.FieldArgument is { } column
+                    ? shown.Shown(data.Value(row, column), run.FieldDetail, cultures.For(run.Language, document.Language))
+                    : run.Text);
             lines.Add(text.ToString().ReplaceLineEndings(" "));
         }
         return lines;
@@ -51,16 +55,18 @@ public interface IFolioMergeWizard
     Task<FolioMergePlan?> AskAsync(TextDocument document, MergeData data, int startRecord, CancellationToken ct);
 }
 
-public sealed class FolioMergeWizard(IDialogService dialogs, IFolioMergeLetters letters, ITextCatalog texts, IIconCatalog icons) : IFolioMergeWizard
+public sealed class FolioMergeWizard(IDialogService dialogs, IFolioMergeLetters letters, IMergeRecipients recipients, ITextCatalog texts, IIconCatalog icons) : IFolioMergeWizard
 {
     public async Task<FolioMergePlan?> AskAsync(TextDocument document, MergeData data, int startRecord, CancellationToken ct) =>
-        await dialogs.ShowAsync<FolioMergePlan>(new FolioMergeWizardView(document, data, letters, texts, icons) { StartRecord = startRecord },
+        await dialogs.ShowAsync<FolioMergePlan>(new FolioMergeWizardView(document, data, letters, recipients, texts, icons) { StartRecord = startRecord },
             new DialogOptions { TitleKey = "command.folio.mailMerge.run.title", PreferredWidth = 720, AccessibleDescription = texts["folio.mailMerge.run.explanation"] }, ct).ConfigureAwait(true);
 }
 
 public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogFooterOwner, IDialogSizeHint
 {
     private const int PreviewLines = 14;
+
+    private const int SummaryColumns = 3;
 
     private readonly TextDocument _document;
     private readonly MergeData _data;
@@ -74,8 +80,14 @@ public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogF
     private readonly ContentControl _strip = new();
     private readonly StackPanel _letter = new() { Spacing = 3 };
     private readonly TextBlock _position = new();
-    private readonly NumberBox _from;
-    private readonly NumberBox _to;
+    private readonly IMergeRecipients _recipients;
+    private readonly HashSet<int> _excluded = [];
+    private readonly ComboBox _filterColumn;
+    private readonly ComboBox _filterOperator;
+    private readonly TextBox _filterValue = new() { MinWidth = 200 };
+    private readonly ListBox _list = new() { Height = 220 };
+    private readonly TextBlock _count = new();
+    private readonly IReadOnlyList<MergeFilterOperator> _operators = [MergeFilterOperator.Contains, MergeFilterOperator.Equals, MergeFilterOperator.NotEquals, MergeFilterOperator.Empty, MergeFilterOperator.NotEmpty];
     private readonly ComboBox _naming;
     private readonly Button _back;
     private readonly Button _next;
@@ -86,25 +98,30 @@ public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogF
 
     public event EventHandler<object?>? Completed;
 
-    public FolioMergeWizardView(TextDocument document, MergeData data, IFolioMergeLetters letters, ITextCatalog texts, IIconCatalog? icons, InterfaceDensity density = InterfaceDensity.Compact)
+    public FolioMergeWizardView(TextDocument document, MergeData data, IFolioMergeLetters letters, IMergeRecipients recipients, ITextCatalog texts, IIconCatalog? icons, InterfaceDensity density = InterfaceDensity.Compact)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(letters);
+        ArgumentNullException.ThrowIfNull(recipients);
         ArgumentNullException.ThrowIfNull(texts);
         _document = document;
         _data = data;
         _letters = letters;
         _texts = texts;
+        _recipients = recipients;
         _metrics = DesignTokens.For(density);
-        var count = Math.Max(1, data.Rows.Count);
-        _from = new NumberBox(new NumberEntry(new NumericBounds(1, count, 1), true, CultureInfo.CurrentCulture), 1, _metrics, boxWidth: 72);
-        _to = new NumberBox(new NumberEntry(new NumericBounds(1, count, 1), true, CultureInfo.CurrentCulture), count, _metrics, boxWidth: 72);
+        _filterColumn = new ComboBox { ItemsSource = new[] { texts["folio.mailMerge.filter.none"] }.Concat(data.Columns).ToList(), SelectedIndex = 0, MinWidth = 200 };
+        _filterOperator = new ComboBox { ItemsSource = _operators.Select(item => texts["folio.mailMerge.filter." + char.ToLowerInvariant(item.ToString()[0]) + item.ToString()[1..]]).ToList(), SelectedIndex = 0, MinWidth = 200 };
+        AutomationProperties.SetName(_filterColumn, texts["folio.mailMerge.filter.column"]);
+        AutomationProperties.SetName(_filterOperator, texts["folio.mailMerge.filter.operator"]);
+        AutomationProperties.SetName(_filterValue, texts["folio.mailMerge.filter.value"]);
+        AutomationProperties.SetName(_list, texts["folio.mailMerge.recipients"]);
         _naming = new ComboBox { ItemsSource = new[] { texts["folio.mailMerge.naming.number"] }.Concat(data.Columns).ToList(), SelectedIndex = 0, MinWidth = 200 };
         AutomationProperties.SetName(_naming, texts["folio.mailMerge.naming"]);
 
-        _stepNames = [texts["folio.mailMerge.step.records"], texts["folio.mailMerge.step.output"]];
-        _steps = [RecordsStep(icons), OutputStep(icons)];
+        _stepNames = [texts["folio.mailMerge.step.letters"], texts["folio.mailMerge.step.records"], texts["folio.mailMerge.step.output"]];
+        _steps = [RecordsStep(icons), RecipientsStep(), OutputStep(icons)];
 
         _footer = new DialogFooter(density)
             .WithCancel(texts["prompt.cancel"], () => Completed?.Invoke(this, null))
@@ -115,9 +132,10 @@ public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogF
         Content = new StackPanel
         {
             Spacing = _metrics.SpacingMedium,
-            Children = { _strip, new Panel { Children = { _steps[0], _steps[1] } } },
+            Children = { _strip, new Panel { Children = { _steps[0], _steps[1], _steps[2] } } },
         };
         ShowRecord(0);
+        Refilter();
         Go(0);
     }
 
@@ -163,10 +181,110 @@ public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogF
 
     public FolioMergePlan Plan()
     {
-        var from = (int)Math.Round(_from.Read()) - 1;
-        var to = (int)Math.Round(_to.Read()) - 1;
         var naming = Math.Max(0, _naming.SelectedIndex);
-        return new FolioMergePlan(_targets[Math.Max(0, _targetChoices.Selected)], Math.Min(from, to), Math.Max(from, to), naming == 0 ? null : _data.Columns[naming - 1]);
+        return new FolioMergePlan(_targets[Math.Max(0, _targetChoices.Selected)], Chosen, naming == 0 ? null : _data.Columns[naming - 1]);
+    }
+
+    public IReadOnlyList<int> Chosen => _recipients.Rows(_data, Filter, _excluded);
+
+    public IReadOnlyList<int> Listed => [.. (_list.ItemsSource as IEnumerable<FolioMergeRecipient> ?? Enumerable.Empty<FolioMergeRecipient>()).Select(entry => entry.Row)];
+
+    public void Exclude(int row, bool excluded)
+    {
+        if (excluded) _excluded.Add(row);
+        else _excluded.Remove(row);
+        Refilter();
+    }
+
+    public void ApplyFilter(MergeFilter? filter)
+    {
+        _filterColumn.SelectedIndex = filter is null ? 0 : Math.Max(0, _data.Columns.ToList().IndexOf(filter.Column) + 1);
+        _filterOperator.SelectedIndex = filter is null ? 0 : Math.Max(0, _operators.ToList().IndexOf(filter.Operator));
+        _filterValue.Text = filter?.Value ?? string.Empty;
+        Refilter();
+    }
+
+    private MergeFilter? Filter =>
+        _filterColumn.SelectedIndex is > 0 and var column && column - 1 < _data.Columns.Count
+            ? new MergeFilter(_data.Columns[column - 1], _operators[Math.Clamp(_filterOperator.SelectedIndex, 0, _operators.Count - 1)], _filterValue.Text ?? string.Empty)
+            : null;
+
+    private void Refilter()
+    {
+        var filter = Filter;
+        _filterOperator.IsEnabled = filter is not null;
+        _filterValue.IsEnabled = filter is not null && filter.Operator is not (MergeFilterOperator.Empty or MergeFilterOperator.NotEmpty);
+        _list.ItemsSource = Enumerable.Range(0, _data.Rows.Count).Where(row => _recipients.Matches(_data, row, filter))
+            .Select(row => new FolioMergeRecipient(row, Summary(row))).ToList();
+        Count();
+    }
+
+    private void Count()
+    {
+        var chosen = Chosen.Count;
+        _count.Text = _texts.Format("folio.mailMerge.recipients.count", chosen, _data.Rows.Count);
+        _merge.IsEnabled = chosen > 0;
+    }
+
+    private string Summary(int row) =>
+        (row + 1).ToString(CultureInfo.CurrentCulture) + ". " + string.Join(" · ", _data.Columns.Take(SummaryColumns).Select(column => _data.Value(row, column) ?? string.Empty));
+
+    private Control RecipientsStep()
+    {
+        _list.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<FolioMergeRecipient>((entry, _) => entry is null ? new Border() : Recipient(entry), supportsRecycling: false);
+        _filterColumn.SelectionChanged += (_, _) => Refilter();
+        _filterOperator.SelectionChanged += (_, _) => Refilter();
+        _filterValue.TextChanged += (_, _) => Refilter();
+
+        var filter = new DialogSection(_texts["folio.mailMerge.filter"], _metrics);
+        filter.Add(_texts["folio.mailMerge.filter.column"], _filterColumn, editorWidth: 220);
+        filter.Add(_texts["folio.mailMerge.filter.operator"], _filterOperator, editorWidth: 220);
+        filter.Add(_texts["folio.mailMerge.filter.value"], _filterValue, editorWidth: 220);
+
+        var all = new Button { Content = _texts["folio.mailMerge.selectAll"] };
+        all.Click += (_, _) => Include(true);
+        var none = new Button { Content = _texts["folio.mailMerge.selectNone"] };
+        none.Click += (_, _) => Include(false);
+        _count.VerticalAlignment = VerticalAlignment.Center;
+        AutomationProperties.SetLiveSetting(_count, AutomationLiveSetting.Polite);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = _metrics.SpacingSmall, Children = { all, none, _count } };
+
+        var frame = new Border { CornerRadius = new CornerRadius(_metrics.RadiusTight), BorderThickness = new Thickness(1), Child = _list }
+            .Themed(Border.BorderBrushProperty, Palette.Keys.Border);
+        return new StackPanel
+        {
+            Spacing = _metrics.SpacingMedium,
+            Children =
+            {
+                new TextBlock { Text = _texts["folio.mailMerge.recipients.explanation"], TextWrapping = TextWrapping.Wrap, FontSize = _metrics.FontSize }
+                    .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary),
+                filter,
+                frame,
+                actions,
+            },
+        };
+    }
+
+    private Control Recipient(FolioMergeRecipient entry)
+    {
+        var check = new CheckBox { Content = entry.Summary, IsChecked = !_excluded.Contains(entry.Row) };
+        check.IsCheckedChanged += (_, _) =>
+        {
+            if (check.IsChecked == true) _excluded.Remove(entry.Row);
+            else _excluded.Add(entry.Row);
+            Count();
+        };
+        return check;
+    }
+
+    private void Include(bool included)
+    {
+        foreach (var row in Listed)
+        {
+            if (included) _excluded.Remove(row);
+            else _excluded.Add(row);
+        }
+        Refilter();
     }
 
     private void Finish() => Completed?.Invoke(this, Plan());
@@ -198,15 +316,10 @@ public sealed class FolioMergeWizardView : UserControl, IDialogContent, IDialogF
         }.Themed(Border.BorderBrushProperty, Palette.Keys.Border);
         AutomationProperties.SetName(paper, _texts["folio.mailMerge.letter"]);
 
-        var range = new DialogSection(_texts["folio.mailMerge.range"], _metrics);
-        range.Add(_texts["folio.mailMerge.from"], _from, editorWidth: 120);
-        range.Add(_texts["folio.mailMerge.to"], _to, editorWidth: 120);
-
         var left = new StackPanel { Spacing = _metrics.SpacingMedium, Width = 280 };
         left.Children.Add(new TextBlock { Text = _texts["folio.mailMerge.records.explanation"], TextWrapping = TextWrapping.Wrap, FontSize = _metrics.FontSize }
             .Themed(TextBlock.ForegroundProperty, Palette.Keys.TextSecondary));
         left.Children.Add(navigation);
-        left.Children.Add(range);
 
         var sunken = new Border { Padding = new Thickness(_metrics.SpacingLarge), CornerRadius = new CornerRadius(_metrics.RadiusTight), Child = paper }
             .Themed(Border.BackgroundProperty, Palette.Keys.SurfaceSunken);

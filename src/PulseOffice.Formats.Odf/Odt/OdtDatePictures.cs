@@ -7,8 +7,9 @@ internal sealed class OdtDatePictures : OdtXml
 {
     private readonly XNamespace Number = OdfPackage.Namespaces.Number;
 
-    public XElement? DataStyle(string picture, string name, bool time)
+    public XElement? DataStyle(string picture, string name, bool time, string? language = null)
     {
+        var separators = Culture(language).DateTimeFormat;
         if (picture.Length < 2) return null;
         var parts = new List<XElement>();
         var literal = new StringBuilder();
@@ -35,6 +36,12 @@ internal sealed class OdtDatePictures : OdtXml
             while (i + run < picture.Length && picture[i + run] == c) run++;
             var part = Part(c, run, twelveHour);
             if (part is null && char.IsAsciiLetter(c)) return null;
+            if (part is null && c is '/' or ':')
+            {
+                for (var repeat = 0; repeat < run; repeat++) literal.Append(c == '/' ? separators.DateSeparator : separators.TimeSeparator);
+                i += run;
+                continue;
+            }
             if (part is null)
             {
                 literal.Append(picture, i, run);
@@ -62,6 +69,7 @@ internal sealed class OdtDatePictures : OdtXml
         'm' => Element("minutes", run >= 2),
         's' => Element("seconds", run >= 2),
         't' when twelveHour => new XElement(Number + "am-pm"),
+        'g' => Element("era", run >= 2),
         _ => null,
     };
 
@@ -87,6 +95,7 @@ internal sealed class OdtDatePictures : OdtXml
                 "minutes" => full ? "mm" : "m",
                 "seconds" => full ? "ss" : "s",
                 "am-pm" => "tt",
+                "era" => full ? "gg" : "g",
                 "text" => Quoted(part.Value),
                 _ => null,
             };
@@ -94,6 +103,19 @@ internal sealed class OdtDatePictures : OdtXml
             builder.Append(piece);
         }
         return builder.Length == 0 ? null : builder.ToString();
+    }
+
+    private System.Globalization.CultureInfo Culture(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language)) return System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            return System.Globalization.CultureInfo.GetCultureInfo(language);
+        }
+        catch (System.Globalization.CultureNotFoundException)
+        {
+            return System.Globalization.CultureInfo.InvariantCulture;
+        }
     }
 
     private string Quoted(string text) =>

@@ -123,7 +123,7 @@ public sealed class AnimationPane : UserControl
 
     public void Refresh()
     {
-        var view = _services.Timeline.Build(Effects);
+        var view = _services.Timeline.Build(_context.Slide);
         if (_selectedId is not null && view.Rows.All(row => row.Effect.Id != _selectedId)) _selectedId = null;
         _selectedId ??= view.Rows.FirstOrDefault()?.Effect.Id;
 
