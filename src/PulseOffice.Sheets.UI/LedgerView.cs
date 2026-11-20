@@ -28,7 +28,7 @@ using PulseOffice.UI.Controls.Drawing;
 
 namespace PulseOffice.Sheets.UI;
 
-public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions
+public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRelease, IShellViewOptions, IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions
 {
     public void CommitPendingEdits()
     {
@@ -188,7 +188,7 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
 
         _metrics = DesignTokens.For(InterfaceDensity.Compact);
 
-        _history.Changed += (_, _) => RefreshEverything();
+        _history.Changed += OnHistoryChanged;
 
         var binding = formBinding ?? new FormControlBinding(new PulseOffice.Sheets.Formatting.SystemSpreadsheetLocale());
         _grid = new SheetGridView(_engine, presenter, conditional, _selection, formBinding: binding, linkTips: linkTips)
@@ -313,7 +313,8 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         var chartTables = new Engine.Operations.ChartTableLossWatch(_workbook);
         chartTables.TablesLost += (_, lost) => _status.Report(
             _texts.Format("status.chart.tableMissing", string.Join(", ", lost.Tables)), NotificationSeverity.Warning);
-        _history.Changed += (_, _) => chartTables.Check();
+        _chartTables = chartTables;
+        _history.Changed += OnHistoryCheckCharts;
         chartTables.AnnounceStanding();
         _grid.EditRequested += (_, _) => _editing.BeginEdit(replaceContent: null);
         _grid.ChoicesAvailable = _editing.HasChoices;
@@ -358,6 +359,22 @@ public sealed class LedgerView : UserControl, IShellViewOptions, IPendingEditsOw
         base.OnAttachedToVisualTree(e);
         _texts.LanguageChanged += OnLanguageChanged;
         ShowStatus();
+    }
+
+    private Engine.Operations.ChartTableLossWatch? _chartTables;
+
+    public bool IsSharedModelReleased { get; private set; }
+
+    private void OnHistoryChanged(object? sender, EventArgs e) => RefreshEverything();
+
+    private void OnHistoryCheckCharts(object? sender, EventArgs e) => _chartTables?.Check();
+
+    public void ReleaseSharedModel()
+    {
+        _history.Changed -= OnHistoryChanged;
+        _history.Changed -= OnHistoryCheckCharts;
+        _segments.Hide();
+        IsSharedModelReleased = true;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

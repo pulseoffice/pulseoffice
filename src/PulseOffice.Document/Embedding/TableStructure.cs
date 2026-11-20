@@ -30,6 +30,7 @@ public sealed class TableStructure(ITableSpans spans, IColumnWidths widths) : IT
             Merges = [.. table.Merges.Select(merge => spans.Inserted(merge.Row, merge.RowSpan, at) is var (row, span) ? merge with { Row = row, RowSpan = span } : merge)],
             CellFormats = [.. table.CellFormats.Select(format => format.Row >= at ? format with { Row = format.Row + 1 } : format),
                 .. snapshot.Rows.Count == 0 ? [] : table.CellFormats.Where(format => format.Row == Math.Max(0, at - 1)).Select(format => format with { Row = at })],
+            CellTexts = [.. table.CellTexts.Select(text => text.Row >= at ? text with { Row = text.Row + 1 } : text)],
             Layout = table.Layout with { RowHeights = InsertedHeight(table.Layout.RowHeights, at + Header(table)) },
         };
     }
@@ -50,6 +51,9 @@ public sealed class TableStructure(ITableSpans spans, IColumnWidths widths) : IT
             CellFormats = [.. table.CellFormats
                 .Where(format => format.Row < first || format.Row > last)
                 .Select(format => format.Row > last ? format with { Row = format.Row - count } : format)],
+            CellTexts = [.. table.CellTexts
+                .Where(text => text.Row < first || text.Row > last)
+                .Select(text => text.Row > last ? text with { Row = text.Row - count } : text)],
             Layout = table.Layout with { RowHeights = Without(table.Layout.RowHeights, first + Header(table), last + Header(table)) },
         };
     }
@@ -79,6 +83,7 @@ public sealed class TableStructure(ITableSpans spans, IColumnWidths widths) : IT
             Merges = [.. table.Merges.Select(merge => spans.Inserted(merge.Column, merge.ColumnSpan, at) is var (start, span) ? merge with { Column = start, ColumnSpan = span } : merge)],
             CellFormats = [.. table.CellFormats.Select(format => format.Column >= at ? format with { Column = format.Column + 1 } : format),
                 .. snapshot.Columns.Count == 0 ? [] : table.CellFormats.Where(format => format.Column == Math.Max(0, at - 1)).Select(format => format with { Column = at })],
+            CellTexts = [.. table.CellTexts.Select(text => text.Column >= at ? text with { Column = text.Column + 1 } : text)],
             Layout = table.Layout with { ColumnFractions = InsertedFraction(table.Layout.ColumnFractions, at) },
         };
     }
@@ -104,6 +109,9 @@ public sealed class TableStructure(ITableSpans spans, IColumnWidths widths) : IT
             CellFormats = [.. table.CellFormats
                 .Where(format => Keep(format.Column))
                 .Select(format => format.Column > last ? format with { Column = format.Column - count } : format)],
+            CellTexts = [.. table.CellTexts
+                .Where(text => Keep(text.Column))
+                .Select(text => text.Column > last ? text with { Column = text.Column - count } : text)],
             Layout = table.Layout with { ColumnFractions = Normalised(Without(table.Layout.ColumnFractions, first, last)) },
         };
     }

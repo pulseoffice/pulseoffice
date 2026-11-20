@@ -36,7 +36,7 @@ public sealed record FolioViewServices(
     PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys Nudges,
     IFolioEditingKeys EditingKeys);
 
-public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, ITextEditingTarget, IInlineImeSurface
+public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, IDocumentFocusTarget, ITextEditingTarget, IInlineImeSurface
 {
     private readonly FolioEditor _editor;
     private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps PointSteps = new(1, 10);
@@ -114,6 +114,14 @@ public sealed class FolioView : Grid, IPendingEditsOwner, IDocumentFocusTarget, 
     }
 
     public FolioEditor Editor => _editor;
+
+    public bool IsSharedModelReleased { get; private set; }
+
+    public void ReleaseSharedModel()
+    {
+        _editor.Dispose();
+        IsSharedModelReleased = true;
+    }
 
     public FolioRulers Rulers => _rulers;
 

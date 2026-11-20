@@ -190,18 +190,18 @@ public sealed class ConditionalRulesManagerView : UserControl, IDialogContent, I
                 Refresh(position);
                 break;
             case ActionDuplicate when position >= 0:
-                _rules.Insert(position, _rules[position]);
-                Refresh(position);
+                _rules.Insert(position + 1, _rules[position]);
+                Refresh(position + 1);
                 break;
             case ActionDelete when position >= 0:
                 _rules.RemoveAt(position);
                 Refresh(Math.Min(position, _rules.Count - 1));
                 break;
             case ActionUp when selected > 0:
-                Swap(position, _visible[selected - 1]);
+                MoveRule(position, _visible[selected - 1]);
                 break;
             case ActionDown when selected >= 0 && selected < _visible.Count - 1:
-                Swap(position, _visible[selected + 1]);
+                MoveRule(position, _visible[selected + 1] + 1);
                 break;
         }
     }
@@ -222,10 +222,13 @@ public sealed class ConditionalRulesManagerView : UserControl, IDialogContent, I
         return item is null ? -1 : _list.IndexFromContainer(item);
     }
 
-    private void Swap(int first, int second)
+    private void MoveRule(int from, int before)
     {
-        (_rules[first], _rules[second]) = (_rules[second], _rules[first]);
-        Refresh(second);
+        var rule = _rules[from];
+        _rules.RemoveAt(from);
+        var destination = before > from ? before - 1 : before;
+        _rules.Insert(destination, rule);
+        Refresh(destination);
     }
 
     private bool Covers(ConditionalRule rule) => rule.Ranges.Any(range => range.IntersectsWith(_selection));

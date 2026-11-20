@@ -17,6 +17,7 @@ public sealed class DataTableRenderer : IDataTableRenderer
     private readonly ITextCatalog _texts;
     private readonly ITableCellTextStyles _styles;
     private readonly ITableCellBox _box;
+    private readonly ITableCellRichText _rich;
     private readonly OptimalColumnSizing _optimal = new(new PulseOffice.Document.Tables.ColumnWidths());
 
     public DataTableRenderer(ITextCatalog texts)
@@ -25,10 +26,16 @@ public sealed class DataTableRenderer : IDataTableRenderer
     }
 
     public DataTableRenderer(ITextCatalog texts, ITableCellTextStyles styles, ITableCellBox box)
+        : this(texts, styles, box, new TableCellRichText(styles))
+    {
+    }
+
+    public DataTableRenderer(ITextCatalog texts, ITableCellTextStyles styles, ITableCellBox box, ITableCellRichText rich)
     {
         _texts = texts;
         _styles = styles;
         _box = box;
+        _rich = rich;
     }
 
     private const double CellPadding = 6;
@@ -135,9 +142,14 @@ public sealed class DataTableRenderer : IDataTableRenderer
                     _ => rowTop + Math.Max(0, (Math.Min(bodyRowHeight, style.FontSize * 1.9) - textHeight) / 2),
                 };
 
-                if (index.Format(r, c) is { HasLayout: true } laidOut)
-                    CellText(context, culture, Format(value, kind, culture), text, _box.Inner(new Rect(new Point(xs[c], rowTop), new Point(cellRight, cellBottom)), laidOut.Margins),
-                        typeface, style.FontSize, TableCellLook.Plain with { Horizontal = kind == DataValueKind.Number ? CellHorizontalAlign.Right : null }, valign, laidOut.Direction);
+                var rich = index.Text(r, c, value?.ToString());
+                if (index.Format(r, c) is { HasLayout: true } || rich is not null)
+                {
+                    var laidOut = index.Format(r, c);
+                    CellText(context, culture, Format(value, kind, culture), text, _box.Inner(new Rect(new Point(xs[c], rowTop), new Point(cellRight, cellBottom)), laidOut?.Margins),
+                        typeface, style.FontSize, TableCellLook.Plain with { Horizontal = kind == DataValueKind.Number ? CellHorizontalAlign.Right : null }, valign,
+                        laidOut?.Direction ?? CellTextDirection.Horizontal, rich);
+                }
                 else
                     Draw(context, culture, Format(value, kind, culture), text,
                         new Point(xs[c] + CellPadding, textY), typeface, style.FontSize,
@@ -183,7 +195,7 @@ public sealed class DataTableRenderer : IDataTableRenderer
         for (var d = 0; d < displayedRows; d++) tops[d + 1] = tops[d] + heights[Math.Min(d, heights.Length - 1)];
 
         var index = new TableCellIndex(table);
-        var cells = new List<(Rect Area, TableCellFormat? Format, string Text, DataValueKind Kind)>();
+        var cells = new List<(Rect Area, TableCellFormat? Format, string Text, DataValueKind Kind, TableCellText? Rich)>();
         for (var row = first; row < snapshot.Rows.Count; row++)
         {
             var top = tops[row - first];
@@ -196,8 +208,9 @@ public sealed class DataTableRenderer : IDataTableRenderer
                 var right = xs[Math.Min(c + (origin?.ColumnSpan ?? 1), columns)];
                 var bottom = tops[Math.Min(displayed + (origin?.RowSpan ?? 1), displayedRows)];
                 var text = row < 0 ? snapshot.Columns[c].Name : c < snapshot.Rows[row].Count ? Format(snapshot.Rows[row][c], snapshot.Columns[c].Kind, culture) : string.Empty;
+                var raw = row < 0 ? snapshot.Columns[c].Name : c < snapshot.Rows[row].Count ? snapshot.Rows[row][c]?.ToString() : null;
                 cells.Add((new Rect(new Point(xs[c], tops[displayed]), new Point(right, bottom)),
-                    index.Format(row, c), text, snapshot.Columns[c].Kind));
+                    index.Format(row, c), text, snapshot.Columns[c].Kind, index.Text(row, c, raw)));
             }
         }
 
@@ -211,7 +224,7 @@ public sealed class DataTableRenderer : IDataTableRenderer
             var size = look.FontSize ?? table.Style.FontSize;
             var brush = new SolidColorBrush(look.TextHex is { } hex && Color.TryParse(hex, out var ink) ? ink : Colors.Black);
             CellText(context, culture, cell.Text, brush, _box.Inner(cell.Area, cell.Format?.Margins), _styles.Typeface(look), size, look,
-                cell.Format?.VerticalAlign ?? CellVerticalAlign.Top, cell.Format?.Direction ?? CellTextDirection.Horizontal);
+                cell.Format?.VerticalAlign ?? CellVerticalAlign.Top, cell.Format?.Direction ?? CellTextDirection.Horizontal, cell.Rich);
         }
 
         foreach (var cell in cells)
@@ -225,9 +238,14 @@ public sealed class DataTableRenderer : IDataTableRenderer
     }
 
     private void CellText(DrawingContext context, System.Globalization.CultureInfo culture, string content, IBrush brush, Rect inner, Typeface typeface,
-        double size, TableCellLook look, CellVerticalAlign valign, CellTextDirection direction)
+        double size, TableCellLook look, CellVerticalAlign valign, CellTextDirection direction, TableCellText? rich = null)
     {
         if (content.Length == 0) return;
+        if (rich is not null && direction != CellTextDirection.Stacked)
+        {
+            RichCellText(context, culture, rich, brush, inner, size, look, valign, direction);
+            return;
+        }
         if (direction == CellTextDirection.Stacked)
         {
             var characters = new List<string>();
@@ -251,6 +269,22 @@ public sealed class DataTableRenderer : IDataTableRenderer
         Draw(context, culture, content, brush, new Point(0, offset), typeface, size, lineWidth,
             alignRight: look.Horizontal is CellHorizontalAlign.Right, centre: look.Horizontal is CellHorizontalAlign.Center,
             decorations: _styles.Decorations(look));
+    }
+
+    private void RichCellText(DrawingContext context, System.Globalization.CultureInfo culture, TableCellText rich, IBrush brush, Rect inner,
+        double size, TableCellLook look, CellVerticalAlign valign, CellTextDirection direction)
+    {
+        var turned = direction is CellTextDirection.Down or CellTextDirection.Up;
+        var (lineWidth, lineSpan) = turned ? (inner.Height, inner.Width) : (inner.Width, inner.Height);
+        var lines = _rich.Lines(rich, look, size, brush, lineWidth, culture);
+        var offset = Aligned(0, lineSpan, lines.Sum(line => line.Height), valign);
+        using var frame = turned
+            ? context.PushTransform(direction == CellTextDirection.Down
+                ? Matrix.CreateRotation(Math.PI / 2) * Matrix.CreateTranslation(inner.Right, inner.Top)
+                : Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(inner.Left, inner.Bottom))
+            : context.PushTransform(Matrix.CreateTranslation(inner.X, inner.Y));
+        using var clip = context.PushClip(new Rect(0, 0, Math.Max(0, lineWidth), Math.Max(0, lineSpan)));
+        _rich.Draw(context, lines, new Point(0, offset));
     }
 
     private static double Aligned(double start, double span, double extent, CellVerticalAlign valign) => valign switch

@@ -208,7 +208,7 @@ public sealed class DocxRangeAndNoteReadingTests
                 + "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> HYPERLINK \"https://example.org/\" </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>"
                 + "<w:r><w:t>sito</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>"
                 + "<w:fldSimple w:instr=\" HYPERLINK \\l &quot;capitolo&quot; \"><w:r><w:t>qui</w:t></w:r></w:fldSimple>"
-                + "<w:fldSimple w:instr=\" SECTIONPAGES \"><w:r><w:t>3</w:t></w:r></w:fldSimple>"
+                + "<w:fldSimple w:instr=\" PULSEUNKNOWN \"><w:r><w:t>3</w:t></w:r></w:fldSimple>"
                 + "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> DOCPROPERTY marchio </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p></w:body></w:document>");
         }
 
@@ -219,7 +219,7 @@ public sealed class DocxRangeAndNoteReadingTests
         Assert.Equal("#capitolo", runs.Single(run => run.Text == "qui").Hyperlink);
         Assert.Null(runs.Single(run => run.Text == "3").Hyperlink);
         Assert.Contains(runs, run => run.Field == PulseOffice.Text.Rich.TextFieldKind.CustomProperty && run.FieldArgument == "marchio");
-        Assert.Contains(runs, run => run.Field == PulseOffice.Text.Rich.TextFieldKind.Preserved && run.FieldArgument == " SECTIONPAGES " && run.Text == "3");
+        Assert.Contains(runs, run => run.Field == PulseOffice.Text.Rich.TextFieldKind.Preserved && run.FieldArgument == " PULSEUNKNOWN " && run.Text == "3");
     }
 
     [Fact]

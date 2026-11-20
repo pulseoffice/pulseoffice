@@ -108,8 +108,8 @@ public sealed class Round127DeckTableTests
 
         var read = Table(new PptxReader(_themes, _masters).Read(stream).Value!);
 
-        var look = read.CellFormats.Single(format => format.Row == 0 && format.Column == 1).Look;
-        Assert.True(look?.Italic);
-        Assert.True(look?.Bold);
+        var readRun = read.CellTexts.Single(text => text.Row == 0 && text.Column == 1).Paragraphs.SelectMany(paragraph => paragraph.Runs).Single();
+        Assert.True(readRun.Italic);
+        Assert.True(readRun.Bold);
     }
 }

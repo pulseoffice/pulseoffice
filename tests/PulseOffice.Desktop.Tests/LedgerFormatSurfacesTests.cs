@@ -196,6 +196,78 @@ public sealed class LedgerFormatSurfacesTests(HeadlessDesktopSession headless)
     }, CancellationToken.None);
 
     [Fact]
+    public Task Il_gestore_sposta_nella_selezione_senza_scavalcare_le_regole_nascoste_e_duplica_sotto() => headless.Session.Dispatch(async () =>
+    {
+        var range = CellRange.Single(CellAddress.First);
+        var elsewhere = CellRange.Single(new CellAddress(9, 9));
+        var catalog = new ConditionalRuleCatalog();
+        var shown = catalog.Default(ConditionalRuleKind.DataBar, range);
+        var hidden = catalog.Default(ConditionalRuleKind.ColorScale, elsewhere);
+        var moved = catalog.Default(ConditionalRuleKind.IconSet, range);
+        var view = new ConditionalRulesManagerView([shown, hidden, moved], range, new FixedEditing(null), EditorServices(), _texts);
+        view.Scope.SelectedIndex = 0;
+        Assert.Equal(2, view.List.ItemCount);
+
+        view.List.SelectedIndex = 1;
+        await view.Act(ConditionalRulesManagerView.ActionUp);
+        Assert.Equal([moved, shown, hidden], view.Rules);
+
+        view.List.SelectedIndex = 0;
+        await view.Act(ConditionalRulesManagerView.ActionDuplicate);
+        Assert.Equal([moved, moved, shown, hidden], view.Rules);
+        Assert.Equal(1, view.List.SelectedIndex);
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task L_editor_delle_barre_imposta_asse_e_direzione() => headless.Session.Dispatch(() =>
+    {
+        var catalog = new ConditionalRuleCatalog();
+        var view = new ConditionalRuleEditorView(catalog.Default(ConditionalRuleKind.DataBar, CellRange.Single(CellAddress.First)), string.Empty,
+            new NoReferences(), EditorServices(), _texts);
+        var boxes = view.GetLogicalDescendants().OfType<ComboBox>().ToList();
+        boxes.Single(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts["conditional.bar.axis"]).SelectedIndex = 1;
+        boxes.Single(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts["conditional.bar.direction"]).SelectedIndex = 2;
+
+        Assert.Equal(DataBarAxis.Middle, view.Rule.Bar.Axis);
+        Assert.Equal(DataBarDirection.RightToLeft, view.Rule.Bar.Direction);
+        return Task.CompletedTask;
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task L_editor_delle_icone_imposta_soglie_e_icone_per_posizione() => headless.Session.Dispatch(() =>
+    {
+        var catalog = new ConditionalRuleCatalog();
+        var view = new ConditionalRuleEditorView(catalog.Default(ConditionalRuleKind.IconSet, CellRange.Single(CellAddress.First)), string.Empty,
+            new NoReferences(), EditorServices(), _texts);
+        var count = view.Rule.IconCount;
+        var values = view.GetLogicalDescendants().OfType<TextBox>().Where(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts["conditional.icons.value"]).ToList();
+        Assert.Equal(count - 1, values.Count);
+        values[0].Text = "80";
+        Assert.Equal(count, view.Rule.Thresholds.Count);
+        Assert.Equal(80, view.Rule.Thresholds[^1].Value);
+
+        var icon = view.GetLogicalDescendants().OfType<ComboBox>().First(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts.Format("conditional.icons.icon", 1));
+        icon.SelectedIndex = 0;
+        Assert.Equal(count, view.Rule.CustomIcons.Count);
+        Assert.True(view.Rule.CustomIcons[^1].IsNone);
+        return Task.CompletedTask;
+    }, CancellationToken.None);
+
+    [Fact]
+    public Task Primi_e_ultimi_in_percentuale_si_fermano_a_cento() => headless.Session.Dispatch(() =>
+    {
+        var rule = new ConditionalRuleCatalog().Default(ConditionalRuleKind.TopBottom, CellRange.Single(CellAddress.First)) with { Operands = ["500"] };
+        var view = new ConditionalRuleEditorView(rule, string.Empty, new NoReferences(), EditorServices(), _texts);
+        Assert.Equal("500", view.Draft.TypedOperands[0]);
+        var op = view.GetLogicalDescendants().OfType<ComboBox>().Single(box => Avalonia.Automation.AutomationProperties.GetName(box) == _texts["condition.operator"]);
+        op.SelectedIndex = 2;
+
+        Assert.Equal(ConditionOperator.TopPercent, view.Rule.Operator);
+        Assert.Equal("100", view.Draft.TypedOperands[0]);
+        return Task.CompletedTask;
+    }, CancellationToken.None);
+
+    [Fact]
     public Task L_editor_cambia_tipo_e_l_anteprima_lo_segue() => headless.Session.Dispatch(() =>
     {
         var catalog = new ConditionalRuleCatalog();

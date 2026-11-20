@@ -54,6 +54,14 @@ public sealed class StyleFromSelection(IStoryCatalog stories, IParagraphText tex
         updated.Character = character.Over(existing.Character);
         recorder.Touch(styles, () => styles.All, styles.ReplaceAll);
         styles.Replace(updated);
+        if (updated.Character != existing.Character && updated.LinkedStyleName is { } linked && document.Styles.Character.Find(linked) is { } partner && partner.LinkedStyleName == updated.Name)
+        {
+            var characters = document.Styles.Character;
+            recorder.Touch(characters, () => characters.All, characters.ReplaceAll);
+            var synced = (CharacterStyle)partner.Clone();
+            synced.Character = updated.Character;
+            characters.Replace(synced);
+        }
         recorder.Touch(paragraph);
         paragraph.Content = Cleared(content, character);
         return recorder.Commit(history);
@@ -81,6 +89,14 @@ public sealed class StyleFromSelection(IStoryCatalog stories, IParagraphText tex
         var styles = document.Styles.Character;
         recorder.Touch(styles, () => styles.All, styles.ReplaceAll);
         styles.Replace(updated);
+        if (updated.Character != existing.Character && updated.LinkedStyleName is { } linked && document.Styles.Paragraph.Find(linked) is { } partner && partner.LinkedStyleName == name)
+        {
+            var paragraphs = document.Styles.Paragraph;
+            recorder.Touch(paragraphs, () => paragraphs.All, paragraphs.ReplaceAll);
+            var synced = (ParagraphStyle)partner.Clone();
+            synced.Character = updated.Character;
+            paragraphs.Replace(synced);
+        }
         Map(document, recorder, range, item => item.StyleName == name ? Strip(item, properties) : item);
         return recorder.Commit(history);
     }

@@ -21,7 +21,11 @@ public sealed class PptxDeckTableMapper
     private const string GridStyleId = "{5940675A-B579-460E-94D1-54222C63F5DA}";
     private const string TableUri = "http://schemas.openxmlformats.org/drawingml/2006/table";
 
-    public P.GraphicFrame Build(ObjectElement element, DataTableObject table, uint id)
+    private readonly PptxGridTableStyles _grid = new(new TableGridLook());
+
+    public P.GraphicFrame Build(ObjectElement element, DataTableObject table, uint id) => Build(element, table, id, null);
+
+    internal P.GraphicFrame Build(ObjectElement element, DataTableObject table, uint id, string? gridStyleId)
     {
         var snapshot = table.Snapshot;
         var columns = snapshot.Columns.Count;
@@ -41,7 +45,7 @@ public sealed class PptxDeckTableMapper
         });
 
         if (!table.Style.OwnLook && table.Style.Grid)
-            tbl.TableProperties!.Append(new D.TableStyleId(GridStyleId));
+            tbl.TableProperties!.Append(new D.TableStyleId(gridStyleId ?? GridStyleId));
 
         var grid = new D.TableGrid();
         for (var c = 0; c < columns; c++)
@@ -79,7 +83,7 @@ public sealed class PptxDeckTableMapper
         {
             var text = c < cells.Count ? cells[c]?.ToString() ?? string.Empty : string.Empty;
             var format = index.Format(rowIndex, c);
-            var cell = Cell(text, format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.OwnLook ? format?.Look ?? TableCellLook.Plain : null);
+            var cell = Cell(text, index.Text(rowIndex, c, text), format?.VerticalAlign ?? CellVerticalAlign.Top, table.Style.OwnLook ? format?.Look ?? TableCellLook.Plain : null);
             if (format is { HasLayout: true }) Laid(cell.TableCellProperties!, format);
 
             if (index.Origin(rowIndex, c) is { } origin)
@@ -99,7 +103,7 @@ public sealed class PptxDeckTableMapper
         return row;
     }
 
-    private D.TableCell Cell(string text, CellVerticalAlign valign, TableCellLook? look)
+    private D.TableCell Cell(string text, TableCellText? rich, CellVerticalAlign valign, TableCellLook? look)
     {
         var properties = new D.TableCellProperties();
         if (valign == CellVerticalAlign.Center) properties.Anchor = D.TextAnchoringTypeValues.Center;
@@ -115,7 +119,9 @@ public sealed class PptxDeckTableMapper
         }
 
         var body = new D.TextBody(new D.BodyProperties(), new D.ListStyle());
-        foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        IReadOnlyList<TableCellParagraph> lines = rich?.Paragraphs
+            ?? text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => new TableCellParagraph([new TableTextRun(line)])).ToList();
+        foreach (var line in lines)
         {
             var paragraph = new D.Paragraph();
             if (look?.Horizontal is { } horizontal)
@@ -128,10 +134,33 @@ public sealed class PptxDeckTableMapper
                         _ => D.TextAlignmentTypeValues.Left,
                     },
                 });
-            paragraph.Append(line.Length == 0 ? new D.EndParagraphRunProperties() : new D.Run(RunProperties(look), new D.Text(line)));
+            if (line.Text.Length == 0) paragraph.Append(new D.EndParagraphRunProperties());
+            foreach (var run in line.Runs.Where(run => run.Text.Length > 0))
+            {
+                var pieces = run.Text.Split('\n');
+                for (var i = 0; i < pieces.Length; i++)
+                {
+                    if (i > 0) paragraph.Append(new D.Break(RunProperties(look, run)));
+                    if (pieces[i].Length > 0) paragraph.Append(new D.Run(RunProperties(look, run), new D.Text(pieces[i])));
+                }
+            }
             body.Append(paragraph);
         }
         return new D.TableCell(body, properties);
+    }
+
+    private D.RunProperties RunProperties(TableCellLook? look, TableTextRun run)
+    {
+        if (look is not null) return RunProperties(run.Over(look));
+        var properties = new D.RunProperties();
+        if (run.FontSize is { } size) properties.FontSize = (int)Math.Round(size * 100);
+        if (run.Bold is { } bold) properties.Bold = bold;
+        if (run.Italic is { } italic) properties.Italic = italic;
+        if (run.Underline is { } underline) properties.Underline = underline ? D.TextUnderlineValues.Single : D.TextUnderlineValues.None;
+        if (run.Strikethrough is { } strike) properties.Strike = strike ? D.TextStrikeValues.SingleStrike : D.TextStrikeValues.NoStrike;
+        if (run.TextHex is { } ink) properties.Append(new D.SolidFill(Rgb(ink)));
+        if (run.FontFamily is { Length: > 0 } family) properties.Append(new D.LatinFont { Typeface = family });
+        return properties;
     }
 
     private void Laid(D.TableCellProperties properties, TableCellFormat format)
@@ -219,6 +248,7 @@ public sealed class PptxDeckTableMapper
 
         var merges = new List<TableMerge>();
         var cellFormats = new List<TableCellFormat>();
+        var cellTexts = new List<TableCellText>();
         var headerShift = firstRow ? 1 : 0;
         for (var displayed = 0; displayed < rows.Count; displayed++)
         {
@@ -227,6 +257,7 @@ public sealed class PptxDeckTableMapper
             for (var c = 0; c < cellElements.Count; c++)
             {
                 if (cellElements[c].HorizontalMerge?.Value == true || cellElements[c].VerticalMerge?.Value == true) continue;
+                if (RichText(cellElements[c], r, c) is { } rich) cellTexts.Add(rich);
                 var colSpan = Math.Clamp(cellElements[c].GridSpan?.Value ?? 1, 1, cellElements.Count - c);
                 var rowSpan = Math.Clamp(cellElements[c].RowSpan?.Value ?? 1, 1, rows.Count - displayed);
                 if (colSpan > 1 || rowSpan > 1) merges.Add(new TableMerge(r, c, rowSpan, colSpan));
@@ -235,7 +266,12 @@ public sealed class PptxDeckTableMapper
             }
         }
 
-        var ownLook = _styles is not null && _styles.HasLook(tbl, presentation);
+        var named = _styles?.Style(tbl, presentation);
+        var namedGrid = _grid.IsOurs(named)
+            || tbl.TableProperties?.GetFirstChild<D.TableStyleId>()?.Text is { } styleId && string.Equals(styleId, GridStyleId, StringComparison.OrdinalIgnoreCase);
+        var cellLooks = tbl.Descendants<D.TableCellProperties>().Any(cell => cell.HasChildren);
+        var ownLook = _styles is not null && !(namedGrid && !cellLooks) && _styles.HasLook(tbl, presentation);
+        var accent = !ownLook && _grid.IsOurs(named) ? _grid.AccentOf(named!) : null;
         if (ownLook)
         {
             var style = _styles!.Style(tbl, presentation);
@@ -253,6 +289,7 @@ public sealed class PptxDeckTableMapper
                     cellFormats.Add((Format(cells[c], row, c) ?? new TableCellFormat(row, c, CellVerticalAlign.Top)) with { Look = look });
                 }
             }
+            cellTexts = [.. cellTexts.Select(text => BeyondLook(text, cellFormats)).OfType<TableCellText>()];
         }
 
         var bounds = ReadBounds(frame.Transform);
@@ -271,9 +308,11 @@ public sealed class PptxDeckTableMapper
                 LastRow = tbl.TableProperties?.LastRow?.Value ?? false,
                 OwnLook = ownLook,
                 Grid = !ownLook,
+                AccentHex = accent,
             },
             Merges = merges,
             CellFormats = cellFormats,
+            CellTexts = cellTexts,
             Layout = ReadLayout(tbl, rows),
         };
 
@@ -326,6 +365,63 @@ public sealed class PptxDeckTableMapper
             D.Break => "\n",
             _ => string.Empty,
         }))) ?? []);
+
+    private TableCellText? RichText(D.TableCell cell, int row, int column)
+    {
+        var paragraphs = cell.TextBody?.Elements<D.Paragraph>().Select(paragraph => new TableCellParagraph([.. Merged(paragraph.ChildElements.Select(child => child switch
+        {
+            D.Run run => RunOf(run.Text?.Text ?? string.Empty, run.RunProperties),
+            D.Field field => RunOf(field.Text?.Text ?? string.Empty, field.RunProperties),
+            D.Break line => RunOf("\n", line.RunProperties),
+            _ => null,
+        }).OfType<TableTextRun>())])).ToList() ?? [];
+        var text = new TableCellText(row, column, paragraphs);
+        return text.IsPlain ? null : text;
+    }
+
+    private TableCellText? BeyondLook(TableCellText text, IReadOnlyList<TableCellFormat> formats)
+    {
+        if (formats.FirstOrDefault(format => format.Row == text.Row && format.Column == text.Column)?.Look is not { } look) return text;
+        var stripped = text with
+        {
+            Paragraphs = [.. text.Paragraphs.Select(paragraph => new TableCellParagraph([.. Merged(paragraph.Runs.Select(run => run.Beyond(look)))]))],
+        };
+        return stripped.IsPlain ? null : stripped;
+    }
+
+    private IEnumerable<TableTextRun> Merged(IEnumerable<TableTextRun> runs)
+    {
+        TableTextRun? pending = null;
+        foreach (var run in runs)
+        {
+            if (pending is not null && pending.SameFormat(run)) pending = pending with { Text = pending.Text + run.Text };
+            else
+            {
+                if (pending is not null) yield return pending;
+                pending = run;
+            }
+        }
+        if (pending is not null) yield return pending;
+    }
+
+    private const double LargestFontSize = 4000;
+
+    private TableTextRun RunOf(string text, OpenXmlElement? properties)
+    {
+        if (properties is not D.TextCharacterPropertiesType format) return new TableTextRun(text);
+        var underline = format.Underline?.Value;
+        var strike = format.Strike?.Value;
+        return new TableTextRun(text)
+        {
+            Bold = format.Bold?.Value,
+            Italic = format.Italic?.Value,
+            Underline = underline is null ? null : underline != D.TextUnderlineValues.None,
+            Strikethrough = strike is null ? null : strike != D.TextStrikeValues.NoStrike,
+            FontSize = format.FontSize?.Value is { } size && size > 0 && size / 100.0 <= LargestFontSize ? size / 100.0 : null,
+            TextHex = format.GetFirstChild<D.SolidFill>()?.RgbColorModelHex?.Val?.Value is { Length: 6 } hex ? "#" + hex.ToUpperInvariant() : null,
+            FontFamily = format.GetFirstChild<D.LatinFont>()?.Typeface?.Value is { Length: > 0 and <= 256 } family && !family.StartsWith('+') ? family : null,
+        };
+    }
 
     private DocumentRect ReadBounds(P.Transform? xfrm)
     {

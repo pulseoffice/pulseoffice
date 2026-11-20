@@ -84,6 +84,7 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
     {
         private readonly OdfStyleMapper _styles = new();
         private readonly OdfConditionalMapper _conditionals = new();
+        private readonly OdsStyleMapCells _styleMapCells = new();
         private readonly OdfChartMapper _charts = new();
         private OdfShapeMapper? _shapeMapper;
         private OdfShapeMapper Shapes => _shapeMapper ??= new OdfShapeMapper(_images);
@@ -161,7 +162,8 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
             writer.WriteAttributeString("version", Namespaces.Office.NamespaceName, "1.3");
             Emit(writer, FontDeclarations());
             Emit(writer, new XElement(Namespaces.Office + "automatic-styles",
-                _styles.Declarations, _layout.Declarations, _tableStyles.Declarations, Shapes.Declarations, _images.Declarations));
+                _styles.Declarations, _layout.Declarations, _tableStyles.Declarations, Shapes.Declarations, _images.Declarations,
+                _styleMapCells.Declarations(_styles.Declarations)));
 
             using (var reader = XmlReader.Create(body, new XmlReaderSettings { CloseInput = false }))
             {
@@ -377,15 +379,17 @@ public sealed class OdsWriter(bool template, SignatureLineImage signatureImages,
 
             foreach (var column in BuildColumns(sheet, Math.Max(columnCount, 1))) Emit(writer, column);
 
+            _styleMapCells.Begin(_conditionals.StyleMapGroups(workbook, sheet),
+                column => sheet.Layout.ColumnStyle(column) is { } columnStyle ? Cells.DefaultStyleName(columnStyle, workbook) : null);
             if (lastRow < 0)
             {
                 var emptyRows = Padded(sheet, RepeatedEmptyRows(CellAddress.MaxRows), -1);
                 emptyRows.Add(new XAttribute(Namespaces.Table + "style-name", _layout.RowStyle(sheet.Layout.DefaultRowHeight, false, !sheet.Layout.DefaultRowHeightManual)));
-                Emit(writer, emptyRows);
+                foreach (var span in _styleMapCells.Apply([new OdsRowSpan(0, CellAddress.MaxRows - 1, emptyRows)])) Emit(writer, span.Element);
             }
             else
             {
-                _rowGroups.Write(writer, RowSpans(sheet, index, lastRow, frames, sources), sheet.RowGroups, sheet.PrintTitleRows,
+                _rowGroups.Write(writer, _styleMapCells.Apply(RowSpans(sheet, index, lastRow, frames, sources)), sheet.RowGroups, sheet.PrintTitleRows,
                     element => Emit(writer, element));
             }
 

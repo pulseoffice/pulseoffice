@@ -21,6 +21,10 @@ public interface IDeckTableKeys
     DataTableObject Type(DataTableObject table, TableCellRange cell, string typed, bool replace);
 
     DataTableObject Erase(DataTableObject table, TableCellRange cell);
+
+    string? Text(DataTableObject table, TableCellRange cell);
+
+    DataTableObject Write(DataTableObject table, TableCellRange cell, string text);
 }
 
 public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
@@ -79,6 +83,23 @@ public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
         return before is null ? table : WithText(table, row, column, replace ? typed : before + typed);
     }
 
+    public string? Text(DataTableObject table, TableCellRange cell)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        var (row, column) = Anchor(new TableCellIndex(table), cell.FirstRow, cell.FirstColumn);
+        return TextAt(table, row, column);
+    }
+
+    public DataTableObject Write(DataTableObject table, TableCellRange cell, string text)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(text);
+        var (row, column) = Anchor(new TableCellIndex(table), cell.FirstRow, cell.FirstColumn);
+        var before = TextAt(table, row, column);
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+        return before is null || before == normalized ? table : WithText(table, row, column, normalized);
+    }
+
     public DataTableObject Erase(DataTableObject table, TableCellRange cell)
     {
         ArgumentNullException.ThrowIfNull(table);
@@ -100,6 +121,7 @@ public sealed class DeckTableKeys(ITableStructure structure) : IDeckTableKeys
 
     private static DataTableObject WithText(DataTableObject table, int row, int column, string text)
     {
+        table = table with { CellTexts = [.. table.CellTexts.Where(rich => rich.Row != row || rich.Column != column || rich.Matches(text))] };
         var snapshot = table.Snapshot;
         if (row == TableCellFormat.HeaderRow)
             return table with { Snapshot = snapshot with { Columns = [.. snapshot.Columns.Select((c, i) => i == column ? c with { Name = text } : c)] } };

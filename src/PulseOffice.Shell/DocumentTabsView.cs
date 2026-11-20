@@ -15,6 +15,8 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
     private readonly IDocumentWorkspace _workspace;
     private readonly DesignTokens.Metrics _metrics;
     private readonly StackPanel _tabs;
+    private readonly Border _dropIndicator;
+    private OpenDocument? _dragged;
     private readonly List<(Control Tab, OpenDocument Document)> _shown = [];
 
     private readonly ITextCatalog _texts;
@@ -31,9 +33,21 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
 
         this.Themed(BackgroundProperty, Palette.Keys.SurfaceRaised);
 
+        _dropIndicator = new Border
+        {
+            Width = 2,
+            IsVisible = false,
+            IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        }.Themed(Border.BackgroundProperty, Palette.Keys.TextPrimary);
+
+        var strip = new Panel();
+        strip.Children.Add(_tabs);
+        strip.Children.Add(_dropIndicator);
+
         Content = new ScrollViewer
         {
-            Content = _tabs,
+            Content = strip,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
         };
@@ -53,9 +67,36 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
 
     private OpenDocument? _pressed;
 
+    public int DropIndicatorIndex { get; private set; } = -1;
+
+    public int ShowDropIndicator(OpenDocument document, double x)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var target = TabIndexAt(x);
+        var from = _shown.FindIndex(entry => ReferenceEquals(entry.Document, document));
+        if (target < 0 || target == from)
+        {
+            HideDropIndicator();
+            return -1;
+        }
+
+        var bounds = _shown[target].Tab.Bounds;
+        _dropIndicator.Margin = new Thickness((target > from ? bounds.Right : bounds.Left) - 1, 0, 0, 0);
+        _dropIndicator.IsVisible = true;
+        DropIndicatorIndex = target;
+        return target;
+    }
+
+    public void HideDropIndicator()
+    {
+        _dropIndicator.IsVisible = false;
+        DropIndicatorIndex = -1;
+    }
+
     public void Drop(OpenDocument document, double x)
     {
         ArgumentNullException.ThrowIfNull(document);
+        HideDropIndicator();
         var target = TabIndexAt(x);
         if (target >= 0) _workspace.Move(document, target);
         _workspace.Activate(document);
@@ -171,19 +212,29 @@ public sealed class DocumentTabsView : ContentControl, PulseOffice.UI.Controls.R
                 return;
             }
 
+            if (!e.GetCurrentPoint(tab).Properties.IsLeftButtonPressed) return;
+            _dragged = document;
             if (ReferenceEquals(_workspace.Active, document)) return;
             _pressed = document;
+        };
+        tab.PointerMoved += (_, e) =>
+        {
+            if (!ReferenceEquals(_dragged, document) || !e.GetCurrentPoint(tab).Properties.IsLeftButtonPressed) return;
+            ShowDropIndicator(document, e.GetPosition(_tabs).X);
         };
         tab.PointerReleased += (_, e) =>
         {
             if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left || e.Source is Button) return;
             _pressed = null;
+            _dragged = null;
             Drop(document, e.GetPosition(_tabs).X);
         };
         tab.PointerCaptureLost += (_, _) =>
         {
             if (ReferenceEquals(_pressed, document)) _workspace.Activate(document);
             _pressed = null;
+            _dragged = null;
+            HideDropIndicator();
         };
 
         return tab;

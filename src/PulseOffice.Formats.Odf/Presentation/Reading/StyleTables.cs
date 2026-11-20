@@ -307,6 +307,10 @@ internal sealed class OdpStyleSheetBuilder(OdfValues values, SmilTransitionMappe
             content.Descendants(OdfPackage.Namespaces.Style + "style")
                 .Where(style => (string?)style.Attribute(OdfPackage.Namespaces.Style + "family") == "table-cell")
                 .GroupBy(style => (string?)style.Attribute(OdfPackage.Namespaces.Style + "name") ?? string.Empty)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal),
+            content.Descendants(OdfPackage.Namespaces.Style + "style")
+                .Where(style => (string?)style.Attribute(OdfPackage.Namespaces.Style + "family") == "text")
+                .GroupBy(style => (string?)style.Attribute(OdfPackage.Namespaces.Style + "name") ?? string.Empty)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal)),
         Present(new PageBackgroundTable(values).Read(content)),
         new PageImageTable(styles).Read(content),

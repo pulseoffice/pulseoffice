@@ -259,6 +259,8 @@ public sealed class DocumentWorkspace : IDocumentWorkspace
         if (ReferenceEquals(_deferredActivation, document)) _deferredActivation = null;
 
         if (_listeners.Remove(document, out var listener)) document.Changed -= listener;
+        if (_documents.Any(other => ReferenceEquals(other.History, document.History)))
+            (document.View as IDocumentViewRelease)?.ReleaseSharedModel();
 
         if (ReferenceEquals(Active, document))
         {

@@ -30,6 +30,19 @@ internal sealed class StyleMapConditionText
         }
         return null;
     }
+
+    public string? ToStyleMapCondition(string? value)
+    {
+        var text = value?.Trim() ?? string.Empty;
+        if (text.StartsWith("formula-is(", StringComparison.Ordinal)) return "of:is-true-formula(" + text["formula-is(".Length..];
+        if (text.StartsWith("not-between(", StringComparison.Ordinal)) return "of:cell-content-is-not-between(" + text["not-between(".Length..];
+        if (text.StartsWith("between(", StringComparison.Ordinal)) return "of:cell-content-is-between(" + text["between(".Length..];
+        foreach (var symbol in _comparisons)
+            if (text.StartsWith(symbol, StringComparison.Ordinal) && text.Length > symbol.Length) return "of:cell-content()" + text;
+        return null;
+    }
+
+    private readonly IReadOnlyList<string> _comparisons = [">=", "<=", "!=", "=", ">", "<"];
 }
 
 internal sealed class OdsStyleMaps
@@ -38,6 +51,9 @@ internal sealed class OdsStyleMaps
     private readonly Dictionary<XElement, List<StyleMapRegion>> _regions = [];
     private readonly Dictionary<XElement, Dictionary<(string Style, int Left, int Right), int>> _open = [];
     private readonly TableCells _cells = new();
+    private readonly TableRows _rows = new();
+    private readonly Dictionary<XElement, IReadOnlyList<(string Style, int Left, int Right)>> _columnStyles = [];
+    private readonly XName _defaultStyleName = Namespaces.Table + "default-cell-style-name";
     private readonly XName _styleName = Namespaces.Table + "style-name";
 
     public void Load(params XDocument?[] documents)
@@ -56,21 +72,63 @@ internal sealed class OdsStyleMaps
     {
         if (_maps.Count == 0 || row.Index >= CellAddress.MaxRows) return;
         var bottom = (int)Math.Min((long)row.Index + row.Repeat - 1, CellAddress.MaxRows - 1);
+        var columns = ColumnStylesOf(table);
+        var rowDefault = (string?)row.Element.Attribute(_defaultStyleName);
         (string Style, int Left, int Right)? run = null;
         foreach (var cell in _cells.Of(row))
         {
             if (cell.Address.Column >= CellAddress.MaxColumns) break;
             var right = (int)Math.Min((long)cell.Address.Column + cell.Repeat - 1, CellAddress.MaxColumns - 1);
-            var style = (string?)cell.Element.Attribute(_styleName);
-            if (style is not null && _maps.ContainsKey(style) && run is { } current && current.Style == style && current.Right == cell.Address.Column - 1)
+            var own = (string?)cell.Element.Attribute(_styleName) ?? rowDefault;
+            foreach (var (style, left, end) in Segments(own, columns, cell.Address.Column, right))
             {
-                run = (current.Style, current.Left, right);
-                continue;
+                if (style is not null && _maps.ContainsKey(style) && run is { } current && current.Style == style && current.Right == left - 1)
+                {
+                    run = (current.Style, current.Left, end);
+                    continue;
+                }
+                if (run is { } finished) Add(table, finished, row.Index, bottom);
+                run = style is not null && _maps.ContainsKey(style) ? (style, left, end) : null;
             }
-            if (run is { } finished) Add(table, finished, row.Index, bottom);
-            run = style is not null && _maps.ContainsKey(style) ? (style, cell.Address.Column, right) : null;
         }
         if (run is { } last) Add(table, last, row.Index, bottom);
+    }
+
+    private IEnumerable<(string? Style, int Left, int Right)> Segments(string? own, IReadOnlyList<(string Style, int Left, int Right)> columns, int left, int right)
+    {
+        if (own is not null || columns.Count == 0)
+        {
+            yield return (own, left, right);
+            yield break;
+        }
+        var position = left;
+        foreach (var column in columns)
+        {
+            if (column.Right < position) continue;
+            if (column.Left > right) break;
+            if (column.Left > position) yield return (null, position, column.Left - 1);
+            var end = Math.Min(column.Right, right);
+            yield return (column.Style, Math.Max(column.Left, position), end);
+            position = end + 1;
+            if (position > right) yield break;
+        }
+        if (position <= right) yield return (null, position, right);
+    }
+
+    private IReadOnlyList<(string Style, int Left, int Right)> ColumnStylesOf(XElement table)
+    {
+        if (_columnStyles.TryGetValue(table, out var known)) return known;
+        var styles = new List<(string Style, int Left, int Right)>();
+        var index = 0;
+        foreach (var column in _rows.Columns(table))
+        {
+            var repeat = _rows.Repeat(column, Namespaces.Table + "number-columns-repeated");
+            if (index < CellAddress.MaxColumns && (string?)column.Attribute(_defaultStyleName) is { Length: > 0 } name && _maps.ContainsKey(name))
+                styles.Add((name, index, (int)Math.Min((long)index + repeat - 1, CellAddress.MaxColumns - 1)));
+            index = _rows.Advance(index, repeat);
+        }
+        _columnStyles[table] = styles;
+        return styles;
     }
 
     public IReadOnlyList<StyleMapRegion> RegionsOf(XElement table) => _regions.GetValueOrDefault(table) ?? [];

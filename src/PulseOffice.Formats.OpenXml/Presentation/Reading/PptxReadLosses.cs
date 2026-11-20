@@ -53,26 +53,3 @@ internal sealed class PptxCommentThreads : IPptxReadLoss
                 .Any(comment => comment.GetFirstChild<DocumentFormat.OpenXml.Office2021.PowerPoint.Comment.CommentReplyList>()?.HasChildren == true
                     || comment.Status?.Value == DocumentFormat.OpenXml.Office2021.PowerPoint.Comment.CommentStatus.Resolved) == true));
 }
-
-internal sealed class PptxMixedTableRuns : IPptxReadLoss
-{
-    public Diagnostic Loss { get; } = Diagnostic.Info("PPTX225",
-        "Some table cells have text runs with different formatting: a Deck table cell has one look, so it takes the format of its first run.");
-
-    public bool Present(PresentationPart presentation) =>
-        presentation.SlideParts.Any(slide => slide.Slide?.Descendants<DocumentFormat.OpenXml.Drawing.TableCell>().Any(Mixed) == true);
-
-    private bool Mixed(DocumentFormat.OpenXml.Drawing.TableCell cell) =>
-        cell.TextBody?.Descendants<DocumentFormat.OpenXml.Drawing.Run>()
-            .Where(run => !string.IsNullOrEmpty(run.Text?.Text))
-            .Select(run => Key(run.RunProperties))
-            .Distinct(StringComparer.Ordinal)
-            .Skip(1).Any() == true;
-
-    private string Key(DocumentFormat.OpenXml.Drawing.RunProperties? run) => string.Join('|',
-        run?.Bold?.Value == true, run?.Italic?.Value == true,
-        run?.Underline?.InnerText is { Length: > 0 } underline ? underline : "none",
-        run?.Strike?.InnerText is { Length: > 0 } strike ? strike : "noStrike",
-        run?.FontSize?.Value, run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.SolidFill>()?.OuterXml,
-        run?.GetFirstChild<DocumentFormat.OpenXml.Drawing.LatinFont>()?.Typeface?.Value);
-}

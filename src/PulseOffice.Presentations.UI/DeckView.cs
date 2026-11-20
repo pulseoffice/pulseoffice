@@ -12,7 +12,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions, IDeckViewHost
+public sealed class DeckView : UserControl, PulseOffice.Shell.IDocumentViewRelease, PulseOffice.Shell.IPendingEditsOwner, PulseOffice.UI.Controls.Services.IDocumentFocusTarget, PulseOffice.UI.Controls.Navigation.IDocumentRegions, IDeckViewHost
 {
     private readonly DeckViewState _state;
     private readonly Presentation _deck;
@@ -156,9 +156,10 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
         _menus = new DeckCanvasMenus(_state, this, _text, _shapes, _filmstrip, _ancestry, contextMenus, contextChooser,
             menuKey ?? new PulseOffice.UI.Controls.Services.ContextMenuKey(), drawing);
         _canvasEditing = new DeckCanvasEditing(_state, this, connectors);
+        var tableKeys = new DeckTableKeys(new PulseOffice.Document.Embedding.TableStructure(new PulseOffice.Document.Tables.TableSpans(), new PulseOffice.Document.Tables.ColumnWidths()));
         _stageKeys = new DeckStageKeys(_state, this, _text, _shapes, _canvasEditing, drawing, keyNavigation,
             keys ?? new PulseOffice.UI.Controls.Services.DocumentKeyScope(), _chords, nudges ?? new PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys(),
-            new DeckTableKeys(new PulseOffice.Document.Embedding.TableStructure(new PulseOffice.Document.Tables.TableSpans(), new PulseOffice.Document.Tables.ColumnWidths())));
+            tableKeys, new DeckTableCellEditor(_state, tableKeys));
         _inspector = new DeckInspector(_state, this, _player, new PulseOffice.Presentations.UI.Motion.DeckElementNames(_state.Texts));
         _modes = new DeckModeViews(_state, this, renderer,
             new DeckMasterViews(_state, this, renderer, handoutLayout ?? new HandoutLayout(), masterSlides ?? new SlideFactory(), new DeckChoiceNames(_state.Texts),
@@ -178,11 +179,7 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
 
         Content = Build();
 
-        _deck.Changed += (_, _) =>
-        {
-            _lastEditedId = _state.Current?.Id;
-            Sync();
-        };
+        _deck.Changed += OnDeckChanged;
         _actions.SlideFocusRequested += (_, slide) =>
         {
             _lastEditedId = slide.Id;
@@ -604,4 +601,18 @@ public sealed class DeckView : UserControl, PulseOffice.Shell.IPendingEditsOwner
     void IDeckViewHost.GoToSlide(int index) => GoToSlide(index);
 
     void IDeckViewHost.SelectElements(IReadOnlyList<SlideElement> elements) => SelectElements(elements);
+
+    public bool IsSharedModelReleased { get; private set; }
+
+    private void OnDeckChanged(object? sender, EventArgs e)
+    {
+        _lastEditedId = _state.Current?.Id;
+        Sync();
+    }
+
+    public void ReleaseSharedModel()
+    {
+        _deck.Changed -= OnDeckChanged;
+        IsSharedModelReleased = true;
+    }
 }

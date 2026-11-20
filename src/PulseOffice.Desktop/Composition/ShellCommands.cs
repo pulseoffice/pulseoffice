@@ -227,6 +227,10 @@ public sealed class ShellCommands(
 
         Cycle("shell.window.previousDocument", "Ctrl+Alt+PageUp", -1),
 
+        MoveTab("shell.window.moveTabLeft", "Ctrl+Shift+PageUp", -1),
+
+        MoveTab("shell.window.moveTabRight", "Ctrl+Shift+PageDown", 1),
+
         new CommandDefinition
         {
             Id = new CommandId("shell.help.about"),
@@ -285,6 +289,28 @@ public sealed class ShellCommands(
             return Task.CompletedTask;
         },
     };
+
+    private CommandDefinition MoveTab(string id, string gesture, int step) => new()
+    {
+        Id = new CommandId(id),
+        MenuPath = "view",
+        DefaultGesture = gesture,
+        Surface = CommandSurface.Advanced,
+        RequiredState = DocumentState.DocumentOpen,
+        EnabledWhen = _ => TabTarget(step) is not null,
+        Execute = (_, _) =>
+        {
+            if (workspace.Active is { } active && TabTarget(step) is { } target) workspace.Move(active, target);
+            return Task.CompletedTask;
+        },
+    };
+
+    private int? TabTarget(int step)
+    {
+        if (workspace.Active is not { } active) return null;
+        var target = workspace.Documents.ToList().IndexOf(active) + step;
+        return target >= 0 && target < workspace.Documents.Count ? target : null;
+    }
 
     private CommandDefinition New(ModuleKind module)
     {

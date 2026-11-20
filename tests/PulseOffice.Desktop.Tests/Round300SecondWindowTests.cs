@@ -65,6 +65,8 @@ public sealed class Round300SecondWindowTests(HeadlessDesktopSession headless)
                 await Run("shell.window.close");
 
                 Assert.DoesNotContain(second, workspace.Documents);
+                Assert.True(((IDocumentViewRelease)second.View).IsSharedModelReleased);
+                Assert.False(((IDocumentViewRelease)first.View).IsSharedModelReleased);
                 Assert.Contains(first, workspace.Documents);
                 Assert.False(registry.Find(new CommandId("shell.window.close"))!.IsEnabled(workspace.Context));
             }

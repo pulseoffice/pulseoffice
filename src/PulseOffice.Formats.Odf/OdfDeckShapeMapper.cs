@@ -78,6 +78,9 @@ public sealed class OdfDeckShapeMapper
 
     public XElement BuildTable(ObjectElement element, DataTableObject table, XElement autostyles) => _tables.Build(element, table, autostyles);
 
+    internal XElement BuildTable(ObjectElement element, DataTableObject table, XElement autostyles, OdfTableTemplateSink templates) =>
+        _tables.Build(element, table, autostyles, templates);
+
     public ObjectElement? ReadTable(XElement frame, string id, OdfTableStyles styles) =>
         _tables.Read(frame, id, styles);
 }

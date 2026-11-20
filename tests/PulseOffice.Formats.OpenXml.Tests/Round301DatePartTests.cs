@@ -48,7 +48,7 @@ public sealed class Round301DatePartTests
         var pictures = new WordDatePictures();
 
         Assert.Equal("Q3 Q 32", text);
-        Assert.Equal("Q yyyy W", pictures.FromWord(pictures.ToWord("Q yyyy W")));
+        Assert.Equal("'Q' yyyy 'W'", pictures.ToWord("Q yyyy W"));
     }
 }
 

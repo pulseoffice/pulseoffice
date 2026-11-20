@@ -49,6 +49,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
     private readonly DialogFooter _footer;
     private readonly Dictionary<ConditionalRuleKind, ConditionalRule> _byKind = [];
     private readonly Dictionary<ConditionalRuleKind, string[]> _operandsByKind = [];
+    private readonly ConditionalVisualOptions _visual;
     private ConditionalRule _rule;
     private ConditionalRuleKind _kind;
     private string[] _operands;
@@ -63,6 +64,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
         _operands = [.. initial.Operands.Select(operand => DisplayOperand(_kind, operand))];
         _formula = displayFormula ?? string.Empty;
         _byKind[_kind] = initial;
+        _visual = new ConditionalVisualOptions(services.Painting, texts, _metrics, () => _rule, Update);
 
         _kinds = new ThumbnailGallery<ConditionalRuleKind>(
             [.. services.Catalog.Kinds.Select(kind => new ThumbnailGalleryItem<ConditionalRuleKind>(
@@ -162,7 +164,22 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
             Show(_texts["conditional.error.value"]);
             return;
         }
+        if (_kind == ConditionalRuleKind.TopBottom && CountError() is { } countError)
+        {
+            Show(countError);
+            return;
+        }
         Completed?.Invoke(this, Draft);
+    }
+
+    private bool IsPercent => _rule.Operator is ConditionOperator.TopPercent or ConditionOperator.BottomPercent;
+
+    private string? CountError()
+    {
+        var limit = IsPercent ? 100 : 1000;
+        return double.TryParse(_operands.FirstOrDefault(), NumberStyles.Float, CultureInfo.CurrentCulture, out var count) && count >= 1 && count <= limit && count == Math.Floor(count)
+            ? null
+            : _texts[IsPercent ? "conditional.error.percent" : "conditional.error.count"];
     }
 
     private int NeedsValues() => _kind switch
@@ -205,7 +222,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
             {
                 if (box.SelectedIndex < 0) return;
                 Update(_rule with { Operator = operators[box.SelectedIndex] });
-                if (_kind == ConditionalRuleKind.CellValue) Build();
+                if (_kind is ConditionalRuleKind.CellValue or ConditionalRuleKind.TopBottom) Build();
             };
             _parameters.Children.Add(box);
         }
@@ -220,7 +237,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
                 break;
             case ConditionalRuleKind.TopBottom:
                 var count = new MeasureField(
-                    new MeasureEntry(new MeasureOptions(string.Empty, 1, 1000, 1) { Integer = true }, _services.Units, CultureInfo.CurrentCulture),
+                    new MeasureEntry(new MeasureOptions(string.Empty, 1, IsPercent ? 100 : 1000, 1) { Integer = true }, _services.Units, CultureInfo.CurrentCulture),
                     double.TryParse(_operands.FirstOrDefault(), NumberStyles.Float, CultureInfo.CurrentCulture, out var n) ? n : 10,
                     _texts, _metrics, _services.Icons, _texts["condition.count"], boxWidth: 56);
                 Operand(0, count.Value.ToString(CultureInfo.CurrentCulture));
@@ -368,6 +385,7 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
         ], null, _metrics, _texts["conditional.bar.fill"], _rule.Bar.Gradient ? 0 : 1, showLabels: true);
         fill.SelectionChanged += (_, index) => Update(_rule with { Bar = _rule.Bar with { Gradient = index == 0 } });
         _appearance.Children.Add(Labelled(_texts["conditional.bar.fill"], fill));
+        foreach (var option in _visual.BarOptions()) _appearance.Children.Add(option);
         _appearance.Children.Add(ShowValue());
     }
 
@@ -396,12 +414,21 @@ public sealed class ConditionalRuleEditorView : UserControl, IDialogContent, IDi
             new ThumbnailGalleryOptions { TileWidth = 104, ThumbnailHeight = 26, Columns = 5, FrameRadius = _metrics.RadiusTight, Scrolls = true, MaxViewportHeight = 200, AccessibleName = _texts["conditional.kind.iconSet"] },
             _metrics);
         if (names.Contains(_rule.IconSetName)) gallery.Select(_rule.IconSetName);
-        gallery.SelectionChanged += (_, name) => Update(_rule with { IconSetName = name, CustomIcons = [], Thresholds = [] });
+        gallery.SelectionChanged += (_, name) =>
+        {
+            Update(_rule with { IconSetName = name, CustomIcons = [], Thresholds = [] });
+            Build();
+        };
         _appearance.Children.Add(gallery);
 
         var reverse = new CheckBox { Content = _texts["conditional.icons.reverse"], IsChecked = _rule.ReverseIcons };
-        reverse.IsCheckedChanged += (_, _) => Update(_rule with { ReverseIcons = reverse.IsChecked == true });
+        reverse.IsCheckedChanged += (_, _) =>
+        {
+            Update(_rule with { ReverseIcons = reverse.IsChecked == true, CustomIcons = [] });
+            Build();
+        };
         _appearance.Children.Add(reverse);
+        _appearance.Children.Add(_visual.IconRules());
         _appearance.Children.Add(ShowValue());
     }
 

@@ -114,6 +114,7 @@ public sealed class RecoveryCoordinator : IDisposable
     private void OnDocumentClosed(object? sender, OpenDocument document)
     {
         document.Changed -= OnDocumentChanged;
+        if (_workspace.Documents.Any(other => ReferenceEquals(other.History, document.History))) return;
         _recovery.DiscardFor(document);
     }
 

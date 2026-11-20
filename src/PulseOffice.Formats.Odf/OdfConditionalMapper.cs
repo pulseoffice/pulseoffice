@@ -52,6 +52,29 @@ public sealed class OdfConditionalMapper
         return element;
     }
 
+    internal IReadOnlyList<StyleMapGroup> StyleMapGroups(Workbook workbook, Worksheet sheet)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+        ArgumentNullException.ThrowIfNull(sheet);
+        var groups = new List<StyleMapGroup>();
+        foreach (var group in sheet.ConditionalRules.GroupBy(rule => rule.RangeText))
+        {
+            var maps = new List<XElement>();
+            foreach (var rule in group.OrderBy(rule => rule.Priority))
+            {
+                var element = Write(workbook, sheet, rule);
+                if (element.Name != Namespaces.Calcext + "condition") continue;
+                if (_mapConditions.ToStyleMapCondition((string?)element.Attribute(Namespaces.Calcext + "value")) is not { } condition) continue;
+                maps.Add(new XElement(Namespaces.Style + "map",
+                    new XAttribute(Namespaces.Style + "condition", condition),
+                    new XAttribute(Namespaces.Style + "apply-style-name", (string?)element.Attribute(Namespaces.Calcext + "apply-style-name") ?? string.Empty),
+                    new XAttribute(Namespaces.Style + "base-cell-address", (string?)element.Attribute(Namespaces.Calcext + "base-cell-address") ?? string.Empty)));
+            }
+            if (maps.Count > 0) groups.Add(new StyleMapGroup([.. group.First().Ranges], maps));
+        }
+        return groups;
+    }
+
     private List<XElement> Entries(XElement element) =>
         [.. element.Elements().Where(child => child.Name == Namespaces.Calcext + "formatting-entry" || child.Name == Namespaces.Calcext + "color-scale-entry")];
 

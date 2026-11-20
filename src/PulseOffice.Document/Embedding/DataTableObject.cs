@@ -157,6 +157,8 @@ public sealed record DataTableObject : EmbeddedObject
 
     public IReadOnlyList<TableCellFormat> CellFormats { get; init; } = [];
 
+    public IReadOnlyList<TableCellText> CellTexts { get; init; } = [];
+
     public TableLayout Layout { get; init; } = TableLayout.Automatic;
 
     public string? LastError { get; init; }

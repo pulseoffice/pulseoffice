@@ -5,10 +5,12 @@ public sealed class TableCellIndex
     private readonly Dictionary<(int Row, int Column), TableCellFormat> _formats = [];
     private readonly Dictionary<(int Row, int Column), TableMerge> _origins = [];
     private readonly Dictionary<(int Row, int Column), TableMerge> _covers = [];
+    private readonly Dictionary<(int Row, int Column), TableCellText> _texts = [];
 
     public TableCellIndex(DataTableObject table)
     {
         foreach (var format in table.CellFormats) _formats.TryAdd((format.Row, format.Column), format);
+        foreach (var text in table.CellTexts) _texts.TryAdd((text.Row, text.Column), text);
         var rows = table.Snapshot.Rows.Count;
         var columns = table.Snapshot.Columns.Count;
         foreach (var merge in table.Merges)
@@ -23,6 +25,9 @@ public sealed class TableCellIndex
     }
 
     public TableCellFormat? Format(int row, int column) => _formats.GetValueOrDefault((row, column));
+
+    public TableCellText? Text(int row, int column, string? value) =>
+        _texts.GetValueOrDefault((row, column)) is { } text && text.Matches(value) ? text : null;
 
     public TableMerge? Origin(int row, int column) => _origins.GetValueOrDefault((row, column));
 

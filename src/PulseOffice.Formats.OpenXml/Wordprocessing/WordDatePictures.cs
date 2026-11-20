@@ -8,6 +8,8 @@ public interface IWordDatePictures
     string ToWord(string format);
 
     string FromWord(string picture);
+
+    bool HasWordlessParts(string format);
 }
 
 public sealed class WordDatePictures : IWordDatePictures
@@ -39,6 +41,13 @@ public sealed class WordDatePictures : IWordDatePictures
             {
                 var run = Run(pattern, i, c);
                 builder.Append(run >= 2 ? "AM/PM" : "A/P");
+                i += run - 1;
+                continue;
+            }
+            if (c is 'Q' or 'W')
+            {
+                var run = Run(pattern, i, c);
+                builder.Append('\'').Append(c, run).Append('\'');
                 i += run - 1;
                 continue;
             }
@@ -75,11 +84,34 @@ public sealed class WordDatePictures : IWordDatePictures
             if (c is 'D') builder.Append('d');
             else if (c is 'Y') builder.Append('y');
             else if (c is '%' or '\\') builder.Append('\\').Append(c);
-            else if (char.IsLetter(c) && c is not ('d' or 'M' or 'y' or 'h' or 'H' or 'm' or 's' or 'S' or 'Q' or 'W'))
+            else if (char.IsLetter(c) && c is not ('d' or 'M' or 'y' or 'h' or 'H' or 'm' or 's' or 'S'))
                 builder.Append('\\').Append(c);
             else builder.Append(c == 'S' ? 's' : c);
         }
         return builder.Length == 1 ? "%" + builder : builder.ToString();
+    }
+
+    public bool HasWordlessParts(string format)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        for (var i = 0; i < format.Length; i++)
+        {
+            var c = format[i];
+            if (c is '\'' or '"')
+            {
+                var end = format.IndexOf(c, i + 1);
+                if (end < 0) return false;
+                i = end;
+                continue;
+            }
+            if (c == '\\')
+            {
+                i++;
+                continue;
+            }
+            if (c is 'Q' or 'W') return true;
+        }
+        return false;
     }
 
     private (string Format, int Length)? Designator(string picture, int at)

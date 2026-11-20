@@ -22,6 +22,7 @@ public sealed class DocumentLayoutEngine(
     IPageFrames frames,
     IPaginator paginator,
     IPageCountFields counts,
+    ISectionPageRuns sectionPages,
     IPageNumberText numbers,
     IStyleResolver resolver,
     IFrameChains chains,
@@ -156,10 +157,11 @@ public sealed class DocumentLayoutEngine(
     private DocumentLayout Finish(TextDocument document, IReadOnlyList<PageBox> pages, IReadOnlyList<FlowKey> keys, FlowKey signature)
     {
         var decorated = new List<PageBox>(pages.Count);
+        var sections = sectionPages.Sections(pages);
         for (var i = 0; i < pages.Count; i++)
         {
             var first = i == 0 || pages[i - 1].StyleName != pages[i].StyleName;
-            var stories = frames.Stories(document, pages[i], pages.Count, first);
+            var stories = frames.Stories(document, pages[i], pages.Count, first, sections[i]);
             decorated.Add(stories == PageStories.None && pages[i].Stories == PageStories.None ? pages[i] : pages[i].WithStories(stories));
         }
         return new DocumentLayout(decorated, keys) { Signature = signature };

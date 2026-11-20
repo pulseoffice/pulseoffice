@@ -47,10 +47,13 @@ public sealed record MergeSelection(MergeFilter Filter, IReadOnlyList<MergeSort>
 
     public IReadOnlySet<string> ExcludedRecords { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 
+    public string KeyColumn { get; init; } = string.Empty;
+
     public bool IsEmpty => Filter.Conditions.All(condition => condition.Column.Length == 0) && Sort.Count == 0 && Excluded.Count == 0 && ExcludedRecords.Count == 0;
 
     public bool Equals(MergeSelection? other) =>
-        other is not null && Filter.Equals(other.Filter) && Sort.SequenceEqual(other.Sort) && Excluded.SetEquals(other.Excluded) && ExcludedRecords.SetEquals(other.ExcludedRecords);
+        other is not null && Filter.Equals(other.Filter) && Sort.SequenceEqual(other.Sort) && Excluded.SetEquals(other.Excluded) && ExcludedRecords.SetEquals(other.ExcludedRecords)
+        && string.Equals(KeyColumn, other.KeyColumn, StringComparison.Ordinal);
 
     public override int GetHashCode() => HashCode.Combine(Filter, Sort.Count, Excluded.Count);
 }
@@ -70,6 +73,8 @@ public interface IMergeRecipients
     IReadOnlySet<int> ExcludedRows(MergeData data, MergeSelection selection);
 
     MergeSelection Keyed(MergeData data, MergeSelection selection);
+
+    IReadOnlyList<string> UniqueColumns(MergeData data);
 }
 
 public sealed class MergeRecipients : IMergeRecipients
@@ -171,7 +176,33 @@ public sealed class MergeRecipients : IMergeRecipients
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(selection);
         if (selection.ExcludedRecords.Count == 0) return new HashSet<int>(selection.Excluded.Where(row => row >= 0 && row < data.Rows.Count));
+        var column = Column(data, selection.KeyColumn);
+        if (column is not null && selection.ExcludedRecords.Any(record => record.StartsWith(KeyPrefix, StringComparison.Ordinal)))
+            return new HashSet<int>(Enumerable.Range(0, data.Rows.Count).Where(row => selection.ExcludedRecords.Contains(KeyIdentity(data, row, column))));
         return new HashSet<int>(Enumerable.Range(0, data.Rows.Count).Where(row => selection.ExcludedRecords.Contains(RecordIdentity(data, row))));
+    }
+
+    private const string KeyPrefix = "key:";
+
+    private string KeyIdentity(MergeData data, int row, string column) => KeyPrefix + (data.Value(row, column) ?? string.Empty).Trim();
+
+    private string? Column(MergeData data, string name) =>
+        name.Length == 0 ? null : data.Columns.FirstOrDefault(column => string.Equals(column, name, StringComparison.OrdinalIgnoreCase));
+
+    public IReadOnlyList<string> UniqueColumns(MergeData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Rows.Count == 0) return [];
+        return [.. data.Columns.Where(column =>
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < data.Rows.Count; row++)
+            {
+                var value = (data.Value(row, column) ?? string.Empty).Trim();
+                if (value.Length == 0 || !seen.Add(value)) return false;
+            }
+            return true;
+        })];
     }
 
     public MergeSelection Keyed(MergeData data, MergeSelection selection)
@@ -179,6 +210,10 @@ public sealed class MergeRecipients : IMergeRecipients
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(selection);
         var rows = selection.Excluded.Where(row => row >= 0 && row < data.Rows.Count).ToList();
-        return selection with { ExcludedRecords = new HashSet<string>(rows.Select(row => RecordIdentity(data, row)), StringComparer.Ordinal) };
+        var column = Column(data, selection.KeyColumn);
+        var key = column is not null && UniqueColumns(data).Contains(column, StringComparer.Ordinal) ? column : null;
+        var records = new HashSet<string>(rows.Select(row => RecordIdentity(data, row)), StringComparer.Ordinal);
+        if (key is not null) records.UnionWith(rows.Select(row => KeyIdentity(data, row, key)));
+        return selection with { ExcludedRecords = records, KeyColumn = key ?? string.Empty };
     }
 }

@@ -165,6 +165,8 @@ public sealed class RtfVocabulary : IRtfVocabulary
     {
         TextFieldKind.PageNumber => "PAGE",
         TextFieldKind.PageCount => "NUMPAGES",
+        TextFieldKind.SectionNumber => "SECTION",
+        TextFieldKind.SectionPageCount => "SECTIONPAGES",
         TextFieldKind.Date => "DATE",
         TextFieldKind.Time => "TIME",
         TextFieldKind.Author => "AUTHOR",
@@ -187,6 +189,8 @@ public sealed class RtfVocabulary : IRtfVocabulary
     {
         "PAGE" => TextFieldKind.PageNumber,
         "NUMPAGES" => TextFieldKind.PageCount,
+        "SECTION" => TextFieldKind.SectionNumber,
+        "SECTIONPAGES" => TextFieldKind.SectionPageCount,
         "DATE" => TextFieldKind.Date,
         "TIME" => TextFieldKind.Time,
         "AUTHOR" => TextFieldKind.Author,

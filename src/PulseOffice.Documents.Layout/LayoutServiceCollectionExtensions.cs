@@ -56,6 +56,7 @@ public static class LayoutServiceCollectionExtensions
         services.AddSingleton<IPageFieldText, PageFieldText>();
         services.AddSingleton<IPageNumberText, PageNumberText>();
         services.AddSingleton<IPageCountFields, PageCountFields>();
+        services.AddSingleton<ISectionPageRuns, SectionPageRuns>();
         services.TryAddSingleton(new PageFlowOptions());
         services.AddSingleton<IInlineInserter, InlineInserter>();
         services.AddSingleton<IBorderStrokes, BorderStrokes>();

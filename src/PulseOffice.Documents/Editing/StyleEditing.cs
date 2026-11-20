@@ -38,9 +38,42 @@ public sealed class StyleEditing(IStyleReferences references, IFragmentRemapper 
         var before = (TStyle)existing.Clone();
         var after = (TStyle)existing.Clone();
         change(after);
+        var partner = Partner(document.Styles, before, after);
+        partner?.Redo();
         Apply(document, styles, (TStyle)after.Clone());
-        history.Push(new DelegateAction(description, () => Apply(document, styles, (TStyle)after.Clone()), () => Apply(document, styles, (TStyle)before.Clone())));
+        history.Push(new DelegateAction(description,
+            () =>
+            {
+                partner?.Redo();
+                Apply(document, styles, (TStyle)after.Clone());
+            },
+            () =>
+            {
+                partner?.Undo();
+                Apply(document, styles, (TStyle)before.Clone());
+            }));
         return true;
+    }
+
+    private sealed record PartnerChange(Action Redo, Action Undo);
+
+    private PartnerChange? Partner(StyleSheet sheet, DocumentStyle before, DocumentStyle after)
+    {
+        switch (before, after)
+        {
+            case (ParagraphStyle old, ParagraphStyle edited) when old.Character != edited.Character && edited.LinkedStyleName is { } name && sheet.Character.Find(name) is { } partner && partner.LinkedStyleName == edited.Name:
+                var characterBefore = (CharacterStyle)partner.Clone();
+                var characterAfter = (CharacterStyle)partner.Clone();
+                characterAfter.Character = edited.Character;
+                return new PartnerChange(() => sheet.Character.Replace((CharacterStyle)characterAfter.Clone()), () => sheet.Character.Replace((CharacterStyle)characterBefore.Clone()));
+            case (CharacterStyle old, CharacterStyle edited) when old.Character != edited.Character && edited.LinkedStyleName is { } name && sheet.Paragraph.Find(name) is { } partner && partner.LinkedStyleName == edited.Name:
+                var paragraphBefore = (ParagraphStyle)partner.Clone();
+                var paragraphAfter = (ParagraphStyle)partner.Clone();
+                paragraphAfter.Character = edited.Character;
+                return new PartnerChange(() => sheet.Paragraph.Replace((ParagraphStyle)paragraphAfter.Clone()), () => sheet.Paragraph.Replace((ParagraphStyle)paragraphBefore.Clone()));
+            default:
+                return null;
+        }
     }
 
     public bool Add<TStyle>(TextDocument document, UndoStack history, StyleCollection<TStyle> styles, TStyle style, string description)

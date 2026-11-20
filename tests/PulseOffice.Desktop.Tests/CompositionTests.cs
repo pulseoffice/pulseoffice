@@ -429,6 +429,13 @@ public sealed class CompositionTests : IDisposable
         Assert.Same(workspace.Documents[0], workspace.Active);
         await executor.ExecuteAsync(registry.Find(new CommandId("shell.window.previousDocument"))!, workspace.Context);
         Assert.Same(last, workspace.Active);
+        var moveRight = registry.Find(new CommandId("shell.window.moveTabRight"))!;
+        Assert.False(moveRight.EnabledWhen!(workspace.Context));
+        await executor.ExecuteAsync(registry.Find(new CommandId("shell.window.moveTabLeft"))!, workspace.Context);
+        Assert.Same(last, workspace.Documents[^2]);
+        Assert.Same(last, workspace.Active);
+        await executor.ExecuteAsync(moveRight, workspace.Context);
+        Assert.Same(last, workspace.Documents[^1]);
         window.Close();
     }, CancellationToken.None);
 

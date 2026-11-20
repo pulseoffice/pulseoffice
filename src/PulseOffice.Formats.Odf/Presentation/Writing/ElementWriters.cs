@@ -149,7 +149,7 @@ internal sealed class TableObjectWriter(OdfDeckShapeMapper shapes, OdfAltTextMap
     : OdpObjectWriter<DataTableObject>(altText)
 {
     protected override XElement Build(ObjectElement element, DataTableObject table, OdpWriteSession session) =>
-        shapes.BuildTable(element, table, session.AutomaticStyles);
+        shapes.BuildTable(element, table, session.AutomaticStyles, session.TableTemplates);
 }
 
 internal sealed class ShapeObjectWriter(OdfDeckShapeMapper shapes, OdfAltTextMapper altText)

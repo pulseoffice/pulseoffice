@@ -18,6 +18,8 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
         new(TextFieldKind.SlideNumber, Text + "page-number", null, [new XAttribute(Text + "select-page", "current"), new XAttribute(OdtNamespaces.Pulse + "field", "slide-number")]),
         new(TextFieldKind.PageCount, Text + "page-count", null, []),
         new(TextFieldKind.SlideCount, Text + "page-count", null, [new XAttribute(OdtNamespaces.Pulse + "field", "slide-count")]),
+        new(TextFieldKind.SectionPageCount, Text + "page-count", null, [new XAttribute(OdtNamespaces.Pulse + "field", "section-page-count")]),
+        new(TextFieldKind.SectionNumber, OdtNamespaces.Pulse + "section-number", null, []),
         new(TextFieldKind.SlideTitle, Loext + "page-name", null, []),
         new(TextFieldKind.Title, Text + "title", null, []),
         new(TextFieldKind.Subject, Text + "subject", null, []),
@@ -165,7 +167,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
             default:
                 if (detail?.Fixed == true) element.SetAttributeValue(Text + "fixed", "true");
                 if (run.Field == TextFieldKind.Chapter && detail?.Value is { Length: > 0 } chapterLevel) element.SetAttributeValue(Text + "outline-level", chapterLevel);
-                if (run.Field == TextFieldKind.PageNumber && detail?.Value is { Length: > 0 } pageShape) element.SetAttributeValue(Style + "num-format", pageShape);
+                if (run.Field is TextFieldKind.PageNumber or TextFieldKind.SectionNumber or TextFieldKind.SectionPageCount && detail?.Value is { Length: > 0 } pageShape) element.SetAttributeValue(Style + "num-format", pageShape);
                 if (detail?.Value is { Length: > 0 } stored && run.Field is TextFieldKind.Date or TextFieldKind.Time)
                     element.SetAttributeValue(Text + (run.Field == TextFieldKind.Date ? "date-value" : "time-value"), stored);
                 if (detail?.Format is { Length: > 0 } format)
@@ -303,7 +305,7 @@ internal sealed class OdtFieldTable(OdtPreservedFields preserved, PulseOffice.Fo
                         ? dates.Picture(data?.Find(OdtAutomaticStyles.DataFamily, (string?)element.Attribute(Style + "data-style-name")))
                         : null);
                 var stored = fixedValue ? (string?)element.Attribute(Text + "date-value") ?? (string?)element.Attribute(Text + "time-value") : null;
-                if (kind == TextFieldKind.PageNumber) stored = PageShape((string?)element.Attribute(Style + "num-format"));
+                if (kind is TextFieldKind.PageNumber or TextFieldKind.SectionNumber or TextFieldKind.SectionPageCount) stored = PageShape((string?)element.Attribute(Style + "num-format"));
                 if (kind == TextFieldKind.Chapter) stored = ChapterLevel((string?)element.Attribute(Text + "outline-level"));
                 return fixedValue || own is not null || stored is not null ? new FieldDetail { Fixed = fixedValue, Format = own, Value = stored } : null;
         }

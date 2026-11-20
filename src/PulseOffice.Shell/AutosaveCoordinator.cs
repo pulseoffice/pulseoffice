@@ -53,7 +53,7 @@ public sealed class AutosaveCoordinator : IDisposable
 
         try
         {
-            foreach (var document in _workspace.Documents.Where(d => d.IsModified).ToList())
+            foreach (var document in _workspace.Documents.Where(d => d.IsModified).DistinctBy(d => d.History).ToList())
             {
                 try
                 {

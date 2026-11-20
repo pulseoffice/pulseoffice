@@ -30,6 +30,8 @@ public sealed class FolioMergeRecipientsStep : UserControl
     private readonly List<(ComboBox Column, ComboBox Direction)> _sort = [];
     private readonly ListBox _list = new() { Height = 200 };
     private readonly TextBlock _count = new();
+    private readonly IReadOnlyList<string> _uniqueColumns;
+    private readonly ComboBox _key = new() { MinWidth = 160 };
     private readonly IReadOnlyList<MergeFilterOperator> _operators =
         [MergeFilterOperator.Contains, MergeFilterOperator.Equals, MergeFilterOperator.NotEquals, MergeFilterOperator.Less, MergeFilterOperator.Greater, MergeFilterOperator.Empty, MergeFilterOperator.NotEmpty];
     private bool _applying;
@@ -74,6 +76,18 @@ public sealed class FolioMergeRecipientsStep : UserControl
         }
         var sort = new DialogSection(texts["folio.mailMerge.sort"], metrics);
 
+        _uniqueColumns = recipients.UniqueColumns(data);
+        _key.ItemsSource = new[] { texts["folio.mailMerge.key.record"] }.Concat(_uniqueColumns).ToList();
+        _key.SelectedIndex = _uniqueColumns.Count > 0 ? 1 : 0;
+        AutomationProperties.SetName(_key, texts["folio.mailMerge.key"]);
+        ToolTip.SetTip(_key, texts["folio.mailMerge.key.tip"]);
+        var keyRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = _metrics.SpacingSmall,
+            IsVisible = _uniqueColumns.Count > 0,
+            Children = { new TextBlock { Text = texts["folio.mailMerge.key"], VerticalAlignment = VerticalAlignment.Center }, _key },
+        };
         var all = new Button { Content = texts["folio.mailMerge.selectAll"] };
         all.Click += (_, _) => Include(true);
         var none = new Button { Content = texts["folio.mailMerge.selectNone"] };
@@ -97,6 +111,7 @@ public sealed class FolioMergeRecipientsStep : UserControl
                 sortPanel,
                 frame,
                 actions,
+                keyRow,
             },
         };
         Apply(initial);
@@ -108,7 +123,17 @@ public sealed class FolioMergeRecipientsStep : UserControl
 
     public int ConditionCount => _conditions.Count;
 
-    public MergeSelection Selection => _recipients.Keyed(_data, new MergeSelection(Filter, Sort, new HashSet<int>(_excluded)));
+    public MergeSelection Selection => _recipients.Keyed(_data, new MergeSelection(Filter, Sort, new HashSet<int>(_excluded)) { KeyColumn = KeyColumn });
+
+    public string KeyColumn => _key.SelectedIndex > 0 && _key.SelectedIndex - 1 < _uniqueColumns.Count ? _uniqueColumns[_key.SelectedIndex - 1] : string.Empty;
+
+    public IReadOnlyList<string> KeyColumns => _uniqueColumns;
+
+    public void ChooseKey(string column)
+    {
+        var index = _uniqueColumns.ToList().FindIndex(item => string.Equals(item, column, StringComparison.OrdinalIgnoreCase));
+        _key.SelectedIndex = index + 1;
+    }
 
     public void Exclude(int row, bool excluded)
     {
@@ -132,6 +157,8 @@ public sealed class FolioMergeRecipientsStep : UserControl
             _sort[index].Column.SelectedIndex = key is null ? 0 : ColumnIndex(key.Column) + 1;
             _sort[index].Direction.SelectedIndex = key?.Descending == true ? 1 : 0;
         }
+        if (selection.KeyColumn.Length > 0) ChooseKey(selection.KeyColumn);
+        else if (selection.ExcludedRecords.Count > 0) _key.SelectedIndex = 0;
         _excluded.Clear();
         foreach (var row in _recipients.ExcludedRows(_data, selection)) _excluded.Add(row);
         _applying = false;

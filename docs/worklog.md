@@ -14298,3 +14298,30 @@ docs/deep-audit/round-288-shell-recent-pinning.md.
 - Excluded merge records keyed by record content with a record-number fallback; ODF quarter and week-of-year date
   parts; localized STYLEREF heading names become chapter fields; hidden blank ODF left/first headers read as the
   default header. Log: docs/deep-audit/round-301-folio-merge-fields-headers.md.
+
+### Round 302: Deck table runs, cell editor and grid looks (2026-11-20)
+- Table cells carry paragraphs of runs across PPTX, ODP and the shared renderer (PPTX225 and ODF281 retired); an
+  in-place cell editor with a caret makes one undo step per edit session; grid tables name an ODP
+  `table:table-template` written by Folio's template writer and a PPTX "PulseOffice Grid" table style with the header
+  tint and bands. Log: docs/deep-audit/round-302-deck-table-runs.md.
+
+### Round 303: Shell windows leftovers (2026-11-20)
+- A closed second window releases its view's subscriptions to the shared model (`IDocumentViewRelease` on LedgerView,
+  FolioView, DeckView, called by `DocumentWorkspace.Close` while another window keeps the history); recovery keeps one
+  snapshot per document history and closing one of two windows keeps it; a new window opens next to its document's
+  last tab; Move Tab Left/Right (Ctrl+Shift+PageUp/PageDown); a drop indicator while dragging a tab; headless pointer
+  walk of drag and middle-click close. Tear-off windows designed and queued. Log: docs/deep-audit/round-303-shell-windows.md.
+
+### Round 304: Ledger conditional formatting leftovers (2026-11-20)
+- ODS also writes standard `style:map` on cell styles for the rules ODF can express; `style:map` reading covers cells
+  styled through a column default; the rule editor gains data bar negative colour, border, axis and direction and icon
+  set per-icon thresholds and icons; top/bottom percent stops at 100 with specific warnings; the rules manager moves a
+  rule past hidden ones without reordering them and duplicates below. Log:
+  docs/deep-audit/round-304-ledger-conditional-leftovers.md.
+
+### Round 305: Folio merge keys, section fields, date pictures and styles (2026-11-20)
+- Excluded merge recipients remembered by a chosen unique key column (hash fallback); live `SECTION` and
+  `SECTIONPAGES` fields (DOCX, RTF, ODT); DOCX date pictures quote quarter and week parts and carry our picture in
+  `w:fldData`; linked paragraph and character styles keep their character part in step; ODT linked styles also
+  written and read with the extension attribute other readers know; Word's default paragraph font is no longer
+  imported as a custom style; dangling style links dropped on reading. Log: docs/deep-audit/round-305-folio-styles.md.

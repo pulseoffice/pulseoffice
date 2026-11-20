@@ -103,6 +103,15 @@ public sealed class ConditionalPainting(IConditionalIconCatalog icons, IconPaint
         }
     }
 
+    public void Icon(DrawingContext context, Rect box, ConditionalIconChoice choice)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(choice);
+        if (choice.IsNone) return;
+        var size = Math.Min(box.Width, box.Height);
+        painter.Paint(context, icons.Icon(choice.Set, choice.Index), new Rect(box.X + (box.Width - size) / 2, box.Y + (box.Height - size) / 2, size, size));
+    }
+
     public void Text(DrawingContext context, Point at, string text, double size, bool bold = false)
     {
         ArgumentNullException.ThrowIfNull(context);

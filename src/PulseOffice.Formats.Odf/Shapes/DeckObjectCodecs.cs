@@ -449,13 +449,18 @@ public sealed record OdfTableStyles(
     IReadOnlyDictionary<string, double> ColumnWidths,
     IReadOnlyDictionary<string, double> RowHeights,
     IReadOnlyDictionary<string, XElement>? FrameStyles = null,
-    IReadOnlyDictionary<string, XElement>? CellStyles = null);
+    IReadOnlyDictionary<string, XElement>? CellStyles = null,
+    IReadOnlyDictionary<string, XElement>? TextStyles = null);
 
 internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectCodec
 {
     private readonly OdfTableCellLooks _looks = new();
 
     private readonly OdfTableCellLayout _layout = new();
+
+    private readonly OdfTableCellRuns _runs = new(paragraphs);
+
+    private readonly OdfDeckGridTemplates _grids = new(new TableGridLook());
 
     private readonly OptimalColumnSizing _optimal = new(new PulseOffice.Document.Tables.ColumnWidths());
 
@@ -497,13 +502,18 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
         };
     }
 
-    public XElement Build(ObjectElement element, DataTableObject table, XElement automaticStyles)
+    public XElement Build(ObjectElement element, DataTableObject table, XElement automaticStyles) =>
+        Build(element, table, automaticStyles, null);
+
+    public XElement Build(ObjectElement element, DataTableObject table, XElement automaticStyles, OdfTableTemplateSink? templates)
     {
         var snapshot = table.Snapshot;
         var columns = Math.Max(1, snapshot.Columns.Count);
 
         var prefix = "tva_" + new string([.. element.Id.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')]);
         var body = new XElement(Table + "table", TemplateFlags(table.Style));
+        if (templates is not null && table.Style.Grid && !table.Style.OwnLook)
+            body.SetAttributeValue(Table + "template-name", _grids.Name(table.Style, templates));
 
         var fractions = table.Layout.ColumnFractions.Count == snapshot.Columns.Count && snapshot.Columns.Count > 0
             ? table.Layout.ColumnFractions
@@ -560,6 +570,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
         var merges = new List<TableMerge>();
         var formats = new List<TableCellFormat>();
         var looks = new List<TableCellFormat>();
+        var texts = new List<TableCellText>();
         TableCellLook? LookOf(XElement cell) =>
             (string?)cell.Attribute(Table + "style-name") is { } name && styles.CellStyles?.GetValueOrDefault(name) is { } style ? _looks.Read(style) : null;
         CellVerticalAlign? AlignOf(XElement cell) =>
@@ -571,6 +582,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
             {
                 if (cell.Name == Table + "table-cell" && Spans(cell) is var (rowSpan, columnSpan) && (columnSpan > 1 || rowSpan > 1))
                     merges.Add(new TableMerge(TableCellFormat.HeaderRow, column, rowSpan, columnSpan));
+                if (cell.Name == Table + "table-cell" && _runs.Read(cell, TableCellFormat.HeaderRow, column, styles.TextStyles) is { } headerText) texts.Add(headerText);
                 var align = AlignOf(cell);
                 var laid = Laid(new TableCellFormat(TableCellFormat.HeaderRow, column, align ?? CellVerticalAlign.Top), cell);
                 if (align is not null || laid.HasLayout) formats.Add(laid);
@@ -586,6 +598,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
                 if (cell.Name == Table + "table-cell")
                 {
                     values.Add(paragraphs.Read(cell));
+                    if (_runs.Read(cell, row, column, styles.TextStyles) is { } richText) texts.Add(richText);
                     var (rowSpan, columnSpan) = Spans(cell);
                     if (columnSpan > 1 || rowSpan > 1) merges.Add(new TableMerge(row, column, rowSpan, columnSpan));
                     var align = AlignOf(cell);
@@ -624,6 +637,7 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
                 },
                 Merges = merges,
                 CellFormats = looks.Count > 0 ? looks : formats,
+                CellTexts = texts,
                 Layout = ReadLayout(tableElement, rows, styles),
             },
         };
@@ -711,7 +725,9 @@ internal sealed class DeckTableCodec(IOdfParagraphText paragraphs) : DeckObjectC
             }
 
             var text = column < cells.Count ? cells[column]?.ToString() ?? string.Empty : string.Empty;
-            var cell = new XElement(Table + "table-cell", paragraphs.Paragraphs(text));
+            var cell = new XElement(Table + "table-cell", index.Text(row, column, text) is { } rich
+                ? _runs.Write(rich, $"{prefix}_{(row < 0 ? "h" : row.ToString(System.Globalization.CultureInfo.InvariantCulture))}_{column}", automaticStyles).ToList()
+                : paragraphs.Paragraphs(text));
 
             var format = index.Format(row, column);
             var align = format?.VerticalAlign ?? CellVerticalAlign.Top;

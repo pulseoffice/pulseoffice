@@ -144,6 +144,7 @@ internal sealed class OdtStylesReader(
         }
 
         sheet.BreakInheritanceCycles();
+        sheet.DropDanglingLinks([.. sheet.Paragraph.All, .. sheet.Character.All]);
         Resolve(sheet, relative);
     }
 
@@ -282,7 +283,7 @@ internal sealed class OdtStylesReader(
         (string?)style.Attribute(Style + "name") is { } encoded ? context.StyleNames.Resolve(encoded) : null;
 
     private string? Linked(XElement style, OdtReadContext context) =>
-        (string?)style.Attribute(Pt + "linked-style-name") is { Length: > 0 } linked ? context.StyleNames.Resolve(linked) : null;
+        ((string?)style.Attribute(Pt + "linked-style-name") ?? (string?)style.Attribute(Loext + "linked-style-name")) is { Length: > 0 } linked ? context.StyleNames.Resolve(linked) : null;
 
     private T Common<T>(T style, XElement element, OdtReadContext context) where T : DocumentStyle
     {

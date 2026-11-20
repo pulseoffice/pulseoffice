@@ -29,6 +29,8 @@ internal sealed class OdpWriteSession(PulseOffice.Presentations.Presentation dec
 
     public XElement AutomaticStyles { get; } = new(Office + "automatic-styles");
 
+    public OdfTableTemplateSink TableTemplates { get; } = new();
+
     public OdfShapeStyleMapper ShapeStyles { get; } = new();
 
     public bool UsesListStyles { get; private set; }

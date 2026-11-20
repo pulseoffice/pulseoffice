@@ -37,6 +37,8 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
     [
         (TextFieldKind.PageNumber, "PAGE"),
         (TextFieldKind.PageCount, "NUMPAGES"),
+        (TextFieldKind.SectionNumber, "SECTION"),
+        (TextFieldKind.SectionPageCount, "SECTIONPAGES"),
         (TextFieldKind.Author, "AUTHOR"),
         (TextFieldKind.Title, "TITLE"),
         (TextFieldKind.Subject, "SUBJECT"),
@@ -60,7 +62,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         foreach (var (kind, keyword) in _simple)
         {
             if (kind != run.Field) continue;
-            if (kind == TextFieldKind.PageNumber && detail?.Value is { Length: > 0 } shape) return $" {keyword} \\* {WordShape(shape)} ";
+            if (kind is TextFieldKind.PageNumber or TextFieldKind.SectionNumber or TextFieldKind.SectionPageCount && detail?.Value is { Length: > 0 } shape) return $" {keyword} \\* {WordShape(shape)} ";
             return detail?.Format is { Length: > 0 } format && kind is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate
                 ? $" {keyword} \\@ {Quote(pictures.ToWord(format))} "
                 : $" {keyword} ";
@@ -108,7 +110,7 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         foreach (var (kind, simple) in _simple)
         {
             if (simple != keyword) continue;
-            if (kind == TextFieldKind.PageNumber) return new DocxField(kind, null, PageShape(words));
+            if (kind is TextFieldKind.PageNumber or TextFieldKind.SectionNumber or TextFieldKind.SectionPageCount) return new DocxField(kind, null, PageShape(words));
             var format = Switch(words, "\\@");
             return new DocxField(kind, null, format is null ? null : new FieldDetail { Format = pictures.FromWord(format) });
         }
@@ -231,6 +233,8 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
     {
         if (field is null || NativeOdf(data) is not { } native) return field;
         if (HiddenParagraph(native) is { } hidden) return hidden;
+        if (DatePicture(native) is { } picture && field.Kind is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate)
+            return field with { Detail = (field.Detail ?? new FieldDetail()) with { Format = picture } };
         if (field.Kind != TextFieldKind.Preserved) return field;
         return field with
         {
@@ -245,6 +249,11 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
                 new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "text", OdfText.NamespaceName),
                 new System.Xml.Linq.XAttribute(OdfText + "condition", "ooow:" + condition),
                 new System.Xml.Linq.XAttribute(OdfText + "is-hidden", run.Hidden == true ? "true" : "false")).ToString(System.Xml.Linq.SaveOptions.DisableFormatting)))
+        : run.Field is TextFieldKind.Date or TextFieldKind.Time or TextFieldKind.CreatedDate or TextFieldKind.ModifiedDate
+            && run.FieldDetail?.Format is { Length: > 0 and <= NativeLimit } format && pictures.HasWordlessParts(format)
+            ? Convert.ToBase64String(Encoding.UTF8.GetBytes(NativeMarker + new System.Xml.Linq.XElement(PulseText + "date-picture",
+                new System.Xml.Linq.XAttribute(System.Xml.Linq.XNamespace.Xmlns + "pt", PulseText.NamespaceName),
+                new System.Xml.Linq.XAttribute(PulseText + "format", format)).ToString(System.Xml.Linq.SaveOptions.DisableFormatting)))
         : run.Field == TextFieldKind.Preserved && run.FieldDetail?.NativeOdf is { Length: > 0 and <= NativeLimit } native
             ? Convert.ToBase64String(Encoding.UTF8.GetBytes(NativeMarker + native))
             : null;
@@ -263,6 +272,21 @@ public sealed class DocxFieldInstructions(IPreservedFieldTable preserved, IWordD
         if (!Convert.TryFromBase64String(data.Trim(), bytes, out var written)) return null;
         var text = Encoding.UTF8.GetString(bytes, 0, written);
         return text.StartsWith(NativeMarker, StringComparison.Ordinal) && text.Length > NativeMarker.Length ? text[NativeMarker.Length..] : null;
+    }
+
+    private readonly System.Xml.Linq.XNamespace PulseText = "urn:pulseoffice:text";
+
+    private string? DatePicture(string native)
+    {
+        try
+        {
+            var element = System.Xml.Linq.XElement.Parse(native);
+            return element.Name == PulseText + "date-picture" && (string?)element.Attribute(PulseText + "format") is { Length: > 0 } format ? format : null;
+        }
+        catch (System.Xml.XmlException)
+        {
+            return null;
+        }
     }
 
     private DocxField? HiddenParagraph(string native)

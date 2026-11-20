@@ -109,7 +109,7 @@ public sealed class Round128DeckTableTests
     }
 
     [Fact]
-    public void A_pptx_table_cell_with_differently_formatted_runs_declares_the_loss()
+    public void A_pptx_table_cell_with_differently_formatted_runs_keeps_them_and_declares_nothing()
     {
         using var stream = Pptx(table =>
         {
@@ -119,7 +119,9 @@ public sealed class Round128DeckTableTests
 
         var result = new PptxReader(_themes, _masters).Read(stream);
 
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "PPTX225");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "PPTX225");
+        var table = result.Value!.Slides.SelectMany(slide => slide.Elements).OfType<ObjectElement>().Select(element => element.Content).OfType<DataTableObject>().Single();
+        Assert.Contains(table.CellTexts, text => text.Paragraphs.SelectMany(paragraph => paragraph.Runs).Any(run => run.Text == "plain" && run.Bold == false));
     }
 
     [Fact]
@@ -160,7 +162,7 @@ public sealed class Round128DeckTableTests
     private static readonly XNamespace TextNs = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
     [Fact]
-    public void An_odp_table_cell_with_formatted_spans_declares_the_loss()
+    public void An_odp_table_cell_with_formatted_spans_declares_nothing()
     {
         using var stream = Odp(root =>
         {
@@ -172,7 +174,7 @@ public sealed class Round128DeckTableTests
         var result = new OdpReader(_themes, _masters).Read(stream);
 
         Assert.True(result.Succeeded);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "ODF281");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "ODF281");
     }
 
     [Fact]

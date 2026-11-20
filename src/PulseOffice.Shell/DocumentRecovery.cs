@@ -54,8 +54,8 @@ public sealed class DocumentRecovery : IDocumentRecovery
     private readonly IReadOnlyList<IDocumentSnapshotProvider> _providers;
     private readonly ILogger<DocumentRecovery> _logger;
     private readonly string _directory;
-    private readonly Dictionary<OpenDocument, string> _identifiers = [];
-    private readonly ConditionalWeakTable<OpenDocument, StrongBox<int>> _discards = [];
+    private readonly Dictionary<PulseOffice.Document.Commands.UndoStack, string> _identifiers = new(ReferenceEqualityComparer.Instance);
+    private readonly ConditionalWeakTable<PulseOffice.Document.Commands.UndoStack, StrongBox<int>> _discards = [];
     private readonly IDocumentPasswordGate? _passwords;
     private readonly IPrivateFiles _privateFiles;
     private readonly IRecoveryOwnership _ownership;
@@ -102,7 +102,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
         lock (_queueGate) return _queueTail.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
-    private int Discards(OpenDocument document) => _discards.TryGetValue(document, out var count) ? count.Value : 0;
+    private int Discards(OpenDocument document) => _discards.TryGetValue(document.History, out var count) ? count.Value : 0;
 
     private async Task SnapshotAfterAsync(Task previous, OpenDocument document, int discardsWhenAsked, CancellationToken ct)
     {
@@ -116,8 +116,8 @@ public sealed class DocumentRecovery : IDocumentRecovery
         var provider = _providers.FirstOrDefault(p => p.Module == document.Module);
         if (provider is null) return;
 
-        if (!_identifiers.TryGetValue(document, out var id))
-            _identifiers[document] = id = Guid.NewGuid().ToString("N");
+        if (!_identifiers.TryGetValue(document.History, out var id))
+            _identifiers[document.History] = id = Guid.NewGuid().ToString("N");
 
         var snapshot = new RecoverySnapshot(
             id, document.Module, document.Title, document.Path, DateTimeOffset.Now, document.IsReadOnly, _owner);
@@ -135,7 +135,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
                 return;
             }
 
-            if (!_identifiers.TryGetValue(document, out var current) || current != id) Discard(id);
+            if (!_identifiers.TryGetValue(document.History, out var current) || current != id) Discard(id);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
         {
@@ -223,7 +223,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
 
             document.IsReadOnly = snapshot.ReadOnly;
             document.MarkModified();
-            _identifiers[document] = snapshot.Id;
+            _identifiers[document.History] = snapshot.Id;
             Pending = [.. Pending.Where(s => s.Id != snapshot.Id)];
 
             return document;
@@ -253,8 +253,8 @@ public sealed class DocumentRecovery : IDocumentRecovery
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        _discards.GetOrCreateValue(document).Value++;
-        if (!_identifiers.Remove(document, out var id)) return;
+        _discards.GetOrCreateValue(document.History).Value++;
+        if (!_identifiers.Remove(document.History, out var id)) return;
         Discard(id);
     }
 
@@ -267,7 +267,7 @@ public sealed class DocumentRecovery : IDocumentRecovery
 
     public void DiscardSession()
     {
-        foreach (var document in _identifiers.Keys.ToList()) _discards.GetOrCreateValue(document).Value++;
+        foreach (var history in _identifiers.Keys.ToList()) _discards.GetOrCreateValue(history).Value++;
         foreach (var id in _identifiers.Values.ToList()) Discard(id);
         _identifiers.Clear();
     }

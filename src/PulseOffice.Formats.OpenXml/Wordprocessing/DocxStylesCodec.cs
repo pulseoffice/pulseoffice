@@ -128,7 +128,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     public void Adopt(W.Styles? styles, StyleSheet sheet, DocxStyleMap map)
     {
         if (styles is null) return;
-        var elements = styles.Elements<W.Style>().Where(style => style.StyleId?.Value is not null).ToList();
+        var elements = styles.Elements<W.Style>().Where(style => style.StyleId?.Value is not null && !DefaultFont(style)).ToList();
         var defaultParagraph = map.DefaultParagraphId(elements);
         foreach (var style in elements)
             map.Adopt(style.StyleId!.Value!, Family(style),
@@ -144,7 +144,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
     public void ReadStyles(W.Styles? styles, StyleSheet sheet, DocxStyleMap map, DocxListMap lists)
     {
         if (styles is null) return;
-        foreach (var element in styles.Elements<W.Style>().Where(style => style.StyleId?.Value is not null))
+        foreach (var element in styles.Elements<W.Style>().Where(style => style.StyleId?.Value is not null && !DefaultFont(style)))
         {
             var name = map.NameOf(element.StyleId!.Value!)!;
             var parent = map.NameOf(element.BasedOn?.Val?.Value);
@@ -183,6 +183,7 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
             }
         }
         sheet.BreakInheritanceCycles();
+        sheet.DropDanglingLinks([.. sheet.Paragraph.All, .. sheet.Character.All]);
     }
 
     private W.Style Header(DocumentStyle style, W.StyleValues type, StyleFamily family, DocxStyleMap map, string? next, string? linked)
@@ -201,6 +202,10 @@ public sealed class DocxStylesCodec(DocxCharacterCodec characters, DocxParagraph
 
     private string? Linked(W.Style style, DocxStyleMap map, StyleFamily family) =>
         map.NameOf(style.LinkedStyle?.Val?.Value) is { } name && map.IdOf(family, name) == style.LinkedStyle!.Val!.Value ? name : null;
+
+    private bool DefaultFont(W.Style style) =>
+        style.Type?.Value == W.StyleValues.Character && style.Default?.Value == true
+        && (style.StyleRunProperties is null || !style.StyleRunProperties.HasChildren);
 
     private bool Hidden(W.Style style) => style.SemiHidden is { } hidden && hidden.Val?.Value != W.OnOffOnlyValues.Off;
 

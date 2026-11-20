@@ -79,6 +79,8 @@ public enum TextFieldKind
     HiddenParagraph,
     Sender,
     Preserved,
+    SectionNumber,
+    SectionPageCount,
 }
 
 public sealed record FieldDetail

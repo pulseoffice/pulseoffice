@@ -215,7 +215,7 @@ internal sealed class OdpStylesBuilder(OdfUnits units, ISlideLayoutRegistry layo
         return new(new XElement(Office + "document-styles",
             namespaces.Declarations(),
             new XElement(Office + "styles", new OdpTextDefaults().Write(deck.DefaultLanguages, deck.DefaultScriptFonts), masterLayouts.SelectMany(entry => entry.Master.Layouts.DistinctBy(layout => layout.Kind).Select(layout => PageLayout(entry.Prefix, layout))), seeds.Build(masterLayouts),
-                graphicMapper.Definitions, session.FillImages(), graphicStyles, masterPages.NotesStyles(deck)),
+                graphicMapper.Definitions, session.FillImages(), graphicStyles, masterPages.NotesStyles(deck), session.TableTemplates.Elements),
             new XElement(Office + "automatic-styles", automatic),
             masters));
     }

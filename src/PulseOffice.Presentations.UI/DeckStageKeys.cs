@@ -15,7 +15,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, DeckTextEditing text, DeckShapeTextEditing shapes, DeckCanvasEditing canvasEditing, IDeckDrawingState drawing, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IDocumentKeyScope keys, PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords, PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges, IDeckTableKeys tableKeys)
+internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, DeckTextEditing text, DeckShapeTextEditing shapes, DeckCanvasEditing canvasEditing, IDeckDrawingState drawing, ISlideKeyNavigation slideKeys, PulseOffice.UI.Controls.Services.IDocumentKeyScope keys, PulseOffice.UI.Controls.Shortcuts.TypingChordGuard chords, PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys nudges, IDeckTableKeys tableKeys, DeckTableCellEditor cellEditor)
 {
     private static readonly PulseOffice.UI.Controls.Shapes.NudgeSteps TwipSteps = new(60, 300);
     private readonly DeckViewState _state = state;
@@ -30,7 +30,6 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
     private readonly ISlideKeyNavigation _slideKeys = slideKeys;
     private readonly PulseOffice.UI.Controls.Services.IDocumentKeyScope _keys = keys;
     private readonly PulseOffice.UI.Controls.Shortcuts.TypingChordGuard _chords = chords;
-    private (string ElementId, TableCellRange Range)? _typing;
 
     private bool IsTextInput(object? source)
     {
@@ -134,32 +133,16 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
         if (_state.Current is not { } slide || _state.Selected is null || typed.Length == 0 || typed.Any(char.IsControl)) return false;
         if (slide.Find(_state.Selected.Id) is not ObjectElement { Content: PulseOffice.Document.Embedding.DataTableObject } element) return false;
         if (_state.Options.TableCells is not { } cells || cells.ElementId != element.Id) return false;
-        var continuing = _typing is { } typing && typing.ElementId == element.Id && typing.Range == cells.Range;
-        var cell = new TableCellRange(cells.Range.Top, cells.Range.Left, cells.Range.Top, cells.Range.Left);
-        _actions.EditTable(slide, element.Id, current => tableKeys.Type(current, cell, typed, !continuing));
-        _state.Selected = slide.Find(element.Id);
-        _canvas.SelectedElement = _state.Selected;
-        _typing = (element.Id, cells.Range);
-        return true;
+        return cellEditor.Begin(slide, element, cells.Range, typed);
     }
 
     private bool TableKey(KeyEventArgs e, Slide slide, SlideElement element)
     {
         if (element is not ObjectElement { Content: PulseOffice.Document.Embedding.DataTableObject table }) return false;
         if (_state.Options.TableCells is not { } cells || cells.ElementId != element.Id) return false;
-        var typing = _typing is { } typed && typed.ElementId == element.Id && typed.Range == cells.Range;
-        _typing = null;
-        if (typing && e.Key == Key.Back && e.KeyModifiers == KeyModifiers.None && !_actions.IsReadOnly)
+        if (e.Key is Key.Enter or Key.F2 && e.KeyModifiers == KeyModifiers.None && !_actions.IsReadOnly && element is ObjectElement tableElement)
         {
-            _actions.EditTable(slide, element.Id, current => tableKeys.Erase(current, cells.Range));
-            _state.Selected = slide.Find(element.Id);
-            _canvas.SelectedElement = _state.Selected;
-            _typing = (element.Id, cells.Range);
-            e.Handled = true;
-            return true;
-        }
-        if (typing && e.Key is Key.Enter or Key.Escape && e.KeyModifiers == KeyModifiers.None)
-        {
+            cellEditor.Begin(slide, tableElement, cells.Range, null);
             e.Handled = true;
             return true;
         }

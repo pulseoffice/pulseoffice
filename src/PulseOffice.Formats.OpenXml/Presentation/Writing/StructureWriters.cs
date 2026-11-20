@@ -187,11 +187,11 @@ internal sealed class ChartWriter(PptxDeckChartMapper charts, OoxmlAltTextMapper
         charts.Build(element, chart, shapeId, slide);
 }
 
-internal sealed class TableWriter(PptxDeckTableMapper tables, OoxmlAltTextMapper altText)
+internal sealed class TableWriter(PptxDeckTableMapper tables, PptxGridTableStyles grids, OoxmlAltTextMapper altText)
     : PptxObjectWriter<PulseOffice.Document.Embedding.DataTableObject>(altText)
 {
     protected override OpenXmlElement? Build(ObjectElement element, PulseOffice.Document.Embedding.DataTableObject table, uint shapeId, SlidePart slide) =>
-        tables.Build(element, table, shapeId);
+        tables.Build(element, table, shapeId, table.Style.Grid && !table.Style.OwnLook ? grids.Ensure(slide, table.Style) : null);
 }
 
 internal sealed class PackageWriter(PptxDeckShapeMapper shapes, OoxmlAltTextMapper altText)

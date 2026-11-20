@@ -4,18 +4,20 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Documents.Layout.Flow;
 
+public sealed record SectionPages(int Number, int Pages);
+
 public interface IPageFieldText
 {
     bool HasNumber(TextParagraph paragraph);
 
     bool HasCount(TextParagraph paragraph);
 
-    TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null);
+    TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null, SectionPages? section = null);
 }
 
 public sealed class PageFieldText(PulseOffice.Documents.Fields.ISequenceNumerals numerals) : IPageFieldText
 {
-    private readonly ConditionalWeakTable<TextParagraph, Dictionary<(string? Number, string? Count, int? Value), TextParagraph>> _resolved = new();
+    private readonly ConditionalWeakTable<TextParagraph, Dictionary<(string? Number, string? Count, int? Value, SectionPages? Section), TextParagraph>> _resolved = new();
 
     public bool HasNumber(TextParagraph paragraph) => Has(paragraph, TextFieldKind.PageNumber);
 
@@ -31,23 +33,32 @@ public sealed class PageFieldText(PulseOffice.Documents.Fields.ISequenceNumerals
         return false;
     }
 
-    public TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null)
+    private bool HasSection(TextParagraph paragraph) => Has(paragraph, TextFieldKind.SectionNumber) || Has(paragraph, TextFieldKind.SectionPageCount);
+
+    public TextParagraph Resolve(TextParagraph paragraph, string? number, string? count, int? value = null, SectionPages? section = null)
     {
-        if (!HasNumber(paragraph) && !HasCount(paragraph)) return paragraph;
+        var sectioned = section is not null && HasSection(paragraph);
+        if (!sectioned) section = null;
+        if (!HasNumber(paragraph) && !HasCount(paragraph) && !sectioned) return paragraph;
         var variants = _resolved.GetValue(paragraph, _ => []);
         lock (variants)
         {
-            if (variants.TryGetValue((number, count, value), out var cached)) return cached;
+            if (variants.TryGetValue((number, count, value, section), out var cached)) return cached;
             cached = paragraph.WithRuns([.. paragraph.Runs.Select(run => run.Field switch
             {
                 TextFieldKind.PageNumber when number is not null => run with { Text = Shaped(number, value, run.FieldDetail?.Value) },
                 TextFieldKind.PageCount when count is not null => run with { Text = count },
+                TextFieldKind.SectionNumber when section is not null => run with { Text = Shaped(section.Number, run.FieldDetail?.Value) },
+                TextFieldKind.SectionPageCount when section is not null => run with { Text = Shaped(section.Pages, run.FieldDetail?.Value) },
                 _ => run,
             })]);
-            variants[(number, count, value)] = cached;
+            variants[(number, count, value, section)] = cached;
             return cached;
         }
     }
+
+    private string Shaped(int value, string? format) =>
+        format is { Length: > 0 } ? numerals.Format(value, format) : value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private string Shaped(string number, int? value, string? format)
     {

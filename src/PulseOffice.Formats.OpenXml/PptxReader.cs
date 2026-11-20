@@ -9,7 +9,7 @@ public sealed class PptxReader : IPresentationReader
 {
     private readonly OoxmlAttributeSanitizer _sanitizer = new();
     private readonly OoxmlReadFailures _failures = new();
-    private readonly IReadOnlyList<IPptxReadLoss> _readLosses = [new PptxEquations(), new PptxUnknownPresets(new UnknownPresetShapes(new PulseOffice.Drawing.Shapes.ShapePresets())), new PptxUnsupportedClickActions(), new PptxCommentThreads(), new PptxMixedTableRuns()];
+    private readonly IReadOnlyList<IPptxReadLoss> _readLosses = [new PptxEquations(), new PptxUnknownPresets(new UnknownPresetShapes(new PulseOffice.Drawing.Shapes.ShapePresets())), new PptxUnsupportedClickActions(), new PptxCommentThreads()];
     private readonly PptxThemeReader _theme;
     private readonly PptxMasterReader _master;
     private readonly SlideListReader _slides;

@@ -20,7 +20,6 @@ public sealed class OdpReader : IPresentationReader
     private readonly OdfValues _values = new();
     private readonly OdpMissingObjects _missingObjects = new();
     private readonly OdpUnsupportedClickActions _unsupportedClickActions = new();
-    private readonly OdpTableCellSpans _tableCellSpans = new();
     private readonly OdfLiteralEnhancedPath _literal = new(new PulseOffice.Drawing.Shapes.ShapePresets());
     private readonly OdpStyleSheetBuilder _styles;
     private readonly OdpMasterReader _master;
@@ -207,7 +206,6 @@ public sealed class OdpReader : IPresentationReader
                 losses.Add(Diagnostic.Info("ODP215", "The date format of the header and footer is not one of the thirteen formats Deck offers: the nearest one is used."));
             if (_missingObjects.Present(body, package.OpenEntry)) losses.Add(_missingObjects.Loss);
             if (_unsupportedClickActions.Present(body)) losses.Add(_unsupportedClickActions.Loss);
-            if (_tableCellSpans.Present(body)) losses.Add(_tableCellSpans.Loss);
             if (body?.Descendants(Draw + "custom-shape").Any(_literal.Approximated) == true)
                 losses.Add(Diagnostic.Warning("ODP183", "Shapes whose geometry formulas cannot be evaluated, because their equations or path are malformed, are imported as rectangles."));
             if (content.Descendants(TextNs + "list-level-style-image").Concat(styles?.Descendants(TextNs + "list-level-style-image") ?? []).Any(image => image.Element(Office + "binary-data") is null))

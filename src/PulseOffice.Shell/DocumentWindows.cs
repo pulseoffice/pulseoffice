@@ -40,8 +40,18 @@ public sealed class DocumentWindows(IDocumentWorkspace workspace, IEnumerable<ID
     {
         ArgumentNullException.ThrowIfNull(document);
         if (SourceFor(document)?.CreateSecondView(document, NextTitle(document)) is not { } second) return null;
+        var after = LastWindowIndex(document);
         workspace.Open(second);
+        if (after >= 0) workspace.Move(second, after + 1);
         return second;
+    }
+
+    private int LastWindowIndex(OpenDocument document)
+    {
+        var documents = workspace.Documents;
+        for (var index = documents.Count - 1; index >= 0; index--)
+            if (ReferenceEquals(documents[index].History, document.History)) return index;
+        return -1;
     }
 
     public bool HasAnotherWindow(OpenDocument document)

@@ -63,7 +63,7 @@ public sealed class PptxWriter : IPresentationWriter
             new PptxMediaMapper(),
             [
                 new ChartWriter(new PptxDeckChartMapper(), altText),
-                new TableWriter(new PptxDeckTableMapper(), altText),
+                new TableWriter(new PptxDeckTableMapper(), new PptxGridTableStyles(new PulseOffice.Document.Embedding.TableGridLook()), altText),
                 new PackageWriter(shapes, altText),
                 new DrawingWriter(shapes, altText),
             ],
