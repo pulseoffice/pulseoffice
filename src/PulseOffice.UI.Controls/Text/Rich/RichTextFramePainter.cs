@@ -10,6 +10,10 @@ public sealed record RichTextScene(
     Func<string, IReadOnlyList<WordSpan>>? Proofing = null)
 {
     public IPaintedTextLines? Painted { get; init; }
+
+    public Func<string, IReadOnlyList<WordSpan>>? Found { get; init; }
+
+    public IBrush? FoundFill { get; init; }
 }
 
 public interface IRichTextFramePainter
@@ -52,10 +56,12 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
             var words = scene.Proofing is { } proofing && line.Paragraph.EffectiveRuns().All(run => run.Field == TextFieldKind.None)
                 ? proofing(line.Paragraph.Text)
                 : null;
+            var found = scene.Found is { } finder && scene.FoundFill is not null ? finder(line.Paragraph.Text) : null;
             foreach (var segment in line.Segments)
             {
                 var origin = composed.Origin(index, segment);
                 PaintHighlights(scene, line, segment, origin);
+                if (found is { Count: > 0 }) PaintFound(scene, found, line.Offset, segment, origin);
                 scene.Context.DrawText(segment.Text, origin);
                 _upright.Paint(scene.Context, segment.Text, origin, segment.Start, segment.Upright);
                 if (words is not null) _waves.Paint(scene.Context, segment.Text, origin, line.Offset - segment.Start, Within(words, line.Offset, segment), scene.Scale);
@@ -88,6 +94,18 @@ public sealed class RichTextFramePainter(ITextFrameComposer composer, IBulletPic
 
             var area = segment.Text.BuildHighlightGeometry(origin, from - segment.Start, to - from);
             if (area is not null) scene.Context.DrawGeometry(new SolidColorBrush(Color.FromUInt32(colour)), null, area);
+        }
+    }
+
+    private void PaintFound(RichTextScene scene, IReadOnlyList<WordSpan> found, int offset, TypesetSegment segment, Point origin)
+    {
+        foreach (var span in found)
+        {
+            var from = Math.Max(offset + span.Start, segment.Start);
+            var to = Math.Min(offset + span.Start + span.Length, segment.End);
+            if (to <= from) continue;
+            var area = segment.Text.BuildHighlightGeometry(origin, from - segment.Start, to - from);
+            if (area is not null) scene.Context.DrawGeometry(scene.FoundFill, null, area);
         }
     }
 

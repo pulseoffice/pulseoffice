@@ -75,7 +75,7 @@ public sealed class XlsxReader
                 foreach (var merge in content.Descendants<MergeCell>())
                     if (merge.Reference?.Value is { Length: > 0 } reference && CellRange.TryParseA1(reference, out var region))
                         _overlappingMerges.Add(sheet.Merges, region, context.Diagnostics);
-                new XlsxSparklineMapper().Read(content.GetFirstChild<WorksheetExtensionList>(), sheet);
+                new XlsxSparklineMapper().Read(content.GetFirstChild<WorksheetExtensionList>(), sheet, context.Stylesheet);
                 new XlsxScenarioMapper().Read(content.GetFirstChild<Scenarios>(), sheet);
                 var formats = context.Stylesheet?.DifferentialFormats?.Elements<DifferentialFormat>().ToList() ?? [];
                 _tableFilters.Read(content.GetFirstChild<AutoFilter>(), part, sheet, context.Workbook, formats);

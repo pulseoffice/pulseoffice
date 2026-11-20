@@ -480,6 +480,12 @@ legitimate adapters (Strategy over the module's own model: `*FontCollector`, `*D
   fine move, Shift+arrow = resize (Right/Down grow, Left/Up shrink), Ctrl+Shift+arrow = fine resize; other modifiers do
   nothing. Per-module steps (normal/fine): Deck 6/0.75 pt, Folio 5/1 pt, Ledger 5/1 px. Ledger had no arrow keys on objects:
   now it has them, also on several selected objects, each as a history step.
+  Since round 332 the same table is also sixteen palette commands per module (`IObjectNudgeCommands`:
+  `{ledger,deck,folio}.object.nudge.{move,moveFine,resize,resizeFine}{Left,Right,Up,Down}`, wired by
+  `ObjectNudgeCommandSets` in Desktop through each module context's nudge hook). They carry
+  `CommandDefinition.GestureRoutedByView`: the gesture is shown in the shortcut lists but never dispatched by the shell
+  (the view's key handler owns it, so text and cell navigation keep their arrows) and cannot be rebound. Cmd (Meta)
+  counts as a fine modifier too, so the listed Ctrl gesture is right on macOS.
 - `IObjectSnapping` in the core (`Drawing.Shapes`, formerly `Presentations.Snapping`): `Snap(session, lines, tolerance)` snaps
   the move (edge, centre or opposite side) or the dragged sides of a resize, never the rotation; `Lattice`
   builds the lines of a grid. Deck uses it with grid, guides and margins; Folio with the page grid (it now

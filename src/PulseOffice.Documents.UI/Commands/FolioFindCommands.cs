@@ -132,6 +132,7 @@ public sealed class FolioFindCommands(
         if (_shownComment is { } shown && editor.HasSelection && editor.Selection == shown.Shown)
             from = backwards ? shown.Match.Range.Start : shown.Match.Range.End;
         _shownComment = null;
+        find.Highlights.Focus(editor, null);
         if (search.Next(matches, stories, from, backwards) is not { } found)
         {
             status.Report(texts.Format("folio.find.notFound", query.Text), NotificationSeverity.Warning);
@@ -142,6 +143,7 @@ public sealed class FolioFindCommands(
             var shownRange = new DocumentRange(anchor.Start, anchor.End);
             editor.Select(anchor.Start, anchor.End);
             _shownComment = (found, shownRange);
+            find.Highlights.Focus(editor, found);
             status.Report(texts.Format("folio.find.inComment", anchor.Comment.Author), NotificationSeverity.Info);
             return true;
         }

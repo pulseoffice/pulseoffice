@@ -15,6 +15,8 @@ public sealed record FolioTarget(
     Func<Task> PasteAsync)
 {
     public ZoomSubject ZoomSubject => new(Zoom, EffectiveZoom, SetZoom, ZoomLimits.Pages);
+
+    public Func<PulseOffice.UI.Controls.Shapes.ObjectNudge, bool> NudgeObject { get; init; } = _ => false;
 }
 
 public interface IActiveFolioContext

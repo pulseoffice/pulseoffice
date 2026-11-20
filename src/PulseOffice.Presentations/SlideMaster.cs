@@ -23,6 +23,11 @@ public sealed record SlideLayoutTemplate
     public IReadOnlyList<SlideElement> Objects { get; init; } = [];
 
     public bool HideMasterObjects { get; init; }
+
+    public bool HasOwnName =>
+        Name.Trim().Length > 0
+        && !string.Equals(Name, Kind.ToString(), StringComparison.OrdinalIgnoreCase)
+        && !(Kind == SlideLayout.TitleSlide && string.Equals(Name, "title", StringComparison.Ordinal));
 }
 
 public sealed record MasterElements(bool Date = true, bool Footer = true, bool SlideNumber = true)

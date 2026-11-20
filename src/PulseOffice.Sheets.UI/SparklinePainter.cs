@@ -28,6 +28,7 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
         var colour = Brush(style.ColorHex);
         var negative = Brush(style.NegativeHex);
         var markers = MarkersOf(points, style, Brush(style.MarkerHex));
+        if (style.ShowAxis && kind != SparklineKind.Stacked) Axis(context, area, points, style);
 
         if (kind == SparklineKind.Line)
         {
@@ -37,10 +38,19 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
 
         var count = points.Values.Count;
         var width = area.Width / Math.Max(1, count);
+        var slots = area.Width - width;
         foreach (var bar in bars.Layout(points, kind, area.Top, area.Bottom))
             context.FillRectangle(
                 bar.Negative && (style.ShowNegative || kind == SparklineKind.Stacked) ? negative : markers.At(points, bar.Index) ?? colour,
-                new Rect(area.X + bar.Index * width + width * 0.15, bar.Top, Math.Max(1, width * 0.7), bar.Bottom - bar.Top));
+                new Rect(area.X + points.Position(bar.Index) * slots + width * 0.15, bar.Top, Math.Max(1, width * 0.7), bar.Bottom - bar.Top));
+    }
+
+    private void Axis(DrawingContext context, Rect area, SparklinePoints points, SparklineStyle style)
+    {
+        if (points.Minimum >= 0 || points.Maximum <= 0) return;
+        var span = Math.Max(1e-9, points.Maximum - points.Minimum);
+        var y = area.Bottom - (0 - points.Minimum) / span * area.Height;
+        context.DrawLine(new Pen(Brush(style.AxisHex), 0.75), new Point(area.Left, y), new Point(area.Right, y));
     }
 
     private void Line(DrawingContext context, Rect area, SparklinePoints points, SparklineStyle style, IBrush colour, Markers markers)
@@ -48,28 +58,38 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
         var count = points.Values.Count;
         var span = Math.Max(1e-9, points.Maximum - points.Minimum);
         Point At(int index, double value) => new(
-            area.X + (count == 1 ? area.Width / 2 : area.Width * index / (count - 1)),
-            area.Bottom - (value - points.Minimum) / span * area.Height);
+            area.X + area.Width * points.Position(index),
+            area.Bottom - Math.Clamp((value - points.Minimum) / span, 0, 1) * area.Height);
 
         var geometry = new StreamGeometry();
         var started = false;
+        var open = false;
         using (var draw = geometry.Open())
         {
             for (var index = 0; index < count; index++)
             {
-                if (points.Values[index] is not { } value) continue;
+                if (points.Values[index] is not { } value)
+                {
+                    if (!points.SpansGaps && open)
+                    {
+                        draw.EndFigure(false);
+                        open = false;
+                    }
+                    continue;
+                }
                 var point = At(index, value);
-                if (!started)
+                if (!open)
                 {
                     draw.BeginFigure(point, false);
                     started = true;
+                    open = true;
                 }
                 else
                 {
                     draw.LineTo(point);
                 }
             }
-            if (started) draw.EndFigure(false);
+            if (open) draw.EndFigure(false);
         }
         if (!started) return;
         context.DrawGeometry(null, new Pen(colour, style.LineWidth), geometry);
@@ -78,7 +98,7 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
         for (var index = 0; index < count; index++)
         {
             if (points.Values[index] is not { } value) continue;
-            if (markers.At(points, index) is { } marker) context.DrawEllipse(marker, null, At(index, value), radius, radius);
+            if (markers.Line(points, index) is { } marker) context.DrawEllipse(marker, null, At(index, value), radius, radius);
         }
     }
 
@@ -97,22 +117,27 @@ public sealed class SparklinePainter(ISparklineBars bars) : ISparklinePainter
             last = index;
         }
 
-        return new Markers(style, marker, high, low, first, last);
+        return new Markers(style, marker, high, low, first, last, Brush);
     }
 
-    private sealed record Markers(SparklineStyle Style, IBrush Marker, double High, double Low, int First, int Last)
+    private sealed record Markers(SparklineStyle Style, IBrush Marker, double High, double Low, int First, int Last, Func<string?, IBrush> Paint)
     {
         public IBrush? At(SparklinePoints points, int index)
         {
             if (points.Values[index] is not { } value) return null;
-            if (Style.ShowHighPoint && value >= High) return Marker;
-            if (Style.ShowLowPoint && value <= Low) return Marker;
-            if (Style.ShowFirstPoint && index == First) return Marker;
-            if (Style.ShowLastPoint && index == Last) return Marker;
+            if (Style.ShowHighPoint && value >= High) return Own(Style.HighHex);
+            if (Style.ShowLowPoint && value <= Low) return Own(Style.LowHex);
+            if (Style.ShowFirstPoint && index == First) return Own(Style.FirstHex);
+            if (Style.ShowLastPoint && index == Last) return Own(Style.LastHex);
             return null;
         }
+
+        public IBrush? Line(SparklinePoints points, int index) =>
+            At(points, index) ?? (Style.ShowMarkers && points.Values[index] is not null ? Marker : null);
+
+        private IBrush Own(string? hex) => hex is null ? Marker : Paint(hex);
     }
 
-    private IBrush Brush(string hex) =>
-        Color.TryParse(hex, out var colour) ? new SolidColorBrush(colour) : Brushes.SteelBlue;
+    private IBrush Brush(string? hex) =>
+        hex is not null && Color.TryParse(hex, out var colour) ? new SolidColorBrush(colour) : Brushes.SteelBlue;
 }

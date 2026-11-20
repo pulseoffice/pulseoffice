@@ -49,6 +49,8 @@ internal static class SharedControlsComposition
     public static IServiceCollection AddSharedControls(this IServiceCollection services)
     {
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IObjectNudgeKeys, PulseOffice.UI.Controls.Shapes.ObjectNudgeKeys>();
+        services.AddSingleton<PulseOffice.UI.Controls.Shapes.IObjectNudgeCommands, PulseOffice.UI.Controls.Shapes.ObjectNudgeCommands>();
+        services.AddSingleton<ObjectNudgeCommandSets>();
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IRecentShapes>(_ => new PulseOffice.UI.Controls.Shapes.RecentShapes());
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IShapeChooser, PulseOffice.UI.Controls.Shapes.ShapeChooser>();
         services.AddSingleton<PulseOffice.UI.Controls.Shapes.IConnectorSitesDialog, PulseOffice.UI.Controls.Shapes.ConnectorSitesDialog>();

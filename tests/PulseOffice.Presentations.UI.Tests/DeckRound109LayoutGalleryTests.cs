@@ -63,7 +63,7 @@ public sealed class DeckRound109LayoutGalleryTests
         var history = new UndoStack();
         var texts = new FakeTextCatalog();
         var actions = new DeckActions(deck, history, _factory, texts, layoutCatalog: _catalog);
-        var choices = new LayoutChoices(new DeckChoiceNames(texts), _catalog);
+        var choices = new LayoutChoices(new DeckChoiceNames(texts));
         var context = new ActiveDeckContext();
         var commands = new DeckLayoutCommands(context, choices, new NoDialogs(), texts);
         var scene = new Scene { Deck = deck, History = history, Actions = actions, Commands = commands, Choices = choices };

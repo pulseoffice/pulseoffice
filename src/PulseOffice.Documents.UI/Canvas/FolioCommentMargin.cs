@@ -13,6 +13,12 @@ namespace PulseOffice.Documents.UI.Canvas;
 
 public sealed record CommentBalloon(CommentAnchor Anchor, Rect Bounds, Point Origin, Color Ink, FormattedText Header, FormattedText Body);
 
+public sealed record CommentFinds(
+    TextDocument Document,
+    IReadOnlyDictionary<string, IReadOnlyList<PulseOffice.Documents.UI.Editing.CommentFind>> All,
+    PulseOffice.Documents.Editing.SearchMatch? Focused,
+    IBrush? Accent);
+
 public sealed record CommentRange(int From, int To, uint Color, bool Resolved);
 
 public sealed record CommentSheet(IReadOnlyList<CommentAnchor> Anchors, IReadOnlyDictionary<string, uint> Colors)
@@ -30,7 +36,7 @@ public interface IFolioCommentMargin
 
     IReadOnlyList<CommentBalloon> Place(TextDocument document, CommentSheet sheet, PageBox page);
 
-    void Paint(DrawingContext context, PageBox page, IReadOnlyList<CommentBalloon> balloons, string? current, double scale);
+    void Paint(DrawingContext context, PageBox page, IReadOnlyList<CommentBalloon> balloons, string? current, double scale, CommentFinds? finds = null);
 }
 
 public sealed class FolioCommentMargin(ICommentAnchors anchors, IAuthorColors colors, IFolioViewMarks marks, ILineOffsets geometry, PulseOffice.Documents.UI.Editing.IParagraphOrder order) : IFolioCommentMargin
@@ -126,7 +132,7 @@ public sealed class FolioCommentMargin(ICommentAnchors anchors, IAuthorColors co
         return result;
     }
 
-    public void Paint(DrawingContext context, PageBox page, IReadOnlyList<CommentBalloon> balloons, string? current, double scale)
+    public void Paint(DrawingContext context, PageBox page, IReadOnlyList<CommentBalloon> balloons, string? current, double scale, CommentFinds? finds = null)
     {
         foreach (var balloon in balloons)
         {
@@ -143,8 +149,56 @@ public sealed class FolioCommentMargin(ICommentAnchors anchors, IAuthorColors co
             context.DrawRectangle(stroke, null, new Rect(balloon.Bounds.X, balloon.Bounds.Y, 3, balloon.Bounds.Height));
             using var opacity = context.PushOpacity(faded ? 0.6 : 1);
             context.DrawText(balloon.Header, new Point(balloon.Bounds.X + Padding, balloon.Bounds.Y + Padding));
-            context.DrawText(balloon.Body, new Point(balloon.Bounds.X + Padding, balloon.Bounds.Y + Padding + balloon.Header.Height + 2));
+            var bodyOrigin = new Point(balloon.Bounds.X + Padding, balloon.Bounds.Y + Padding + balloon.Header.Height + 2);
+            if (finds is not null) PaintFinds(context, balloon, bodyOrigin, finds);
+            context.DrawText(balloon.Body, bodyOrigin);
         }
+    }
+
+    private void PaintFinds(DrawingContext context, CommentBalloon balloon, Point origin, CommentFinds finds)
+    {
+        if (finds.Accent is not ISolidColorBrush accent) return;
+        var document = finds.Document;
+        var fill = new SolidColorBrush(accent.Color, 0.22);
+        var focus = new SolidColorBrush(accent.Color, 0.5);
+        var starts = BodyStarts(document, balloon.Anchor.Comment, out var length);
+        void Mark(string paragraphId, int from, int to, IBrush brush)
+        {
+            if (!starts.TryGetValue(paragraphId, out var at)) return;
+            var start = Math.Clamp(at.Start + from, 0, length);
+            var end = Math.Clamp(at.Start + Math.Min(to, at.Length), start, length);
+            if (end <= start) return;
+            if (balloon.Body.BuildHighlightGeometry(origin, start, end - start) is { } area) context.DrawGeometry(brush, null, area);
+        }
+        foreach (var comment in document.Comments.Thread(balloon.Anchor.Comment.Id))
+            if (finds.All.TryGetValue(comment.Id, out var found))
+                foreach (var item in found) Mark(item.ParagraphId, item.From, item.To, fill);
+        if (finds.Focused is { CommentId: { } focusedId } focused && starts.ContainsKey(focused.Range.Start.ParagraphId)
+            && document.Comments.Thread(balloon.Anchor.Comment.Id).Any(comment => comment.Id == focusedId))
+        {
+            var end = focused.Range.End.ParagraphId == focused.Range.Start.ParagraphId ? focused.Range.End.Offset : int.MaxValue;
+            Mark(focused.Range.Start.ParagraphId, focused.Range.Start.Offset, end, focus);
+        }
+    }
+
+    private Dictionary<string, (int Start, int Length)> BodyStarts(TextDocument document, Comment root, out int length)
+    {
+        var starts = new Dictionary<string, (int Start, int Length)>(StringComparer.Ordinal);
+        var position = 0;
+        var first = true;
+        foreach (var comment in document.Comments.Thread(root.Id))
+        {
+            if (!first) position += 1 + ("↳ " + comment.Author + ": ").Length;
+            first = false;
+            var paragraphs = comment.Content.Blocks.OfType<ParagraphBlock>().ToList();
+            for (var index = 0; index < paragraphs.Count; index++)
+            {
+                starts[paragraphs[index].Id] = (position, paragraphs[index].Text.Length);
+                position += paragraphs[index].Text.Length + (index < paragraphs.Count - 1 ? 1 : 0);
+            }
+        }
+        length = position;
+        return starts;
     }
 
     private byte Blend(byte channel) => (byte)(channel + (255 - channel) * 0.88);

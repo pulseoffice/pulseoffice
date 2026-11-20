@@ -23,10 +23,12 @@ internal sealed class OdpLayoutCatalogXml
     private SlideLayoutTemplate? Standard(SlideLayout kind) =>
         _standard.Layouts.FirstOrDefault(layout => layout.Kind == kind);
 
-    public void Write(XElement masterPage, SlideMaster master)
+    public void Write(XElement masterPage, SlideMaster master, Action<XElement, SlideLayoutTemplate> decorate)
     {
         ArgumentNullException.ThrowIfNull(masterPage);
+        ArgumentNullException.ThrowIfNull(decorate);
         if (!Needed(master)) return;
+        var firsts = master.Layouts.DistinctBy(layout => layout.Kind).ToHashSet(ReferenceEqualityComparer.Instance);
         masterPage.Add(new XElement(Pulse + "layouts",
             master.Layouts.Select(layout =>
             {
@@ -42,6 +44,11 @@ internal sealed class OdpLayoutCatalogXml
                         new XAttribute(Pulse + "width", Number(placeholder.Bounds.Width)),
                         new XAttribute(Pulse + "height", Number(placeholder.Bounds.Height)))));
                 if (layout.Background is { } background) element.Add(new XAttribute(Pulse + "background", background.ToString()));
+                if (!firsts.Contains(layout))
+                {
+                    element.Add(new XAttribute(Pulse + "own-decoration", "true"));
+                    decorate(element, layout);
+                }
                 return element;
             })));
     }
@@ -55,9 +62,10 @@ internal sealed class OdpLayoutCatalogXml
 
     public string? SlideLayoutId(XElement page) => (string?)page.Attribute(Pulse + "layout-id");
 
-    public SlideMaster Read(XElement masterPage, SlideMaster master)
+    public SlideMaster Read(XElement masterPage, SlideMaster master, Func<XElement, string, IReadOnlyList<SlideElement>> decoration)
     {
         ArgumentNullException.ThrowIfNull(masterPage);
+        ArgumentNullException.ThrowIfNull(decoration);
         if (masterPage.Element(Pulse + "layouts") is not { } catalog) return master;
         var layouts = new List<SlideLayoutTemplate>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -80,7 +88,8 @@ internal sealed class OdpLayoutCatalogXml
                 HideMasterObjects = (string?)entry.Attribute(Pulse + "hide-master-objects") == "true",
                 Background = Enum.TryParse<ColorRole>((string?)entry.Attribute(Pulse + "background"), out var role) && Enum.IsDefined(role) ? role : null,
                 Placeholders = placeholders,
-                Objects = basis.Kind == kind ? basis.Objects : [],
+                Objects = (string?)entry.Attribute(Pulse + "own-decoration") == "true" ? decoration(entry, id)
+                    : basis.Kind == kind ? basis.Objects : [],
             });
         }
         return layouts.Count == 0 ? master : master with { Layouts = layouts };
@@ -103,6 +112,4 @@ internal sealed class OdpLayoutCatalogXml
 
     private string Number(Twip value) => value.Value.ToString(CultureInfo.InvariantCulture);
 
-    public bool KeepsDecoration(SlideMaster master) =>
-        master.Layouts.GroupBy(layout => layout.Kind).All(group => group.Skip(1).All(layout => layout.Objects.Count == 0 || layout.Objects.SequenceEqual(group.First().Objects)));
 }

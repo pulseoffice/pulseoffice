@@ -31,7 +31,8 @@ public sealed class LedgerEditDataCommands(
     PulseOffice.Shell.IDocumentWorkspace workspace,
     ITextCatalog texts,
     PulseOffice.UI.Controls.ISidePanelHost panel,
-    PulseOffice.UI.Controls.Search.IFindPanelPages pages) : LedgerCommandSet(context)
+    PulseOffice.UI.Controls.Search.IFindPanelPages pages,
+    ILedgerFindHighlights highlights) : LedgerCommandSet(context)
 {
     public IEnumerable<CommandDefinition> GetCommands() =>
     [
@@ -75,7 +76,9 @@ public sealed class LedgerEditDataCommands(
             {
                 pages.Show(panel, () => new PulseOffice.UI.Controls.Search.TargetFindPanelSource(
                     () => Context.Workbook is null ? null : FindTarget(),
-                    _ => FindDialog(CancellationToken.None)));
+                    _ => FindDialog(CancellationToken.None),
+                    request => { if (Context.Workbook is { } shown) highlights.Show(shown, FindTarget().QueryOf(request)); },
+                    () => { if (Context.Workbook is { } shown) highlights.Clear(shown); }));
                 return Task.CompletedTask;
             },
         },

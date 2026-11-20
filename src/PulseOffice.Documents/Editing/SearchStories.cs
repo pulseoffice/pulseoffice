@@ -18,7 +18,8 @@ public sealed class SearchStories(IStoryCatalog stories, IBlockTree tree) : ISea
         var found = new List<SearchStory>();
         void Add(BlockContainer story, string? commentId = null)
         {
-            if (seen.Add(story)) found.Add(new SearchStory([.. tree.Paragraphs(story)]) { CommentId = commentId });
+            if (seen.Add(story))
+                found.Add(new SearchStory([.. tree.Paragraphs(story)]) { CommentId = commentId, Styles = document.Styles, SectionStarts = SectionStarts(story) });
         }
         var comment = document.Comments.All.FirstOrDefault(item => ReferenceEquals(item.Content, current));
         Add(current, comment?.Id);
@@ -40,6 +41,26 @@ public sealed class SearchStories(IStoryCatalog stories, IBlockTree tree) : ISea
         }
         foreach (var item in document.Comments.All) Add(item.Content, item.Id);
         return found;
+    }
+
+    private HashSet<string> SectionStarts(BlockContainer story)
+    {
+        var owner = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var section in tree.Blocks(story).OfType<SectionBlock>())
+            foreach (var paragraph in tree.Paragraphs(section.Content))
+                owner[paragraph.Id] = section.Id;
+        var starts = new HashSet<string>(StringComparer.Ordinal);
+        if (owner.Count == 0) return starts;
+        string? previous = null;
+        var first = true;
+        foreach (var paragraph in tree.Paragraphs(story))
+        {
+            var current = owner.GetValueOrDefault(paragraph.Id);
+            if (!first && !string.Equals(current, previous, StringComparison.Ordinal)) starts.Add(paragraph.Id);
+            previous = current;
+            first = false;
+        }
+        return starts;
     }
 
     private IEnumerable<PageStyle> UsedPageStyles(TextDocument document)

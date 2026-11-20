@@ -15,7 +15,14 @@ using PulseOffice.UI.Theming;
 
 namespace PulseOffice.Sheets.UI.CellFormat;
 
-public sealed record SparklineDialogResult(string Data, string Destination, SparklineKind Kind, SparklineStyle Style, bool SameScale);
+public sealed record SparklineDialogResult(string Data, string Destination, SparklineKind Kind, SparklineStyle Style, bool SameScale)
+{
+    public SparklineEmptyCells EmptyCells { get; init; }
+
+    public bool ShowHidden { get; init; }
+
+    public bool RightToLeft { get; init; }
+}
 
 public sealed class SparklineDialogServices(ISparklinePainter painter, ISparklineData data, IGalleryNavigator navigator)
 {
@@ -59,6 +66,9 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
     private readonly ThumbnailGallery<SparklineKind> _kinds;
     private readonly SparklineSample _preview;
     private readonly CheckBox _sameScale;
+    private readonly CheckBox _showHidden;
+    private readonly CheckBox _rightToLeft;
+    private readonly ComboBox _emptyCells;
     private readonly DialogFooter _footer;
     private SparklineKind _kind = SparklineKind.Line;
     private SparklineStyle _style = new();
@@ -117,6 +127,20 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         points.Children.Add(Flag(texts["sparkline.point.first"], _style.ShowFirstPoint, value => _style with { ShowFirstPoint = value }));
         points.Children.Add(Flag(texts["sparkline.point.last"], _style.ShowLastPoint, value => _style with { ShowLastPoint = value }));
         points.Children.Add(Flag(texts["sparkline.point.negative"], _style.ShowNegative, value => _style with { ShowNegative = value }));
+        points.Children.Add(Flag(texts["sparkline.point.markers"], _style.ShowMarkers, value => _style with { ShowMarkers = value }));
+        points.Children.Add(Flag(texts["sparkline.axis"], _style.ShowAxis, value => _style with { ShowAxis = value }));
+
+        _emptyCells = new ComboBox
+        {
+            ItemsSource = new[] { texts["sparkline.emptyCells.gap"], texts["sparkline.emptyCells.zero"], texts["sparkline.emptyCells.span"] },
+            SelectedIndex = 0,
+        };
+        AutomationProperties.SetName(_emptyCells, texts["sparkline.emptyCells"]);
+        _emptyCells.SelectionChanged += (_, _) => Refresh();
+        _showHidden = new CheckBox { Content = texts["sparkline.showHidden"] };
+        _showHidden.IsCheckedChanged += (_, _) => Refresh();
+        _rightToLeft = new CheckBox { Content = texts["sparkline.rightToLeft"] };
+        _rightToLeft.IsCheckedChanged += (_, _) => Refresh();
 
         _sameScale = new CheckBox { Content = texts["sparkline.sameScale"], IsChecked = true };
 
@@ -132,6 +156,10 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
         look.Add(texts["sparkline.markerColour"], markers, editorWidth: 260);
         look.Add(null, points, DialogRowKind.Indented, editorWidth: 300);
         look.Add(null, _sameScale, DialogRowKind.Indented);
+        var cells = layout.AddSection(texts["sparkline.section.cells"]);
+        cells.Add(texts["sparkline.emptyCells"], _emptyCells, editorWidth: 200);
+        cells.Add(null, _showHidden, DialogRowKind.Indented);
+        cells.Add(null, _rightToLeft, DialogRowKind.Indented);
 
         _footer = new DialogFooter()
             .WithCancel(texts["prompt.cancel"], () => Completed?.Invoke(this, null))
@@ -150,7 +178,19 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
 
     public RangeFieldControl Destination => _destination;
 
-    public SparklineDialogResult Result => new(_data.Text.Trim(), _destination.Text.Trim(), _kind, _style, _sameScale.IsChecked == true);
+    public SparklineDialogResult Result => new(_data.Text.Trim(), _destination.Text.Trim(), _kind, _style, _sameScale.IsChecked == true)
+    {
+        EmptyCells = EmptyCells,
+        ShowHidden = _showHidden.IsChecked == true,
+        RightToLeft = _rightToLeft.IsChecked == true,
+    };
+
+    private SparklineEmptyCells EmptyCells => _emptyCells?.SelectedIndex switch
+    {
+        1 => SparklineEmptyCells.Zero,
+        2 => SparklineEmptyCells.Span,
+        _ => SparklineEmptyCells.Gap,
+    };
 
     public SparklinePoints Points()
     {
@@ -159,7 +199,16 @@ public sealed class SparklineDialogView : UserControl, IDialogContent, IDialogFo
             ? range
             : new CellRange(range.Start, new CellAddress(range.Start.Row, range.End.Column));
         var line = new Sparkline(range.Start, first);
-        var group = new SparklineGroup { Id = "preview", Sparklines = [line], Kind = _kind, Style = _style };
+        var group = new SparklineGroup
+        {
+            Id = "preview",
+            Sparklines = [line],
+            Kind = _kind,
+            Style = _style,
+            EmptyCells = EmptyCells,
+            ShowHidden = _showHidden?.IsChecked == true,
+            RightToLeft = _rightToLeft?.IsChecked == true,
+        };
         return _services.Data.Read(_sheet, group, line);
     }
 

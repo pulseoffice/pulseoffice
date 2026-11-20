@@ -33,7 +33,7 @@ public sealed class SparklineBars : ISparklineBars
         }
 
         var span = Math.Max(1e-9, points.Maximum - points.Minimum);
-        double Y(double value) => bottom - (value - points.Minimum) / span * (bottom - top);
+        double Y(double value) => bottom - Math.Clamp((value - points.Minimum) / span, 0, 1) * (bottom - top);
 
         var baseline = Y(Math.Clamp(0, points.Minimum, points.Maximum));
 

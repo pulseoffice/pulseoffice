@@ -63,6 +63,8 @@ public sealed class FocusedSheetContext : IActiveSheetContext
 
     public void SelectSheet(int index) => Current.SelectSheet(index);
 
+    public bool NudgeObjects(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge) => Current.NudgeObjects(nudge);
+
     public void Attach(SheetTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);

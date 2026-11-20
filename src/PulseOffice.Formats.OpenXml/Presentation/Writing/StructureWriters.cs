@@ -140,7 +140,7 @@ internal sealed class PptxMasterWriter(
         var common = template.Background is { } background
             ? new P.CommonSlideData(units.Background(background), tree)
             : new P.CommonSlideData(tree);
-        common.Name = template.Id.StartsWith(PptxLayoutIdentity.CustomPrefix, StringComparison.Ordinal) ? template.Name : template.Kind.ToString();
+        common.Name = template.HasOwnName ? template.Name : template.Kind.ToString();
 
         part.SlideLayout = new P.SlideLayout(common)
         {

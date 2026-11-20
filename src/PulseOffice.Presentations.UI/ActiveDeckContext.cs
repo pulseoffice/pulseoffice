@@ -39,6 +39,17 @@ public sealed record DeckTarget(
 {
     public Func<int?> TextCaret { get; init; } = () => null;
 
+    public Func<IReadOnlyList<Slide>> SelectedSlides { get; init; } = () => [];
+
+    public Func<bool> SlidePaneFocused { get; init; } = () => false;
+
+    public Func<PulseOffice.UI.Controls.Shapes.ObjectNudge, bool> NudgeObjects { get; init; } = _ => false;
+
+    public bool CopiesSlides() => ViewMode() == DeckViewMode.Sorter || (ViewMode() == DeckViewMode.Normal && SlidePaneFocused() && SelectedMany().Count == 0);
+
+    public IReadOnlyList<Slide> SlidesToCopy() =>
+        SelectedSlides() is { Count: > 0 } chosen ? chosen : CurrentSlide() is { } current ? [current] : [];
+
     public Func<string?> MasterLayoutId { get; init; } = () => null;
 
     public Func<string?> EditedMasterId { get; init; } = () => null;

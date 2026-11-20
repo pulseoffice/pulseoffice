@@ -60,7 +60,7 @@ public sealed class WorkbookSearch : IWorkbookSearch
             var area = options.AllSheets && index != currentSheet ? null : scope;
 
             replaced += _sheets.ReplaceAll(
-                workbook.Sheets[index], query, replacement, options, area, history);
+                workbook.Sheets[index], query, replacement, options, area, history, workbook.Styles);
         }
 
         return replaced;

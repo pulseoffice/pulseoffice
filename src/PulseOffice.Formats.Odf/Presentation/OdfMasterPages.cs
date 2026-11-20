@@ -107,7 +107,7 @@ internal sealed class OdfMasterPages
             if (master.Elements.SlideNumber) page.Add(Frame("page-number", 24.0, 17.4));
             Decorate(page, master.Objects, automaticStyles, session);
             page.Add(_print.Notes(deck.NotesMaster));
-            _catalog.Write(page, master);
+            _catalog.Write(page, master, (entry, layout) => Decorate(entry, layout.Objects, automaticStyles, session));
             styles.Add(page);
         }
         for (var index = 0; index < deck.Masters.Count; index++)
@@ -407,10 +407,11 @@ internal sealed class OdfMasterPages
             deck.ReplaceMaster(updated);
         }
 
-        deck.Master = _catalog.Read(pages[0], deck.Master);
+        IReadOnlyList<SlideElement> Own(XElement entry, string id) => Decoration(entry, definitions, $"deco.{id}.", readBytes);
+        deck.Master = _catalog.Read(pages[0], deck.Master, Own);
         foreach (var page in pages.Skip(1))
             if ((string?)page.Attribute(Style + "name") is { } name && deck.Masters.FirstOrDefault(master => master.Id == name) is { } secondary)
-                deck.ReplaceMaster(_catalog.Read(page, secondary));
+                deck.ReplaceMaster(_catalog.Read(page, secondary, Own));
 
         var drawPages = body?.Elements(Draw + "page").ToList() ?? [];
         for (var index = 0; index < drawPages.Count && index < deck.Slides.Count; index++)

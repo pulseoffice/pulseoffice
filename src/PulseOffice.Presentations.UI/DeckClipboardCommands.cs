@@ -16,8 +16,8 @@ public sealed class DeckClipboardCommands(
     [
         Edit("deck.edit.selectAll", "Ctrl+A", _ => HasSlide(), SelectAll, edits: false),
         Edit("deck.edit.duplicate", "Ctrl+D", _ => HasSelection(), Duplicate),
-        Edit("deck.clipboard.copy", "Ctrl+C", _ => HasSelection(), () => exchange.CopyAsync(ModuleKind.Presentations), edits: false),
-        Edit("deck.clipboard.cut", "Ctrl+X", _ => HasSelection(), () => exchange.CutAsync(ModuleKind.Presentations)),
+        Edit("deck.clipboard.copy", "Ctrl+C", _ => HasSelection() || CopiesSlides(), () => exchange.CopyAsync(ModuleKind.Presentations), edits: false),
+        Edit("deck.clipboard.cut", "Ctrl+X", _ => HasSelection() || CopiesSlides(), () => exchange.CutAsync(ModuleKind.Presentations)),
         Edit("deck.clipboard.paste", "Ctrl+V", _ => exchange.CanPaste(ModuleKind.Presentations), () => exchange.PasteAsync(ModuleKind.Presentations)),
         Prototype("deck.clipboard.pasteUnformatted") with
         {
@@ -50,6 +50,8 @@ public sealed class DeckClipboardCommands(
     }
 
     private bool HasSlide() => Context.Target is { } t && t.CurrentSlide() is not null;
+
+    private bool CopiesSlides() => Context.Target is { } t && t.CurrentSlide() is not null && t.CopiesSlides();
 
     private bool HasSelection() => Context.Target is { } t && t.SelectedMany().Count > 0;
 

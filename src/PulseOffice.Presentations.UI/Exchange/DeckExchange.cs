@@ -31,7 +31,7 @@ public sealed class DeckExchange(
     ISlideGroupDecomposition decomposition,
     IDeckGrouping grouping,
     ISlideGroupUnits units,
-    ISlideFactory slideFactory) : IExchangeParticipant
+    IDeckSlideClipboard slideClipboard) : IExchangeParticipant
 {
     private const int PasteOffset = 200;
     private const double FreeFontSize = 18;
@@ -39,32 +39,14 @@ public sealed class DeckExchange(
 
     public ModuleKind Module => ModuleKind.Presentations;
 
-    public bool CanCapture => context.Target is { } target && target.CurrentSlide() is not null && (target.SelectedMany().Count > 0 || CopiesSlides(target));
-
-    private bool CopiesSlides(DeckTarget target) => target.ViewMode() == DeckViewMode.Sorter;
-
-    private ExchangePackage CaptureSlide(string id, DeckTarget target, Slide slide, bool cut)
-    {
-        var copy = slideFactory.Clone(slide, slide.Id);
-        copy.MasterId = slide.MasterId;
-        var title = slide.Placeholder(PlaceholderRole.Title)?.Text.PlainText ?? string.Empty;
-        var package = new ExchangePackage
-        {
-            Id = id,
-            Origin = Module,
-            Native = new DeckSlidesNative(target.Deck, [copy]),
-            Representations = title.Length > 0 ? [ExchangeRepresentation.OfText(ExchangeFlavor.Text, title)] : [],
-        };
-        if (cut && !target.Actions.IsReadOnly && target.Deck.Slides.Count > 1) target.Actions.DeleteSlide(slide);
-        return package;
-    }
+    public bool CanCapture => context.Target is { } target && target.CurrentSlide() is not null && (target.SelectedMany().Count > 0 || target.CopiesSlides());
 
     public bool CanReceive => context.Target is { } target && target.CurrentSlide() is not null && !target.Actions.IsReadOnly;
 
     public ExchangePackage? Capture(string id, bool cut)
     {
         if (context.Target is not { } target || target.CurrentSlide() is not { } slide) return null;
-        if (CopiesSlides(target)) return CaptureSlide(id, target, slide, cut);
+        if (target.CopiesSlides()) return slideClipboard.Capture(id, target, cut);
         var selection = target.SelectedMany();
         if (selection.Count == 0) return null;
 
@@ -102,7 +84,7 @@ public sealed class DeckExchange(
     {
         ArgumentNullException.ThrowIfNull(package);
         var modes = new List<ExchangePasteMode>();
-        if (package.NativeFrom<DeckSlidesNative>(Module) is not null) return [ExchangePasteMode.Native];
+        if (package.NativeFrom<DeckSlidesNative>(Module) is { } slides) return slideClipboard.Modes(context.Target, slides);
         if (package.NativeFrom<DeckNative>(Module) is not null) modes.Add(ExchangePasteMode.Native);
         else if (package.Content is ObjectsContent) modes.Add(ExchangePasteMode.Objects);
         if (package.Content is CellRangeContent)
@@ -123,9 +105,8 @@ public sealed class DeckExchange(
         if (context.Target is not { } target || target.CurrentSlide() is not { } slide || target.Actions.IsReadOnly) return false;
         switch (mode)
         {
-            case ExchangePasteMode.Native when package.NativeFrom<DeckSlidesNative>(Module) is { } copied:
-                target.Actions.PasteSlides(target.CurrentIndex(), copied.Source, copied.Slides);
-                return true;
+            case ExchangePasteMode.Native or ExchangePasteMode.KeepSourceFormatting when package.NativeFrom<DeckSlidesNative>(Module) is { } copied:
+                return slideClipboard.Receive(target, copied, mode);
             case ExchangePasteMode.Native when package.NativeFrom<DeckNative>(Module) is { } native:
                 return Place(target, slide, native.Elements, PasteOffset, native.Groups, native.Behaviours);
             case ExchangePasteMode.Objects when package.Content is ObjectsContent content:

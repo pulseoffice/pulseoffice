@@ -91,7 +91,10 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         ApplyScrollBars();
         _ime = new InlineImeClient(this);
 
-        _target = new FolioTarget(editor, () => _canvas.Zoom, SetZoom, () => _canvas.Scale / PageDesk.PointsToPixels, CopyAsync, CutAsync, PasteAsync);
+        _target = new FolioTarget(editor, () => _canvas.Zoom, SetZoom, () => _canvas.Scale / PageDesk.PointsToPixels, CopyAsync, CutAsync, PasteAsync)
+        {
+            NudgeObject = NudgeSelectedObject,
+        };
 
         _canvas.PointerPlaced += (_, _) => FocusDocument();
         _canvas.MenuRequested += (_, _) => services.Menus.Open(editor, _canvas, FocusDocument);
@@ -273,11 +276,9 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
             e.Handled = true;
             return;
         }
-        if (_editor.SelectedObjectId is { } nudged && _services.Nudges.Read(e.Key, e.KeyModifiers) is { } nudge)
+        if (_editor.SelectedObjectId is not null && _services.Nudges.Read(e.Key, e.KeyModifiers) is { } nudge)
         {
-            var (dx, dy) = nudge.Distance(PointSteps);
-            if (nudge.Resizes) _services.Canvas.Mover.Resize(_editor, nudged, dx, dy);
-            else _services.Canvas.Mover.Nudge(_editor, nudged, dx, dy);
+            NudgeSelectedObject(nudge);
             e.Handled = true;
             return;
         }
@@ -358,4 +359,13 @@ public sealed class FolioView : Grid, IDocumentViewRelease, IPendingEditsOwner, 
         PulseOffice.Documents.Objects.EmbeddedContent { Value: PulseOffice.Charts.ChartDefinition } => SelectionKind.Chart,
         _ => SelectionKind.Shape,
     };
+
+    private bool NudgeSelectedObject(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
+    {
+        if (_editor.SelectedObjectId is not { } nudged) return false;
+        var (dx, dy) = nudge.Distance(PointSteps);
+        if (nudge.Resizes) _services.Canvas.Mover.Resize(_editor, nudged, dx, dy);
+        else _services.Canvas.Mover.Nudge(_editor, nudged, dx, dy);
+        return true;
+    }
 }

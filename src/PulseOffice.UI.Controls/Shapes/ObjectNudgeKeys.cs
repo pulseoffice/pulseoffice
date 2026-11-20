@@ -36,12 +36,13 @@ public interface IObjectNudgeKeys
 
 public sealed class ObjectNudgeKeys : IObjectNudgeKeys
 {
-    private const KeyModifiers FineModifiers = KeyModifiers.Control | KeyModifiers.Alt;
+    private const KeyModifiers FineModifiers = KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta;
 
     public ObjectNudge? Read(Key key, KeyModifiers modifiers)
     {
-        var fine = (modifiers & FineModifiers) != 0;
-        if ((modifiers & FineModifiers) == FineModifiers) return null;
+        var held = modifiers & FineModifiers;
+        var fine = held != 0;
+        if (held is not (KeyModifiers.None or KeyModifiers.Control or KeyModifiers.Alt or KeyModifiers.Meta)) return null;
         var rest = modifiers & ~FineModifiers;
         if (rest is not (KeyModifiers.None or KeyModifiers.Shift)) return null;
         var kind = rest == KeyModifiers.Shift ? ObjectNudgeKind.Resize : ObjectNudgeKind.Move;

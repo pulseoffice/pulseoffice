@@ -37,7 +37,12 @@ public sealed record SlideLayer(Rect Bounds, Action<DrawingContext> Paint)
 public readonly record struct SlidePalette(
     Color Placeholder, Color Border, Func<string, IReadOnlyList<PulseOffice.Text.Spelling.WordSpan>>? Proofing = null,
     Action<DrawingContext>? Underlay = null, SlideOutputQuality Quality = SlideOutputQuality.Color, SlideElement? Live = null,
-    PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted = null, SlideElement? Overlay = null);
+    PulseOffice.UI.Controls.Text.Rich.IPaintedTextLines? Painted = null, SlideElement? Overlay = null)
+{
+    public Func<string, IReadOnlyList<PulseOffice.Text.Spelling.WordSpan>>? Found { get; init; }
+
+    public IBrush? FoundFill { get; init; }
+}
 
 public enum SlideOutputQuality { Color, Grayscale, BlackAndWhite }
 

@@ -203,6 +203,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
 
     public bool SnapToGrid { get; set; }
 
+    public bool NudgeObjects(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge) => _parts.Keyboard.NudgeObjects(nudge);
+
     public ISheetSpelling? Spelling
     {
         get => Options.Spelling;
@@ -223,17 +225,33 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
     {
         base.OnAttachedToVisualTree(e);
         if (Options.Spelling is { } spelling) spelling.Changed += SpellingChanged;
+        if (FindHighlights is { } found) found.Changed += SpellingChanged;
         _parts.Drawing.Link();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         if (Options.Spelling is { } spelling) spelling.Changed -= SpellingChanged;
+        if (FindHighlights is { } found) found.Changed -= SpellingChanged;
         _parts.Drawing.Unlink();
         base.OnDetachedFromVisualTree(e);
     }
 
     private void SpellingChanged(object? sender, EventArgs e) => InvalidateVisual();
+
+    public ILedgerFindHighlights? FindHighlights
+    {
+        get;
+        set
+        {
+            if (ReferenceEquals(field, value)) return;
+            var attached = this.IsAttachedToVisualTree();
+            if (attached && field is { } previous) previous.Changed -= SpellingChanged;
+            field = value;
+            if (attached && value is not null) value.Changed += SpellingChanged;
+            InvalidateVisual();
+        }
+    }
 
     public Func<CellAddress, bool> ChoicesAvailable
     {
@@ -360,6 +378,8 @@ public sealed class SheetGridView : PulseOffice.UI.Controls.Theming.ThemedSurfac
         using (context.PushClip(Viewport.GridArea()))
         {
             _parts.Overlay.PaintViewAids(context, visible, lineBrush, foreground);
+            if (FindHighlights is { } highlights)
+                _parts.Overlay.PaintFound(context, visible, highlights.Found(_engine.Workbook, Viewport.SheetIndex));
             _parts.ObjectsPainter.PaintObjects(context, _parts.Pointer.Gesture);
             _parts.ObjectsPainter.PaintFreeformOverlay(context, _parts.Pointer.Gesture);
             _parts.Notes.PaintNotes(context);

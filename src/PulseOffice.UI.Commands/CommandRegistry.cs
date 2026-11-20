@@ -142,7 +142,7 @@ public sealed class CommandRegistry(ITextCatalog texts)
     {
         lock (_gate)
         {
-            if (!_commands.TryGetValue(id.Value, out var command)) return false;
+            if (!_commands.TryGetValue(id.Value, out var command) || command.GestureRoutedByView) return false;
 
             _commands[id.Value] = command with
             {
@@ -223,7 +223,7 @@ public sealed class CommandRegistry(ITextCatalog texts)
     public IReadOnlyDictionary<string, CommandDefinition> ActiveGestures(CommandContext ctx)
     {
         var chosen = new Dictionary<string, (string Gesture, CommandDefinition Command)>(StringComparer.Ordinal);
-        foreach (var c in Applicable(ctx).Where(c => !string.IsNullOrWhiteSpace(c.DefaultGesture)))
+        foreach (var c in Applicable(ctx).Where(c => !c.GestureRoutedByView && !string.IsNullOrWhiteSpace(c.DefaultGesture)))
         {
             var key = _gestures.Canonical(c.DefaultGesture!);
             if (key.Length == 0) continue;
@@ -420,7 +420,7 @@ internal sealed class ShortcutAudit
 
     public IReadOnlyList<string> Conflicts(IEnumerable<CommandDefinition> commands) =>
         [.. commands
-            .Where(command => command.DefaultGesture is { Length: > 0 })
+            .Where(command => !command.GestureRoutedByView && command.DefaultGesture is { Length: > 0 })
             .GroupBy(command => Canonical(command.DefaultGesture!), StringComparer.Ordinal)
             .Where(group => group.Count() > 1 && ActiveTogether(group.ToList()))
             .Select(group => $"{group.First().DefaultGesture}: {string.Join(", ", group.Select(command => command.Id.Value).Order(StringComparer.Ordinal))}")

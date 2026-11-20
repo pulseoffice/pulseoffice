@@ -89,8 +89,9 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
         }
     }
 
-    public SlideView(ISlideRenderer renderer, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe? animatedImages = null, IPathAuthoring? authoring = null, IObjectManipulator? manipulator = null, IPathNormalizer? normalizer = null, IPathEditing? pathEditing = null, PulseOffice.UI.Controls.Objects.IBitmapPixels? pixels = null, ISlideGroupUnits? units = null, ISlideGroupEditing? groupEditing = null, PulseOffice.UI.Controls.Shapes.IAdjustHandleChrome? adjusting = null, IObjectSnapping? snapping = null, PulseOffice.UI.Controls.Shapes.IObjectFrameChrome? frame = null)
+    public SlideView(ISlideRenderer renderer, PulseOffice.UI.Controls.Objects.IAnimatedImageProbe? animatedImages = null, IPathAuthoring? authoring = null, IObjectManipulator? manipulator = null, IPathNormalizer? normalizer = null, IPathEditing? pathEditing = null, PulseOffice.UI.Controls.Objects.IBitmapPixels? pixels = null, ISlideGroupUnits? units = null, ISlideGroupEditing? groupEditing = null, PulseOffice.UI.Controls.Shapes.IAdjustHandleChrome? adjusting = null, IObjectSnapping? snapping = null, PulseOffice.UI.Controls.Shapes.IObjectFrameChrome? frame = null, Rendering.ISlideFoundCells? foundCells = null)
     {
+        _foundCells = foundCells ?? new Rendering.SlideFoundCells();
         _snapping = snapping ?? new ObjectSnapping();
         _adjusting = adjusting ?? new PulseOffice.UI.Controls.Shapes.AdjustHandleChrome();
         _units = units ?? new SlideGroupUnits();
@@ -182,6 +183,18 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
     }
 
     private readonly PulseOffice.Document.Embedding.TableGeometry _tables = new();
+
+    private readonly Rendering.ISlideFoundCells _foundCells;
+
+    public Func<string, IReadOnlyList<PulseOffice.Text.Spelling.WordSpan>>? Found
+    {
+        get;
+        set
+        {
+            field = value;
+            InvalidateVisual();
+        }
+    }
 
     public bool ShowComments { get; set; } = true;
 
@@ -677,6 +690,9 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
             context.DrawRectangle(_cellEdge, rect);
         }
 
+        if (Found is { } found && FoundFill() is { } foundFill)
+            _foundCells.Paint(context, Slide, BoundsOf, _scale, found, foundFill);
+
         if (Editable && Grid is { HelplinesWhileMoving: true } && _gesture is TransformGesture { Preview: { } moving })
             DrawHelplines(context, moving.Normalized());
 
@@ -963,8 +979,17 @@ public sealed class SlideView : PulseOffice.UI.Controls.Theming.ThemedSurface, P
                 : null,
             Quality,
             LiveText,
-            Overlay: LiveOverlay);
+            Overlay: LiveOverlay)
+        {
+            Found = Found,
+            FoundFill = Found is null ? null : FoundFill(),
+        };
     }
+
+    private IBrush? FoundFill() =>
+        this.FindResource(PulseOffice.UI.Theming.Palette.Keys.Warning) is ISolidColorBrush warning
+            ? new SolidColorBrush(warning.Color, 0.35)
+            : null;
 
     private Rect TargetFor(Rect available)
     {

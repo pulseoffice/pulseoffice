@@ -19,6 +19,8 @@ public sealed record SheetRenamePlan(
     public IReadOnlyList<SheetRuleRename> Rules { get; init; } = [];
 
     public IReadOnlyList<(Pivot.PivotDefinition Before, Pivot.PivotDefinition After)> Pivots { get; init; } = [];
+
+    public IReadOnlyList<(Worksheet Sheet, IReadOnlyList<SparklineGroup> Before, IReadOnlyList<SparklineGroup> After)> Sparklines { get; init; } = [];
 }
 
 public sealed record SheetRuleRename(
@@ -82,7 +84,20 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
                     DestinationSheet = Same(pivot.DestinationSheet, oldName) ? newName : pivot.DestinationSheet,
                 }))
                 .Where(pair => pair.After != pair.Before)],
+            Sparklines = [.. workbook.Sheets
+                .Select(owner => (Sheet: owner, Before: (IReadOnlyList<SparklineGroup>)[.. owner.Sparklines.Groups],
+                    After: (IReadOnlyList<SparklineGroup>)[.. owner.Sparklines.Groups.Select(group => RenamedSparklines(group, oldName, newName))]))
+                .Where(entry => !entry.Before.SequenceEqual(entry.After))],
         };
+    }
+
+    private SparklineGroup RenamedSparklines(SparklineGroup group, string oldName, string newName)
+    {
+        var lines = group.Sparklines
+            .Select(sparkline => Same(sparkline.SourceSheet, oldName) ? sparkline with { SourceSheet = newName } : sparkline)
+            .ToList();
+        var dates = Same(group.DateSheet, oldName) ? newName : group.DateSheet;
+        return lines.SequenceEqual(group.Sparklines) && dates == group.DateSheet ? group : group with { Sparklines = lines, DateSheet = dates };
     }
 
     public void Apply(CalculationEngine engine, SheetRenamePlan plan) => Run(engine, plan, forward: true);
@@ -123,6 +138,12 @@ public sealed class SheetRenaming(IChartSheetReferences charts) : ISheetRenaming
         {
             var index = workbook.Pivots.IndexOf(forward ? before : after);
             if (index >= 0) workbook.Pivots[index] = forward ? after : before;
+        }
+
+        foreach (var (owner, before, after) in plan.Sparklines)
+        {
+            owner.Sparklines.Clear();
+            owner.Sparklines.AddRange(forward ? after : before);
         }
 
         foreach (var rename in plan.Rules)

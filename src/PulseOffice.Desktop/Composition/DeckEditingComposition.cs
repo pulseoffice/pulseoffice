@@ -109,6 +109,7 @@ internal static class DeckEditingComposition
         services.AddSingleton<PulseOffice.Presentations.ICanvasContextChooser, PulseOffice.Presentations.CanvasContextChooser>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckDrawCommands>();
         services.AddSingleton<PulseOffice.Presentations.UI.DeckImageCommands>();
+        services.AddSingleton<PulseOffice.Presentations.UI.Exchange.IDeckSlideClipboard, PulseOffice.Presentations.UI.Exchange.DeckSlideClipboard>();
         services.AddSingleton<PulseOffice.Exchange.IExchangeParticipant, PulseOffice.Presentations.UI.Exchange.DeckExchange>();
         services.TryAddSingleton<PulseOffice.UI.Embedding.IContentPainter, PulseOffice.UI.Embedding.StandardContentPainters>();
         services.TryAddSingleton<PulseOffice.UI.Embedding.ISheetObjectFactory, PulseOffice.UI.Embedding.SheetObjectFactory>();

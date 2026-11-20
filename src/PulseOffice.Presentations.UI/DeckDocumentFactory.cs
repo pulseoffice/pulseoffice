@@ -48,7 +48,8 @@ public sealed class DeckDocumentFactory(
     Motion.IDeckMotionEditors motionEditors,
     PulseOffice.Drawing.Assets.IImageExtents extents,
     IInterfaceCulture culture,
-    IDeckLinkTips linkTips) : IDeckDocumentFactory, IDocumentViewSource
+    IDeckLinkTips linkTips,
+    PulseOffice.UI.Controls.Search.ITextFindHighlights findHighlights) : IDeckDocumentFactory, IDocumentViewSource
 {
     public PulseOffice.Foundation.Modules.ModuleKind Module => PulseOffice.Foundation.Modules.ModuleKind.Presentations;
 
@@ -108,6 +109,7 @@ public sealed class DeckDocumentFactory(
             DictionaryChanges = dictionaryChanges,
             RichInsertion = richInsertion,
             MotionEditors = motionEditors,
+            FindHighlights = findHighlights,
         };
         return view;
     }

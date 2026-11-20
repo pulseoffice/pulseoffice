@@ -44,6 +44,8 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
 
     public Control? CurrentThumbnailFrame => _currentThumbnailFrame;
 
+    public bool HasFocus => _filmstrip.IsKeyboardFocusWithin;
+
     public void RefreshCaption()
     {
         if (_slidesCaption is not null) _slidesCaption.Text = _texts["deck.slides"].ToUpperInvariant();
@@ -152,6 +154,7 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
         var chrome = _state.ChromeFor(entry.Slide);
         if (entry.Thumb.Chrome != chrome) entry.Thumb.Chrome = chrome;
         Avalonia.Automation.AutomationProperties.SetName(entry.Frame, SlideAccessibleName(entry.Slide, index));
+        entry.Frame.Themed(Border.BackgroundProperty, _state.Slides.Marks(entry.Slide, _state.Current) ? Palette.Keys.Pressed : Palette.Keys.SurfaceRaised);
         if (!ReferenceEquals(entry.Slide, _state.Current)) return;
         _currentThumbnail = entry.Thumb;
         _currentThumbnailFrame = entry.Frame;
@@ -225,8 +228,15 @@ internal sealed class DeckFilmstrip(DeckViewState state, IDeckViewHost host, ISl
             _filmstripHadFocus = true;
             if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Left
                 && _drag.Finish(_filmstrip, e.GetPosition(_filmstrip), _frames)) return;
-            _host.Select(slide);
-            if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Right) _contextMenus.Open("slide", _host.View);
+            if (e.InitialPressMouseButton == Avalonia.Input.MouseButton.Right)
+            {
+                if (!_state.Slides.Marks(slide, _state.Current)) _state.Slides.Collapse(slide);
+                _host.Select(slide);
+                _contextMenus.Open("slide", _host.View);
+                return;
+            }
+            _state.Slides.Pick(_deck, slide, _state.Slides.PickFor(e.KeyModifiers));
+            _host.Select(_state.Slides.Lead(_deck, slide));
         };
 
         return new FilmstripEntry(slide, frame, thumb);

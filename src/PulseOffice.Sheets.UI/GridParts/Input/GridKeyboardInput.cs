@@ -102,6 +102,14 @@ internal sealed class GridKeyboardInput(
         return true;
     }
 
+    public bool NudgeObjects(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
+    {
+        if (objects.Count == 0) return false;
+        Nudge(nudge);
+        surface.Invalidate();
+        return true;
+    }
+
     private void Nudge(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
     {
         notifications.ObjectChanges([.. objects.Items.Select(placed =>

@@ -217,6 +217,7 @@ public sealed class ShellComposition(IServiceProvider services)
         registry.RegisterRange(_services.GetRequiredService<LedgerAnalysisCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerToolCommands>().GetCommands());
         registry.RegisterRange(_services.GetRequiredService<LedgerStyleCommands>().GetCommands());
+        registry.RegisterRange(_services.GetRequiredService<ObjectNudgeCommandSets>().GetCommands());
 
         return registry;
     }

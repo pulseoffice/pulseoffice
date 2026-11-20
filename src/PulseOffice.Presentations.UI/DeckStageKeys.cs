@@ -123,13 +123,27 @@ internal sealed class DeckStageKeys(DeckViewState state, IDeckViewHost host, Dec
 
         if (nudges.Read(e.Key, e.KeyModifiers) is not { } nudge) return;
 
+        Nudge(ids, nudge);
+        e.Handled = true;
+    }
+
+    public bool Nudge(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
+    {
+        if (_text.Editor is not null || _state.Current is null || _state.Selected is null || _state.Current.Find(_state.Selected.Id) is not { } element) return false;
+        var ids = _canvas.Selection.Select(s => s.Id).ToList();
+        if (ids.Count == 0) ids.Add(element.Id);
+        Nudge(ids, nudge);
+        return true;
+    }
+
+    private void Nudge(List<string> ids, PulseOffice.UI.Controls.Shapes.ObjectNudge nudge)
+    {
         if (nudge.Resizes) _canvasEditing.ResizeBy(ids, nudge, TwipSteps);
         else
         {
             var (dx, dy) = nudge.Distance(TwipSteps);
             _canvasEditing.MoveBy(ids, (int)dx, (int)dy);
         }
-        e.Handled = true;
     }
 
     private bool TypeIntoCell(string typed)

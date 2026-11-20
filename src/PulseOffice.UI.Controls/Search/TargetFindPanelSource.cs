@@ -1,16 +1,14 @@
 namespace PulseOffice.UI.Controls.Search;
 
-public sealed class TargetFindPanelSource(Func<IFindReplaceTarget?> target, Func<string, Task> openReplace) : IFindPanelSource
+public sealed class TargetFindPanelSource(
+    Func<IFindReplaceTarget?> target, Func<string, Task> openReplace,
+    Action<FindRequest>? highlight = null, Action? clearHighlights = null) : IFindPanelSource
 {
     public IFindReplaceTarget? Target() => target();
 
-    public void Highlight(FindRequest request)
-    {
-    }
+    public void Highlight(FindRequest request) => highlight?.Invoke(request);
 
-    public void ClearHighlights()
-    {
-    }
+    public void ClearHighlights() => clearHighlights?.Invoke();
 
     public Task OpenReplaceAsync(string query) => openReplace(query);
 }

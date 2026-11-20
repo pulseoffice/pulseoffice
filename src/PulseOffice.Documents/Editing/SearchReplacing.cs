@@ -50,7 +50,12 @@ public sealed class SearchReplacing(IStoryCatalog stories) : ISearchReplacing
                 split = character == SearchMarks.Paragraph;
             }
             if (character != SearchMarks.Paragraph)
-                SetBreak(editor, document, history, position.ParagraphId, character == SearchMarks.Column ? SearchBreak.Column : SearchBreak.Page, true);
+                SetBreak(editor, document, history, position.ParagraphId, character switch
+                {
+                    SearchMarks.Column => SearchBreak.Column,
+                    SearchMarks.Section => SearchBreak.Section,
+                    _ => SearchBreak.Page,
+                }, true);
         }
         return Flush(editor, document, history, position, segment);
     }
@@ -74,12 +79,22 @@ public sealed class SearchReplacing(IStoryCatalog stories) : ISearchReplacing
     private void SetBreak(IDocumentEditor editor, TextDocument document, UndoStack history, string paragraphId, SearchBreak kind, bool on)
     {
         var range = DocumentRange.In(paragraphId, 0, 0);
+        var pageStyle = kind == SearchBreak.Section && on ? PageStyleBefore(document, paragraphId) : null;
         editor.MapParagraphs(document, history, range, "find-break", paragraph => kind switch
         {
             SearchBreak.Page => paragraph with { PageBreakBefore = on ? true : null },
             SearchBreak.Column => paragraph with { ColumnBreakBefore = on ? true : null },
+            _ when on => paragraph with { PageStyleName = pageStyle },
             _ => paragraph with { PageStyleName = null, PageNumberRestart = null },
         });
+    }
+
+    private string PageStyleBefore(TextDocument document, string paragraphId)
+    {
+        var location = stories.Find(document, paragraphId).Location;
+        for (var index = location.Index - 1; index >= 0; index--)
+            if (location.Container[index] is Blocks.ParagraphBlock { Content.PageStyleName: { } name }) return name;
+        return document.InitialPageStyle;
     }
 
     private void Format(IDocumentEditor editor, TextDocument document, UndoStack history, DocumentRange range, SearchFormat format)

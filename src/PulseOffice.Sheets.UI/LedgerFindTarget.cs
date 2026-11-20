@@ -13,8 +13,11 @@ public sealed class LedgerFindTarget(
     ITextCatalog texts,
     ISheetEditGuard guard,
     IWorkbookSearch search,
-    bool readOnly) : IFindReplaceTarget
+    bool readOnly,
+    IWorkbookMatchOrder? order = null) : IFindReplaceTarget
 {
+    private readonly IWorkbookMatchOrder _order = order ?? new WorkbookMatchOrder();
+
     private const string MatchCase = "matchCase";
     private const string WholeCell = "wholeCell";
     private const string InFormulas = "inFormulas";
@@ -22,6 +25,7 @@ public sealed class LedgerFindTarget(
     private const string AllSheets = "allSheets";
     private const string ByFormat = "byFormat";
     private const string InComments = "inComments";
+    private const string ByColumns = "byColumns";
 
     public IReadOnlyList<FindOption> Options { get; } =
     [
@@ -32,13 +36,22 @@ public sealed class LedgerFindTarget(
         new(AllSheets, "find.allSheets"),
         new(ByFormat, "find.byFormat"),
         new(InComments, "find.inComments"),
+        new(ByColumns, "find.byColumns"),
     ];
 
     public string InitialQuery => string.Empty;
 
     public bool IsReadOnly => readOnly;
 
-    public bool SupportsFindNext => false;
+    public bool SupportsFindNext => true;
+
+    public bool SupportsFindPrevious => true;
+
+    public LedgerFindQuery QueryOf(FindRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return new LedgerFindQuery(request.Query, OptionsOf(request), context.SheetIndex);
+    }
 
     public string? Summarize(FindRequest request)
     {
@@ -54,7 +67,24 @@ public sealed class LedgerFindTarget(
         };
     }
 
-    public string FindNext(FindRequest request) => Summarize(request) ?? string.Empty;
+    public string FindNext(FindRequest request) => Go(request, backwards: false);
+
+    public string FindPrevious(FindRequest request) => Go(request, backwards: true);
+
+    private string Go(FindRequest request, bool backwards)
+    {
+        if (context.Workbook is not { } workbook || (request.Query.Length == 0 && !request.Has(ByFormat)))
+            return string.Empty;
+
+        var matches = search.FindAll(workbook, context.SheetIndex, request.Query, OptionsOf(request));
+        if (_order.Next(matches, context.SheetIndex, context.Selection.Start, request.Has(ByColumns), backwards) is not { } match)
+            return texts["find.matches.none"];
+
+        if (match.SheetIndex != context.SheetIndex) context.SelectSheet(match.SheetIndex);
+        context.SelectRange(new CellRange(match.Address, match.Address));
+        var place = request.Has(AllSheets) ? match.SheetName + "." + match.Address.ToA1() : match.Address.ToA1();
+        return texts.Format("find.foundInCell", place);
+    }
 
     public string ReplaceAll(FindRequest request)
     {

@@ -22,7 +22,7 @@ public interface ILayoutChoices
     string Title(SlideMaster master, SlideLayoutTemplate layout);
 }
 
-public sealed class LayoutChoices(IDeckChoiceNames names, ISlideLayoutCatalog catalog) : ILayoutChoices
+public sealed class LayoutChoices(IDeckChoiceNames names) : ILayoutChoices
 {
     private const char Separator = '\u001F';
 
@@ -56,7 +56,7 @@ public sealed class LayoutChoices(IDeckChoiceNames names, ISlideLayoutCatalog ca
         })];
 
     public string Title(SlideMaster master, SlideLayoutTemplate layout) =>
-        catalog.IsStandard(master, layout) || layout.Name.Trim().Length == 0 ? names.Layout(layout.Kind) : layout.Name;
+        layout.HasOwnName ? layout.Name : names.Layout(layout.Kind);
 
     private string Key(SlideMaster master, SlideLayoutTemplate layout) => $"{master.Id}{Separator}{layout.Id}";
 }

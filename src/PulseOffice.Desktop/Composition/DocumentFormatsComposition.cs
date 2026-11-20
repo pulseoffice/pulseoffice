@@ -78,6 +78,7 @@ internal static class DocumentFormatsComposition
 
         services.AddSingleton<PulseOffice.UI.Controls.Services.IFileTypeNames, PulseOffice.UI.Controls.Services.FileTypeNames>();
         services.AddSingleton<PulseOffice.UI.Controls.Search.IFindPanelPages, PulseOffice.UI.Controls.Search.FindPanelPages>();
+        services.AddSingleton<PulseOffice.UI.Controls.Search.ITextFindHighlights, PulseOffice.UI.Controls.Search.TextFindHighlights>();
         services.AddSingleton<IAtomicFileWriter, AtomicFileWriter>();
         services.AddSingleton<IFileSystemLinks, FileSystemLinks>();
         services.AddSingleton<IConfinedFileWriter, ConfinedFileWriter>();

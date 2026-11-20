@@ -33,12 +33,15 @@ public sealed class XlsxChartMapper
     private readonly ChartTableSources _tables = new();
     private readonly XlsxChartTableSources _tableSources = new();
     private readonly ChartExReader _chartEx = new();
+    private readonly ChartExAnchors _chartExAnchors;
 
     public XlsxChartMapper()
     {
         var families = new ChartFamilies();
         _builder = new ChartSpaceBuilder(families);
         _reader = new ChartSpaceReader(families, new PulseOffice.Formats.OpenXml.DrawingML.DrawingPlainText());
+        var layouts = new ChartExLayouts();
+        _chartExAnchors = new ChartExAnchors(layouts, new ChartExSpaceWriter(layouts));
     }
 
     public IEnumerable<OpenXmlCompositeElement> BuildAnchors(
@@ -61,7 +64,10 @@ public sealed class XlsxChartMapper
             _tableSources.Write(chartPart.ChartSpace, structured);
             chartPart.ChartSpace.Save();
 
-            yield return _anchors.Build(sheet.Layout, placed, drawingsPart.GetIdOfPart(chartPart));
+            var classic = _anchors.Build(sheet.Layout, placed, drawingsPart.GetIdOfPart(chartPart));
+            yield return _chartExAnchors.Writes(definition)
+                ? _chartExAnchors.Wrap(drawingsPart, definition, chartPart.ChartSpace, classic)
+                : classic;
         }
     }
 
@@ -79,48 +85,61 @@ public sealed class XlsxChartMapper
         {
             if (anchor.LocalName == "AlternateContent")
             {
+                if (_chartExAnchors.FallbackAnchor(anchor) is { } fallback && Classic(drawings, anchors, fallback, ordinal + 1) is { } kept && _chartExAnchors.Writes((ChartDefinition)kept.Content))
+                {
+                    ordinal++;
+                    placed.Add(kept);
+                    continue;
+                }
                 if (ChartEx(drawings, anchor, ++ordinal) is { } extended) placed.Add(anchors.Place(extended.Anchor, extended.Placed, new DocumentSize(Twip.FromCentimeters(12), Twip.FromCentimeters(7))));
                 continue;
             }
 
-            var frame = anchor.GetFirstChild<Xdr.GraphicFrame>();
-            var reference = frame?.Descendants<C.ChartReference>().FirstOrDefault();
-            if (reference?.Id?.Value is not { } id) continue;
-            if (!drawings.TryGetPartById(id, out var found) || found is not ChartPart { ChartSpace: { } space }) continue;
-            if (_reader.Read(space) is not { } content) continue;
-
-            var pivot = space.Descendants<C.PivotSource>().Any();
-            var formulas = content.Series
-                .SelectMany(s => s.Descendants<C.Formula>())
-                .Select(f => pivot ? _pivotExtent.Drawn(f) : f.Text)
-                .SelectMany(text => _rangeFormulas.Parts(text))
-                .Where(t => t.Contains('!'))
-                .ToList();
-
-            var sourceSheet = formulas.Count > 0 ? SheetOf(formulas[0]) : string.Empty;
-            var definition = content.Decorate(_layout.Settle(_orientation.Infer(content.Series, new ChartDefinition
-            {
-                Id = $"grafico{++ordinal}",
-                Type = content.Type,
-                SourceSheet = sourceSheet,
-                SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sourceSheet, StringComparison.CurrentCultureIgnoreCase))]),
-            }), Sources(content.Series, pivot)));
-            definition = definition with { PivotSource = _pivotLink.Read(space) };
-            if (_tableSources.Read(space) is { } kept) definition = definition with { SeriesSources = kept };
-            if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
-                definition = _inlineErrors.Refresh(definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null });
-
-            placed.Add(anchors.Place(anchor, new PlacedObject
-            {
-                Id = frame?.GetFirstChild<Xdr.NonVisualGraphicFrameProperties>()
-                        ?.GetFirstChild<Xdr.NonVisualDrawingProperties>()?.Name?.Value
-                     ?? definition.Id,
-                Content = definition,
-                Anchor = new CellAddress(0, 0),
-            }, new DocumentSize(Twip.FromCentimeters(12), Twip.FromCentimeters(7))));
+            if (Classic(drawings, anchors, anchor, ordinal + 1) is not { } read) continue;
+            ordinal++;
+            placed.Add(read);
         }
 
         return placed;
+    }
+
+    private PlacedObject? Classic(DrawingsPart drawings, XlsxAnchorLayout anchors, OpenXmlCompositeElement anchor, int ordinal)
+    {
+        var frame = anchor.GetFirstChild<Xdr.GraphicFrame>();
+        var reference = frame?.Descendants<C.ChartReference>().FirstOrDefault();
+        if (reference?.Id?.Value is not { } id) return null;
+        if (!drawings.TryGetPartById(id, out var found) || found is not ChartPart { ChartSpace: { } space }) return null;
+        if (_reader.Read(space) is not { } content) return null;
+
+        var pivot = space.Descendants<C.PivotSource>().Any();
+        var formulas = content.Series
+            .SelectMany(s => s.Descendants<C.Formula>())
+            .Select(f => pivot ? _pivotExtent.Drawn(f) : f.Text)
+            .SelectMany(text => _rangeFormulas.Parts(text))
+            .Where(t => t.Contains('!'))
+            .ToList();
+
+        var sourceSheet = formulas.Count > 0 ? SheetOf(formulas[0]) : string.Empty;
+        var definition = content.Decorate(_layout.Settle(_orientation.Infer(content.Series, new ChartDefinition
+        {
+            Id = $"grafico{ordinal}",
+            Type = content.Type,
+            SourceSheet = sourceSheet,
+            SourceRange = _union.Of([.. formulas.Where(formula => string.Equals(SheetOf(formula), sourceSheet, StringComparison.CurrentCultureIgnoreCase))]),
+        }), Sources(content.Series, pivot)));
+        definition = definition with { PivotSource = _pivotLink.Read(space) };
+        if (_tableSources.Read(space) is { } kept) definition = definition with { SeriesSources = kept };
+        if (formulas.Count == 0 && _reader.Literals(content.Series) is { IsEmpty: false } literals)
+            definition = _inlineErrors.Refresh(definition with { InlineData = literals, SourceSheet = string.Empty, SourceRange = string.Empty, SeriesSources = null });
+
+        return anchors.Place(anchor, new PlacedObject
+        {
+            Id = frame?.GetFirstChild<Xdr.NonVisualGraphicFrameProperties>()
+                ?.GetFirstChild<Xdr.NonVisualDrawingProperties>()?.Name?.Value
+                 ?? definition.Id,
+            Content = definition,
+            Anchor = new CellAddress(0, 0),
+        }, new DocumentSize(Twip.FromCentimeters(12), Twip.FromCentimeters(7)));
     }
 
     private (OpenXmlCompositeElement Anchor, PlacedObject Placed)? ChartEx(DrawingsPart drawings, OpenXmlElement alternate, int ordinal)

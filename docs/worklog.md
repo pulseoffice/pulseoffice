@@ -14468,3 +14468,27 @@ docs/deep-audit/round-322-window-module-contexts.md.
   the layout; changing or deleting a master relayouts its slides; ODP keeps custom layouts and each slide's layout;
   Insert Slides from File can keep the source formatting; the slide sorter copies and pastes slides.
   Log: docs/deep-audit/round-329-deck-masters-keyboard-resize.md.
+
+### Round 330: XLSX chartex charts (2026-11-20)
+Treemap, sunburst, histogram, Pareto, box plot, waterfall and funnel are now written to XLSX as native chartex parts behind `mc:AlternateContent` with the classic chart as fallback; XLSX087 no longer covers them. Layout properties, multi-level hierarchies, per-category box plots, chart styles and the Pareto rendering test remain queued. Log: docs/deep-audit/round-330-chartex-writing.md.
+
+### Round 331 (2026-11-20): find panel highlights, Folio find leftovers, Ledger find and replace
+- Ledger Find Next and Previous select matches by rows or columns across sheets; Replace All honours the format
+  filter; the grid highlights the find panel's matches. Deck find searches, replaces and highlights shape and table
+  text. Folio format search resolves style inheritance, section blocks are `^b` matches and `^b` can be inserted,
+  comment matches are marked in the comment balloon. Log: docs/deep-audit/round-331-find-panel-ledger-find.md.
+
+### Round 332 (2026-11-20): Deck slide clipboard, layout names, further layouts, object arrow commands
+- Slides can be selected with Ctrl and Shift clicks in the sorter and the filmstrip and copied or cut from either (one
+  undo step); slides pasted from another presentation take the destination theme by default and can keep their source
+  formatting from Paste Special. PPTX keeps PowerPoint's names of standard layouts; ODP keeps the decoration of further
+  layouts of a type. The arrow keys on objects are listed palette commands in Ledger, Deck and Folio.
+  Log: docs/deep-audit/round-332-deck-slide-clipboard-layouts.md.
+
+### Round 333 (2026-11-20): best fit labels avoid marks, Ledger sparklines complete
+- Best fit data labels now avoid the plot marks (points and bars) as well as earlier labels. Sparklines keep a source
+  on another sheet (read, drawn, renamed), scale lines from their lowest value, and carry all markers, axis and its
+  colour, first/last/high/low colours, empty cells as gap, zero or connected, hidden data, separate and custom axis
+  bounds, right to left and the date axis through XLSX `x14:sparklineGroup` and the ODS `calcext` attributes (date
+  range as our extension); the insert dialog offers empty cells, hidden data, right to left, markers and axis.
+  Log: docs/deep-audit/round-333-chart-labels-sparklines.md.

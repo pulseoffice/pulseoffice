@@ -69,6 +69,8 @@ public sealed record CommandDefinition
 
     public bool OutsideHistory { get; init; }
 
+    public bool GestureRoutedByView { get; init; }
+
     public bool RunsDocumentQueries { get; init; }
 
     public required Func<CommandContext, CancellationToken, Task> Execute { get; init; }

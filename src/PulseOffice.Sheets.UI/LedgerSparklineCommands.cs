@@ -119,6 +119,9 @@ public sealed class LedgerSparklineCommands(
             Kind = values.Kind,
             Style = values.Style,
             SameScale = values.SameScale,
+            EmptyCells = values.EmptyCells,
+            ShowHidden = values.ShowHidden,
+            RightToLeft = values.RightToLeft,
         };
 
         Apply("ledger.sparkline.insert", sheet => sheet.Sparklines.Add(group));

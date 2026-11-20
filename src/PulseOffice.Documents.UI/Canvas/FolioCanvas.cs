@@ -322,7 +322,8 @@ public sealed class FolioCanvas : Control
             if (sheet is null) continue;
             var balloons = _services.Comments.Place(_editor.Document, sheet, page);
             _balloons[slot.Index] = balloons;
-            _services.Comments.Paint(context, page, balloons, current, Scale);
+            _services.Comments.Paint(context, page, balloons, current, Scale,
+                new CommentFinds(_editor.Document, _services.Found.InComments(_editor), _services.Found.Focused(_editor), Accent));
         }
         PaintCaret(context, layout);
         PaintOffer(context);

@@ -87,6 +87,22 @@ internal sealed class GridOverlayPainter(
         if (options.ShowHiddenMarkers) PaintHiddenMarkers(context, sheet, visible, lineBrush);
     }
 
+    public void PaintFound(DrawingContext context, VisibleRange visible, IReadOnlySet<CellAddress> found)
+    {
+        if (found.Count == 0) return;
+        var warning = theme.Brush(Palette.Keys.Warning, theme.Accent);
+        var colour = (warning as ISolidColorBrush)?.Color ?? Colors.Transparent;
+        var fill = new ImmutableSolidColorBrush(colour, 0.3);
+        var frame = new Pen(warning, 1);
+        foreach (var address in found)
+        {
+            if (!visible.Contains(address)) continue;
+            var cell = viewport.MergedRect(address);
+            context.FillRectangle(fill, cell);
+            context.DrawRectangle(frame, cell.Deflate(0.5));
+        }
+    }
+
     public IBrush CrossTint(IBrush foreground) =>
         new ImmutableSolidColorBrush((foreground as ISolidColorBrush)?.Color ?? Colors.Black, 0.06);
 

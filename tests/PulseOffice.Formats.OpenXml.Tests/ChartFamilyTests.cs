@@ -103,7 +103,8 @@ public sealed class ChartFamilyTests
     {
         var writer = new XlsxSpreadsheetWriter();
 
-        Assert.Contains(writer.CheckFidelity(With(ChartType.Waterfall, false)).Losses, loss => loss.Code == "XLSX087");
+        Assert.Contains(writer.CheckFidelity(With(ChartType.SteppedLine, false)).Losses, loss => loss.Code == "XLSX087");
+        Assert.DoesNotContain(writer.CheckFidelity(With(ChartType.Waterfall, false)).Losses, loss => loss.Code == "XLSX087");
         Assert.Contains(writer.CheckFidelity(With(ChartType.Line, true)).Losses, loss => loss.Code == "XLSX088");
         Assert.DoesNotContain(writer.CheckFidelity(With(ChartType.Scatter, false)).Losses, loss => loss.Code is "XLSX087" or "XLSX088");
         Assert.DoesNotContain(writer.CheckFidelity(With(ChartType.Column, true)).Losses, loss => loss.Code is "XLSX087" or "XLSX088");

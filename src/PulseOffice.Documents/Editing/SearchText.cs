@@ -17,6 +17,8 @@ public sealed class SearchText
 
     public string? CommentId { get; init; }
 
+    public PulseOffice.Documents.Styles.StyleSheet? Styles { get; init; }
+
     internal void Add(char character, DocumentPosition start, DocumentPosition end, ParagraphBlock? paragraph, TextRun? run, SearchBreak? kind = null)
     {
         _text.Append(character);
@@ -65,7 +67,7 @@ public sealed class SearchTextBuilder : ISearchTextBuilder
     public SearchText Build(SearchStory story)
     {
         ArgumentNullException.ThrowIfNull(story);
-        var text = new SearchText { CommentId = story.CommentId };
+        var text = new SearchText { CommentId = story.CommentId, Styles = story.Styles };
         ParagraphBlock? previous = null;
         foreach (var paragraph in story.Paragraphs)
         {
@@ -73,7 +75,7 @@ public sealed class SearchTextBuilder : ISearchTextBuilder
             if (previous is not null) text.Add(SearchMarks.Paragraph, new DocumentPosition(previous.Id, previous.Length), at, null, null);
             if (paragraph.Content.PageBreakBefore == true) text.Add(SearchMarks.Page, at, at, null, null, SearchBreak.Page);
             if (paragraph.Content.ColumnBreakBefore == true) text.Add(SearchMarks.Column, at, at, null, null, SearchBreak.Column);
-            if (previous is not null && paragraph.Content.PageStyleName is not null) text.Add(SearchMarks.Section, at, at, null, null, SearchBreak.Section);
+            if (previous is not null && (paragraph.Content.PageStyleName is not null || story.SectionStarts.Contains(paragraph.Id))) text.Add(SearchMarks.Section, at, at, null, null, SearchBreak.Section);
             AddCharacters(text, paragraph);
             previous = paragraph;
         }

@@ -93,6 +93,7 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
 
     private readonly DrawingStyleFidelity _drawing = new();
 
+    private readonly ChartExLayouts _chartExLayouts = new();
     private readonly OoxmlChartFidelity _charts = new();
 
     private readonly XlsxDataTableWriter _dataTables = new(new XlsxFormulaSyntax());
@@ -176,8 +177,8 @@ public sealed class XlsxSpreadsheetWriter(SignatureLineImage signatureImages, Ve
             losses.Add(Diagnostic.Info("XLSX026", "Open in design mode, automatic focus and the data source of form controls do not exist in XLSX."));
 
         var charts = workbook.Sheets.SelectMany(sheet => sheet.Objects).Select(placed => placed.Content).OfType<Charts.ChartDefinition>().ToList();
-        if (charts.Any(_charts.LosesType))
-            losses.Add(Diagnostic.Warning("XLSX087", "Chart types that DrawingML does not have, such as stepped lines, waterfall, statistical and other special charts, are written as column charts in XLSX. ODS keeps them. PulseOffice reads the type back from an extension."));
+        if (charts.Any(chart => _charts.LosesType(chart) && !_chartExLayouts.Writes(chart.Type)))
+            losses.Add(Diagnostic.Warning("XLSX087", "Chart types that DrawingML does not have, such as stepped lines, waterfall, statistical and other special charts, are written as column charts in XLSX. ODS keeps them. Treemap, sunburst, histogram, Pareto, box plot, waterfall and funnel charts are written natively. PulseOffice reads the type back from an extension."));
         if (charts.Any(_charts.DropsSeriesAnalysis))
             losses.Add(Diagnostic.Warning("XLSX241", "Trendlines, error bars and secondary axes on pie, doughnut and radar chart series have no place in DrawingML: they are not written to XLSX. ODS keeps them."));
         if (charts.Any(_charts.DropsCategoryUnits))

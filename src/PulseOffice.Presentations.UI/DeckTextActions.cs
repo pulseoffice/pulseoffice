@@ -6,7 +6,7 @@ using PulseOffice.Text.Rich;
 
 namespace PulseOffice.Presentations.UI;
 
-public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckActionRecorder recorder, ITextEditSplice _splice, IParagraphLineMerge _lines)
+public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckActionRecorder recorder, ITextEditSplice _splice, IParagraphLineMerge _lines, IDeckElementTextRewrite rewriter)
 {
     public void EditText(Slide slide, string elementId, RichText updated, string labelKey = "deck.action.editText")
     {
@@ -22,9 +22,10 @@ public sealed class DeckTextActions(Presentation deck, ITextCatalog texts, DeckA
     public int RewriteTexts(string labelKey, Func<RichText, RichText> text, Func<string, string>? notes = null)
     {
         var elements = deck.Slides
-            .SelectMany(slide => slide.Elements.OfType<TextElement>().Select(element => (Slide: slide, Before: element)))
-            .Select(entry => (entry.Slide, entry.Before, After: Fitted(entry.Slide, entry.Before with { Text = text(entry.Before.Text) })))
-            .Where(entry => entry.After.Text.PlainText != entry.Before.Text.PlainText)
+            .SelectMany(slide => slide.Elements.Select(element => (Slide: slide, Before: element)))
+            .Select(entry => (entry.Slide, entry.Before, After: rewriter.Rewrite(entry.Before, text)))
+            .Where(entry => !ReferenceEquals(entry.After, entry.Before))
+            .Select(entry => (entry.Slide, entry.Before, After: Fitted(entry.Slide, entry.After)))
             .ToList();
         var notesChanges = notes is null
             ? []

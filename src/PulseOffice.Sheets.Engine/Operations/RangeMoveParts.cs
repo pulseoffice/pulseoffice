@@ -154,14 +154,14 @@ internal sealed class MovedSparklinesPart : RangeMovePart
                 foreach (var sparkline in group.Sparklines)
                 {
                     var cellMoves = move.Moves(sheet.Name, new CellRange(sparkline.Cell, sparkline.Cell));
-                    var sourceMoves = move.Moves(sheet.Name, sparkline.Source);
+                    var sourceMoves = move.Moves(sparkline.SourceSheetOr(sheet.Name), sparkline.Source);
                     if (move.Overwrites(sheet.Name, new CellRange(sparkline.Cell, sparkline.Cell))) continue;
                     if (cellMoves && edit.CrossSheet && sourceMoves)
-                        leaving.Add(new Sparkline(move.Moved(sparkline.Cell), move.Moved(sparkline.Source)));
+                        leaving.Add(sparkline with { Cell = move.Moved(sparkline.Cell), Source = move.Moved(sparkline.Source) });
                     else if (edit.CrossSheet && (cellMoves || sourceMoves))
                         staying.Add(sparkline);
                     else
-                        staying.Add(new Sparkline(cellMoves ? move.Moved(sparkline.Cell) : sparkline.Cell, sourceMoves ? move.Moved(sparkline.Source) : sparkline.Source));
+                        staying.Add(sparkline with { Cell = cellMoves ? move.Moved(sparkline.Cell) : sparkline.Cell, Source = sourceMoves ? move.Moved(sparkline.Source) : sparkline.Source });
                 }
                 if (staying.Count > 0) groups.Add(group with { Sparklines = staying });
                 if (leaving.Count > 0) carried.Add(group with { Id = Guid.NewGuid().ToString("N"), Sparklines = leaving });

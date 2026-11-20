@@ -123,6 +123,7 @@ internal static class LedgerCoreComposition
         services.AddSingleton<LedgerShapeListCommands>();
         services.AddSingleton<LedgerCommands>();
         services.AddSingleton<PulseOffice.Sheets.IFormControlBinding, PulseOffice.Sheets.FormControlBinding>();
+        services.AddSingleton<PulseOffice.Sheets.UI.ILedgerFindHighlights, PulseOffice.Sheets.UI.LedgerFindHighlights>();
         services.AddSingleton<LedgerDocumentFactory>();
         services.AddSingleton<ILedgerDocumentFactory>(provider => provider.GetRequiredService<LedgerDocumentFactory>());
         services.AddSingleton<PulseOffice.Shell.IDocumentViewSource>(provider => provider.GetRequiredService<LedgerDocumentFactory>());

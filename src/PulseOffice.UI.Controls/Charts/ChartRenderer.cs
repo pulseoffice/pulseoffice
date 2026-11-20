@@ -201,14 +201,16 @@ public sealed class ChartRenderer
     private void DrawDataLabels(ChartText text, DrawingContext context, ChartDefinition definition, ChartData data, IEnumerable<Plots.ChartDataLabel> labels)
     {
         var placed = new List<Rect>();
-        foreach (var label in labels)
+        var all = labels.ToList();
+        IReadOnlyList<Rect> marks = definition.DataLabels.Placement == DataLabelPlacement.BestFit ? _labelLayout.Marks(all) : [];
+        foreach (var label in all)
         {
             var caption = LabelText(text, definition, data, label);
             if (caption.Length == 0) continue;
             var layout = text.Layout(caption, text.Ink.Text, 9);
             var size = new Size(layout.Width, layout.Height);
             var origin = definition.DataLabels.Placement == DataLabelPlacement.BestFit
-                ? _labelLayout.BestFit(label, size, placed)
+                ? _labelLayout.BestFit(label, size, placed, marks)
                 : _labelLayout.Origin(label, size, definition.DataLabels.Placement);
             placed.Add(new Rect(origin, size));
             context.FillRectangle(text.Ink.Backdrop, new Rect(origin, new Size(layout.Width, layout.Height)));

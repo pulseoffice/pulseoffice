@@ -41,6 +41,8 @@ public sealed record SheetTarget
 
     public required Func<IReadOnlyList<PlacedObject>> ReadSelectedObjects { get; init; }
 
+    public Func<PulseOffice.UI.Controls.Shapes.ObjectNudge, bool> NudgeObjects { get; init; } = _ => false;
+
     public required Action<IEnumerable<PlacedObject>> WriteSelectedObjects { get; init; }
 
     public required Action<int> SelectSheet { get; init; }
@@ -96,6 +98,8 @@ public interface IActiveSheetContext
     void SelectObjects(IEnumerable<PlacedObject> objects);
 
     void SelectSheet(int index);
+
+    bool NudgeObjects(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge) => false;
 
     void Attach(SheetTarget target);
 
@@ -165,6 +169,8 @@ public sealed class ActiveSheetContext : IActiveSheetContext
     public void SelectObjects(IEnumerable<PlacedObject> objects) => _target?.WriteSelectedObjects(objects);
 
     public void SelectSheet(int index) => _target?.SelectSheet(index);
+
+    public bool NudgeObjects(PulseOffice.UI.Controls.Shapes.ObjectNudge nudge) => _target?.NudgeObjects(nudge) ?? false;
 
     public event EventHandler? TargetChanged;
 

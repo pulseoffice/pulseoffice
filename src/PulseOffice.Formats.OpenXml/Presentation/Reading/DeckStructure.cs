@@ -87,12 +87,10 @@ internal sealed class PptxMasterReader(
         foreach (var (layoutPart, kind, customId) in identities.Entries(masterPart))
         {
             if (!byKind.TryGetValue(kind, out var template)) continue;
-            if (customId is not null)
-                template = standard.Template(kind) with
-                {
-                    Id = customId,
-                    Name = layoutPart.SlideLayout?.CommonSlideData?.Name?.Value is { Length: > 0 } customName ? customName : template.Name,
-                };
+            var ownName = layoutPart.SlideLayout?.CommonSlideData?.Name?.Value is { Length: > 0 } readName ? readName : template.Name;
+            template = customId is not null
+                ? standard.Template(kind) with { Id = customId, Name = ownName }
+                : template with { Name = ownName };
             using var layoutScope = schemes.Enter(masterMap, maps.Override(masterMap, layoutPart.SlideLayout?.ColorMapOverride));
 
             var tree = layoutPart.SlideLayout?.CommonSlideData?.ShapeTree;

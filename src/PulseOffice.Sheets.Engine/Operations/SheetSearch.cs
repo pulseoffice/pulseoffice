@@ -75,7 +75,8 @@ public interface ISheetSearch
         Worksheet sheet, string query, SearchOptions? options = null, CellRange? scope = null, Styling.StyleCatalog? styles = null);
 
     int ReplaceAll(
-        Worksheet sheet, string query, string replacement, SearchOptions? options = null, CellRange? scope = null, UndoStack? history = null);
+        Worksheet sheet, string query, string replacement, SearchOptions? options = null, CellRange? scope = null, UndoStack? history = null,
+        Styling.StyleCatalog? styles = null);
 }
 
 public sealed class SheetSearch : ISheetSearch
@@ -119,7 +120,8 @@ public sealed class SheetSearch : ISheetSearch
 
     public int ReplaceAll(
         Worksheet sheet, string query, string replacement,
-        SearchOptions? options = null, CellRange? scope = null, UndoStack? history = null)
+        SearchOptions? options = null, CellRange? scope = null, UndoStack? history = null,
+        Styling.StyleCatalog? styles = null)
     {
         ArgumentNullException.ThrowIfNull(sheet);
         if (string.IsNullOrEmpty(query)) return 0;
@@ -127,7 +129,7 @@ public sealed class SheetSearch : ISheetSearch
         options ??= SearchOptions.Default;
         if (options.InComments) return _comments.ReplaceAll(sheet, query, replacement, options, scope, history, _matchers);
 
-        var matches = FindAll(sheet, query, options, scope);
+        var matches = FindAll(sheet, query, options, scope, styles);
         if (matches.Count == 0) return 0;
 
         var matcher = _matchers.For(query, options);
@@ -184,7 +186,7 @@ internal sealed class TextMatchers
     {
         var comparison = options.MatchCase ? StringComparison.Ordinal : StringComparison.CurrentCultureIgnoreCase;
 
-        if (options.UseRegex) return Regex(query, options.MatchCase);
+        if (options.UseRegex) return Regex(options.WholeCell ? "^(?:" + query + ")$" : query, options.MatchCase);
         return options.WholeCell ? new WholeCellText(query, comparison) : new ContainedText(query, comparison);
     }
 

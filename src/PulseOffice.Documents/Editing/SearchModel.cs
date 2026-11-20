@@ -23,6 +23,10 @@ public sealed record SearchQuery(string Text, bool MatchCase = false, bool Whole
 public sealed record SearchStory(IReadOnlyList<ParagraphBlock> Paragraphs)
 {
     public string? CommentId { get; init; }
+
+    public PulseOffice.Documents.Styles.StyleSheet? Styles { get; init; }
+
+    public IReadOnlySet<string> SectionStarts { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 }
 
 public enum SearchBreak

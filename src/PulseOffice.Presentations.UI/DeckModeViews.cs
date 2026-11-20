@@ -66,6 +66,8 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
             }.Themed(ScrollViewer.BackgroundProperty, Palette.Keys.Canvas);
         }
         _sorterStrip.Update(_deck, _state.Current);
+        foreach (var (slide, frame) in _deck.Slides.Zip(_sorterStrip.Frames))
+            frame.Themed(Border.BackgroundProperty, _state.Slides.Marks(slide, _state.Current) ? Palette.Keys.Pressed : Palette.Keys.SurfaceRaised);
         return _sorterView;
     }
 
@@ -98,7 +100,7 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
             CornerRadius = new CornerRadius(_metrics.RadiusTight),
             BorderThickness = new Thickness(current ? 2 : 1),
             Cursor = new Cursor(StandardCursorType.Hand),
-        }.Themed(Border.BackgroundProperty, Palette.Keys.SurfaceRaised);
+        }.Themed(Border.BackgroundProperty, _state.Slides.Marks(slide, _state.Current) ? Palette.Keys.Pressed : Palette.Keys.SurfaceRaised);
 
         frame = frame.Themed(Border.BorderBrushProperty, current ? PulseOffice.UI.Theming.AccentService.AccentKey : Palette.Keys.Border);
 
@@ -115,7 +117,9 @@ internal sealed class DeckModeViews(DeckViewState state, IDeckViewHost host, ISl
         frame.PointerReleased += (_, e) =>
         {
             if (_sorterStrip is null || _drag is null) return;
-            if (!_drag.Finish(_sorterStrip.Panel, e.GetPosition(_sorterStrip.Panel), _sorterStrip.Frames)) _host.Select(slide);
+            if (_drag.Finish(_sorterStrip.Panel, e.GetPosition(_sorterStrip.Panel), _sorterStrip.Frames)) return;
+            _state.Slides.Pick(_deck, slide, _state.Slides.PickFor(e.KeyModifiers));
+            _host.Select(_state.Slides.Lead(_deck, slide));
         };
         frame.DoubleTapped += (_, _) => { _host.Select(slide); _host.SetViewMode(DeckViewMode.Normal); };
         return frame;

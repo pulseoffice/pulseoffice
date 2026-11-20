@@ -4,6 +4,10 @@ namespace PulseOffice.Sheets;
 
 public enum SparklineKind { Line, Column, Stacked }
 
+public enum SparklineEmptyCells { Gap, Zero, Span }
+
+public enum SparklineAxisBound { Individual, Group, Custom }
+
 public sealed record SparklineStyle
 {
     public const double ThinnestLine = 0.01;
@@ -27,9 +31,26 @@ public sealed record SparklineStyle
     public bool ShowNegative { get; init; } = true;
 
     public double LineWidth { get; init; } = 1.4;
+
+    public bool ShowMarkers { get; init; }
+
+    public bool ShowAxis { get; init; }
+
+    public string AxisHex { get; init; } = "#000000";
+
+    public string? FirstHex { get; init; }
+
+    public string? LastHex { get; init; }
+
+    public string? HighHex { get; init; }
+
+    public string? LowHex { get; init; }
 }
 
-public sealed record Sparkline(CellAddress Cell, CellRange Source);
+public sealed record Sparkline(CellAddress Cell, CellRange Source, string? SourceSheet = null)
+{
+    public string SourceSheetOr(string host) => SourceSheet ?? host;
+}
 
 public sealed record SparklineGroup
 {
@@ -41,7 +62,33 @@ public sealed record SparklineGroup
 
     public SparklineStyle Style { get; init; } = new();
 
-    public bool SameScale { get; init; }
+    public bool SameScale
+    {
+        get => MinimumAxis == SparklineAxisBound.Group && MaximumAxis == SparklineAxisBound.Group;
+        init
+        {
+            MinimumAxis = value ? SparklineAxisBound.Group : SparklineAxisBound.Individual;
+            MaximumAxis = MinimumAxis;
+        }
+    }
+
+    public SparklineAxisBound MinimumAxis { get; init; }
+
+    public SparklineAxisBound MaximumAxis { get; init; }
+
+    public double? ManualMinimum { get; init; }
+
+    public double? ManualMaximum { get; init; }
+
+    public SparklineEmptyCells EmptyCells { get; init; }
+
+    public bool ShowHidden { get; init; }
+
+    public bool RightToLeft { get; init; }
+
+    public CellRange? DateRange { get; init; }
+
+    public string? DateSheet { get; init; }
 
     public bool Contains(CellAddress address) =>
         Sparklines.Any(sparkline => sparkline.Cell == address);

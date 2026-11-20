@@ -65,10 +65,23 @@ public sealed class ChartLabelLayout
         };
     }
 
-    public Point BestFit(ChartDataLabel label, Size size, IReadOnlyList<Rect> placed)
+    private const double MarkRadius = Gap;
+
+    public IReadOnlyList<Rect> Marks(IReadOnlyList<ChartDataLabel> labels)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        return labels.Select(Mark).ToList();
+    }
+
+    public Point BestFit(ChartDataLabel label, Size size, IReadOnlyList<Rect> placed) => BestFit(label, size, placed, []);
+
+    public Point BestFit(ChartDataLabel label, Size size, IReadOnlyList<Rect> placed, IReadOnlyList<Rect> marks)
     {
         ArgumentNullException.ThrowIfNull(label);
         ArgumentNullException.ThrowIfNull(placed);
+        ArgumentNullException.ThrowIfNull(marks);
+        var own = Mark(label);
+        var obstacles = placed.Concat(marks.Where(mark => label.Base is null || mark != own)).ToList();
         DataLabelPlacement[] candidates = label.Base is null
             ? [DataLabelPlacement.Automatic, DataLabelPlacement.Above, DataLabelPlacement.Right, DataLabelPlacement.Below, DataLabelPlacement.Left]
             : [DataLabelPlacement.Automatic, DataLabelPlacement.OutsideEnd, DataLabelPlacement.InsideEnd, DataLabelPlacement.Center, DataLabelPlacement.InsideBase];
@@ -77,7 +90,7 @@ public sealed class ChartLabelLayout
         {
             var origin = Origin(label, size, candidate);
             var area = new Rect(origin, size);
-            if (!placed.Any(other => other.Intersects(area))) return origin;
+            if (!obstacles.Any(other => other.Intersects(area))) return origin;
         }
         return first;
     }
@@ -90,6 +103,16 @@ public sealed class ChartLabelLayout
         ChartLabelPlacement.Centre => Centred(label.Middle ?? label.Anchor, size),
         _ => new Point(label.Anchor.X - size.Width / 2, label.Anchor.Y - size.Height - Gap),
     };
+
+    private static Rect Mark(ChartDataLabel label)
+    {
+        if (label.Base is { } start)
+        {
+            var tip = label.Tip ?? label.Anchor;
+            return new Rect(new Point(Math.Min(start.X, tip.X), Math.Min(start.Y, tip.Y)), new Point(Math.Max(start.X, tip.X), Math.Max(start.Y, tip.Y))).Inflate(1);
+        }
+        return new Rect(label.Anchor.X - MarkRadius, label.Anchor.Y - MarkRadius, MarkRadius * 2, MarkRadius * 2);
+    }
 
     private static Point Centred(Point centre, Size size) => new(centre.X - size.Width / 2, centre.Y - size.Height / 2);
 

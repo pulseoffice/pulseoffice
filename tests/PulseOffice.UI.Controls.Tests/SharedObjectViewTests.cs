@@ -54,7 +54,8 @@ public sealed class SharedObjectViewTests
         Assert.Equal((10.0, 20.0, 35.0, 40.0), grow.Apply(10, 20, 30, 40, steps, 1));
         Assert.Equal((10.0, 20.0, 30.0, 39.0), _nudges.Read(Key.Up, KeyModifiers.Shift | KeyModifiers.Control)!.Value.Apply(10, 20, 30, 40, steps, 1));
         Assert.Equal((0.0, 0.0, 1.0, 2.0), _nudges.Read(Key.Left, KeyModifiers.Shift)!.Value.Apply(0, 0, 2, 2, steps, 1));
-        Assert.Null(_nudges.Read(Key.Left, KeyModifiers.Meta));
+        Assert.True(_nudges.Read(Key.Left, KeyModifiers.Meta)!.Value.Fine);
+        Assert.Null(_nudges.Read(Key.Left, KeyModifiers.Control | KeyModifiers.Alt));
         Assert.Null(_nudges.Read(Key.A, KeyModifiers.None));
     }
 

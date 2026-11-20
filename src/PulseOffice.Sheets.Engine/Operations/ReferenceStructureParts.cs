@@ -216,8 +216,9 @@ internal sealed class SparklinesPart : StructurePart
             .Select(group => group with
             {
                 Sparklines = [.. group.Sparklines
-                    .Select(sparkline => edit.Shift.Move(sparkline.Cell) is { } cell && edit.Shift.Move(sparkline.Source) is { } source
-                        ? new Sparkline(cell, source)
+                    .Select(sparkline => edit.Shift.Move(sparkline.Cell) is { } cell
+                        && (sparkline.SourceSheet is not null ? sparkline.Source : edit.Shift.Move(sparkline.Source)) is { } source
+                        ? sparkline with { Cell = cell, Source = source }
                         : null)
                     .OfType<Sparkline>()],
             })

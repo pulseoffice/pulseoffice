@@ -19,13 +19,13 @@ public interface IDocumentSearch
     bool IsValid(SearchQuery query);
 }
 
-public sealed class DocumentSearch(ISearchTextBuilder builder, IWordWildcards wildcards) : IDocumentSearch
+public sealed class DocumentSearch(ISearchTextBuilder builder, IWordWildcards wildcards, PulseOffice.Documents.Styles.IStyleResolver styles) : IDocumentSearch
 {
     private static readonly TimeSpan MatchTimeout = TimeSpan.FromSeconds(1);
 
     private const string AnyCharacter = "[^\\n\\f\\u000E\\u001D]";
 
-    public DocumentSearch() : this(new SearchTextBuilder(), new WordWildcards())
+    public DocumentSearch() : this(new SearchTextBuilder(), new WordWildcards(), new PulseOffice.Documents.Styles.StyleResolver())
     {
     }
 
@@ -58,6 +58,7 @@ public sealed class DocumentSearch(ISearchTextBuilder builder, IWordWildcards wi
         ['p'] = "\n",
         ['m'] = "\f",
         ['n'] = "\u000E",
+        ['b'] = "\u001D",
     };
 
     public IReadOnlyList<DocumentRange> FindAll(IEnumerable<ParagraphBlock> paragraphs, SearchQuery query)
@@ -255,11 +256,26 @@ public sealed class DocumentSearch(ISearchTextBuilder builder, IWordWildcards wi
             if (format.ParagraphStyle is { } style && !string.Equals(paragraph.StyleName, style, StringComparison.Ordinal)) return false;
             var run = text.RunAt(i);
             if (format.CharacterStyle is { } character && !string.Equals(run?.StyleName, character, StringComparison.Ordinal)) return false;
-            if (format.Bold is { } bold && (run?.Bold ?? paragraph.Content.Bold) != bold) return false;
-            if (format.Italic is { } italic && (run?.Italic ?? paragraph.Content.Italic) != italic) return false;
-            if (format.Underline is { } underline && (run?.Underline ?? paragraph.Content.Underline) != underline) return false;
+            if (!format.HasCharacterFormat) continue;
+            var effective = Effective(text, paragraph, run);
+            if (format.Bold is { } bold && effective.Bold != bold) return false;
+            if (format.Italic is { } italic && effective.Italic != italic) return false;
+            if (format.Underline is { } underline && effective.Underline != underline) return false;
         }
         return true;
+    }
+
+    private (bool Bold, bool Italic, bool Underline) Effective(SearchText text, ParagraphBlock paragraph, PulseOffice.Text.Rich.TextRun? run)
+    {
+        if (text.Styles is not { } sheet)
+            return (run?.Bold ?? paragraph.Content.Bold, run?.Italic ?? paragraph.Content.Italic, run?.Underline ?? paragraph.Content.Underline);
+        if (run is null)
+        {
+            var whole = styles.EffectiveParagraph(sheet, paragraph.Content);
+            return (whole.Bold, whole.Italic, whole.Underline);
+        }
+        var resolved = styles.EffectiveRun(sheet, paragraph.Content, run);
+        return (resolved.Bold, resolved.Italic, resolved.Underline);
     }
 
     private bool IsWordEdge(string text, int index) =>

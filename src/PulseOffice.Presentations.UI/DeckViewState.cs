@@ -22,6 +22,8 @@ internal sealed class DeckViewState(Presentation deck, DeckActions actions, ITex
 
     public Slide? Current { get; set; }
 
+    public SlideSelection Slides { get; } = new();
+
     public SlideElement? Selected { get; set; }
 
     public TextElement? SelectedText { get; set; }

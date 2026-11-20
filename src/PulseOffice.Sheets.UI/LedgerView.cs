@@ -82,6 +82,12 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
 
     public PulseOffice.UI.Controls.Links.ILinkFollower? Links { get; init; }
 
+    public ILedgerFindHighlights? FindHighlights
+    {
+        get => _grid.FindHighlights;
+        init => _grid.FindHighlights = value;
+    }
+
     public ICellLinkClicking CellLinks
     {
         get => _grid.CellLinks;
@@ -496,6 +502,7 @@ public sealed class LedgerView : UserControl, PulseOffice.Shell.IDocumentViewRel
             WriteZoom = zoom => _grid.Zoom = zoom,
             ReadSelectedObject = () => _grid.SelectedObject,
             ReadSelectedObjects = () => _grid.SelectedObjects,
+            NudgeObjects = _grid.NudgeObjects,
             WriteSelectedObjects = objects => _grid.SelectObjects(objects),
             SelectSheet = index => SelectSheet(index),
             WriteSelectedObject = placed => _grid.SelectObject(placed),

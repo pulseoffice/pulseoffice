@@ -36,6 +36,7 @@ public enum ExchangePasteMode
     FormattedText,
     UnformattedText,
     Image,
+    KeepSourceFormatting,
 }
 
 public interface IExchangeContentVisitor<out T>

@@ -9,6 +9,7 @@ namespace PulseOffice.Presentations.UI;
 public sealed class DeckActions
 {
     private readonly UndoStack _history;
+    private readonly ITextCatalog _texts;
     private readonly DeckActionRecorder _recorder;
     private readonly DeckSlideActions _slides;
     private readonly DeckElementActions _elements;
@@ -25,6 +26,7 @@ public sealed class DeckActions
         ISlideLayoutCatalog? layoutCatalog = null, IGraphicStyleRelinker? styleRelinker = null)
     {
         _history = history;
+        _texts = texts;
         _recorder = new DeckActionRecorder(deck, history, readOnly, fitting ?? new Rendering.NoTextFrameFitting());
         _recorder.FocusRequested += slide => SlideFocusRequested?.Invoke(this, slide);
         _show = new DeckShowActions(deck, texts, _recorder);
@@ -34,7 +36,7 @@ public sealed class DeckActions
             refit ?? new FreeformRefit(), optionGroups ?? new PulseOffice.Document.Forms.OptionGroups(),
             behaviourCloning ?? new ElementBehaviourCloning());
         var textSplice = splice ?? new TextEditSplice();
-        _text = new DeckTextActions(deck, texts, _recorder, textSplice, new ParagraphLineMerge(textSplice));
+        _text = new DeckTextActions(deck, texts, _recorder, textSplice, new ParagraphLineMerge(textSplice), new DeckElementTextRewrite());
         _design = new DeckDesignActions(deck, texts, _recorder, styleRelinker ?? new GraphicStyleRelinker());
         _layouts = new DeckLayoutActions(deck, history, texts, _recorder, slides, layoutCatalog ?? new SlideLayoutCatalog(), _slides, _design);
     }
@@ -54,6 +56,14 @@ public sealed class DeckActions
 
     public void DeleteSlide(Slide slide) =>
         _slides.DeleteSlide(slide);
+
+    public void DeleteSlides(IReadOnlyList<Slide> slides, string labelKey)
+    {
+        ArgumentNullException.ThrowIfNull(slides);
+        if (IsReadOnly || slides.Count == 0) return;
+        using (_history.BeginLabelledStep(_texts[labelKey]))
+            foreach (var slide in slides) _slides.DeleteSlide(slide);
+    }
 
     public Slide? DuplicateSlide(Slide slide) =>
         _slides.DuplicateSlide(slide);

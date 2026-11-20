@@ -6,7 +6,7 @@ namespace PulseOffice.Presentations.UI;
 
 public sealed class DeckFindTarget(IActiveDeckContext context, ITextCatalog texts) : IFindReplaceTarget
 {
-    private const string MatchCase = "matchCase";
+    public const string MatchCase = "matchCase";
 
     private readonly DeckTextSearch _search = new();
     private DeckTextMatch? _last;
@@ -19,7 +19,17 @@ public sealed class DeckFindTarget(IActiveDeckContext context, ITextCatalog text
 
     public bool SupportsFindNext => true;
 
-    public string? Summarize(FindRequest request) => null;
+    public string? Summarize(FindRequest request)
+    {
+        if (context.Target is not { } target || request.Query.Length == 0) return null;
+        var count = _search.Matches(target.Deck.Slides, request.Query, request.Has(MatchCase)).Count;
+        return count switch
+        {
+            0 => texts["find.matches.none"],
+            1 => texts["find.matches.one"],
+            _ => texts.Format("find.matches.many", count),
+        };
+    }
 
     public string FindNext(FindRequest request)
     {
