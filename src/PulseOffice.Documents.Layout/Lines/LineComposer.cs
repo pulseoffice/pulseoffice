@@ -33,7 +33,7 @@ public sealed class LineComposer(ILineBidi bidi, ILineBreakOpportunities opportu
         var runs = new List<GlyphRun>();
         if (index == 0 && paragraph.Label is { } label)
         {
-            runs.Add(new GlyphRun(GlyphRunKind.Label, label.Font, label.Text, frame.MarginLeft + label.Position + Math.Max(0, offset), 0, paragraph.SourceOf(span.Start), label.Advances) { Picture = label.Picture });
+            runs.Add(new GlyphRun(GlyphRunKind.Label, label.Font, label.Text, frame.MarginLeft + label.Position + Math.Max(0, offset), label.Shift, paragraph.SourceOf(span.Start), label.Advances) { Picture = label.Picture });
         }
         var x = frame.MarginLeft + span.X0 + Math.Max(0, offset);
         var origin = x;

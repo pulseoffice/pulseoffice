@@ -267,13 +267,21 @@ internal sealed class OdtStylesReader(
         if (layout.Element(Style + "header-style")?.Element(Style + "header-footer-properties") is { } header)
         {
             page.Header.Spacing = measure.Twips((string?)header.Attribute(Fo + "margin-bottom")) ?? page.Header.Spacing;
-            page.Header.MinimumHeight = measure.Twips((string?)header.Attribute(Fo + "min-height")) ?? page.Header.MinimumHeight;
+            page.Header.MinimumHeight = Content(header, page.Header);
         }
         if (layout.Element(Style + "footer-style")?.Element(Style + "header-footer-properties") is { } footer)
         {
             page.Footer.Spacing = measure.Twips((string?)footer.Attribute(Fo + "margin-top")) ?? page.Footer.Spacing;
-            page.Footer.MinimumHeight = measure.Twips((string?)footer.Attribute(Fo + "min-height")) ?? page.Footer.MinimumHeight;
+            page.Footer.MinimumHeight = Content(footer, page.Footer);
         }
+    }
+
+    private Twip Content(XElement properties, HeaderFooterContent region)
+    {
+        if (measure.Twips((string?)properties.Attribute(Fo + "min-height")) is not { } height) return region.MinimumHeight;
+        if ((string?)properties.Attribute(Style + "dynamic-spacing") != "true") return new Twip(Math.Max(0, height.Value - region.Spacing.Value));
+        region.Spacing = Twip.Zero;
+        return height;
     }
 
     private Twip Margin(XElement properties, string name) =>

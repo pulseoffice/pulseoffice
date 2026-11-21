@@ -22,6 +22,21 @@ public sealed class NoteFlowTests
     }
 
     [Fact]
+    public void The_citation_in_the_footnote_area_is_superscript()
+    {
+        var f = new LayoutFixture(width: 200, height: 60);
+        Note(f, f.Add("riga"), "n1");
+
+        var line = f.Layout().Pages[0].Footnotes!.Lines.Single();
+        var label = line.Line.Runs.Single(run => run.Kind == GlyphRunKind.Label);
+        var text = line.Line.Runs.First(run => run.Kind == GlyphRunKind.Text);
+
+        Assert.Equal("1", label.Text);
+        Assert.True(label.BaselineShift > 0);
+        Assert.True(label.Font.Size < text.Font.Size);
+    }
+
+    [Fact]
     public void ConLeColonneDiPaginaLaNotaStaSottoLaSuaColonna()
     {
         var f = new LayoutFixture(width: 210, height: 120);

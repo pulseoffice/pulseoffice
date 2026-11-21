@@ -11,6 +11,8 @@ public sealed record ShapedLabel(string Text, FontKey Font, FontMetrics Metrics,
 
     public bool FollowedByTab { get; init; } = true;
 
+    public double Shift { get; init; }
+
     public PulseOffice.Text.Rich.ListBulletPicture? Picture { get; init; }
 }
 

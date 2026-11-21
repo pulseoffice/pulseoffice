@@ -266,7 +266,7 @@ public sealed class FlowBuilder(IBlockTree tree, IParagraphEntries entries, ILis
         if (context.Labels.TryGetValue(block.Id, out var label))
         {
             var effective = entries.Effective(document.Styles, block, content);
-            list = new ListPlacement(label, 0, effective.Indent ?? 0) { FollowedByTab = false };
+            list = new ListPlacement(label, 0, effective.Indent ?? 0) { FollowedByTab = false, Superscript = true };
         }
         if (block.Marks.Count == 0 && document.Objects.All.Count == 0 && marked is null)
         {

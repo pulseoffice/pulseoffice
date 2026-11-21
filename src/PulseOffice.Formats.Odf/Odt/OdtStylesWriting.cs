@@ -174,7 +174,7 @@ internal sealed class OdtStylesWriter(
 
     private XElement Spacing(HeaderFooterContent region, string side) =>
         new(Style + "header-footer-properties",
-            new XAttribute(Fo + "min-height", measure.Length(region.MinimumHeight)),
+            new XAttribute(Fo + "min-height", measure.Length(region.MinimumHeight + region.Spacing)),
             new XAttribute(Fo + side, measure.Length(region.Spacing)));
 
     private XElement? TextProperties(CharacterProperties character, ParagraphProperties paragraph, OdtWriteSession session)

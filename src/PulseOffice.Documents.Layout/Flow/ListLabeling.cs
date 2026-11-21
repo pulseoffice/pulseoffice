@@ -13,7 +13,9 @@ public sealed record ListPlacement(string Label, double ExtraMargin, double Labe
 
     public ListNumberAlignment Alignment { get; init; }
 
-    public string Key => (Alignment == ListNumberAlignment.Left ? string.Empty : "\uFFFD" + Alignment) + (Picture is null ? Label : Label + "\uFFFC" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Picture).ToString(CultureInfo.InvariantCulture));
+    public bool Superscript { get; init; }
+
+    public string Key => (Superscript ? "\uFFFDsup" : string.Empty) + (Alignment == ListNumberAlignment.Left ? string.Empty : "\uFFFD" + Alignment) + (Picture is null ? Label : Label + "\uFFFC" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Picture).ToString(CultureInfo.InvariantCulture));
 }
 
 public interface INumberFormatter

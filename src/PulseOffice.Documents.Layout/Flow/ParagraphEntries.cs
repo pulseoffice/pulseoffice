@@ -63,7 +63,7 @@ public sealed class ParagraphEntries(
         var (_, effective, font) = Resolve(document.Styles, block, request.Content, request.Variant);
         var list = request.List;
         var language = effective.Runs.Select(run => run.Language).FirstOrDefault(value => value is not null) ?? options.DefaultLanguage ?? document.Language;
-        var placement = list is null || (list.Label.Length == 0 && list.Picture is null) ? null : new ListLabelPlacement(list.Label, list.LabelPosition) { FollowedByTab = list.FollowedByTab, Picture = list.Picture, Alignment = list.Alignment };
+        var placement = list is null || (list.Label.Length == 0 && list.Picture is null) ? null : new ListLabelPlacement(list.Label, list.LabelPosition) { FollowedByTab = list.FollowedByTab, Picture = list.Picture, Alignment = list.Alignment, Superscript = list.Superscript };
         var shaped = inliner.Insert(shaper.Shape(new ShapingRequest(effective, font, placement, settings.Hyphenation(block, effective), language)), request.Inlines);
         var decoration = Decoration(effective);
         var mirrored = effective.Direction == PulseOffice.Text.Rich.Bidi.TextDirection.RightToLeft;

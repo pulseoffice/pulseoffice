@@ -185,6 +185,13 @@ the round that fixes it is joined and the join run is green.
 - Images (287): compressing all pictures and the Size dialog lock checkbox are tested at service and format level, not
   through a headless walk of the three modules' commands. (287)
 
+- Folio rendering of the complex DOCX/ODT report (after the footnote citation and ODT header height fixes): the DOCX
+  path draws the text of a vertically merged first-column cell outside the table's left edge (R1 at 55 pt with the
+  table at 72 pt); ODT tables start at 72.25 pt and their rows sit about 1 pt lower than DOCX; a landscape ODT page
+  reports two column areas though it is single-column; legal-article list labels are drawn glued to their text
+  ("Art. 1Definizioni") in both formats; after reading a dynamic-spacing ODT header, the spacing/height split is not
+  kept on the next save. (Folio render diff)
+
 ## Shell and formats
 - The Windows path of the private file spool has not run on a real Windows. (192)
 - Shell (314): the notification history is application-wide by decision. (314)

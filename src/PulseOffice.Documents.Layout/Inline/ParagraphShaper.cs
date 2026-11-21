@@ -14,6 +14,8 @@ public sealed record ListLabelPlacement(string Text, double Position)
     public PulseOffice.Text.Rich.ListBulletPicture? Picture { get; init; }
 
     public PulseOffice.Documents.Styles.ListNumberAlignment Alignment { get; init; }
+
+    public bool Superscript { get; init; }
 }
 
 public interface IParagraphShaper
@@ -140,10 +142,24 @@ public sealed class ParagraphShaper(ITextMeasurer measurer, IRunFonts fonts, IHy
         {
             runs.Add(new ShapedRun(first, fallbackFont, 0, measurer.Metrics(fallbackFont), 0, 0, measurer.Advances(fallbackFont, "-")[0]));
         }
-        var label = request.Label is null ? null : Label(request.Label, runs[0].Font with { Size = runs[0].Style.FontSize ?? fallbackFont.Size });
+        var label = request.Label is null ? null : request.Label.Superscript && request.Label.Picture is null
+            ? Raised(request.Label, runs[0].Style with { Baseline = TextBaseline.Superscript, FontSize = runs[0].Style.FontSize ?? fallbackFont.Size }, runs[0].Font.Family)
+            : Label(request.Label, runs[0].Font with { Size = runs[0].Style.FontSize ?? fallbackFont.Size });
         var points = request.Hyphenation is { Enabled: true } rules ? limits.Apply(text, hyphenation.Find(text, request.Language), rules) : new HashSet<int>();
         var drop = request.Paragraph.DropCap is { IsActive: true } cap ? drops.Shape(cap, text, advances, runs[0]) : null;
         return new ShapedParagraph(text, advances, runOf, runs, measurer.Metrics(fallbackFont), label, points) { Drop = drop, Direction = request.Paragraph.Direction };
+    }
+
+    private ShapedLabel Raised(ListLabelPlacement placement, TextRun style, string family)
+    {
+        var font = fonts.FontOf(style, family);
+        var shift = fonts.ShiftOf(style);
+        var metrics = measurer.Metrics(font);
+        return new ShapedLabel(placement.Text, font, metrics with { Ascent = metrics.Ascent + shift }, measurer.Advances(font, placement.Text), placement.Position)
+        {
+            FollowedByTab = placement.FollowedByTab,
+            Shift = shift,
+        };
     }
 
     private ShapedLabel Label(ListLabelPlacement placement, FontKey font)
